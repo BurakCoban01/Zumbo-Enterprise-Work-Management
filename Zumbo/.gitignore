@@ -1,0 +1,42 @@
+# .NET
+**/bin/
+**/obj/
+**/TestResults/
+*.user
+*.suo
+
+# Frontend/package output
+**/node_modules/
+**/dist/
+**/coverage/
+**/.playwright/
+artifacts/ui/playwright/
+Frontend/test-results/
+pnpm-debug.log*
+npm-debug.log*
+
+# Local runtime data and secrets
+.env
+.env.*
+!.env.example
+storage/
+Backend/storage/
+**/DataProtection-Keys/
+*.pfx
+*.key
+
+# IDE/OS
+.vs/
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Generated performance datasets
+artifacts/performance/data/
+
+# Runtime logs (may contain runtime/request data)
+.runlogs/
+*.log
+*.out
+*.err
