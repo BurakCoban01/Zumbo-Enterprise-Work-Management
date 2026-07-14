@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
+    <PackageReference Include="MessagePack" />
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
+    <PackageReference Include="Microsoft.AspNetCore.SignalR.StackExchangeRedis" />
+    <PackageReference Include="Swashbuckle.AspNetCore" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Zumbo.SharedKernel\Zumbo.SharedKernel.csproj" />
+    <ProjectReference Include="..\Zumbo.BuildingBlocks.Infrastructure\Zumbo.BuildingBlocks.Infrastructure.csproj" />
+    <ProjectReference Include="..\Zumbo.Modules.Identity\Zumbo.Modules.Identity.csproj" />
+    <ProjectReference Include="..\Zumbo.Modules.Teams\Zumbo.Modules.Teams.csproj" />
+    <ProjectReference Include="..\Zumbo.Modules.Projects\Zumbo.Modules.Projects.csproj" />
+    <ProjectReference Include="..\Zumbo.Modules.Boards\Zumbo.Modules.Boards.csproj" />
+    <ProjectReference Include="..\Zumbo.Modules.WorkItems\Zumbo.Modules.WorkItems.csproj" />
+    <ProjectReference Include="..\Zumbo.Modules.Notifications\Zumbo.Modules.Notifications.csproj" />
+    <ProjectReference Include="..\Zumbo.Modules.Audit\Zumbo.Modules.Audit.csproj" />
+    <ProjectReference Include="..\Zumbo.Modules.Organizations\Zumbo.Modules.Organizations.csproj" />
+    <ProjectReference Include="..\Zumbo.Modules.Workflows\Zumbo.Modules.Workflows.csproj" />
+  </ItemGroup>
+
+</Project>
