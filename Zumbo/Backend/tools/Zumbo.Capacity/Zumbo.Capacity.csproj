@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="MongoDB.Driver" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Zumbo.BuildingBlocks.Infrastructure\Zumbo.BuildingBlocks.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\Zumbo.Modules.Audit\Zumbo.Modules.Audit.csproj" />
+    <ProjectReference Include="..\..\src\Zumbo.Modules.Boards\Zumbo.Modules.Boards.csproj" />
+    <ProjectReference Include="..\..\src\Zumbo.Modules.Identity\Zumbo.Modules.Identity.csproj" />
+    <ProjectReference Include="..\..\src\Zumbo.Modules.Organizations\Zumbo.Modules.Organizations.csproj" />
+    <ProjectReference Include="..\..\src\Zumbo.Modules.Projects\Zumbo.Modules.Projects.csproj" />
+    <ProjectReference Include="..\..\src\Zumbo.Modules.WorkItems\Zumbo.Modules.WorkItems.csproj" />
+  </ItemGroup>
+</Project>

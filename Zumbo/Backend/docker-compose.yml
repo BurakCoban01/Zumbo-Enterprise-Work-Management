@@ -1,0 +1,158 @@
+services:
+  api:
+    image: backend-api
+    build:
+      context: .
+      dockerfile: src/Zumbo.Api/Dockerfile
+    environment:
+      ASPNETCORE_URLS: http://+:8080
+      Persistence__Provider: Mongo
+      MongoDb__ConnectionString: mongodb://mongo:27017
+      MongoDb__DatabaseName: Zumbo
+      Jwt__SigningKey: ${ZUMBO_JWT_SIGNING_KEY:?ZUMBO_JWT_SIGNING_KEY must be set in Backend/.env}
+      IdentityBootstrap__AdminEmails__0: ${ZUMBO_IDENTITY_ADMIN_EMAIL:-}
+      IdentityBootstrap__BootstrapToken: ${ZUMBO_IDENTITY_BOOTSTRAP_TOKEN:-}
+      RateLimiting__ApiPermitLimit: 1000
+      Cors__AllowedOrigins__0: http://localhost:5177
+      Cors__AllowedOrigins__1: http://127.0.0.1:5177
+      PasswordReset__FrontendResetUrl: http://localhost:5177/#/reset-password
+      Storage__Provider: Minio
+      Storage__Minio__Endpoint: http://minio:9000
+      Storage__Minio__AccessKey: ${ZUMBO_MINIO_ROOT_USER:?ZUMBO_MINIO_ROOT_USER must be set in Backend/.env}
+      Storage__Minio__SecretKey: ${ZUMBO_MINIO_ROOT_PASSWORD:?ZUMBO_MINIO_ROOT_PASSWORD must be set in Backend/.env}
+      Storage__Minio__BucketName: zumbo-attachments
+      Storage__Minio__PublicBaseUrl: http://localhost:9000/zumbo-attachments
+      Search__Provider: OpenSearch
+      Search__OpenSearch__BaseUrl: http://opensearch:9200
+      Search__OpenSearch__IndexName: zumbo-work-items
+      Search__OpenSearch__NumberOfReplicas: 0
+      DistributedLock__Provider: Redis
+      DistributedLock__Redis__ConnectionString: redis:6379,abortConnect=false
+      Realtime__Backplane: Redis
+      Realtime__Redis__ConnectionString: redis:6379,abortConnect=false
+      ReadModelCache__Provider: Redis
+      ReadModelCache__TtlSeconds: 30
+      ReadModelCache__KeyPrefix: "zumbo:read-model:"
+      Runtime__Role: Api
+      BackgroundJobs__Enabled: false
+      DataProtection__KeyPath: /var/lib/zumbo/data-protection
+    ports:
+      - "5088:8080"
+    volumes:
+      - data_protection_keys:/var/lib/zumbo/data-protection
+    depends_on:
+      mongo:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      opensearch:
+        condition: service_healthy
+    restart: unless-stopped
+
+  worker:
+    image: backend-api
+    environment:
+      ASPNETCORE_URLS: http://+:8080
+      Persistence__Provider: Mongo
+      MongoDb__ConnectionString: mongodb://mongo:27017
+      MongoDb__DatabaseName: Zumbo
+      Jwt__SigningKey: ${ZUMBO_JWT_SIGNING_KEY:?ZUMBO_JWT_SIGNING_KEY must be set in Backend/.env}
+      IdentityBootstrap__AdminEmails__0: ${ZUMBO_IDENTITY_ADMIN_EMAIL:-}
+      IdentityBootstrap__BootstrapToken: ${ZUMBO_IDENTITY_BOOTSTRAP_TOKEN:-}
+      Storage__Provider: Minio
+      Storage__Minio__Endpoint: http://minio:9000
+      Storage__Minio__AccessKey: ${ZUMBO_MINIO_ROOT_USER:?ZUMBO_MINIO_ROOT_USER must be set in Backend/.env}
+      Storage__Minio__SecretKey: ${ZUMBO_MINIO_ROOT_PASSWORD:?ZUMBO_MINIO_ROOT_PASSWORD must be set in Backend/.env}
+      Storage__Minio__BucketName: zumbo-attachments
+      Storage__Minio__PublicBaseUrl: http://localhost:9000/zumbo-attachments
+      Search__Provider: OpenSearch
+      Search__OpenSearch__BaseUrl: http://opensearch:9200
+      Search__OpenSearch__IndexName: zumbo-work-items
+      Search__OpenSearch__NumberOfReplicas: 0
+      DistributedLock__Provider: Redis
+      DistributedLock__Redis__ConnectionString: redis:6379,abortConnect=false
+      Realtime__Backplane: Redis
+      Realtime__Redis__ConnectionString: redis:6379,abortConnect=false
+      ReadModelCache__Provider: Redis
+      ReadModelCache__TtlSeconds: 30
+      ReadModelCache__KeyPrefix: "zumbo:read-model:"
+      Runtime__Role: Worker
+      BackgroundJobs__Enabled: true
+      DataProtection__KeyPath: /var/lib/zumbo/data-protection
+    volumes:
+      - data_protection_keys:/var/lib/zumbo/data-protection
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
+  mongo:
+    image: mongo:7
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "quit(db.adminCommand('ping').ok ? 0 : 2)"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${ZUMBO_MINIO_ROOT_USER:?ZUMBO_MINIO_ROOT_USER must be set in Backend/.env}
+      MINIO_ROOT_PASSWORD: ${ZUMBO_MINIO_ROOT_PASSWORD:?ZUMBO_MINIO_ROOT_PASSWORD must be set in Backend/.env}
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+
+  opensearch:
+    image: opensearchproject/opensearch:2
+    environment:
+      discovery.type: single-node
+      DISABLE_INSTALL_DEMO_CONFIG: "true"
+      DISABLE_SECURITY_PLUGIN: "true"
+      OPENSEARCH_JAVA_OPTS: "-Xms512m -Xmx512m"
+    ports:
+      - "9200:9200"
+    volumes:
+      - opensearch_data:/usr/share/opensearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:9200/_cluster/health | grep -q '\"status\"'"]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 45s
+    restart: unless-stopped
+
+volumes:
+  mongo_data:
+  minio_data:
+  opensearch_data:
+  data_protection_keys:
