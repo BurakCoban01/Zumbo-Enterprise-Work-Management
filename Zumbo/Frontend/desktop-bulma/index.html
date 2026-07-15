@@ -1,0 +1,785 @@
+<!doctype html>
+<html ng-app="zumboDesktop">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#173f46">
+  <title>Zumbo Desktop</title>
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" href="../shared/zumbo-mark.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@1.0.2/css/bulma.min.css" integrity="sha384-tl5h4XuWmVzPeVWU0x8bx0j/5iMwCBduLEgZ+2lH4Wjda+4+q3mpCww74dgAB3OX" crossorigin="anonymous">
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body ng-cloak ng-controller="WorkspaceController as vm" ng-class="{'theme-dark': vm.theme === 'dark', 'nav-collapsed': vm.navCollapsed, 'density-compact': vm.density === 'compact'}">
+  <a class="skip-link" href="#main-workspace">Ana içeriğe geç</a>
+  <section class="desktop-login" ng-if="!vm.session.currentUser">
+    <div class="desktop-login-panel">
+      <div class="brand">
+        <img src="../shared/zumbo-mark.svg" alt="Zumbo">
+        <strong>Zumbo</strong>
+      </div>
+      <form ng-submit="vm.login()">
+        <div class="field">
+          <label class="label">Kullanıcı</label>
+          <input class="input" ng-model="vm.loginForm.usernameOrEmail" autocomplete="username" required>
+        </div>
+        <div class="field">
+          <label class="label">Parola</label>
+          <input class="input" type="password" ng-model="vm.loginForm.password" autocomplete="current-password" required>
+        </div>
+        <div class="field" ng-if="vm.mfaRequired">
+          <label class="label">Doğrulama kodu</label>
+          <input class="input" ng-model="vm.loginForm.mfaCode" inputmode="numeric" autocomplete="one-time-code" maxlength="16" required>
+        </div>
+        <button class="button is-primary is-fullwidth" type="submit">Giriş yap</button>
+        <button class="button is-light is-fullwidth" type="button" ng-click="vm.seed()">Demo çalışma alanı oluştur</button>
+        <p class="login-error" ng-if="vm.loginError">{{vm.loginError}}</p>
+      </form>
+    </div>
+  </section>
+
+  <aside class="side-nav" ng-if="vm.session.currentUser">
+    <div class="brand nav-brand">
+      <img src="../shared/zumbo-mark.svg" alt="Zumbo">
+      <strong class="nav-label">Zumbo</strong>
+      <button class="icon-button nav-collapse" ng-click="vm.toggleNav()" aria-label="Navigasyonu daralt" title="Navigasyonu daralt">
+        <i data-lucide="panel-left-close" lucide-icon></i>
+      </button>
+    </div>
+    <div class="context-selectors nav-label">
+      <label>Organizasyon</label>
+      <select aria-label="Organizasyon"><option>{{vm.session.currentUser.organizationId}}</option></select>
+      <label>Proje</label>
+      <select ng-model="vm.project" ng-options="project as project.name for project in vm.projects track by project.id" ng-change="vm.selectProject(vm.project)" aria-label="Proje"></select>
+    </div>
+    <nav aria-label="Ana navigasyon">
+      <button class="nav-item" ng-class="{active: vm.activeSection === 'board'}" ng-click="vm.showSection('board')" title="Pano"><i data-lucide="kanban" lucide-icon></i><span class="nav-label">Pano</span></button>
+      <button class="nav-item" ng-class="{active: vm.activeSection === 'projects'}" ng-click="vm.showSection('projects')" title="Projeler"><i data-lucide="folder-kanban" lucide-icon></i><span class="nav-label">Projeler</span></button>
+      <button class="nav-item" ng-class="{active: vm.activeSection === 'teams'}" ng-click="vm.showSection('teams')" title="Ekipler"><i data-lucide="users-round" lucide-icon></i><span class="nav-label">Ekipler</span></button>
+      <button class="nav-item" ng-class="{active: vm.activeSection === 'reports'}" ng-click="vm.showSection('reports')" title="Raporlar"><i data-lucide="chart-no-axes-combined" lucide-icon></i><span class="nav-label">Raporlar</span></button>
+      <button class="nav-item" ng-class="{active: vm.activeSection === 'audit'}" ng-click="vm.showSection('audit')" title="Denetim"><i data-lucide="scroll-text" lucide-icon></i><span class="nav-label">Denetim</span></button>
+      <button class="nav-item" ng-class="{active: vm.activeSection === 'archive'}" ng-click="vm.showSection('archive')" title="Arşiv"><i data-lucide="archive-restore" lucide-icon></i><span class="nav-label">Arşiv</span></button>
+      <button class="nav-item" ng-class="{active: vm.activeSection === 'settings'}" ng-click="vm.showSection('settings')" title="Ayarlar"><i data-lucide="settings" lucide-icon></i><span class="nav-label">Ayarlar</span></button>
+    </nav>
+    <div class="nav-secondary nav-label" ng-if="vm.favoriteProjects.length">
+      <span>Favoriler</span>
+      <button ng-repeat="favorite in vm.favoriteProjects | limitTo:3" ng-click="vm.selectProject(favorite)">{{favorite.name}}</button>
+    </div>
+    <div class="nav-secondary nav-label">
+      <span>Son kullanılan</span>
+      <button ng-repeat="recent in vm.recentProjects | limitTo:3" ng-click="vm.selectProject(recent)">{{recent.name}}</button>
+    </div>
+    <div class="side-footer">
+      <span class="nav-label">{{vm.session.currentUser.username || 'Oturum yok'}}</span>
+      <button class="icon-button" ng-click="vm.logout()" aria-label="Çıkış" title="Çıkış"><i data-lucide="log-out" lucide-icon></i></button>
+    </div>
+  </aside>
+
+  <main id="main-workspace" class="workspace" ng-if="vm.session.currentUser" tabindex="-1">
+    <header class="topbar">
+      <div class="title-context">
+        <nav class="breadcrumbs" aria-label="İçerik yolu">
+          <button ng-click="vm.showSection('projects')">{{vm.session.currentUser.organizationId}}</button><span>/</span>
+          <button ng-click="vm.showSection('board')">{{vm.project.name || 'Projeler'}}</button><span>/</span>
+          <strong>{{vm.selectedTask ? vm.selectedTask.title : (vm.activeSection === 'board' ? 'Pano' : vm.activeSection)}}</strong>
+        </nav>
+        <h1>{{vm.project.name || 'Zumbo Platform'}}</h1>
+      </div>
+      <div class="actions">
+        <button class="command-trigger" ng-click="vm.openCommandPalette()"><i data-lucide="search" lucide-icon></i><span>Görev veya komut ara</span><kbd>Ctrl K</kbd></button>
+        <button class="icon-button" ng-click="vm.toggleFavoriteProject(vm.project)" ng-class="{active: vm.isFavoriteProject(vm.project)}" aria-label="Projeyi favorilere ekle veya çıkar" title="Projeyi favorilere ekle veya çıkar"><i data-lucide="star" lucide-icon></i></button>
+        <button class="icon-button" ng-click="vm.toggleTheme()" aria-label="Temayı değiştir" title="Temayı değiştir"><i data-lucide="sun-moon" lucide-icon></i></button>
+        <button class="icon-button notification-button" ng-click="vm.notificationsOpen = !vm.notificationsOpen" aria-label="Bildirimler" title="Bildirimler"><i data-lucide="bell" lucide-icon></i><span ng-if="vm.unreadCount">{{vm.unreadCount}}</span></button>
+        <div class="create-context">
+          <button class="button is-primary create-button" ng-click="vm.createMenuOpen = !vm.createMenuOpen" aria-haspopup="menu"><i data-lucide="plus" lucide-icon></i><span>Oluştur</span></button>
+          <div class="create-menu" ng-if="vm.createMenuOpen" role="menu">
+            <button ng-if="vm.board" ng-click="vm.openEntityCreator('task')"><i data-lucide="circle-check-big" lucide-icon></i><span>Görev</span></button>
+            <button ng-click="vm.openEntityCreator('project')"><i data-lucide="folder-plus" lucide-icon></i><span>Proje</span></button>
+            <button ng-click="vm.openEntityCreator('team')"><i data-lucide="users-round" lucide-icon></i><span>Ekip</span></button>
+            <button ng-if="vm.canManageProject" ng-click="vm.openEntityCreator('board')"><i data-lucide="panel-top-open" lucide-icon></i><span>Pano</span></button>
+          </div>
+        </div>
+        <button class="icon-button" ng-click="vm.userMenuOpen = !vm.userMenuOpen" aria-label="Kullanıcı menüsü" title="Kullanıcı menüsü"><i data-lucide="circle-user-round" lucide-icon></i></button>
+      </div>
+      <div class="notification-popover" ng-if="vm.notificationsOpen">
+        <div class="popover-heading"><strong>Bildirimler</strong><span>{{vm.unreadCount}} okunmamış</span></div>
+        <button ng-repeat="notification in vm.notifications | limitTo:6" ng-click="vm.readNotification(notification)" ng-class="{unread: !notification.read}"><strong>{{notification.type}}</strong><span>{{notification.message}}</span></button>
+        <p ng-if="!vm.notifications.length">Yeni bildirim yok.</p>
+      </div>
+      <div class="user-popover" ng-if="vm.userMenuOpen">
+        <strong>{{vm.session.currentUser.username}}</strong>
+        <span>{{vm.session.currentUser.email}}</span>
+        <small>{{vm.session.currentUser.organizationId}}</small>
+        <button ng-click="vm.userMenuOpen = false; vm.showSection('settings')"><i data-lucide="settings" lucide-icon></i><span>Hesap ayarları</span></button>
+        <button ng-click="vm.toggleTheme()"><i data-lucide="sun-moon" lucide-icon></i><span>Temayı değiştir</span></button>
+        <button ng-click="vm.logout()"><i data-lucide="log-out" lucide-icon></i><span>Çıkış yap</span></button>
+      </div>
+    </header>
+
+    <div class="toast" ng-if="vm.feedback" ng-class="vm.feedback.kind" role="status" aria-live="polite">
+      <i data-lucide="{{vm.feedback.kind === 'success' ? 'circle-check' : 'triangle-alert'}}" lucide-icon></i>
+      <span>{{vm.feedback.message}}</span>
+      <button class="delete is-small" ng-click="vm.feedback = null" aria-label="Bildirimi kapat"></button>
+    </div>
+
+    <section class="summary-strip">
+      <div>
+        <span>Toplam</span>
+        <strong>{{vm.summary.total || 0}}</strong>
+      </div>
+      <div>
+        <span>Aktif</span>
+        <strong>{{vm.summary.inProgress || 0}}</strong>
+      </div>
+      <div>
+        <span>Tamamlanan</span>
+        <strong>{{vm.summary.done || 0}}</strong>
+      </div>
+      <div>
+        <span>Geciken</span>
+        <strong>{{vm.summary.overdue || 0}}</strong>
+      </div>
+    </section>
+
+    <section class="insight-grid" ng-if="vm.project && vm.activeSection === 'reports'">
+      <div class="insight-panel">
+        <div class="panel-heading">
+          <span>Durum dağılımı</span>
+          <strong>{{vm.statusDistribution.length || 0}}</strong>
+        </div>
+        <p ng-repeat="item in vm.statusDistribution">
+          <span>{{item.status}}</span>
+          <strong>{{item.count}}</strong>
+        </p>
+      </div>
+      <div class="insight-panel">
+        <div class="panel-heading">
+          <span>Kullanıcı yükü</span>
+          <strong>{{vm.workload.length || 0}}</strong>
+        </div>
+        <p ng-repeat="user in vm.workload">
+          <span>{{user.userId}}</span>
+          <strong>{{user.openItems}} açık / {{user.loggedHours}} sa</strong>
+        </p>
+      </div>
+      <div class="insight-panel">
+        <div class="panel-heading">
+          <span>Yakın riskler</span>
+          <strong>{{vm.dueDateRisks.length || 0}}</strong>
+        </div>
+        <p ng-repeat="risk in vm.dueDateRisks">
+          <span>{{risk.title}}</span>
+          <strong>{{risk.status}}</strong>
+        </p>
+      </div>
+      <div class="insight-panel">
+        <div class="panel-heading">
+          <span>Sprint velocity</span>
+          <strong>{{vm.velocity.length || 0}}</strong>
+        </div>
+        <p ng-repeat="item in vm.velocity">
+          <span>{{item.sprintId}}</span>
+          <strong>{{item.completedPoints}} puan / {{item.completedItems}} iş</strong>
+        </p>
+      </div>
+      <div class="insight-panel">
+        <div class="panel-heading">
+          <span>Sprint burndown</span>
+          <strong>{{vm.burndown.length || 0}}</strong>
+        </div>
+        <p ng-repeat="point in vm.burndown | limitTo:-3">
+          <span>{{point.date}}</span>
+          <strong>{{point.remainingPoints}} puan</strong>
+        </p>
+      </div>
+      <div class="insight-panel">
+        <div class="panel-heading">
+          <span>Workflow</span>
+          <strong>{{vm.workflow.transitions.length || 0}}</strong>
+        </div>
+        <p ng-repeat="transition in vm.workflow.transitions">
+          <span>{{transition.fromStatus}} -> {{transition.toStatus}}</span>
+          <strong ng-if="transition.requiresAssignee">Atanan</strong>
+          <strong ng-if="transition.requiresCompletedChecklist">Checklist</strong>
+        </p>
+      </div>
+    </section>
+
+    <section class="board-tools" ng-if="vm.board && vm.activeSection === 'board'">
+      <div class="field-group search-field">
+        <label for="board-search">Arama</label>
+        <input id="board-search" class="input is-small" ng-model="vm.search" ng-change="vm.loadTasks()" placeholder="Başlık, açıklama veya etiket">
+      </div>
+      <div class="field-group">
+        <label for="saved-view">Görünüm</label>
+        <div class="select is-small">
+          <select id="saved-view" ng-model="vm.activeViewId" ng-change="vm.selectView()">
+            <option value="">Varsayılan</option>
+            <option ng-repeat="view in vm.board.views" value="{{view.id}}">{{view.name}}{{view.isShared ? ' · paylaşılan' : ''}}</option>
+          </select>
+        </div>
+      </div>
+      <div class="field-group">
+        <label for="swimlane-mode">Swimlane</label>
+        <div class="select is-small">
+          <select id="swimlane-mode" ng-model="vm.swimlaneMode" ng-change="vm.updateSwimlane()">
+            <option>None</option>
+            <option>Assignee</option>
+            <option>Priority</option>
+            <option>Team</option>
+            <option>Epic</option>
+          </select>
+        </div>
+      </div>
+      <div class="field-group">
+        <label for="priority-filter">Öncelik</label>
+        <div class="select is-small">
+          <select id="priority-filter" ng-model="vm.priorityFilter" ng-change="vm.refreshBoardModel()">
+            <option value="">Tümü</option>
+            <option>High</option>
+            <option>Medium</option>
+            <option>Low</option>
+          </select>
+        </div>
+      </div>
+      <div class="save-view">
+        <input class="input is-small" ng-model="vm.viewDraftName" maxlength="80" placeholder="Görünüm adı">
+        <button class="button is-small" ng-disabled="!vm.viewDraftName" ng-click="vm.saveCurrentView()">Kaydet</button>
+        <button class="icon-button" ng-if="vm.activeView" ng-click="vm.deleteCurrentView()" aria-label="Kayıtlı görünümü sil" title="Kayıtlı görünümü sil"><i data-lucide="trash-2" lucide-icon></i></button>
+      </div>
+      <div class="density-control" role="group" aria-label="Kart yoğunluğu">
+        <button ng-class="{active: vm.density === 'comfortable'}" ng-click="vm.setDensity('comfortable')" aria-label="Rahat görünüm" title="Rahat görünüm"><i data-lucide="rows-3" lucide-icon></i></button>
+        <button ng-class="{active: vm.density === 'compact'}" ng-click="vm.setDensity('compact')" aria-label="Sıkı görünüm" title="Sıkı görünüm"><i data-lucide="list" lucide-icon></i></button>
+      </div>
+      <div class="card-config">
+        <button class="icon-button" ng-click="vm.cardConfigOpen = !vm.cardConfigOpen" aria-label="Kart alanlarını yapılandır" title="Kart alanlarını yapılandır"><i data-lucide="settings-2" lucide-icon></i></button>
+        <div class="card-config-menu" ng-if="vm.cardConfigOpen">
+          <strong>Kart alanları</strong>
+          <label><input type="checkbox" ng-model="vm.cardFields.type" ng-change="vm.saveCardFields()"> Tür</label>
+          <label><input type="checkbox" ng-model="vm.cardFields.priority" ng-change="vm.saveCardFields()"> Öncelik</label>
+          <label><input type="checkbox" ng-model="vm.cardFields.assignee" ng-change="vm.saveCardFields()"> Atanan</label>
+          <label><input type="checkbox" ng-model="vm.cardFields.dueDate" ng-change="vm.saveCardFields()"> Bitiş tarihi</label>
+          <label><input type="checkbox" ng-model="vm.cardFields.labels" ng-change="vm.saveCardFields()"> Etiketler</label>
+        </div>
+      </div>
+    </section>
+
+    <section class="bulk-toolbar" ng-if="vm.selectedIds().length">
+      <strong>{{vm.selectedIds().length}} görev seçildi</strong>
+      <button class="button is-small" ng-click="vm.bulkMove('In Progress')"><i data-lucide="arrow-right" lucide-icon></i><span>Devam ediyor</span></button>
+      <button class="button is-small" ng-click="vm.bulkAssignToMe()"><i data-lucide="user-check" lucide-icon></i><span>Bana ata</span></button>
+      <button class="button is-small is-danger is-light" ng-click="vm.bulkArchive()"><i data-lucide="archive" lucide-icon></i><span>Arşivle</span></button>
+      <button class="icon-button" ng-click="vm.clearSelection()" aria-label="Seçimi temizle" title="Seçimi temizle"><i data-lucide="x" lucide-icon></i></button>
+    </section>
+
+    <div class="status-banner error" ng-if="vm.loadError"><i data-lucide="triangle-alert" lucide-icon></i><span>{{vm.loadError}}</span><button ng-click="vm.loadTasks()">Yeniden dene</button></div>
+    <div class="board-skeleton" ng-if="vm.loading" aria-label="Pano yükleniyor"><span></span><span></span><span></span><span></span></div>
+    <div class="board-empty" ng-if="!vm.loading && !vm.loadError && vm.board && !vm.tasks.length"><i data-lucide="inbox" lucide-icon></i><strong>Bu görünümde görev yok</strong><button class="button is-small" ng-click="vm.openEntityCreator('task')">Görev oluştur</button></div>
+
+    <section class="board-shell" ng-if="vm.board && vm.activeSection === 'board' && !vm.loading && !vm.loadError && vm.tasks.length">
+      <div class="swimlane-row" ng-repeat="row in vm.boardRows">
+        <div class="swimlane-title" ng-if="vm.swimlaneMode !== 'None' || vm.activeView">{{row.label}}</div>
+        <div class="board">
+          <div class="column-lane" ng-repeat="column in row.columns" drop-lane="vm.dropTask(taskId, column)" ng-class="{collapsed: column.collapsed, 'at-wip-limit': column.atWipLimit}">
+            <div class="lane-title">
+              <strong>{{column.name}}</strong>
+              <span class="wip-count" ng-if="column.wipLimit">{{column.count}} / {{column.wipLimit}}</span>
+              <span class="lane-count" ng-if="!column.wipLimit">{{column.count}}</span>
+              <button class="lane-collapse" ng-click="$event.stopPropagation(); vm.toggleColumn(column)" aria-label="{{column.collapsed ? 'Kolonu genişlet' : 'Kolonu daralt'}}" title="{{column.collapsed ? 'Kolonu genişlet' : 'Kolonu daralt'}}"><i data-lucide="{{column.collapsed ? 'panel-right-open' : 'panel-right-close'}}" lucide-icon></i></button>
+            </div>
+            <div class="lane-content" ng-if="!column.collapsed">
+            <article class="task" ng-repeat="task in column.tasks track by task.id" data-work-item-id="{{task.id}}" data-project-id="{{task.projectId}}" ng-click="vm.selectTask(task)" draggable-task="task.id" drop-task-before="vm.dropTaskBefore(taskId, task)" tabindex="0" ng-keydown="vm.handleTaskKey($event, task)" ng-class="{selected: vm.selectedTaskIds[task.id], pending: vm.pendingTaskIds[task.id]}">
+              <div class="task-topline">
+                <label class="task-select" ng-click="$event.stopPropagation()"><input type="checkbox" ng-checked="vm.selectedTaskIds[task.id]" ng-click="vm.toggleTaskSelection(task.id)"><span class="sr-only">Görevi seç</span></label>
+                <span ng-if="vm.cardFields.type">{{task.type}}</span>
+                <span class="priority" ng-if="vm.cardFields.priority" data-priority="{{task.priority}}">{{task.priority}}</span>
+              </div>
+              <h2>{{task.title}}</h2>
+              <p ng-if="vm.cardFields.assignee && task.assigneeUserId"><i data-lucide="user-round" lucide-icon></i>{{task.assigneeUserId}}</p>
+              <p ng-if="vm.cardFields.dueDate && task.dueDate"><i data-lucide="calendar" lucide-icon></i>{{task.dueDate | date:'dd.MM.yyyy'}}</p>
+              <div class="task-labels" ng-if="vm.cardFields.labels && task.labels.length"><span ng-repeat="label in task.labels | limitTo:3">{{label}}</span></div>
+            </article>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="board-load-more" ng-if="vm.hasMoreTasks">
+        <button class="button is-small" ng-click="vm.loadMoreTasks()" ng-disabled="vm.loading">Daha fazla görev yükle</button>
+      </div>
+    </section>
+
+    <section class="section-view" ng-if="vm.activeSection === 'projects'">
+      <div class="section-heading">
+        <div><p class="eyebrow">Portföy</p><h2>Projeler ve panolar</h2></div>
+        <button class="button is-primary is-small" ng-click="vm.openEntityCreator('project')"><i data-lucide="folder-plus" lucide-icon></i><span>Proje oluştur</span></button>
+      </div>
+      <div class="management-layout">
+        <nav class="entity-list" aria-label="Proje listesi">
+          <button ng-repeat="project in vm.projects track by project.id" data-project-id="{{project.id}}" ng-click="vm.selectProject(project)" ng-class="{active: vm.project.id === project.id}"><strong>{{project.key}}</strong><span>{{project.name}}</span></button>
+          <p class="section-empty" ng-if="!vm.projects.length">Proje bulunamadı.</p>
+        </nav>
+        <div class="entity-detail" ng-if="vm.project">
+          <div class="form-row">
+            <div class="field"><label class="label" for="project-name">Proje adı</label><input id="project-name" class="input" ng-model="vm.projectDraft.name" maxlength="120" ng-disabled="!vm.canManageProject"></div>
+            <div class="field"><label class="label" for="project-visibility">Görünürlük</label><div class="select is-fullwidth"><select id="project-visibility" ng-model="vm.projectDraft.visibility" ng-disabled="!vm.canManageProject"><option>Internal</option><option>Private</option></select></div></div>
+          </div>
+          <div class="detail-actions" ng-if="vm.canManageProject || vm.canArchiveProject">
+            <button class="button is-small is-primary" ng-if="vm.canManageProject" ng-click="vm.saveProject()" ng-disabled="vm.entitySaving || !vm.projectDraft.name"><i data-lucide="save" lucide-icon></i><span>Kaydet</span></button>
+            <button class="button is-small is-danger is-light" ng-if="vm.canArchiveProject" ng-click="vm.archiveProject()" ng-disabled="vm.entitySaving"><i data-lucide="archive" lucide-icon></i><span>Arşivle</span></button>
+          </div>
+          <div class="permission-notice" ng-if="vm.projectMembership && !vm.canManageProject"><i data-lucide="eye" lucide-icon></i><span>{{vm.projectMembership.role}} rolüyle bu proje salt okunur görüntüleniyor.</span></div>
+          <p class="section-empty" ng-if="!vm.projectMembership">Bu organizasyon içi proje görünür; pano ve iş öğelerine erişmek için proje üyeliği gerekir.</p>
+          <div class="project-facts">
+            <div><strong>{{vm.project.members.length}}</strong><span>Üye</span></div>
+            <div><strong>{{(vm.project.teamIds || []).length}}</strong><span>Ekip</span></div>
+            <div><strong>{{vm.boards.length}}</strong><span>Pano</span></div>
+          </div>
+          <div class="detail-subheading" ng-if="vm.projectMembership"><h3>Panolar</h3><button class="icon-button" ng-if="vm.canManageProject" ng-click="vm.openEntityCreator('board')" aria-label="Pano oluştur" title="Pano oluştur"><i data-lucide="plus" lucide-icon></i></button></div>
+          <div class="board-management" ng-if="vm.projectMembership">
+            <button ng-repeat="board in vm.boards track by board.id" ng-click="vm.selectBoard(board)" ng-class="{active: vm.board.id === board.id}"><strong>{{board.name}}</strong><span>{{board.type}}</span></button>
+          </div>
+          <div class="form-row" ng-if="vm.board && vm.canManageProject">
+            <div class="field"><label class="label" for="board-name">Pano adı</label><input id="board-name" class="input" ng-model="vm.boardDraft.name" maxlength="100"></div>
+            <div class="field"><label class="label" for="board-type">Tür</label><div class="select is-fullwidth"><select id="board-type" ng-model="vm.boardDraft.type"><option>Kanban</option><option>Scrum</option></select></div></div>
+          </div>
+          <div class="detail-actions" ng-if="vm.board && vm.canManageProject">
+            <button class="button is-small" ng-click="vm.saveBoard()" ng-disabled="vm.entitySaving"><i data-lucide="save" lucide-icon></i><span>Panoyu kaydet</span></button>
+            <button class="button is-small is-danger is-light" ng-click="vm.archiveBoard()" ng-disabled="vm.entitySaving"><i data-lucide="archive" lucide-icon></i><span>Panoyu arşivle</span></button>
+          </div>
+          <div class="detail-subheading" ng-if="vm.board && vm.canManageProject"><h3>Kolonlar ve WIP limitleri</h3></div>
+          <div class="configuration-list" ng-if="vm.board && vm.canManageProject">
+            <div class="configuration-row" ng-repeat="column in vm.boardColumns track by column.id">
+              <input class="input is-small" ng-model="column.name" aria-label="Kolon adı" ng-disabled="column.category !== 'Custom'">
+              <div class="select is-small"><select ng-model="column.category" aria-label="Kolon kategorisi" ng-disabled="column.category !== 'Custom'"><option>Todo</option><option>InProgress</option><option>Done</option><option>Custom</option></select></div>
+              <input class="input is-small compact-number" type="number" min="1" max="10000" ng-model="column.wipLimit" placeholder="WIP" aria-label="WIP limiti">
+              <div class="row-actions">
+                <button class="icon-button is-small" ng-click="vm.moveBoardColumn(column, -1)" ng-disabled="$first || vm.entitySaving" aria-label="Kolonu sola taşı" title="Kolonu sola taşı"><i data-lucide="arrow-left" lucide-icon></i></button>
+                <button class="icon-button is-small" ng-click="vm.moveBoardColumn(column, 1)" ng-disabled="$last || vm.entitySaving" aria-label="Kolonu sağa taşı" title="Kolonu sağa taşı"><i data-lucide="arrow-right" lucide-icon></i></button>
+                <button class="icon-button is-small" ng-click="vm.saveBoardColumn(column)" ng-disabled="vm.entitySaving" aria-label="Kolonu kaydet" title="Kolonu kaydet"><i data-lucide="save" lucide-icon></i></button>
+                <button class="icon-button is-small danger-icon" ng-if="column.category === 'Custom'" ng-click="vm.deleteBoardColumn(column)" ng-disabled="vm.entitySaving" aria-label="Kolonu kaldır" title="Kolonu kaldır"><i data-lucide="trash-2" lucide-icon></i></button>
+              </div>
+            </div>
+            <form class="configuration-row" ng-submit="vm.addBoardColumn()">
+              <input class="input is-small" ng-model="vm.boardColumnDraft.name" placeholder="Yeni kolon" aria-label="Yeni kolon adı" required>
+              <div class="select is-small"><select ng-model="vm.boardColumnDraft.category" aria-label="Yeni kolon kategorisi"><option>Custom</option></select></div>
+              <input class="input is-small compact-number" type="number" min="1" max="10000" ng-model="vm.boardColumnDraft.wipLimit" placeholder="WIP" aria-label="Yeni kolon WIP limiti">
+              <button class="button is-small" type="submit" ng-disabled="vm.entitySaving"><i data-lucide="plus" lucide-icon></i><span>Kolon ekle</span></button>
+            </form>
+          </div>
+          <div class="detail-subheading" ng-if="vm.board && vm.projectMembership"><h3>Pano etkinliği</h3></div>
+          <div class="timeline" ng-if="vm.board && vm.projectMembership"><p ng-repeat="entry in vm.boardAudit | limitTo:10"><strong>{{entry.action}}</strong><span>{{entry.createdAt | date:'dd.MM.yyyy HH:mm'}}</span></p><p ng-if="!vm.boardAudit.length"><span>Henüz pano etkinliği yok.</span></p></div>
+          <div class="detail-subheading"><h3>Üyeler</h3></div>
+          <div class="member-table">
+            <div class="member-row member-manage-row" ng-repeat="member in vm.project.members track by member.userId">
+              <span>{{member.userId}}</span>
+              <strong ng-if="!vm.canManageProject || member.role === 'ProjectOwner'">{{member.role}}</strong>
+              <div class="select is-small" ng-if="vm.canManageProject && member.role !== 'ProjectOwner'"><select ng-model="member.role" ng-change="vm.changeProjectMemberRole(member)" ng-disabled="vm.entitySaving" aria-label="Proje üyesi rolü"><option>ProjectAdmin</option><option>Developer</option><option>Viewer</option></select></div>
+              <button class="icon-button is-small danger-icon" ng-if="vm.canManageProject && member.role !== 'ProjectOwner'" ng-click="vm.removeProjectMember(member)" ng-disabled="vm.entitySaving" aria-label="Proje üyesini kaldır" title="Proje üyesini kaldır"><i data-lucide="user-round-x" lucide-icon></i></button>
+            </div>
+          </div>
+          <form class="member-add-row" ng-if="vm.canManageProject" ng-submit="vm.addProjectMember()">
+            <div class="select is-small is-fullwidth"><select ng-model="vm.projectMemberDraft.userId" ng-options="user.id as (user.username + ' · ' + user.email) for user in vm.users" aria-label="Proje üyesi" required><option value="">Kullanıcı seçin</option></select></div>
+            <div class="select is-small"><select ng-model="vm.projectMemberDraft.role" aria-label="Yeni proje rolü"><option>ProjectAdmin</option><option>Developer</option><option>Viewer</option></select></div>
+            <button class="button is-small" type="submit" ng-disabled="vm.entitySaving"><i data-lucide="user-round-plus" lucide-icon></i><span>Üye ekle</span></button>
+          </form>
+          <div class="detail-subheading" ng-if="vm.canManageProject"><h3>Bağlı ekipler</h3></div>
+          <div class="member-table" ng-if="vm.canManageProject">
+            <div class="member-row" ng-repeat="teamId in vm.project.teamIds track by teamId"><span>{{vm.teamName(teamId)}}</span><button class="icon-button is-small danger-icon" ng-click="vm.removeProjectTeam(teamId)" aria-label="Ekip bağlantısını kaldır" title="Ekip bağlantısını kaldır"><i data-lucide="unlink" lucide-icon></i></button></div>
+          </div>
+          <form class="member-add-row" ng-if="vm.canManageProject" ng-submit="vm.addProjectTeam()">
+            <div class="select is-small is-fullwidth"><select ng-model="vm.projectTeamId" ng-options="team.id as team.name for team in vm.teams" aria-label="Projeye bağlanacak ekip" required><option value="">Ekip seçin</option></select></div>
+            <button class="button is-small" type="submit" ng-disabled="vm.entitySaving"><i data-lucide="link" lucide-icon></i><span>Bağla</span></button>
+          </form>
+          <div class="detail-subheading" ng-if="vm.canManageProject"><h3>Workflow</h3><button class="button is-small" ng-click="vm.saveWorkflow()" ng-disabled="vm.entitySaving || vm.workflowLoading || !vm.workflowDraft.transitions.length"><i data-lucide="save" lucide-icon></i><span>Workflow'u kaydet</span></button></div>
+          <div class="workflow-editor" ng-if="vm.canManageProject">
+            <div class="workflow-heading"><strong>Durumlar</strong><button class="icon-button is-small" ng-click="vm.addWorkflowStatus()" aria-label="Workflow durumu ekle" title="Workflow durumu ekle"><i data-lucide="plus" lucide-icon></i></button></div>
+            <div class="workflow-row status-row" ng-repeat="status in vm.workflowDraft.statuses track by $index">
+              <input class="input is-small" ng-model="status.name" aria-label="Workflow durum adı">
+              <div class="select is-small"><select ng-model="status.category" aria-label="Workflow durum kategorisi"><option>Todo</option><option>InProgress</option><option>Done</option></select></div>
+              <button class="icon-button is-small danger-icon" ng-click="vm.removeWorkflowStatus($index)" aria-label="Workflow durumunu kaldır" title="Workflow durumunu kaldır"><i data-lucide="trash-2" lucide-icon></i></button>
+            </div>
+            <div class="workflow-heading"><strong>Geçişler</strong><button class="icon-button is-small" ng-click="vm.addWorkflowTransition()" aria-label="Workflow geçişi ekle" title="Workflow geçişi ekle"><i data-lucide="plus" lucide-icon></i></button></div>
+            <div class="workflow-row transition-row" ng-repeat="transition in vm.workflowDraft.transitions track by $index">
+              <div class="select is-small"><select ng-model="transition.fromStatus" ng-options="status.name as status.name for status in vm.workflowDraft.statuses" aria-label="Kaynak durum"><option value="">Kaynak</option></select></div>
+              <i data-lucide="arrow-right" lucide-icon></i>
+              <div class="select is-small"><select ng-model="transition.toStatus" ng-options="status.name as status.name for status in vm.workflowDraft.statuses" aria-label="Hedef durum"><option value="">Hedef</option></select></div>
+              <label class="checkbox"><input type="checkbox" ng-model="transition.requiresAssignee"> Atanan</label>
+              <label class="checkbox"><input type="checkbox" ng-model="transition.requiresCompletedChecklist"> Liste</label>
+              <label class="checkbox"><input type="checkbox" ng-model="transition.requiresApproval"> Onay</label>
+              <button class="icon-button is-small danger-icon" ng-click="vm.removeWorkflowTransition($index)" aria-label="Workflow geçişini kaldır" title="Workflow geçişini kaldır"><i data-lucide="trash-2" lucide-icon></i></button>
+            </div>
+          </div>
+          <div class="detail-subheading" ng-if="vm.projectMembership"><h3>Etkinlik</h3></div>
+          <div class="timeline" ng-if="vm.projectMembership"><p ng-repeat="entry in vm.entityAudit | limitTo:10"><strong>{{entry.action}}</strong><span>{{entry.createdAt | date:'dd.MM.yyyy HH:mm'}}</span></p></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section-view" ng-if="vm.activeSection === 'teams'">
+      <div class="section-heading">
+        <div><p class="eyebrow">Organizasyon</p><h2>Ekipler</h2></div>
+        <button class="button is-primary is-small" ng-click="vm.openEntityCreator('team')"><i data-lucide="user-round-plus" lucide-icon></i><span>Ekip oluştur</span></button>
+      </div>
+      <div class="management-layout">
+        <nav class="entity-list" aria-label="Ekip listesi">
+          <button ng-repeat="team in vm.teams track by team.id" ng-click="vm.selectTeam(team)" ng-class="{active: vm.selectedTeam.id === team.id}"><strong>{{team.name}}</strong><span>{{team.members.length}} üye</span></button>
+          <p class="section-empty" ng-if="!vm.teams.length">Ekip bulunamadı.</p>
+        </nav>
+        <div class="entity-detail" ng-if="vm.selectedTeam">
+          <div class="field"><label class="label" for="team-name">Ekip adı</label><input id="team-name" class="input" ng-model="vm.teamDraft.name" maxlength="100" ng-disabled="!vm.canManageTeam"></div>
+          <div class="detail-actions" ng-if="vm.canManageTeam">
+            <button class="button is-small is-primary" ng-click="vm.saveTeam()" ng-disabled="vm.entitySaving || !vm.teamDraft.name"><i data-lucide="save" lucide-icon></i><span>Kaydet</span></button>
+            <button class="button is-small is-danger is-light" ng-if="vm.isTeamOwner" ng-click="vm.archiveTeam()" ng-disabled="vm.entitySaving"><i data-lucide="archive" lucide-icon></i><span>Arşivle</span></button>
+          </div>
+          <div class="detail-subheading"><h3>Üyeler ve davetler</h3></div>
+          <div class="member-table">
+            <div class="member-row member-manage-row" ng-repeat="member in vm.selectedTeam.members track by member.id">
+              <span>{{member.email}} <small>{{member.status}}</small></span>
+              <strong ng-if="!vm.isTeamOwner || member.role === 'Owner' || !member.userId">{{member.role}}</strong>
+              <div class="select is-small" ng-if="vm.isTeamOwner && member.role !== 'Owner' && member.userId"><select ng-model="member.role" ng-change="vm.changeTeamMemberRole(member)" ng-disabled="vm.entitySaving" aria-label="Ekip üyesi rolü"><option>Admin</option><option>Member</option></select></div>
+              <div class="row-actions" ng-if="vm.canManageTeam && member.role !== 'Owner'">
+                <button class="icon-button is-small" ng-if="vm.isTeamOwner && member.userId && member.status === 'Active'" ng-click="vm.transferTeamOwnership(member)" ng-disabled="vm.entitySaving" aria-label="Ekip sahipliğini devret" title="Ekip sahipliğini devret"><i data-lucide="crown" lucide-icon></i></button>
+                <button class="icon-button is-small danger-icon" ng-click="vm.removeTeamMember(member)" ng-disabled="vm.entitySaving" aria-label="Ekip üyesini kaldır" title="Ekip üyesini kaldır"><i data-lucide="user-round-x" lucide-icon></i></button>
+              </div>
+            </div>
+          </div>
+          <div class="invite-row" ng-if="vm.canManageTeam">
+            <input class="input" type="email" ng-model="vm.teamInviteEmail" placeholder="eposta@kurum.com">
+            <div class="select"><select ng-model="vm.teamInviteRole"><option>Member</option><option>Admin</option></select></div>
+            <button class="button" ng-click="vm.inviteTeamMember()" ng-disabled="!vm.teamInviteEmail || vm.entitySaving"><i data-lucide="send" lucide-icon></i><span>Davet et</span></button>
+          </div>
+          <div class="detail-subheading"><h3>Etkinlik</h3></div>
+          <div class="timeline"><p ng-repeat="entry in vm.entityAudit | limitTo:10"><strong>{{entry.action}}</strong><span>{{entry.createdAt | date:'dd.MM.yyyy HH:mm'}}</span></p></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section-view" ng-if="vm.activeSection === 'audit'">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">Denetim izi</p>
+          <h2>{{vm.selectedTask ? vm.selectedTask.title : 'Görev seçilmedi'}}</h2>
+        </div>
+      </div>
+      <div class="member-table" ng-if="vm.audit.length">
+        <div class="member-row" ng-repeat="entry in vm.audit">
+          <span>{{entry.action}}</span>
+          <strong>{{entry.createdAt | date:'dd.MM.yyyy HH:mm'}}</strong>
+        </div>
+      </div>
+      <p class="section-empty" ng-if="!vm.audit.length">Pano üzerinden bir görev seçin.</p>
+    </section>
+
+    <section class="section-view" ng-if="vm.activeSection === 'archive'">
+      <div class="section-heading">
+        <div><p class="eyebrow">Veri yaşam döngüsü</p><h2>Arşiv</h2></div>
+        <button class="icon-button" ng-click="vm.loadArchivedTasks()" aria-label="Arşivi yenile" title="Arşivi yenile"><i data-lucide="refresh-cw" lucide-icon></i></button>
+      </div>
+      <div class="archive-group" ng-if="vm.archivedProjects.length"><h3>Projeler</h3><div class="archive-list"><article ng-repeat="project in vm.archivedProjects track by project.id"><div><strong>{{project.name}}</strong><span>{{project.key}} · {{project.visibility}}</span></div><button class="button is-small" ng-click="vm.restoreLifecycleEntity('projects', project)" ng-disabled="vm.archiveActionId === project.id"><i data-lucide="archive-restore" lucide-icon></i><span>Geri yükle</span></button></article></div></div>
+      <div class="archive-group" ng-if="vm.archivedTeams.length"><h3>Ekipler</h3><div class="archive-list"><article ng-repeat="team in vm.archivedTeams track by team.id"><div><strong>{{team.name}}</strong><span>{{team.members.length}} üye</span></div><button class="button is-small" ng-click="vm.restoreLifecycleEntity('teams', team)" ng-disabled="vm.archiveActionId === team.id"><i data-lucide="archive-restore" lucide-icon></i><span>Geri yükle</span></button></article></div></div>
+      <div class="archive-group" ng-if="vm.archivedBoards.length"><h3>Panolar</h3><div class="archive-list"><article ng-repeat="board in vm.archivedBoards track by board.id"><div><strong>{{board.name}}</strong><span>{{board.type}}</span></div><button class="button is-small" ng-click="vm.restoreLifecycleEntity('boards', board)" ng-disabled="vm.archiveActionId === board.id"><i data-lucide="archive-restore" lucide-icon></i><span>Geri yükle</span></button></article></div></div>
+      <div class="archive-group" ng-if="vm.archivedTasks.length"><h3>Görevler</h3>
+      <div class="archive-list" ng-if="vm.archivedTasks.length">
+        <article ng-repeat="task in vm.archivedTasks track by task.id">
+          <div><strong>{{task.title}}</strong><span>{{task.type}} · {{task.status}} · {{task.priority}}</span></div>
+          <button class="button is-small" ng-click="vm.restoreTask(task)" ng-disabled="vm.archiveActionId === task.id"><i data-lucide="archive-restore" lucide-icon></i><span>Geri yükle</span></button>
+        </article>
+      </div>
+      </div>
+      <div class="section-empty" ng-if="vm.archiveLoading">Arşiv yükleniyor...</div>
+      <div class="section-empty" ng-if="!vm.archiveLoading && !vm.archivedTasks.length && !vm.archivedProjects.length && !vm.archivedTeams.length && !vm.archivedBoards.length">Arşivlenmiş kayıt yok.</div>
+    </section>
+
+    <section class="section-view settings-view" ng-if="vm.activeSection === 'settings'" data-settings-ready="{{!vm.settingsLoading}}">
+      <div class="section-heading">
+        <div><p class="eyebrow">Kişisel ve kurumsal yönetim</p><h2>Ayarlar</h2></div>
+        <button class="icon-button" ng-click="vm.loadSettings()" aria-label="Ayarları yenile" title="Ayarları yenile"><i data-lucide="refresh-cw" lucide-icon></i></button>
+      </div>
+      <div class="settings-tabs" role="tablist" aria-label="Ayar kategorileri">
+        <button role="tab" ng-class="{active: vm.settingsTab === 'account'}" ng-click="vm.settingsTab = 'account'"><i data-lucide="circle-user-round" lucide-icon></i><span>Hesap ve güvenlik</span></button>
+        <button role="tab" ng-class="{active: vm.settingsTab === 'organization'}" ng-click="vm.settingsTab = 'organization'"><i data-lucide="building-2" lucide-icon></i><span>Organizasyon</span></button>
+        <button role="tab" ng-if="vm.canManageRoles" ng-class="{active: vm.settingsTab === 'access'}" ng-click="vm.settingsTab = 'access'"><i data-lucide="shield-ellipsis" lucide-icon></i><span>Rol ve izinler</span></button>
+      </div>
+      <div class="section-empty" ng-if="vm.settingsLoading">Ayarlar yükleniyor...</div>
+
+      <div class="settings-content" ng-if="vm.settingsTab === 'account' && !vm.settingsLoading">
+        <section class="settings-band">
+          <div class="settings-heading"><div><h3>Profil</h3><p>Oturumdaki kurumsal kimlik</p></div></div>
+          <dl class="profile-facts"><div><dt>Kullanıcı</dt><dd>{{vm.session.currentUser.username}}</dd></div><div><dt>E-posta</dt><dd>{{vm.session.currentUser.email}}</dd></div><div><dt>Organizasyon</dt><dd>{{vm.session.currentUser.organizationId}}</dd></div></dl>
+        </section>
+
+        <section class="settings-band">
+          <div class="settings-heading"><div><h3>Parola</h3><p>Yeni parola mevcut paroladan farklı ve güçlü olmalıdır</p></div></div>
+          <form class="settings-form" ng-submit="vm.changePassword()">
+            <input class="input" type="password" ng-model="vm.passwordDraft.currentPassword" autocomplete="current-password" placeholder="Mevcut parola" aria-label="Mevcut parola" required>
+            <input class="input" type="password" ng-model="vm.passwordDraft.newPassword" autocomplete="new-password" placeholder="Yeni parola" aria-label="Yeni parola" required>
+            <button class="button" type="submit" ng-disabled="vm.entitySaving"><i data-lucide="key-round" lucide-icon></i><span>Parolayı değiştir</span></button>
+          </form>
+        </section>
+
+        <section class="settings-band">
+          <div class="settings-heading"><div><h3>İki adımlı doğrulama</h3><p>{{vm.mfaStatus.enabled ? 'Etkin · ' + vm.mfaStatus.remainingRecoveryCodes + ' kurtarma kodu' : 'Devre dışı'}}</p></div><span class="status-pill" ng-class="{enabled: vm.mfaStatus.enabled}">{{vm.mfaStatus.enabled ? 'Etkin' : 'Kapalı'}}</span></div>
+          <div class="settings-form" ng-if="!vm.mfaStatus.enabled">
+            <input class="input" type="password" ng-model="vm.mfaDraft.password" placeholder="Parola" aria-label="MFA kurulum parolası">
+            <button class="button" ng-click="vm.beginMfaSetup()" ng-disabled="vm.entitySaving"><i data-lucide="shield-check" lucide-icon></i><span>Kurulumu başlat</span></button>
+          </div>
+          <div class="secret-output" ng-if="vm.mfaSetup">
+            <label>Doğrulayıcı sırrı</label><div><code>{{vm.mfaSetup.secret}}</code><button class="icon-button" ng-click="vm.copyText(vm.mfaSetup.secret)" aria-label="MFA sırrını kopyala" title="MFA sırrını kopyala"><i data-lucide="copy" lucide-icon></i></button></div>
+            <p>{{vm.mfaSetup.provisioningUri}}</p>
+            <div class="settings-form"><input class="input" ng-model="vm.mfaDraft.code" inputmode="numeric" placeholder="6 haneli kod" aria-label="MFA doğrulama kodu"><button class="button is-primary" ng-click="vm.confirmMfaSetup()" ng-disabled="vm.entitySaving">Etkinleştir</button></div>
+          </div>
+          <div class="settings-form" ng-if="vm.mfaStatus.enabled">
+            <input class="input" type="password" ng-model="vm.mfaDraft.password" placeholder="Parola" aria-label="MFA kapatma parolası">
+            <input class="input" ng-model="vm.mfaDraft.code" placeholder="Doğrulama veya kurtarma kodu" aria-label="MFA kapatma kodu">
+            <button class="button is-danger is-light" ng-click="vm.disableMfa()" ng-disabled="vm.entitySaving">Devre dışı bırak</button>
+          </div>
+          <div class="recovery-codes" ng-if="vm.recoveryCodes.length"><code ng-repeat="code in vm.recoveryCodes track by code">{{code}}</code></div>
+        </section>
+
+        <section class="settings-band">
+          <div class="settings-heading"><div><h3>API anahtarları</h3><p>Anahtar değeri oluşturulduktan sonra yeniden gösterilmez</p></div></div>
+          <div class="secret-output" ng-if="vm.createdApiKey"><label>Yeni API anahtarı</label><div><code>{{vm.createdApiKey.key}}</code><button class="icon-button" ng-click="vm.copyText(vm.createdApiKey.key)" aria-label="API anahtarını kopyala" title="API anahtarını kopyala"><i data-lucide="copy" lucide-icon></i></button></div></div>
+          <form class="settings-form api-key-form" ng-submit="vm.createApiKey()">
+            <input class="input" ng-model="vm.apiKeyDraft.name" placeholder="Anahtar adı" aria-label="API anahtarı adı" required>
+            <input class="input" type="password" ng-model="vm.apiKeyDraft.password" placeholder="Parola" aria-label="API anahtarı parolası" required>
+            <input class="input" ng-model="vm.apiKeyDraft.mfaCode" placeholder="MFA kodu" aria-label="API anahtarı MFA kodu">
+            <input class="input compact-number" type="number" min="1" max="365" ng-model="vm.apiKeyDraft.expiresInDays" aria-label="Geçerlilik günü">
+            <button class="button" type="submit" ng-disabled="vm.entitySaving"><i data-lucide="key-round" lucide-icon></i><span>Oluştur</span></button>
+          </form>
+          <div class="member-table"><div class="member-row" ng-repeat="key in vm.apiKeys track by key.id"><span><strong>{{key.name}}</strong><small>{{key.keyPrefix}} · {{key.expiresAt | date:'dd.MM.yyyy'}}</small></span><button class="icon-button danger-icon" ng-if="!key.revokedAt" ng-click="vm.revokeApiKey(key)" aria-label="API anahtarını iptal et" title="API anahtarını iptal et"><i data-lucide="trash-2" lucide-icon></i></button><strong ng-if="key.revokedAt">İptal</strong></div></div>
+        </section>
+
+        <section class="settings-band">
+          <div class="settings-heading"><div><h3>Bildirim tercihleri</h3><p>Kanal ve sessize alınan bildirim türleri</p></div></div>
+          <form class="settings-form preference-form" ng-submit="vm.saveNotificationPreferences()">
+            <label class="checkbox"><input type="checkbox" ng-model="vm.notificationPreferences.inAppEnabled"> Uygulama içi</label>
+            <label class="checkbox"><input type="checkbox" ng-model="vm.notificationPreferences.emailEnabled"> E-posta</label>
+            <input class="input" ng-model="vm.mutedTypesText" placeholder="Assignment, Mention" aria-label="Sessize alınan bildirim türleri">
+            <button class="button" type="submit" ng-disabled="vm.entitySaving"><i data-lucide="save" lucide-icon></i><span>Kaydet</span></button>
+          </form>
+        </section>
+
+        <section class="settings-band danger-zone">
+          <div class="settings-heading"><div><h3>Gizlilik ve hesap yaşam döngüsü</h3><p>Dışa aktarım indirilebilir JSON oluşturur; anonimleştirme geri alınamaz</p></div><button class="button" ng-click="vm.exportPrivacyData()"><i data-lucide="download" lucide-icon></i><span>Verilerimi aktar</span></button></div>
+          <form class="settings-form" ng-submit="vm.anonymizeAccount()">
+            <input class="input" type="password" ng-model="vm.privacyDraft.password" placeholder="Parola" aria-label="Anonimleştirme parolası" required>
+            <input class="input" ng-model="vm.privacyDraft.confirmation" placeholder="ANONYMIZE" aria-label="Anonimleştirme onayı" required>
+            <button class="button is-danger" type="submit" ng-disabled="vm.entitySaving || vm.privacyDraft.confirmation !== 'ANONYMIZE'"><i data-lucide="user-round-x" lucide-icon></i><span>Hesabı anonimleştir</span></button>
+          </form>
+        </section>
+      </div>
+
+      <div class="settings-content" ng-if="vm.settingsTab === 'organization' && !vm.settingsLoading">
+        <section class="settings-band">
+          <div class="settings-heading"><div><h3>Organizasyon profili</h3><p>Tenant anahtarı oluşturulduktan sonra değiştirilemez</p></div></div>
+          <form class="settings-form" ng-if="vm.canManageOrganization" ng-submit="vm.saveOrganization()">
+            <input class="input" ng-model="vm.organizationDraft.name" placeholder="Organizasyon adı" aria-label="Organizasyon adı" required>
+            <input class="input" ng-model="vm.organizationDraft.tenantKey" placeholder="Tenant anahtarı" aria-label="Tenant anahtarı" ng-disabled="vm.organization" required>
+            <button class="button is-primary" type="submit" ng-disabled="vm.entitySaving"><i data-lucide="save" lucide-icon></i><span>Kaydet</span></button>
+          </form>
+        </section>
+          <div class="permission-notice" ng-if="!vm.canManageOrganization"><i data-lucide="lock-keyhole" lucide-icon></i><span>Bu organizasyon için yönetim yetkiniz yok.</span></div>
+        <section class="settings-band" ng-if="vm.organization && vm.canManageOrganization">
+          <div class="settings-heading"><div><h3>Departmanlar</h3><p>Hiyerarşi, pozisyon ve üye atamaları</p></div></div>
+          <div class="configuration-list">
+            <div class="configuration-row department-row" ng-repeat="department in vm.organization.departments track by department.id">
+              <input class="input is-small" ng-model="department.name" aria-label="Departman adı">
+              <div class="select is-small"><select ng-model="department.parentDepartmentId" ng-options="parent.id as parent.name for parent in vm.organization.departments | filter:{id:'!' + department.id}" aria-label="Üst departman"><option value="">Üst departman yok</option></select></div>
+              <span>{{department.members.length}} üye</span>
+              <div class="row-actions"><button class="icon-button" ng-click="vm.saveDepartment(department)" aria-label="Departmanı kaydet" title="Departmanı kaydet"><i data-lucide="save" lucide-icon></i></button><button class="icon-button danger-icon" ng-click="vm.deleteDepartment(department)" aria-label="Departmanı kaldır" title="Departmanı kaldır"><i data-lucide="trash-2" lucide-icon></i></button></div>
+              <div class="department-members" ng-if="department.members.length"><span ng-repeat="member in department.members track by member.userId">{{member.userId}} · {{member.position}} <button ng-click="vm.removeDepartmentMember(department, member)" ng-disabled="vm.entitySaving" aria-label="Departman üyesini kaldır"><i data-lucide="x" lucide-icon></i></button></span></div>
+            </div>
+          </div>
+          <form class="settings-form" ng-submit="vm.addDepartment()"><input class="input" ng-model="vm.departmentDraft.name" placeholder="Yeni departman" aria-label="Yeni departman adı" required><div class="select"><select ng-model="vm.departmentDraft.parentDepartmentId" ng-options="department.id as department.name for department in vm.organization.departments" aria-label="Yeni departman üst birimi"><option value="">Üst departman yok</option></select></div><button class="button" type="submit" ng-disabled="vm.entitySaving"><i data-lucide="plus" lucide-icon></i><span>Departman ekle</span></button></form>
+          <form class="settings-form department-member-form" ng-submit="vm.assignDepartmentMember()"><div class="select"><select ng-model="vm.departmentMemberDraft.departmentId" ng-options="department.id as department.name for department in vm.organization.departments" aria-label="Departman" required><option value="">Departman</option></select></div><div class="select"><select ng-model="vm.departmentMemberDraft.userId" ng-options="user.id as (user.username + ' · ' + user.email) for user in vm.users" aria-label="Departman üyesi" required><option value="">Kullanıcı</option></select></div><input class="input" ng-model="vm.departmentMemberDraft.position" placeholder="Pozisyon" aria-label="Departman pozisyonu" required><button class="button" type="submit" ng-disabled="vm.entitySaving"><i data-lucide="user-round-plus" lucide-icon></i><span>Üye ata</span></button></form>
+        </section>
+        <section class="settings-band" ng-if="vm.organization"><div class="settings-heading"><div><h3>Organizasyon etkinliği</h3><p>Profil, departman ve üyelik değişiklikleri</p></div></div><div class="timeline"><p ng-repeat="entry in vm.organizationAudit | limitTo:10"><strong>{{entry.action}}</strong><span>{{entry.createdAt | date:'dd.MM.yyyy HH:mm'}}</span></p><p ng-if="!vm.organizationAudit.length"><span>Henüz organizasyon etkinliği yok.</span></p></div></section>
+      </div>
+
+      <div class="settings-content" ng-if="vm.settingsTab === 'access' && vm.canManageRoles && !vm.settingsLoading">
+        <section class="settings-band">
+          <div class="settings-heading"><div><h3>Rol tanımları</h3><p>Sistem rolleri sabittir; özel roller kurum kapsamında çalışır</p></div></div>
+          <div class="role-definition-list">
+            <article class="role-definition" ng-repeat="role in vm.roles track by role.id" ng-class="{'system-role': role.isSystem}" data-role-name="{{role.name}}">
+              <div class="role-title">
+                <input class="input" ng-if="!role.isSystem" ng-model="role.editName" aria-label="Rol adı">
+                <strong ng-if="role.isSystem">{{role.name}}</strong>
+                <span class="status-pill" ng-if="role.isSystem">Sistem</span>
+                <div class="row-actions" ng-if="!role.isSystem"><button class="icon-button" ng-click="vm.saveRole(role)" aria-label="Rolü kaydet" title="Rolü kaydet" ng-disabled="vm.entitySaving"><i data-lucide="save" lucide-icon></i></button><button class="icon-button danger-icon" ng-click="vm.deleteRole(role)" aria-label="Rolü kaldır" title="Rolü kaldır" ng-disabled="vm.entitySaving"><i data-lucide="trash-2" lucide-icon></i></button></div>
+              </div>
+              <div class="permission-grid" ng-if="!role.isSystem"><label ng-repeat="permission in vm.permissionCatalog track by permission"><input type="checkbox" ng-checked="role.editPermissions.indexOf(permission) >= 0" ng-click="vm.togglePermission({permissions: role.editPermissions}, permission)"><span>{{permission}}</span></label></div>
+              <div class="permission-tags" ng-if="role.isSystem"><span ng-repeat="permission in role.permissions track by permission">{{permission}}</span></div>
+            </article>
+          </div>
+          <form class="role-create-form" ng-submit="vm.createRole()">
+            <input class="input" ng-model="vm.roleDraft.name" placeholder="Yeni rol adı" aria-label="Yeni rol adı" required>
+            <div class="permission-grid"><label ng-repeat="permission in vm.permissionCatalog track by permission"><input type="checkbox" ng-checked="vm.permissionSelected(vm.roleDraft, permission)" ng-click="vm.togglePermission(vm.roleDraft, permission)"><span>{{permission}}</span></label></div>
+            <button class="button is-primary" type="submit" ng-disabled="vm.entitySaving || !vm.roleDraft.permissions.length"><i data-lucide="plus" lucide-icon></i><span>Rol oluştur</span></button>
+          </form>
+        </section>
+
+        <section class="settings-band">
+          <div class="settings-heading"><div><h3>Kullanıcı atamaları</h3><p>Rol değişikliği hedef kullanıcının mevcut oturumlarını geçersiz kılar</p></div></div>
+          <div class="user-role-list">
+            <article class="user-role-row" ng-repeat="user in vm.users track by user.id">
+              <div class="user-role-identity"><strong>{{user.username}}</strong><small>{{user.email}}</small></div>
+              <div class="role-choice-list"><label ng-repeat="role in vm.roles track by role.id" ng-if="vm.canAssignRole(role)"><input type="checkbox" ng-checked="vm.userHasDraftRole(user, role.name)" ng-click="vm.toggleUserRole(user, role.name)" ng-disabled="role.name === 'User' || user.id === vm.session.currentUser.id"><span>{{role.name}}</span></label></div>
+              <button class="button" ng-click="vm.saveUserRoles(user)" ng-disabled="vm.entitySaving || user.id === vm.session.currentUser.id"><i data-lucide="save" lucide-icon></i><span>{{user.id === vm.session.currentUser.id ? 'Aktif oturum' : 'Rolleri kaydet'}}</span></button>
+            </article>
+          </div>
+        </section>
+      </div>
+    </section>
+
+    <section class="empty-state" ng-if="!vm.board && vm.activeSection === 'board'">
+      <h2>Pano yüklenmedi</h2>
+      <button class="button is-primary" ng-click="vm.seed()">Demo çalışma alanı oluştur</button>
+    </section>
+  </main>
+
+  <aside class="inspector open" ng-if="vm.session.currentUser && vm.selectedTask">
+    <button class="delete" ng-click="vm.closeTask()" aria-label="Görev detayını kapat"></button>
+    <p class="eyebrow">Görev detayı</p>
+    <div class="field">
+      <label class="label" for="task-title">Başlık</label>
+      <input id="task-title" class="input" ng-model="vm.taskDraft.title" maxlength="200" required>
+    </div>
+    <div class="field">
+      <label class="label" for="task-description">Açıklama</label>
+      <textarea id="task-description" class="textarea" rows="3" ng-model="vm.taskDraft.description"></textarea>
+    </div>
+    <div class="inspector-edit-grid">
+      <div class="field"><label class="label" for="task-priority">Öncelik</label><div class="select is-fullwidth"><select id="task-priority" ng-model="vm.taskDraft.priority"><option>Critical</option><option>High</option><option>Medium</option><option>Low</option></select></div></div>
+      <div class="field"><label class="label" for="task-due-date">Bitiş tarihi</label><input id="task-due-date" class="input" type="date" ng-model="vm.taskDraft.dueDate"></div>
+    </div>
+    <div class="inspector-edit-grid">
+      <div class="field"><label class="label" for="task-assignee">Atanan</label><div class="select is-fullwidth"><select id="task-assignee" ng-model="vm.taskDraft.assigneeUserId" ng-options="user.id as user.username for user in vm.users"><option value="">Atanmamış</option></select></div></div>
+      <div class="field"><label class="label" for="task-team">Ekip</label><div class="select is-fullwidth"><select id="task-team" ng-model="vm.taskDraft.teamId" ng-options="team.id as team.name for team in vm.projectTeams()"><option value="">Ekip yok</option></select></div></div>
+    </div>
+    <div class="inspector-edit-grid">
+      <div class="field"><label class="label" for="task-sprint">Sprint</label><input id="task-sprint" class="input" ng-model="vm.taskDraft.sprintId" maxlength="80"></div>
+      <div class="field"><label class="label" for="task-estimate">Tahmin puanı</label><input id="task-estimate" class="input" type="number" min="0.5" max="1000" step="0.5" ng-model="vm.taskDraft.estimatePoints"></div>
+    </div>
+    <div class="field">
+      <label class="label" for="task-parent">Üst görev</label>
+      <div class="select is-fullwidth"><select id="task-parent" ng-model="vm.taskDraft.parentId" ng-options="task.id as task.title for task in vm.taskLinkCandidates()" ng-disabled="vm.selectedTask.type === 'Epic'"><option value="">Üst görev yok</option></select></div>
+    </div>
+    <button class="button is-fullwidth" ng-click="vm.saveSelectedTask()" ng-disabled="vm.taskSaving || !vm.taskDraft.title">Ayrıntıları kaydet</button>
+    <div class="field">
+      <label class="label">Durum</label>
+      <div class="select is-fullwidth">
+        <select ng-model="vm.nextStatus">
+          <option ng-repeat="transition in vm.workflow.transitions | filter:{fromStatus:vm.selectedTask.status}:true" value="{{transition.toStatus}}">
+            {{transition.toStatus}}
+          </option>
+        </select>
+      </div>
+    </div>
+    <button class="button is-primary is-fullwidth" ng-if="!vm.selectedTransition().requiresApproval" ng-disabled="!vm.selectedTask || !vm.nextStatus" ng-click="vm.moveSelected()">Taşı</button>
+    <button class="button is-warning is-fullwidth" ng-if="vm.selectedTransition().requiresApproval" ng-disabled="vm.taskSaving || !vm.nextStatus" ng-click="vm.requestApproval()"><i data-lucide="shield-check" lucide-icon></i><span>Onay iste</span></button>
+    <hr>
+    <div class="inspector-section">
+      <h3>Etiketler</h3>
+      <div class="editable-labels"><span ng-repeat="label in vm.selectedTask.labels track by label">{{label}}<button ng-click="vm.removeLabel(label)" aria-label="Etiketi kaldır"><i data-lucide="x" lucide-icon></i></button></span></div>
+      <div class="inspector-command"><input class="input is-small" ng-model="vm.labelText" placeholder="Yeni etiket" aria-label="Yeni etiket"><button class="button is-small" ng-click="vm.addLabel()" ng-disabled="!vm.labelText" aria-label="Etiket ekle"><i data-lucide="plus" lucide-icon></i></button></div>
+    </div>
+    <div class="inspector-section">
+      <h3>Kontrol listesi</h3>
+      <label class="checkbox inspector-check" ng-repeat="item in vm.selectedTask.checklist">
+        <input type="checkbox" ng-checked="item.completed" ng-click="vm.toggleChecklist(item)">
+        {{item.text}}
+      </label>
+      <div class="inspector-command">
+        <input class="input is-small" ng-model="vm.checklistText" placeholder="Yeni madde">
+        <button class="button is-small" ng-click="vm.addChecklist()" aria-label="Madde ekle">+</button>
+      </div>
+    </div>
+    <div class="inspector-section">
+      <h3>İlişkiler</h3>
+      <div class="relation-row" ng-repeat="relation in vm.selectedTask.relations"><span><strong>{{relation.relationType}}</strong> {{vm.taskTitle(relation.relatedWorkItemId)}}</span><button class="icon-button danger-icon" ng-click="vm.removeRelation(relation)" aria-label="Görev ilişkisini kaldır" title="Görev ilişkisini kaldır"><i data-lucide="unlink" lucide-icon></i></button></div>
+      <div class="inspector-command relation-command">
+        <div class="select is-small"><select ng-model="vm.relationDraft.relationType" aria-label="İlişki türü"><option>RelatesTo</option><option>Blocks</option><option>BlockedBy</option><option>Duplicates</option></select></div>
+        <div class="select is-small relation-target"><select ng-model="vm.relationDraft.relatedWorkItemId" ng-options="task.id as task.title for task in vm.taskLinkCandidates()" aria-label="İlişkili görev"><option value="">Görev seçin</option></select></div>
+        <button class="icon-button" ng-click="vm.addRelation()" ng-disabled="!vm.relationDraft.relatedWorkItemId || vm.taskSaving" aria-label="Görev ilişkisi ekle" title="Görev ilişkisi ekle"><i data-lucide="link" lucide-icon></i></button>
+      </div>
+    </div>
+    <div class="inspector-section" ng-if="vm.selectedTask.approvals.length">
+      <h3>Onaylar</h3>
+      <input class="input is-small" ng-model="vm.approvalNote" maxlength="1000" placeholder="Karar notu" aria-label="Onay karar notu">
+      <div class="approval-row" ng-repeat="approval in vm.selectedTask.approvals">
+        <span><strong>{{approval.fromStatus}} → {{approval.toStatus}}</strong><small>{{approval.status}} · {{approval.requestedAt | date:'dd.MM HH:mm'}}</small></span>
+        <div class="row-actions" ng-if="approval.status === 'Pending' && approval.requestedByUserId !== vm.session.currentUser.id"><button class="icon-button success-icon" ng-click="vm.decideApproval(approval, true)" aria-label="Geçişi onayla" title="Geçişi onayla"><i data-lucide="check" lucide-icon></i></button><button class="icon-button danger-icon" ng-click="vm.decideApproval(approval, false)" aria-label="Geçişi reddet" title="Geçişi reddet"><i data-lucide="x" lucide-icon></i></button></div>
+      </div>
+    </div>
+    <div class="inspector-section">
+      <h3>Dosyalar</h3>
+      <div class="attachment-row" ng-repeat="attachment in vm.selectedTask.attachments">
+        <button class="button is-small is-white attachment-link" ng-click="vm.downloadAttachment(attachment)">{{attachment.fileName}}</button>
+        <button class="delete is-small" ng-click="vm.deleteAttachment(attachment)" aria-label="Dosyayı sil"></button>
+      </div>
+      <div class="inspector-command">
+        <input class="file-input-plain" type="file" file-change="vm.attachmentFile = file">
+        <button class="button is-small" ng-click="vm.uploadAttachment()" ng-disabled="!vm.attachmentFile">Yükle</button>
+      </div>
+    </div>
+    <div class="inspector-section">
+      <h3>Yorumlar</h3>
+      <div class="comment-row" ng-repeat="comment in vm.selectedTask.comments">
+        <div class="comment-heading"><strong>{{comment.authorUserId}}</strong><div class="row-actions" ng-if="comment.authorUserId === vm.session.currentUser.id || vm.canManageProject"><button class="icon-button" ng-click="vm.editComment(comment)" aria-label="Yorumu düzenle" title="Yorumu düzenle"><i data-lucide="pencil" lucide-icon></i></button><button class="icon-button danger-icon" ng-click="vm.deleteComment(comment)" aria-label="Yorumu sil" title="Yorumu sil"><i data-lucide="trash-2" lucide-icon></i></button></div></div>
+        <p ng-if="!comment.editing">{{comment.body}}</p>
+        <div class="inspector-command" ng-if="comment.editing"><input class="input is-small" ng-model="comment.draftBody" aria-label="Yorum metni"><button class="button is-small" ng-click="vm.saveComment(comment)" aria-label="Yorumu kaydet"><i data-lucide="save" lucide-icon></i></button></div>
+      </div>
+      <textarea class="textarea is-small" rows="2" ng-model="vm.commentBody" placeholder="Yorum"></textarea>
+      <button class="button is-small is-fullwidth" ng-click="vm.addComment()">Yorum ekle</button>
+    </div>
+    <div class="inspector-section">
+      <h3>İş günlüğü</h3>
+      <div class="worklog-row" ng-repeat="log in vm.selectedTask.workLogs"><span>{{log.note || 'Not yok'}}</span><strong>{{log.hours}} sa</strong></div>
+      <div class="inspector-edit-grid"><input class="input is-small" type="number" min="0.25" max="24" step="0.25" ng-model="vm.workLogDraft.hours" placeholder="Saat" aria-label="İş günlüğü saati"><input class="input is-small" ng-model="vm.workLogDraft.note" placeholder="Not" aria-label="İş günlüğü notu"></div>
+      <button class="button is-small is-fullwidth" ng-click="vm.addWorkLog()" ng-disabled="!vm.workLogDraft.hours">İş günlüğü ekle</button>
+    </div>
+    <hr>
+    <div class="audit-list">
+      <h3>Denetim</h3>
+      <p ng-repeat="entry in vm.audit">{{entry.action}} - {{entry.newValue}}</p>
+    </div>
+    <button class="button is-danger is-light is-fullwidth inspector-archive" ng-click="vm.archiveSelectedTask()" ng-disabled="vm.taskSaving"><i data-lucide="archive" lucide-icon></i><span>Görevi arşivle</span></button>
+  </aside>
+
+  <div class="modal-overlay" ng-if="vm.entityCreator" ng-click="vm.closeEntityCreator()">
+    <form class="entity-modal" ng-submit="vm.submitEntityCreator()" ng-click="$event.stopPropagation()" role="dialog" aria-modal="true" aria-labelledby="entity-modal-title">
+      <div class="modal-heading"><div><p class="eyebrow">Yeni kayıt</p><h2 id="entity-modal-title">{{vm.entityCreator === 'task' ? 'Görev' : vm.entityCreator === 'project' ? 'Proje' : vm.entityCreator === 'team' ? 'Ekip' : 'Pano'}} oluştur</h2></div><button class="delete" type="button" ng-click="vm.closeEntityCreator()" aria-label="Formu kapat"></button></div>
+      <div class="field" ng-if="vm.entityCreator === 'task'"><label class="label" for="new-task-title">Başlık</label><input id="new-task-title" class="input" ng-model="vm.entityDraft.title" maxlength="200" required></div>
+      <div class="form-row" ng-if="vm.entityCreator === 'task'">
+        <div class="field"><label class="label" for="new-task-type">Tür</label><div class="select is-fullwidth"><select id="new-task-type" ng-model="vm.entityDraft.type" ng-change="vm.entityDraft.parentId = ''"><option>Task</option><option>Bug</option><option>Story</option><option>Epic</option><option>Subtask</option></select></div></div>
+        <div class="field"><label class="label" for="new-task-priority">Öncelik</label><div class="select is-fullwidth"><select id="new-task-priority" ng-model="vm.entityDraft.priority"><option>Critical</option><option>High</option><option>Medium</option><option>Low</option></select></div></div>
+      </div>
+      <div class="field" ng-if="vm.entityCreator === 'task'"><label class="label" for="new-task-due">Bitiş tarihi</label><input id="new-task-due" class="input" type="date" ng-model="vm.entityDraft.dueDate"></div>
+      <div class="field" ng-if="vm.entityCreator === 'task' && vm.entityDraft.type !== 'Epic'"><label class="label" for="new-task-parent">Üst görev</label><div class="select is-fullwidth"><select id="new-task-parent" ng-model="vm.entityDraft.parentId" ng-options="task.id as task.title for task in vm.parentCandidates(vm.entityDraft.type)"><option value="">Üst görev yok</option></select></div></div>
+      <div class="field" ng-if="vm.entityCreator === 'project'"><label class="label" for="new-project-key">Proje anahtarı</label><input id="new-project-key" class="input" ng-model="vm.entityDraft.key" maxlength="10" pattern="[A-Za-z0-9\-]{2,10}" required></div>
+      <div class="field" ng-if="vm.entityCreator === 'project'"><label class="label" for="new-project-name">Proje adı</label><input id="new-project-name" class="input" ng-model="vm.entityDraft.name" maxlength="120" required></div>
+      <div class="field" ng-if="vm.entityCreator === 'project'"><label class="label" for="new-project-visibility">Görünürlük</label><div class="select is-fullwidth"><select id="new-project-visibility" ng-model="vm.entityDraft.visibility"><option>Internal</option><option>Private</option></select></div></div>
+      <div class="field" ng-if="vm.entityCreator === 'team'"><label class="label" for="new-team-name">Ekip adı</label><input id="new-team-name" class="input" ng-model="vm.entityDraft.name" maxlength="100" required></div>
+      <div class="field" ng-if="vm.entityCreator === 'board'"><label class="label" for="new-board-name">Pano adı</label><input id="new-board-name" class="input" ng-model="vm.entityDraft.name" maxlength="100" required></div>
+      <div class="field" ng-if="vm.entityCreator === 'board'"><label class="label" for="new-board-type">Pano türü</label><div class="select is-fullwidth"><select id="new-board-type" ng-model="vm.entityDraft.type"><option>Kanban</option><option>Scrum</option></select></div></div>
+      <div class="modal-actions"><button class="button" type="button" ng-click="vm.closeEntityCreator()">İptal</button><button class="button is-primary" type="submit" ng-disabled="vm.entitySaving"><i data-lucide="plus" lucide-icon></i><span>Oluştur</span></button></div>
+    </form>
+  </div>
+
+  <div class="command-overlay" ng-if="vm.commandOpen" ng-click="vm.closeCommandPalette()">
+    <section class="command-palette" role="dialog" aria-modal="true" aria-label="Komut paleti" ng-click="$event.stopPropagation()">
+      <div class="command-input"><i data-lucide="search" lucide-icon></i><input command-focus ng-model="vm.commandQuery" placeholder="Komut veya görev ara" aria-label="Komut ara"><kbd>Esc</kbd></div>
+      <div class="command-results">
+        <button ng-repeat="command in vm.filteredCommands()" ng-click="vm.runCommand(command)"><i data-lucide="{{command.icon}}" lucide-icon></i><span><strong>{{command.label}}</strong><small>{{command.group}}</small></span></button>
+        <button ng-repeat="task in vm.tasks | filter:vm.commandQuery | limitTo:6" ng-click="vm.runCommand({action:'task', task:task})"><i data-lucide="circle-check-big" lucide-icon></i><span><strong>{{task.title}}</strong><small>{{task.status}} · {{task.priority}}</small></span></button>
+      </div>
+    </section>
+  </div>
+
+  <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.8.3/angular.min.js" integrity="sha384-quGekMf1ic6tIOn1GgLl0Pzra4ZkFyTcaDW3hZRjORqPQe3HnTKGl+lNPpuh7Lwv" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@microsoft/signalr@8.0.7/dist/browser/signalr.min.js" integrity="sha384-mU1xC5yC2LldSW74Rj1Ax8wPiLw/28V5eh51uKJMlBbRVsOtUYd4xyzNsgIAJARB" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/lucide@1.24.0/dist/umd/lucide.min.js" integrity="sha384-mooE85Luwgx+AyykX7e90VcN8/QCFTSIwPuHLmvcsLVoA0en7lKYb9XlOzn5G2co" crossorigin="anonymous"></script>
+  <script src="./app.js"></script>
+  <script>if ('serviceWorker' in navigator) { window.addEventListener('load', function() { navigator.serviceWorker.register('./service-worker.js'); }); }</script>
+</body>
+</html>
