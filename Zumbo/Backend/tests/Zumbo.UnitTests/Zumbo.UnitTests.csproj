@@ -1,0 +1,34 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="coverlet.collector" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Zumbo.SharedKernel\Zumbo.SharedKernel.csproj" />
+    <ProjectReference Include="..\..\src\Zumbo.Modules.Identity\Zumbo.Modules.Identity.csproj" />
+    <ProjectReference Include="..\..\src\Zumbo.Modules.Organizations\Zumbo.Modules.Organizations.csproj" />
+    <ProjectReference Include="..\..\src\Zumbo.Modules.Teams\Zumbo.Modules.Teams.csproj" />
+    <ProjectReference Include="..\..\src\Zumbo.Modules.Boards\Zumbo.Modules.Boards.csproj" />
+    <ProjectReference Include="..\..\src\Zumbo.Modules.Projects\Zumbo.Modules.Projects.csproj" />
+    <ProjectReference Include="..\..\src\Zumbo.Modules.WorkItems\Zumbo.Modules.WorkItems.csproj" />
+    <ProjectReference Include="..\..\src\Zumbo.Modules.Workflows\Zumbo.Modules.Workflows.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="coverlet.collector" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Zumbo.SharedKernel\Zumbo.SharedKernel.csproj" />
+    <ProjectReference Include="..\..\src\Zumbo.Modules.Identity\Zumbo.Modules.Identity.csproj" />
+    <ProjectReference Include="..\..\src\Zumbo.Modules.WorkItems\Zumbo.Modules.WorkItems.csproj" />
+    <ProjectReference Include="..\..\src\Zumbo.Api\Zumbo.Api.csproj" />
+  </ItemGroup>
+
+</Project>

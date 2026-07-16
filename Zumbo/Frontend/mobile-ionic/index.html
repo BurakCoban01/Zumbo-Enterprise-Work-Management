@@ -1,0 +1,333 @@
+<!doctype html>
+<html ng-app="zumboMobile">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#173f46">
+  <title>Zumbo Mobile</title>
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" href="../shared/zumbo-mark.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="https://code.ionicframework.com/1.3.3/css/ionic.min.css" integrity="sha384-j079iFVBvbiXKXmyTZV1zkV/VopO+oNwH4YK1Ub6Z52OtyDUAieYk83/HYeYKgjA" crossorigin="anonymous">
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body ng-controller="ShellController as shell" ng-class="{'theme-dark': shell.theme === 'dark'}">
+  <ion-nav-bar class="bar-stable">
+    <ion-nav-back-button></ion-nav-back-button>
+  </ion-nav-bar>
+
+  <ion-nav-view></ion-nav-view>
+
+  <script id="templates/login.html" type="text/ng-template">
+    <ion-view view-title="Zumbo">
+      <ion-content class="login-surface">
+        <div class="brand-lockup">
+          <img src="../shared/zumbo-mark.svg" alt="Zumbo">
+          <h1>Zumbo</h1>
+          <p>İç görev ve ekip yönetimi</p>
+        </div>
+        <form class="list login-form" ng-submit="vm.login()">
+          <label class="item item-input">
+            <span class="input-label">Kullanıcı</span>
+            <input type="text" ng-model="vm.form.usernameOrEmail" placeholder="Kullanıcı adı veya e-posta">
+          </label>
+          <label class="item item-input">
+            <span class="input-label">Parola</span>
+            <input type="password" ng-model="vm.form.password" placeholder="Parolanız">
+          </label>
+          <label class="item item-input" ng-if="vm.mfaRequired">
+            <span class="input-label">Doğrulama</span>
+            <input type="text" ng-model="vm.form.mfaCode" inputmode="numeric" autocomplete="one-time-code" maxlength="16">
+          </label>
+          <button class="button button-positive button-block" type="submit">Giriş yap</button>
+          <a class="button button-clear button-positive button-block" href="#/forgot-password">Parolamı unuttum</a>
+          <button class="button button-light button-block" type="button" ng-click="vm.demo()">Demo kullanıcı oluştur</button>
+          <p class="error-line" ng-if="vm.error">{{vm.error}}</p>
+        </form>
+      </ion-content>
+    </ion-view>
+  </script>
+
+  <script id="templates/forgot-password.html" type="text/ng-template">
+    <ion-view view-title="Parola sıfırlama">
+      <ion-content class="login-surface">
+        <form class="list login-form" ng-submit="vm.submit()" ng-if="!vm.sent">
+          <label class="item item-input">
+            <span class="input-label">Email</span>
+            <input type="email" ng-model="vm.email" autocomplete="email" required>
+          </label>
+          <button class="button button-positive button-block" type="submit" ng-disabled="vm.pending">Bağlantı gönder</button>
+          <button class="button button-clear button-stable button-block" type="button" ng-click="vm.back()">Girişe dön</button>
+          <p class="error-line" ng-if="vm.error">{{vm.error}}</p>
+        </form>
+        <div class="list login-form" ng-if="vm.sent">
+          <div class="item item-text-wrap">Hesap eşleşirse parola sıfırlama bağlantısı gönderildi.</div>
+          <button class="button button-positive button-block" type="button" ng-click="vm.back()">Girişe dön</button>
+        </div>
+      </ion-content>
+    </ion-view>
+  </script>
+
+  <script id="templates/reset-password.html" type="text/ng-template">
+    <ion-view view-title="Yeni parola">
+      <ion-content class="login-surface">
+        <form class="list login-form" ng-submit="vm.submit()" ng-if="!vm.reset">
+          <label class="item item-input">
+            <span class="input-label">Yeni parola</span>
+            <input type="password" ng-model="vm.form.newPassword" autocomplete="new-password" required>
+          </label>
+          <label class="item item-input">
+            <span class="input-label">Tekrar</span>
+            <input type="password" ng-model="vm.form.confirmPassword" autocomplete="new-password" required>
+          </label>
+          <button class="button button-positive button-block" type="submit" ng-disabled="vm.pending">Parolayı değiştir</button>
+          <p class="error-line" ng-if="vm.error">{{vm.error}}</p>
+        </form>
+        <div class="list login-form" ng-if="vm.reset">
+          <div class="item item-text-wrap">Parolanız değiştirildi.</div>
+          <button class="button button-positive button-block" type="button" ng-click="vm.back()">Giriş yap</button>
+        </div>
+      </ion-content>
+    </ion-view>
+  </script>
+
+  <script id="templates/project-detail.html" type="text/ng-template">
+    <ion-view view-title="{{vm.project.name || 'Proje'}}">
+      <ion-content class="workspace" data-project-saving="{{vm.saving ? 'true' : 'false'}}">
+        <div class="mobile-feedback success" ng-if="vm.notice">{{vm.notice}}</div>
+        <div class="mobile-feedback error" ng-if="vm.error">{{vm.error}}</div>
+        <form class="mobile-manage-form" ng-if="vm.project && vm.canManage" ng-submit="vm.saveProject()">
+          <label><span>Proje adı</span><input type="text" ng-model="vm.projectDraft.name" aria-label="Mobil proje adı" required></label>
+          <label><span>Görünürlük</span><select ng-model="vm.projectDraft.visibility" aria-label="Mobil proje görünürlüğü"><option>Private</option><option>Internal</option><option>Public</option></select></label>
+          <div class="mobile-form-actions"><button class="button button-small button-positive" type="submit" ng-disabled="vm.saving">Projeyi kaydet</button><button class="button button-small button-assertive button-outline" type="button" ng-if="vm.canArchive" ng-click="vm.archiveProject()" ng-disabled="vm.saving">Arşivle</button></div>
+        </form>
+        <div class="mobile-permission" ng-if="vm.project && !vm.canManage"><i class="ion-locked"></i> Bu projede yönetim yetkiniz yok.</div>
+        <div class="item item-divider">Panolar</div>
+        <div class="mobile-entity-row" ng-repeat="board in vm.boards track by board.id">
+          <div class="mobile-entity-fields"><input type="text" ng-model="board.name" aria-label="Mobil pano adı" ng-disabled="!vm.canManage"><select ng-model="board.type" aria-label="Mobil pano türü" ng-disabled="!vm.canManage"><option>Kanban</option><option>Scrum</option></select><small>{{board.columns.length}} kolon</small></div>
+          <div class="mobile-row-actions"><button class="button button-small button-stable" ng-click="vm.selectBoard(board)">Görevleri aç</button><button class="button button-small button-positive button-outline" ng-if="vm.canManage" ng-click="vm.saveBoard(board)" ng-disabled="vm.saving">Kaydet</button><button class="button button-small button-assertive button-clear" ng-if="vm.canManage" ng-click="vm.archiveBoard(board)" ng-disabled="vm.saving">Arşivle</button></div>
+        </div>
+        <div class="item item-text-wrap" ng-if="!vm.boards.length">Henüz pano yok.</div>
+        <form class="mobile-manage-form compact" ng-if="vm.canManage" ng-submit="vm.createBoard()"><label><span>Yeni pano</span><input type="text" ng-model="vm.boardDraft.name" aria-label="Yeni mobil pano adı" required></label><label><span>Tür</span><select ng-model="vm.boardDraft.type" aria-label="Yeni mobil pano türü"><option>Kanban</option><option>Scrum</option></select></label><button class="button button-small button-positive" type="submit" ng-disabled="vm.saving">Pano oluştur</button></form>
+        <div class="item item-divider" ng-if="vm.archivedBoards.length">Arşivlenmiş panolar</div>
+        <div class="mobile-archive-row" ng-repeat="board in vm.archivedBoards track by board.id"><span>{{board.name}}</span><button class="button button-small button-stable" ng-click="vm.restoreBoard(board)">Geri yükle</button></div>
+        <div class="item item-divider">Proje etkinliği</div>
+        <div class="mobile-timeline"><p ng-repeat="entry in vm.audit | limitTo:8"><strong>{{entry.action}}</strong><span>{{entry.createdAt | date:'dd.MM HH:mm'}}</span></p><p ng-if="!vm.audit.length">Henüz etkinlik yok.</p></div>
+      </ion-content>
+    </ion-view>
+  </script>
+
+  <script id="templates/team-detail.html" type="text/ng-template">
+    <ion-view view-title="{{vm.team.name || 'Ekip'}}">
+      <ion-content class="workspace" data-team-saving="{{vm.saving ? 'true' : 'false'}}">
+        <div class="mobile-feedback success" ng-if="vm.notice">{{vm.notice}}</div>
+        <div class="mobile-feedback error" ng-if="vm.error">{{vm.error}}</div>
+        <form class="mobile-manage-form" ng-if="vm.team && vm.canManage" ng-submit="vm.save()"><label><span>Ekip adı</span><input type="text" ng-model="vm.teamDraft.name" aria-label="Mobil ekip adı" required></label><div class="mobile-form-actions"><button class="button button-small button-positive" type="submit" ng-disabled="vm.saving">Ekibi kaydet</button><button class="button button-small button-assertive button-outline" type="button" ng-if="vm.canArchive" ng-click="vm.archive()" ng-disabled="vm.saving">Arşivle</button></div></form>
+        <div class="mobile-permission" ng-if="vm.team && !vm.canManage"><i class="ion-locked"></i> Bu ekipte yönetim yetkiniz yok.</div>
+        <div class="item item-divider">Üyeler ve davetler</div>
+        <div class="mobile-member-row" ng-repeat="member in vm.team.members track by member.id"><span><strong>{{member.email}}</strong><small>{{member.role}} · {{member.status}}</small></span><button class="button button-small button-assertive button-clear ion-trash-a" ng-if="vm.canManage && member.role !== 'Owner'" ng-click="vm.removeMember(member)" aria-label="Mobil ekip üyesini kaldır"></button></div>
+        <form class="mobile-manage-form compact" ng-if="vm.canManage" ng-submit="vm.invite()"><label><span>E-posta</span><input type="email" ng-model="vm.inviteDraft.email" aria-label="Mobil ekip davet e-postası" required></label><label><span>Rol</span><select ng-model="vm.inviteDraft.role" aria-label="Mobil ekip davet rolü"><option>Member</option><option>Admin</option></select></label><button class="button button-small button-positive" type="submit" ng-disabled="vm.saving">Davet et</button></form>
+        <div class="item item-divider">Ekip etkinliği</div>
+        <div class="mobile-timeline"><p ng-repeat="entry in vm.audit | limitTo:8"><strong>{{entry.action}}</strong><span>{{entry.createdAt | date:'dd.MM HH:mm'}}</span></p><p ng-if="!vm.audit.length">Henüz etkinlik yok.</p></div>
+      </ion-content>
+    </ion-view>
+  </script>
+
+  <script id="templates/task-detail.html" type="text/ng-template">
+    <ion-view view-title="Görev detayı">
+      <ion-content class="workspace" ng-if="vm.task">
+        <div class="list task-detail-list">
+          <div class="item item-text-wrap">
+            <p>{{vm.task.type}} · {{vm.task.priority}}</p>
+            <h2>{{vm.task.title}}</h2>
+            <p>{{vm.task.description || 'Açıklama yok.'}}</p>
+          </div>
+
+          <div class="item item-divider">Durum</div>
+          <div class="item item-text-wrap">
+            <strong>{{vm.task.status}}</strong>
+            <div class="button-bar transition-bar" ng-if="vm.transitions.length">
+              <button class="button button-small button-positive" ng-repeat="transition in vm.transitions" ng-click="vm.move(transition.toStatus)">
+                {{transition.toStatus}}
+              </button>
+            </div>
+          </div>
+
+          <div class="item item-divider">Etiketler</div>
+          <div class="item item-text-wrap">
+            <span class="label-chip" ng-repeat="label in vm.task.labels">{{label}}</span>
+            <div class="inline-command">
+              <input type="text" ng-model="vm.labelText" placeholder="Etiket">
+              <button class="button button-small button-stable ion-plus" ng-click="vm.addLabel()" aria-label="Etiket ekle"></button>
+            </div>
+          </div>
+
+          <div class="item item-divider">Kontrol listesi</div>
+          <ion-checkbox ng-repeat="item in vm.task.checklist" ng-checked="item.completed" ng-click="vm.toggleChecklist(item)">
+            {{item.text}}
+          </ion-checkbox>
+          <div class="item inline-command">
+            <input type="text" ng-model="vm.checklistText" placeholder="Yeni madde">
+            <button class="button button-small button-stable ion-plus" ng-click="vm.addChecklist()" aria-label="Madde ekle"></button>
+          </div>
+
+          <div class="item item-divider">Dosyalar</div>
+          <div class="item item-button-right" ng-repeat="attachment in vm.task.attachments">
+            <button class="button button-clear button-dark attachment-name" ng-click="vm.download(attachment)">{{attachment.fileName}}</button>
+            <button class="button button-clear button-assertive ion-trash-a" ng-click="vm.removeAttachment(attachment)" aria-label="Dosyayı sil"></button>
+          </div>
+          <div class="item attachment-upload">
+            <input type="file" file-change="vm.attachmentFile = file">
+            <button class="button button-small button-stable ion-upload" ng-click="vm.upload()" ng-disabled="!vm.attachmentFile" aria-label="Dosya yükle"></button>
+          </div>
+
+          <div class="item item-divider">Yorumlar</div>
+          <div class="item item-text-wrap" ng-repeat="comment in vm.task.comments">
+            <h3>{{comment.authorUserId}}</h3>
+            <p>{{comment.body}}</p>
+          </div>
+          <label class="item item-input item-stacked-label">
+            <span class="input-label">Yorum</span>
+            <textarea ng-model="vm.commentBody" rows="3"></textarea>
+          </label>
+          <button class="button button-positive button-block" ng-click="vm.addComment()">Yorum ekle</button>
+        </div>
+      </ion-content>
+    </ion-view>
+  </script>
+
+  <script id="templates/tabs.html" type="text/ng-template">
+    <ion-tabs class="tabs-icon-top tabs-stable">
+      <ion-tab title="Özet" icon="ion-speedometer" href="#/app/dashboard">
+        <ion-nav-view name="dashboard"></ion-nav-view>
+      </ion-tab>
+      <ion-tab title="Çalışma" icon="ion-folder" href="#/app/projects">
+        <ion-nav-view name="projects"></ion-nav-view>
+      </ion-tab>
+      <ion-tab title="Görevlerim" icon="ion-clipboard" href="#/app/tasks">
+        <ion-nav-view name="tasks"></ion-nav-view>
+      </ion-tab>
+      <ion-tab title="Bildirimler" icon="ion-ios-bell" href="#/app/notifications">
+        <ion-nav-view name="notifications"></ion-nav-view>
+      </ion-tab>
+      <ion-tab title="Profil" icon="ion-person" href="#/app/profile">
+        <ion-nav-view name="profile"></ion-nav-view>
+      </ion-tab>
+    </ion-tabs>
+  </script>
+
+  <script id="templates/dashboard.html" type="text/ng-template">
+    <ion-view view-title="Özet">
+      <ion-content class="workspace" delegate-handle="dashboardScroll">
+        <ion-refresher pulling-text="Yenile" on-refresh="vm.refresh()"></ion-refresher>
+        <section class="metric-band">
+          <div>
+            <strong>{{vm.summary.total || 0}}</strong>
+            <span>Toplam</span>
+          </div>
+          <div>
+            <strong>{{vm.summary.inProgress || 0}}</strong>
+            <span>Aktif</span>
+          </div>
+          <div>
+            <strong>{{vm.summary.done || 0}}</strong>
+            <span>Tamam</span>
+          </div>
+          <div>
+            <strong>{{vm.summary.overdue || 0}}</strong>
+            <span>Geciken</span>
+          </div>
+        </section>
+        <div class="section-title">Güncel işler</div>
+        <ion-list>
+          <ion-item class="task-row" ng-repeat="task in vm.tasks" ng-click="vm.openTask(task)">
+            <h2>{{task.title}}</h2>
+            <p>{{task.status}} · {{task.priority}}</p>
+            <span class="badge badge-balanced" ng-if="task.status === 'Done'">tamam</span>
+          </ion-item>
+        </ion-list>
+      </ion-content>
+    </ion-view>
+  </script>
+
+  <script id="templates/projects.html" type="text/ng-template">
+    <ion-view view-title="Çalışma alanları">
+      <ion-content class="workspace">
+        <div class="segmented workspace-segments"><button ng-class="{active: vm.mode === 'projects'}" ng-click="vm.setMode('projects')">Projeler</button><button ng-class="{active: vm.mode === 'teams'}" ng-click="vm.setMode('teams')">Ekipler</button><button ng-class="{active: vm.mode === 'archive'}" ng-click="vm.setMode('archive')">Arşiv</button></div>
+        <div class="mobile-feedback success" ng-if="vm.notice">{{vm.notice}}</div>
+        <div class="mobile-feedback error" ng-if="vm.error">{{vm.error}}</div>
+        <section ng-if="vm.mode === 'projects'">
+          <form class="mobile-manage-form compact" ng-submit="vm.createProject()"><label><span>Anahtar</span><input type="text" ng-model="vm.projectDraft.key" aria-label="Yeni mobil proje anahtarı" maxlength="12" required></label><label><span>Proje adı</span><input type="text" ng-model="vm.projectDraft.name" aria-label="Yeni mobil proje adı" required></label><button class="button button-small button-positive" type="submit" ng-disabled="vm.saving">Proje oluştur</button></form>
+          <ion-list><ion-item ng-repeat="project in vm.projects track by project.id" ng-click="vm.select(project)">
+            <h2>{{project.key}} · {{project.name}}</h2>
+            <p>{{project.members.length}} üye · {{project.visibility}}</p>
+            <i class="icon ion-chevron-right icon-accessory"></i>
+          </ion-item><ion-item ng-if="!vm.projects.length">Henüz proje yok.</ion-item></ion-list>
+        </section>
+        <section ng-if="vm.mode === 'teams'">
+          <form class="mobile-manage-form compact" ng-submit="vm.createTeam()"><label><span>Ekip adı</span><input type="text" ng-model="vm.teamDraft.name" aria-label="Yeni mobil ekip adı" required></label><button class="button button-small button-positive" type="submit" ng-disabled="vm.saving">Ekip oluştur</button></form>
+          <ion-list><ion-item ng-repeat="team in vm.teams track by team.id" ng-click="vm.selectTeam(team)"><h2>{{team.name}}</h2><p>{{team.members.length}} üye ve davet</p><i class="icon ion-chevron-right icon-accessory"></i></ion-item><ion-item ng-if="!vm.teams.length">Henüz ekip yok.</ion-item></ion-list>
+        </section>
+        <section ng-if="vm.mode === 'archive'">
+          <div class="item item-divider">Projeler</div><div class="mobile-archive-row" ng-repeat="project in vm.archivedProjects track by project.id"><span>{{project.key}} · {{project.name}}</span><button class="button button-small button-stable" ng-click="vm.restoreProject(project)">Geri yükle</button></div><div class="item item-text-wrap" ng-if="!vm.archivedProjects.length">Arşivlenmiş proje yok.</div>
+          <div class="item item-divider">Ekipler</div><div class="mobile-archive-row" ng-repeat="team in vm.archivedTeams track by team.id"><span>{{team.name}}</span><button class="button button-small button-stable" ng-click="vm.restoreTeam(team)">Geri yükle</button></div><div class="item item-text-wrap" ng-if="!vm.archivedTeams.length">Arşivlenmiş ekip yok.</div>
+        </section>
+      </ion-content>
+    </ion-view>
+  </script>
+
+  <script id="templates/tasks.html" type="text/ng-template">
+    <ion-view view-title="Görevlerim">
+      <ion-nav-buttons side="right">
+        <button class="button button-icon ion-plus" ng-click="vm.quickAdd()"></button>
+      </ion-nav-buttons>
+      <ion-content class="workspace">
+        <div class="segmented">
+          <button ng-class="{active: vm.status === ''}" ng-click="vm.filter('')">Tümü</button>
+          <button ng-class="{active: vm.status === 'To Do'}" ng-click="vm.filter('To Do')">Yapılacak</button>
+          <button ng-class="{active: vm.status === 'In Progress'}" ng-click="vm.filter('In Progress')">Aktif</button>
+          <button ng-class="{active: vm.status === 'Done'}" ng-click="vm.filter('Done')">Tamam</button>
+        </div>
+        <ion-list>
+          <ion-item class="task-row" collection-repeat="task in vm.tasks" item-height="58px" item-width="100%" ng-click="vm.openTask(task)">
+            <h2>{{task.title}}</h2>
+            <p>{{task.type}} · {{task.status}} · {{task.priority}}</p>
+          </ion-item>
+        </ion-list>
+        <ion-infinite-scroll ng-if="vm.hasMore" on-infinite="vm.loadMore()" distance="10%"></ion-infinite-scroll>
+      </ion-content>
+    </ion-view>
+  </script>
+
+  <script id="templates/notifications.html" type="text/ng-template">
+    <ion-view view-title="Bildirimler">
+      <ion-content class="workspace">
+        <ion-list>
+          <ion-item ng-repeat="notification in vm.notifications" ng-click="vm.read(notification)">
+            <h2>{{notification.type}}</h2>
+            <p>{{notification.message}}</p>
+            <span class="badge badge-assertive" ng-if="!notification.read">yeni</span>
+          </ion-item>
+        </ion-list>
+      </ion-content>
+    </ion-view>
+  </script>
+
+  <script id="templates/profile.html" type="text/ng-template">
+    <ion-view view-title="Profil">
+      <ion-content class="workspace profile">
+        <img src="../shared/zumbo-mark.svg" alt="Zumbo">
+        <h2>{{shell.session.currentUser.username}}</h2>
+        <p>{{shell.session.currentUser.email}}</p>
+        <p>{{shell.session.currentUser.organizationId}}</p>
+        <button class="button button-stable button-block icon-left ion-contrast" ng-click="shell.toggleTheme()">Temayı değiştir</button>
+        <button class="button button-stable button-block" ng-click="shell.logout()">Çıkış yap</button>
+      </ion-content>
+    </ion-view>
+  </script>
+
+  <script src="https://code.ionicframework.com/1.3.3/js/ionic.bundle.min.js" integrity="sha384-+iCv/qN7g8M4X9JK/LxyH8eSoAAmBT14BG8XKxnA8tOLQ1fraUOcAdoNA3I8cQPf" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@microsoft/signalr@8.0.7/dist/browser/signalr.min.js" integrity="sha384-mU1xC5yC2LldSW74Rj1Ax8wPiLw/28V5eh51uKJMlBbRVsOtUYd4xyzNsgIAJARB" crossorigin="anonymous"></script>
+  <script src="./app.js"></script>
+  <script>if ('serviceWorker' in navigator) { window.addEventListener('load', function() { navigator.serviceWorker.register('./service-worker.js'); }); }</script>
+</body>
+</html>

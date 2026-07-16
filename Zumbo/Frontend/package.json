@@ -1,0 +1,11 @@
+{
+  "name": "@zumbo/frontend-quality",
+  "private": true,
+  "scripts": {
+    "generate:pwa-icons": "node tests/generate-pwa-icons.mjs",
+    "test:e2e": "node tests/ui-quality.mjs"
+  },
+  "devDependencies": {
+    "playwright-core": "1.61.1"
+  }
+}
