@@ -1,6 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
+    <ProjectReference Include="..\Zumbo.BuildingBlocks.Application\Zumbo.BuildingBlocks.Application.csproj" />
     <ProjectReference Include="..\Zumbo.SharedKernel\Zumbo.SharedKernel.csproj" />
   </ItemGroup>
 

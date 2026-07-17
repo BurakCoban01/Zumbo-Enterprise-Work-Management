@@ -3,6 +3,8 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using StackExchange.Redis;
+using Zumbo.BuildingBlocks.Application.Concurrency;
+using Zumbo.BuildingBlocks.Application.Runtime;
 
 namespace Zumbo.BuildingBlocks.Infrastructure.Concurrency;
 
@@ -25,33 +27,27 @@ public static class DistributedLockServiceCollectionExtensions
             ?? new RedisLockOptions();
         var connectionOptions = ConfigurationOptions.Parse(redisOptions.ConnectionString);
         connectionOptions.AbortOnConnectFail = false;
+        connectionOptions.ConnectTimeout = redisOptions.ConnectTimeoutMilliseconds;
+        connectionOptions.AsyncTimeout = redisOptions.AsyncTimeoutMilliseconds;
+        connectionOptions.SyncTimeout = redisOptions.SyncTimeoutMilliseconds;
+        connectionOptions.ConnectRetry = redisOptions.ConnectRetry;
+        connectionOptions.KeepAlive = redisOptions.KeepAliveSeconds;
         services.AddSingleton<IConnectionMultiplexer>(_ => ConnectionMultiplexer.Connect(connectionOptions));
         services.AddSingleton<IDistributedLockProvider, RedisDistributedLockProvider>();
         return services;
     }
 }
 
-public sealed class DistributedLockOptions
-{
-    public string Provider { get; init; } = "InMemory";
-    public int LeaseSeconds { get; init; } = 30;
-    public int WaitSeconds { get; init; } = 5;
-}
-
 public sealed class RedisLockOptions
 {
-    public string ConnectionString { get; init; } = "localhost:6379,abortConnect=false";
+    public string ConnectionString { get; init; } = string.Empty;
     public string KeyPrefix { get; init; } = "zumbo:lock:";
     public int RetryMilliseconds { get; init; } = 100;
-}
-
-public interface IDistributedLockProvider
-{
-    Task<IAsyncDisposable?> TryAcquireAsync(
-        string resource,
-        TimeSpan leaseTime,
-        TimeSpan waitTime,
-        CancellationToken ct = default);
+    public int ConnectTimeoutMilliseconds { get; init; } = 5_000;
+    public int AsyncTimeoutMilliseconds { get; init; } = 1_000;
+    public int SyncTimeoutMilliseconds { get; init; } = 1_000;
+    public int ConnectRetry { get; init; } = 2;
+    public int KeepAliveSeconds { get; init; } = 60;
 }
 
 public sealed class InMemoryDistributedLockProvider : IDistributedLockProvider
@@ -140,16 +136,34 @@ public sealed class InMemoryDistributedLockProvider : IDistributedLockProvider
     }
 }
 
-public sealed class RedisDistributedLockProvider(
-    IConnectionMultiplexer connection,
-    IOptions<RedisLockOptions> redisOptions) : IDistributedLockProvider
+public sealed class RedisDistributedLockProvider : IDistributedLockProvider
 {
+    private readonly IConnectionMultiplexer connection;
+    private readonly IOptions<RedisLockOptions> redisOptions;
+    private readonly IExternalDependencyPolicy? resiliencePolicy;
     private const string RenewScript =
         "if redis.call('get', KEYS[1]) == ARGV[1] then "
         + "return redis.call('pexpire', KEYS[1], ARGV[2]) else return 0 end";
     private const string ReleaseScript =
         "if redis.call('get', KEYS[1]) == ARGV[1] then "
         + "return redis.call('del', KEYS[1]) else return 0 end";
+
+    public RedisDistributedLockProvider(
+        IConnectionMultiplexer connection,
+        IOptions<RedisLockOptions> redisOptions)
+        : this(connection, redisOptions, null)
+    {
+    }
+
+    public RedisDistributedLockProvider(
+        IConnectionMultiplexer connection,
+        IOptions<RedisLockOptions> redisOptions,
+        IExternalDependencyPolicyProvider? policyProvider)
+    {
+        this.connection = connection;
+        this.redisOptions = redisOptions;
+        resiliencePolicy = policyProvider?.Get(ExternalDependencyNames.Redis);
+    }
 
     public async Task<IAsyncDisposable?> TryAcquireAsync(
         string resource,
@@ -172,9 +186,17 @@ public sealed class RedisDistributedLockProvider(
         do
         {
             ct.ThrowIfCancellationRequested();
-            if (await database.StringSetAsync(key, ownerToken, leaseTime, When.NotExists))
+            var acquired = resiliencePolicy is null
+                ? await database.StringSetAsync(key, ownerToken, leaseTime, When.NotExists)
+                : await resiliencePolicy.ExecuteAsync(
+                    "lock-acquire",
+                    ExternalDependencyOperationKind.IdempotentWrite,
+                    _ => database.StringSetAsync(key, ownerToken, leaseTime, When.NotExists),
+                    IsTransient,
+                    ct);
+            if (acquired)
             {
-                return new RedisLockHandle(database, key, ownerToken, leaseTime);
+                return new RedisLockHandle(database, key, ownerToken, leaseTime, resiliencePolicy);
             }
 
             if (DateTimeOffset.UtcNow >= deadline)
@@ -193,6 +215,7 @@ public sealed class RedisDistributedLockProvider(
         private readonly RedisKey _key;
         private readonly RedisValue _ownerToken;
         private readonly TimeSpan _leaseTime;
+        private readonly IExternalDependencyPolicy? _resiliencePolicy;
         private readonly CancellationTokenSource _renewalCancellation = new();
         private readonly Task _renewalTask;
         private int _released;
@@ -201,12 +224,14 @@ public sealed class RedisDistributedLockProvider(
             IDatabase database,
             RedisKey key,
             RedisValue ownerToken,
-            TimeSpan leaseTime)
+            TimeSpan leaseTime,
+            IExternalDependencyPolicy? resiliencePolicy)
         {
             _database = database;
             _key = key;
             _ownerToken = ownerToken;
             _leaseTime = leaseTime;
+            _resiliencePolicy = resiliencePolicy;
             _renewalTask = RenewUntilReleasedAsync();
         }
 
@@ -229,10 +254,19 @@ public sealed class RedisDistributedLockProvider(
             {
                 try
                 {
-                    await _database.ScriptEvaluateAsync(
-                        ReleaseScript,
-                        [_key],
-                        [_ownerToken]);
+                    if (_resiliencePolicy is null)
+                    {
+                        await _database.ScriptEvaluateAsync(ReleaseScript, [_key], [_ownerToken]);
+                    }
+                    else
+                    {
+                        await _resiliencePolicy.ExecuteAsync(
+                            "lock-release",
+                            ExternalDependencyOperationKind.IdempotentWrite,
+                            _ => _database.ScriptEvaluateAsync(ReleaseScript, [_key], [_ownerToken]),
+                            IsTransient,
+                            CancellationToken.None);
+                    }
                 }
                 finally
                 {
@@ -247,10 +281,16 @@ public sealed class RedisDistributedLockProvider(
             while (!_renewalCancellation.IsCancellationRequested)
             {
                 await Task.Delay(renewalInterval, _renewalCancellation.Token);
-                var renewed = await _database.ScriptEvaluateAsync(
-                    RenewScript,
-                    [_key],
-                    [_ownerToken, (long)_leaseTime.TotalMilliseconds]);
+                var renewed = _resiliencePolicy is null
+                    ? await _database.ScriptEvaluateAsync(
+                        RenewScript, [_key], [_ownerToken, (long)_leaseTime.TotalMilliseconds])
+                    : await _resiliencePolicy.ExecuteAsync(
+                        "lock-renew",
+                        ExternalDependencyOperationKind.IdempotentWrite,
+                        _ => _database.ScriptEvaluateAsync(
+                            RenewScript, [_key], [_ownerToken, (long)_leaseTime.TotalMilliseconds]),
+                        IsTransient,
+                        _renewalCancellation.Token);
                 if ((long)renewed == 0)
                 {
                     throw new InvalidOperationException("Distributed lock ownership was lost before release.");
@@ -258,4 +298,6 @@ public sealed class RedisDistributedLockProvider(
             }
         }
     }
+
+    private static bool IsTransient(Exception exception) => exception is RedisException;
 }

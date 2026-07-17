@@ -3,14 +3,9 @@ using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
 using Microsoft.IdentityModel.Tokens;
+using Zumbo.BuildingBlocks.Application.Security;
 
 namespace Zumbo.BuildingBlocks.Infrastructure.Security;
-
-public interface IPasswordHasher
-{
-    string Hash(string plainPassword);
-    bool Verify(string plainPassword, string passwordHash);
-}
 
 public sealed class Pbkdf2PasswordHasher : IPasswordHasher
 {
@@ -73,29 +68,29 @@ public sealed class Pbkdf2PasswordHasher : IPasswordHasher
             return false;
         }
     }
-}
 
-public sealed class JwtOptions
-{
-    public string Issuer { get; init; } = "Zumbo";
-    public string Audience { get; init; } = "Zumbo.Clients";
-    public string SigningKey { get; init; } = "development-signing-key-change-me-please-32";
-    public int AccessTokenMinutes { get; init; } = 30;
-}
+    public bool NeedsRehash(string passwordHash)
+    {
+        if (string.IsNullOrWhiteSpace(passwordHash))
+        {
+            return true;
+        }
 
-public sealed record TokenUser(
-    string Id,
-    string Username,
-    string Email,
-    string OrganizationId,
-    IReadOnlyCollection<string> Roles,
-    string SecurityStamp,
-    string SessionId);
-
-public interface ITokenIssuer
-{
-    string CreateAccessToken(TokenUser user, JwtOptions options, DateTimeOffset now);
-    string CreateRefreshToken();
+        try
+        {
+            var parts = passwordHash.Split('$');
+            return parts.Length != 4
+                || parts[0] != "PBKDF2-SHA256"
+                || !int.TryParse(parts[1], out var iterations)
+                || iterations != Iterations
+                || Convert.FromBase64String(parts[2]).Length != SaltSize
+                || Convert.FromBase64String(parts[3]).Length != KeySize;
+        }
+        catch (FormatException)
+        {
+            return true;
+        }
+    }
 }
 
 public sealed class JwtTokenIssuer : ITokenIssuer
@@ -115,7 +110,11 @@ public sealed class JwtTokenIssuer : ITokenIssuer
 
         claims.AddRange(user.Roles.Select(role => new Claim(ClaimTypes.Role, role)));
 
-        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(options.SigningKey));
+        var activeKey = options.ResolveActiveSigningKey();
+        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(activeKey.Value))
+        {
+            KeyId = activeKey.Key
+        };
         var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
         var token = new JwtSecurityToken(
             options.Issuer,
