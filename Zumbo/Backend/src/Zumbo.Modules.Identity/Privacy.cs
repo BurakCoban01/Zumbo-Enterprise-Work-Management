@@ -1,9 +1,10 @@
 using System.Security.Cryptography;
 using System.Text;
 using Microsoft.Extensions.Options;
-using Zumbo.BuildingBlocks.Infrastructure.Concurrency;
-using Zumbo.BuildingBlocks.Infrastructure.Persistence;
-using Zumbo.BuildingBlocks.Infrastructure.Security;
+using Zumbo.BuildingBlocks.Application.Concurrency;
+using Zumbo.BuildingBlocks.Application.Messaging;
+using Zumbo.BuildingBlocks.Application.Persistence;
+using Zumbo.BuildingBlocks.Application.Security;
 using Zumbo.SharedKernel;
 
 namespace Zumbo.Modules.Identity;
@@ -19,12 +20,24 @@ public sealed record PrivacyExportResponse(
     IReadOnlyCollection<PrivacyDataGroup> Data);
 public sealed record AnonymizeAccountRequest(string Password, string Confirmation);
 public sealed record AnonymizeAccountResponse(bool Anonymized, string Pseudonym);
+public sealed record PrivacyAnonymizationContext(
+    string UserId,
+    string OrganizationId,
+    string Pseudonym,
+    string Username,
+    string Email);
 
 public interface IPrivacyDataProcessor
 {
     Task<IReadOnlyCollection<PrivacyDataGroup>> ExportAsync(
         string userId,
         string organizationId,
+        CancellationToken ct);
+    Task<long> WriteExportAsync(
+        string userId,
+        string organizationId,
+        UserProfileResponse profile,
+        Stream destination,
         CancellationToken ct);
     Task EnsureCanAnonymizeAsync(string userId, string organizationId, CancellationToken ct);
     Task AnonymizeReferencesAsync(
@@ -38,7 +51,9 @@ public interface IPrivacyDataProcessor
 
 public sealed class PrivacyService(
     IUserRepository users,
-    IDocumentRepository<ApiKeyDocument> apiKeys,
+    IRefreshSessionStore sessions,
+    IApiKeyStore apiKeys,
+    IDurableTransactionRunner transactions,
     IPasswordHasher passwordHasher,
     IPrivacyDataProcessor dataProcessor,
     IIdentityAuditWriter audit,
@@ -54,15 +69,37 @@ public sealed class PrivacyService(
         return new PrivacyExportResponse(user.ToProfile(), clock.UtcNow, data);
     }
 
+    public async Task<long> StreamExportAsync(Stream destination, CancellationToken ct)
+    {
+        var user = await GetCurrentUserAsync(ct);
+        return await dataProcessor.WriteExportAsync(
+            user.Id,
+            user.OrganizationId,
+            user.ToProfile(),
+            destination,
+            ct);
+    }
+
     public async Task<AnonymizeAccountResponse> AnonymizeAsync(
         AnonymizeAccountRequest request,
         string correlationId,
         CancellationToken ct)
     {
-        var candidate = await GetCurrentUserAsync(ct);
-        await using var userLock = await AcquireUserLockAsync(candidate.Id, ct);
-        var user = await users.GetByIdAsync(candidate.Id, ct)
-            ?? throw new UnauthorizedException("Authenticated user was not found.");
+        var context = await ValidateAnonymizationAsync(request, ct);
+        await AnonymizeReferencesForWorkflowAsync(context.UserId, context.Pseudonym, ct);
+        await FinalizeAnonymizationForWorkflowAsync(
+            context.UserId,
+            context.Pseudonym,
+            correlationId,
+            ct);
+        return new AnonymizeAccountResponse(true, context.Pseudonym);
+    }
+
+    public async Task<PrivacyAnonymizationContext> ValidateAnonymizationAsync(
+        AnonymizeAccountRequest request,
+        CancellationToken ct)
+    {
+        var user = await GetCurrentUserAsync(ct);
         if (request.Confirmation != "ANONYMIZE")
         {
             throw new ValidationException("Confirmation must exactly match ANONYMIZE.");
@@ -77,13 +114,23 @@ public sealed class PrivacyService(
         await dataProcessor.EnsureCanAnonymizeAsync(user.Id, user.OrganizationId, ct);
         var pseudonym = "anon-" + Convert.ToHexString(
             SHA256.HashData(Encoding.UTF8.GetBytes(user.Id)))[..16].ToLowerInvariant();
-        await audit.WriteAsync(
-            "UserAnonymized",
+        return new PrivacyAnonymizationContext(
             user.Id,
-            "active",
+            user.OrganizationId,
             pseudonym,
-            correlationId,
-            ct);
+            user.Username,
+            user.Email);
+    }
+
+    public async Task AnonymizeReferencesForWorkflowAsync(
+        string userId,
+        string pseudonym,
+        CancellationToken ct)
+    {
+        await using var userLock = await AcquireUserLockAsync(userId, ct);
+        var user = await users.GetByIdAsync(userId, ct)
+            ?? throw new NotFoundException("PRIVACY_USER_NOT_FOUND", "Privacy workflow user was not found.");
+        await dataProcessor.EnsureCanAnonymizeAsync(user.Id, user.OrganizationId, ct);
         await dataProcessor.AnonymizeReferencesAsync(
             user.Id,
             user.OrganizationId,
@@ -91,55 +138,60 @@ public sealed class PrivacyService(
             user.Username,
             user.Email,
             ct);
-
-        var keys = await LoadAllApiKeysAsync(user.Id, ct);
-        foreach (var key in keys.Where(x => x.RevokedAt is null))
-        {
-            key.RevokedAt = clock.UtcNow;
-            await apiKeys.ReplaceByFilterAsync(x => x.Id == key.Id, key, ct);
-        }
-
-        user.Username = pseudonym;
-        user.Email = pseudonym + "@invalid.local";
-        user.PasswordHash = passwordHasher.Hash(Convert.ToBase64String(RandomNumberGenerator.GetBytes(48)) + "A1!");
-        user.IsActive = false;
-        user.SecurityStamp = Guid.NewGuid().ToString("N");
-        user.FailedLoginCount = 0;
-        user.LockedUntil = null;
-        user.PasswordResetTokenHash = null;
-        user.PasswordResetTokenExpiresAt = null;
-        user.MfaEnabled = false;
-        user.MfaSecretProtected = null;
-        user.PendingMfaSecretProtected = null;
-        user.PendingMfaExpiresAt = null;
-        user.MfaRecoveryCodeHashes.Clear();
-        user.Roles = ["User"];
-        foreach (var token in user.RefreshTokens.Where(x => x.IsActive(clock.UtcNow)))
-        {
-            token.RevokedAt = clock.UtcNow;
-        }
-
-        await users.UpdateAsync(user, ct);
-        return new AnonymizeAccountResponse(true, pseudonym);
     }
 
-    private async Task<IReadOnlyList<ApiKeyDocument>> LoadAllApiKeysAsync(string userId, CancellationToken ct)
+    public async Task FinalizeAnonymizationForWorkflowAsync(
+        string userId,
+        string pseudonym,
+        string correlationId,
+        CancellationToken ct)
     {
-        var result = new List<ApiKeyDocument>();
-        for (var page = 1; ; page++)
-        {
-            var batch = await apiKeys.ListByFilterAsync(
-                x => x.UserId == userId,
-                x => x.Id,
-                page: page,
-                pageSize: 200,
-                cancellationToken: ct);
-            result.AddRange(batch);
-            if (batch.Count < 200)
+        await using var userLock = await AcquireUserLockAsync(userId, ct);
+        var user = await users.GetByIdAsync(userId, ct)
+            ?? throw new NotFoundException("PRIVACY_USER_NOT_FOUND", "Privacy workflow user was not found.");
+
+        await transactions.ExecuteAsync(
+            "Identity",
+            async token =>
             {
-                return result;
-            }
-        }
+                var keys = await apiKeys.ListAllOwnedAsync(user.Id, user.OrganizationId, token);
+                foreach (var key in keys.Where(x => x.RevokedAt is null))
+                {
+                    key.RevokedAt = clock.UtcNow;
+                    key.RevokedAtUtc = key.RevokedAt.Value.UtcDateTime;
+                    if (!await apiKeys.ReplaceOwnedAsync(key, token))
+                    {
+                        throw new DocumentConflictException("API key disappeared during anonymization.");
+                    }
+                }
+
+                user.Username = pseudonym;
+                user.Email = pseudonym + "@invalid.local";
+                user.PasswordHash = passwordHasher.Hash(Convert.ToBase64String(RandomNumberGenerator.GetBytes(48)) + "A1!");
+                user.IsActive = false;
+                user.SecurityStamp = Guid.NewGuid().ToString("N");
+                user.FailedLoginCount = 0;
+                user.LockedUntil = null;
+                user.PasswordResetTokenHash = null;
+                user.PasswordResetTokenExpiresAt = null;
+                user.MfaEnabled = false;
+                user.MfaSecretProtected = null;
+                user.PendingMfaSecretProtected = null;
+                user.PendingMfaExpiresAt = null;
+                user.MfaRecoveryCodeHashes.Clear();
+                user.Roles = ["User"];
+                LegacyRefreshSessionCompatibility.RevokeAll(user, clock.UtcNow);
+                await sessions.RevokeAllAsync(user.Id, user.OrganizationId, clock.UtcNow, token);
+                await users.UpdateAsync(user, token);
+            },
+            ct);
+        await audit.WriteAsync(
+            "UserAnonymized",
+            user.Id,
+            "active",
+            pseudonym,
+            correlationId,
+            ct);
     }
 
     private async Task<UserDocument> GetCurrentUserAsync(CancellationToken ct)

@@ -1,7 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
-using Zumbo.BuildingBlocks.Infrastructure.Persistence;
-using Zumbo.BuildingBlocks.Infrastructure.Security;
+using Zumbo.BuildingBlocks.Application.Persistence;
+using Zumbo.BuildingBlocks.Application.Security;
 using Zumbo.SharedKernel;
 
 namespace Zumbo.Modules.Identity;
@@ -38,7 +38,7 @@ public sealed record ApiKeyPrincipal(
     IReadOnlyCollection<string> Roles,
     IReadOnlyCollection<string> Scopes);
 
-public sealed class ApiKeyDocument : IDocument
+public sealed class ApiKeyDocument : IVersionedDocument
 {
     public string Id { get; set; } = Guid.NewGuid().ToString("N");
     public string UserId { get; set; } = string.Empty;
@@ -49,12 +49,125 @@ public sealed class ApiKeyDocument : IDocument
     public List<string> Scopes { get; set; } = [];
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset ExpiresAt { get; set; }
+    public DateTime ExpiresAtUtc { get; set; }
     public DateTimeOffset? LastUsedAt { get; set; }
     public DateTimeOffset? RevokedAt { get; set; }
+    public DateTime? RevokedAtUtc { get; set; }
+    public long Version { get; set; }
+}
+
+public interface IApiKeyStore
+{
+    Task CreateAsync(ApiKeyDocument apiKey, CancellationToken ct);
+    Task<ApiKeyDocument?> GetByIdAsync(string apiKeyId, CancellationToken ct);
+    Task<ApiKeyDocument?> GetOwnedAsync(
+        string apiKeyId,
+        string userId,
+        string organizationId,
+        CancellationToken ct);
+    Task<IReadOnlyList<ApiKeyDocument>> ListOwnedAsync(
+        string userId,
+        string organizationId,
+        CancellationToken ct);
+    Task<IReadOnlyList<ApiKeyDocument>> ListAllOwnedAsync(
+        string userId,
+        string organizationId,
+        CancellationToken ct);
+    Task<bool> ReplaceOwnedAsync(ApiKeyDocument apiKey, CancellationToken ct);
+    Task<int> PurgeExpiredAsync(DateTimeOffset now, int batchSize, CancellationToken ct);
+}
+
+public sealed class ApiKeyStore(
+    IDocumentRepository<ApiKeyDocument> apiKeys) : IApiKeyStore
+{
+    public async Task CreateAsync(ApiKeyDocument apiKey, CancellationToken ct) =>
+        await apiKeys.CreateAsync(apiKey, ct);
+
+    public Task<ApiKeyDocument?> GetByIdAsync(string apiKeyId, CancellationToken ct) =>
+        apiKeys.SelectAsync(x => x.Id == apiKeyId, ct);
+
+    public Task<ApiKeyDocument?> GetOwnedAsync(
+        string apiKeyId,
+        string userId,
+        string organizationId,
+        CancellationToken ct) =>
+        apiKeys.SelectAsync(
+            x => x.Id == apiKeyId
+                && x.UserId == userId
+                && x.OrganizationId == organizationId,
+            ct);
+
+    public Task<IReadOnlyList<ApiKeyDocument>> ListOwnedAsync(
+        string userId,
+        string organizationId,
+        CancellationToken ct) =>
+        apiKeys.ListByFilterAsync(
+            x => x.UserId == userId && x.OrganizationId == organizationId,
+            x => x.CreatedAt,
+            orderDescending: true,
+            pageSize: 100,
+            cancellationToken: ct);
+
+    public async Task<IReadOnlyList<ApiKeyDocument>> ListAllOwnedAsync(
+        string userId,
+        string organizationId,
+        CancellationToken ct)
+    {
+        var result = new List<ApiKeyDocument>();
+        string? cursor = null;
+        do
+        {
+            var page = await apiKeys.ListByCursorAsync(
+                x => x.UserId == userId && x.OrganizationId == organizationId,
+                cursor,
+                pageSize: 200,
+                cancellationToken: ct);
+            result.AddRange(page.Items);
+            cursor = page.NextCursor;
+        }
+        while (cursor is not null);
+
+        return result;
+    }
+
+    public async Task<bool> ReplaceOwnedAsync(ApiKeyDocument apiKey, CancellationToken ct)
+    {
+        var result = await apiKeys.ReplaceByVersionAsync(
+            x => x.Id == apiKey.Id
+                && x.UserId == apiKey.UserId
+                && x.OrganizationId == apiKey.OrganizationId,
+            apiKey,
+            apiKey.Version,
+            ct);
+        if (result.Found)
+        {
+            apiKey.Version = result.Version!.Value;
+        }
+
+        return result.Found;
+    }
+
+    public async Task<int> PurgeExpiredAsync(DateTimeOffset now, int batchSize, CancellationToken ct)
+    {
+        var expired = await apiKeys.ListByFilterAsync(
+            x => x.ExpiresAtUtc <= now.UtcDateTime,
+            x => x.ExpiresAtUtc,
+            pageSize: Math.Clamp(batchSize, 1, 500),
+            cancellationToken: ct);
+        if (expired.Count == 0)
+        {
+            return 0;
+        }
+
+        var ids = expired.Select(x => x.Id).ToHashSet(StringComparer.Ordinal);
+        return checked((int)await apiKeys.DeleteByFilterAsync(
+            x => ids.Contains(x.Id) && x.ExpiresAtUtc <= now.UtcDateTime,
+            ct));
+    }
 }
 
 public sealed class ApiKeyService(
-    IDocumentRepository<ApiKeyDocument> apiKeys,
+    IApiKeyStore apiKeys,
     IUserRepository users,
     IPasswordHasher passwordHasher,
     IMfaSecretProtector mfaSecretProtector,
@@ -62,7 +175,7 @@ public sealed class ApiKeyService(
     IClock clock,
     ICurrentUser currentUser)
 {
-    private static readonly string[] AllowedScopes = ["api:full"];
+    private static readonly string[] DefaultScopes = [ApiKeyScopes.Full];
 
     public async Task<CreatedApiKeyResponse> CreateAsync(
         CreateApiKeyRequest request,
@@ -93,17 +206,18 @@ public sealed class ApiKeyService(
             }
         }
 
-        var scopes = (request.Scopes ?? AllowedScopes)
+        var scopes = (request.Scopes ?? DefaultScopes)
             .Select(x => x.Trim().ToLowerInvariant())
             .Where(x => x.Length > 0)
             .Distinct(StringComparer.Ordinal)
             .ToList();
-        if (scopes.Count == 0 || scopes.Except(AllowedScopes, StringComparer.Ordinal).Any())
+        if (scopes.Count is 0 or > 64 || scopes.Any(scope => !ApiKeyScopes.IsValid(scope)))
         {
             throw new ValidationException("API key scopes are invalid.");
         }
 
         var now = clock.UtcNow;
+        _ = await apiKeys.PurgeExpiredAsync(now, 100, ct);
         var expiresAt = request.ExpiresAt ?? now.AddDays(90);
         if (expiresAt <= now.AddHours(1) || expiresAt > now.AddDays(365))
         {
@@ -117,7 +231,8 @@ public sealed class ApiKeyService(
             Name = request.Name.Trim(),
             Scopes = scopes,
             CreatedAt = now,
-            ExpiresAt = expiresAt
+            ExpiresAt = expiresAt,
+            ExpiresAtUtc = expiresAt.UtcDateTime
         };
         var secret = Base64Url(RandomNumberGenerator.GetBytes(32));
         var rawKey = $"zmb_{document.Id}_{secret}";
@@ -144,26 +259,42 @@ public sealed class ApiKeyService(
     public async Task<IReadOnlyList<ApiKeyResponse>> ListAsync(CancellationToken ct)
     {
         var user = await GetCurrentUserAsync(ct);
-        var result = await apiKeys.ListByFilterAsync(
-            x => x.UserId == user.Id,
-            x => x.CreatedAt,
-            orderDescending: true,
-            pageSize: 100,
-            cancellationToken: ct);
+        var result = await apiKeys.ListOwnedAsync(user.Id, user.OrganizationId, ct);
         return result.Select(ToResponse).ToList();
     }
 
     public async Task RevokeAsync(string apiKeyId, string correlationId, CancellationToken ct)
     {
         var user = await GetCurrentUserAsync(ct);
-        var apiKey = await apiKeys.SelectAsync(x => x.Id == apiKeyId && x.UserId == user.Id, ct)
-            ?? throw new NotFoundException("API_KEY_NOT_FOUND", "API key was not found.");
-        if (apiKey.RevokedAt is null)
+        DocumentConcurrencyException? lastConflict = null;
+        for (var attempt = 0; attempt < 3; attempt++)
         {
+            var apiKey = await apiKeys.GetOwnedAsync(apiKeyId, user.Id, user.OrganizationId, ct)
+                ?? throw new NotFoundException("API_KEY_NOT_FOUND", "API key was not found.");
+            if (apiKey.RevokedAt is not null)
+            {
+                return;
+            }
+
             apiKey.RevokedAt = clock.UtcNow;
-            await apiKeys.ReplaceByFilterAsync(x => x.Id == apiKey.Id, apiKey, ct);
-            await audit.WriteAsync("ApiKeyRevoked", user.Id, apiKey.Id, null, correlationId, ct);
+            apiKey.RevokedAtUtc = apiKey.RevokedAt.Value.UtcDateTime;
+            try
+            {
+                if (!await apiKeys.ReplaceOwnedAsync(apiKey, ct))
+                {
+                    throw new NotFoundException("API_KEY_NOT_FOUND", "API key was not found.");
+                }
+
+                await audit.WriteAsync("ApiKeyRevoked", user.Id, apiKey.Id, null, correlationId, ct);
+                return;
+            }
+            catch (DocumentConcurrencyException conflict)
+            {
+                lastConflict = conflict;
+            }
         }
+
+        throw lastConflict!;
     }
 
     public async Task<ApiKeyPrincipal?> AuthenticateAsync(string rawKey, CancellationToken ct)
@@ -174,7 +305,7 @@ public sealed class ApiKeyService(
             return null;
         }
 
-        var apiKey = await apiKeys.SelectAsync(x => x.Id == keyId, ct);
+        var apiKey = await apiKeys.GetByIdAsync(keyId, ct);
         if (apiKey is null
             || apiKey.RevokedAt is not null
             || apiKey.ExpiresAt <= clock.UtcNow
@@ -192,7 +323,30 @@ public sealed class ApiKeyService(
         if (apiKey.LastUsedAt is null || apiKey.LastUsedAt < clock.UtcNow.AddMinutes(-5))
         {
             apiKey.LastUsedAt = clock.UtcNow;
-            await apiKeys.ReplaceByFilterAsync(x => x.Id == apiKey.Id, apiKey, ct);
+            try
+            {
+                if (!await apiKeys.ReplaceOwnedAsync(apiKey, ct))
+                {
+                    return null;
+                }
+            }
+            catch (DocumentConcurrencyException)
+            {
+                var current = await apiKeys.GetOwnedAsync(
+                    apiKey.Id,
+                    apiKey.UserId,
+                    apiKey.OrganizationId,
+                    ct);
+                if (current is null
+                    || current.RevokedAt is not null
+                    || current.ExpiresAt <= clock.UtcNow
+                    || !FixedTimeHashEquals(current.KeyHash, Hash(rawKey)))
+                {
+                    return null;
+                }
+
+                apiKey = current;
+            }
         }
 
         return new ApiKeyPrincipal(

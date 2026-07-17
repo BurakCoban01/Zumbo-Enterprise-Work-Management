@@ -1,7 +1,9 @@
 using System.Text.RegularExpressions;
 using Microsoft.Extensions.Options;
-using Zumbo.BuildingBlocks.Infrastructure.Concurrency;
-using Zumbo.BuildingBlocks.Infrastructure.Persistence;
+using Zumbo.BuildingBlocks.Application.Concurrency;
+using Zumbo.BuildingBlocks.Application.Messaging;
+using Zumbo.BuildingBlocks.Application.Persistence;
+using Zumbo.BuildingBlocks.Application.Security;
 using Zumbo.SharedKernel;
 
 namespace Zumbo.Modules.Identity;
@@ -41,6 +43,8 @@ public sealed class IdentityRoleDocument : IDocument
 public sealed class IdentityAdministrationService(
     IDocumentRepository<UserDocument> users,
     IDocumentRepository<IdentityRoleDocument> roles,
+    IRefreshSessionStore sessions,
+    IDurableTransactionRunner transactions,
     IdentityPermissionService permissionService,
     IIdentityAuditWriter audit,
     IDistributedLockProvider distributedLockProvider,
@@ -48,15 +52,6 @@ public sealed class IdentityAdministrationService(
     IClock clock,
     ICurrentUser currentUser)
 {
-    private static readonly IReadOnlyDictionary<string, string[]> SystemRoles =
-        new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase)
-        {
-            ["User"] = ["ProfileRead"],
-            ["OrganizationAdmin"] = ["OrganizationManage", "UserRoleManage"],
-            ["AuditReader"] = ["AuditReadAll"],
-            ["SystemAdmin"] = ["*"]
-        };
-
     public async Task<IReadOnlyList<RoleResponse>> ListRolesAsync(CancellationToken ct)
     {
         var actor = await GetActorAsync(ct);
@@ -190,7 +185,7 @@ public sealed class IdentityAdministrationService(
             throw new ValidationException("Every assigned role must be a defined system or organization role.");
         }
 
-        var actorIsSystemAdmin = actor.Roles.Contains("SystemAdmin", StringComparer.OrdinalIgnoreCase);
+        var actorIsSystemAdmin = PermissionCatalog.IsSystemAdministrator(actor.Roles);
         if (!actorIsSystemAdmin)
         {
             if (target.Roles.Any(IsPrivilegedSystemRole)
@@ -200,8 +195,8 @@ public sealed class IdentityAdministrationService(
             }
         }
 
-        if (target.Roles.Contains("SystemAdmin", StringComparer.OrdinalIgnoreCase)
-            && !requestedRoles.Contains("SystemAdmin", StringComparer.OrdinalIgnoreCase))
+        if (PermissionCatalog.IsSystemAdministrator(target.Roles)
+            && !PermissionCatalog.IsSystemAdministrator(requestedRoles))
         {
             var admins = await users.ListByFilterAsync(
                 x => x.IsActive && x.Roles.Contains("SystemAdmin"),
@@ -217,8 +212,25 @@ public sealed class IdentityAdministrationService(
         target.Roles = requestedRoles;
         target.SecurityStamp = Guid.NewGuid().ToString("N");
         var now = clock.UtcNow;
-        target.RefreshTokens.Where(x => x.IsActive(now)).ToList().ForEach(x => x.RevokedAt = now);
-        await users.ReplaceByFilterAsync(x => x.Id == target.Id, target, ct);
+        LegacyRefreshSessionCompatibility.RevokeAll(target, now);
+        await transactions.ExecuteAsync(
+            "Identity",
+            async token =>
+            {
+                await sessions.RevokeAllAsync(target.Id, target.OrganizationId, now, token);
+                var result = await users.ReplaceByVersionAsync(
+                    x => x.Id == target.Id && x.OrganizationId == target.OrganizationId,
+                    target,
+                    target.Version,
+                    token);
+                if (!result.Found)
+                {
+                    throw new NotFoundException("USER_NOT_FOUND", "User was not found.");
+                }
+
+                target.Version = result.Version!.Value;
+            },
+            ct);
         await audit.WriteAsync("UserRolesChanged", target.Id, oldRoles, string.Join(',', target.Roles), correlationId, ct);
         return IdentityMappings.ToProfile(target);
     }
@@ -226,7 +238,7 @@ public sealed class IdentityAdministrationService(
     private async Task EnsureSystemRolesAsync(CancellationToken ct)
     {
         await using var roleLock = await AcquireLockAsync("identity-system-roles", ct);
-        foreach (var definition in SystemRoles)
+        foreach (var definition in PermissionCatalog.SystemRoles)
         {
             if (await roles.SelectAsync(x => x.IsSystem && x.Name == definition.Key, ct) is not null)
             {
@@ -248,7 +260,7 @@ public sealed class IdentityAdministrationService(
     private async Task<UserDocument> RequireRoleManagerAsync(CancellationToken ct)
     {
         var actor = await GetActorAsync(ct);
-        if (!await permissionService.HasPermissionAsync("UserRoleManage", ct))
+        if (!await permissionService.HasPermissionAsync(PermissionCatalog.UserRoleManage, ct))
         {
             throw new ForbiddenException("User role management permission is required.");
         }
@@ -266,7 +278,7 @@ public sealed class IdentityAdministrationService(
 
     private static void EnsureOrganizationScope(UserDocument actor, string organizationId)
     {
-        if (!actor.Roles.Contains("SystemAdmin", StringComparer.OrdinalIgnoreCase)
+        if (!PermissionCatalog.IsSystemAdministrator(actor.Roles)
             && actor.OrganizationId != organizationId)
         {
             throw new ForbiddenException("Role management is limited to the current organization.");
@@ -311,7 +323,7 @@ public sealed class IdentityAdministrationService(
 
     private static void EnsureNotReserved(string name)
     {
-        if (SystemRoles.ContainsKey(name))
+        if (PermissionCatalog.SystemRoles.ContainsKey(name))
         {
             throw new ConflictException("SYSTEM_ROLE_NAME_RESERVED", "System role names are reserved.");
         }
@@ -327,6 +339,11 @@ public sealed class IdentityAdministrationService(
         if (result.Count is 0 or > 100 || result.Any(x => !Regex.IsMatch(x, "^[A-Za-z][A-Za-z0-9.:-]{1,79}$")))
         {
             throw new ValidationException("A role requires 1-100 valid permission names.");
+        }
+
+        if (result.Any(x => !PermissionCatalog.IsKnownAssignablePermission(x)))
+        {
+            throw new ValidationException("Every permission must exist in the permission catalog.");
         }
 
         return result;
@@ -352,15 +369,6 @@ public sealed class IdentityPermissionService(
     IDocumentRepository<IdentityRoleDocument> roles,
     ICurrentUser currentUser)
 {
-    private static readonly IReadOnlyDictionary<string, string[]> SystemPermissions =
-        new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase)
-        {
-            ["User"] = ["ProfileRead"],
-            ["OrganizationAdmin"] = ["OrganizationManage", "UserRoleManage"],
-            ["AuditReader"] = ["AuditReadAll"],
-            ["SystemAdmin"] = ["*"]
-        };
-
     public async Task<bool> HasPermissionAsync(string permission, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(permission) || string.IsNullOrWhiteSpace(currentUser.UserId))
@@ -375,9 +383,7 @@ public sealed class IdentityPermissionService(
             return false;
         }
 
-        if (user.Roles.Any(role =>
-            SystemPermissions.TryGetValue(role, out var permissions)
-            && permissions.Any(value => value == "*" || value.Equals(permission, StringComparison.OrdinalIgnoreCase))))
+        if (PermissionCatalog.HasSystemPermission(user.Roles, permission))
         {
             return true;
         }

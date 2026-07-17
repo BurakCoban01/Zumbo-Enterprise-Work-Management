@@ -1,19 +1,14 @@
 using System.Security.Cryptography;
 using System.Text;
 using Microsoft.Extensions.Options;
-using Zumbo.BuildingBlocks.Infrastructure.Concurrency;
-using Zumbo.BuildingBlocks.Infrastructure.Persistence;
-using Zumbo.BuildingBlocks.Infrastructure.Security;
+using Zumbo.BuildingBlocks.Application.Concurrency;
+using Zumbo.BuildingBlocks.Application.Messaging;
+using Zumbo.BuildingBlocks.Application.Persistence;
+using Zumbo.BuildingBlocks.Application.Security;
 using Zumbo.SharedKernel;
 
 namespace Zumbo.Modules.Identity;
 
-public sealed record RegisterUserRequest(
-    string Username,
-    string Email,
-    string Password,
-    string OrganizationId,
-    string? BootstrapToken = null);
 public sealed record LoginRequest(string UsernameOrEmail, string Password, string? MfaCode = null);
 public sealed record RefreshTokenRequest(string RefreshToken);
 public sealed record LogoutRequest(string RefreshToken, bool AllSessions = false);
@@ -31,8 +26,22 @@ public sealed record ConfirmMfaSetupRequest(string Code);
 public sealed record ConfirmMfaSetupResponse(bool Enabled, IReadOnlyCollection<string> RecoveryCodes);
 public sealed record DisableMfaRequest(string Password, string Code);
 public sealed record MfaStatusResponse(bool Enabled, int RemainingRecoveryCodes);
-public sealed record AuthResponse(string AccessToken, string RefreshToken, DateTimeOffset ExpiresAt, UserProfileResponse User);
-public sealed record UserProfileResponse(string Id, string Username, string Email, string OrganizationId, IReadOnlyCollection<string> Roles);
+public sealed record RegenerateMfaRecoveryCodesRequest(string Password, string Code);
+public sealed record RegenerateMfaRecoveryCodesResponse(IReadOnlyCollection<string> RecoveryCodes);
+public sealed record SessionClientInfo(string DeviceName, string ClientFingerprint);
+public sealed record SessionResponse(
+    string Id,
+    string DeviceName,
+    string ClientFingerprint,
+    DateTimeOffset CreatedAt,
+    DateTimeOffset LastSeenAt,
+    DateTimeOffset ExpiresAt,
+    DateTimeOffset? RevokedAt);
+
+public interface ISessionClientContext
+{
+    SessionClientInfo GetClientInfo();
+}
 
 public sealed class LoginSecurityOptions
 {
@@ -49,7 +58,7 @@ public sealed class IdentityBootstrapOptions
 public sealed class PasswordResetOptions
 {
     public int ExpiryMinutes { get; init; } = 30;
-    public string FrontendResetUrl { get; init; } = "http://localhost:5177/#/reset-password";
+    public string FrontendResetUrl { get; init; } = string.Empty;
 }
 
 public interface IPasswordResetNotifier
@@ -63,106 +72,10 @@ public interface IMfaSecretProtector
     string Unprotect(string protectedSecret);
 }
 
-public sealed class UserDocument : IDocument
-{
-    public string Id { get; set; } = Guid.NewGuid().ToString("N");
-    public string Username { get; set; } = string.Empty;
-    public string Email { get; set; } = string.Empty;
-    public string OrganizationId { get; set; } = string.Empty;
-    public string PasswordHash { get; set; } = string.Empty;
-    public bool IsActive { get; set; } = true;
-    public string SecurityStamp { get; set; } = Guid.NewGuid().ToString("N");
-    public int FailedLoginCount { get; set; }
-    public DateTimeOffset? LockedUntil { get; set; }
-    public string? PasswordResetTokenHash { get; set; }
-    public DateTimeOffset? PasswordResetTokenExpiresAt { get; set; }
-    public bool MfaEnabled { get; set; }
-    public string? MfaSecretProtected { get; set; }
-    public string? PendingMfaSecretProtected { get; set; }
-    public DateTimeOffset? PendingMfaExpiresAt { get; set; }
-    public List<string> MfaRecoveryCodeHashes { get; set; } = [];
-    public List<string> Roles { get; set; } = ["User"];
-    public List<RefreshTokenDocument> RefreshTokens { get; set; } = [];
-    public DateTimeOffset CreatedAt { get; set; }
-}
-
-public sealed class RefreshTokenDocument
-{
-    public string TokenHash { get; set; } = string.Empty;
-    public string SessionId { get; set; } = Guid.NewGuid().ToString("N");
-    public DateTimeOffset ExpiresAt { get; set; }
-    public DateTimeOffset CreatedAt { get; set; }
-    public DateTimeOffset? RevokedAt { get; set; }
-    public bool IsActive(DateTimeOffset now) => RevokedAt is null && ExpiresAt > now;
-}
-
-public interface IUserRepository
-{
-    Task<UserDocument?> GetByUsernameOrEmailAsync(string usernameOrEmail, CancellationToken ct);
-    Task<UserDocument?> GetByIdAsync(string userId, CancellationToken ct);
-    Task<UserDocument?> GetByRefreshTokenAsync(string refreshToken, CancellationToken ct);
-    Task<UserDocument?> GetByPasswordResetTokenAsync(string token, CancellationToken ct);
-    Task<IReadOnlyList<UserProfileResponse>> SearchAsync(string? search, string? organizationId, CancellationToken ct);
-    Task AddAsync(UserDocument user, CancellationToken ct);
-    Task UpdateAsync(UserDocument user, CancellationToken ct);
-}
-
-public sealed class UserRepository(IDocumentRepository<UserDocument> users) : IUserRepository
-{
-    public Task<UserDocument?> GetByUsernameOrEmailAsync(string usernameOrEmail, CancellationToken ct)
-    {
-        var normalized = usernameOrEmail.Trim().ToLowerInvariant();
-        return users.SelectAsync(x =>
-            x.Username.ToLower() == normalized || x.Email.ToLower() == normalized, ct);
-    }
-
-    public Task<UserDocument?> GetByRefreshTokenAsync(string refreshToken, CancellationToken ct)
-    {
-        var tokenHash = RefreshTokenSecurity.Hash(refreshToken);
-        return users.SelectAsync(x => x.RefreshTokens.Any(token => token.TokenHash == tokenHash), ct);
-    }
-
-    public Task<UserDocument?> GetByPasswordResetTokenAsync(string token, CancellationToken ct)
-    {
-        var tokenHash = RefreshTokenSecurity.Hash(token);
-        return users.SelectAsync(x => x.PasswordResetTokenHash == tokenHash, ct);
-    }
-
-    public Task<UserDocument?> GetByIdAsync(string userId, CancellationToken ct) =>
-        users.SelectAsync(x => x.Id == userId, ct);
-
-    public async Task<IReadOnlyList<UserProfileResponse>> SearchAsync(
-        string? search,
-        string? organizationId,
-        CancellationToken ct)
-    {
-        var normalized = search?.Trim().ToLowerInvariant();
-        var result = await users.ListByFilterAsync(
-            x => x.IsActive
-                && (string.IsNullOrEmpty(organizationId) || x.OrganizationId == organizationId)
-                && (string.IsNullOrEmpty(normalized)
-                    || x.Username.ToLower().Contains(normalized)
-                    || x.Email.ToLower().Contains(normalized)),
-            x => x.Username,
-            pageSize: 100,
-            cancellationToken: ct);
-
-        return result.Select(IdentityMappings.ToProfile).ToList();
-    }
-
-    public async Task AddAsync(UserDocument user, CancellationToken ct)
-    {
-        await users.CreateAsync(user, ct);
-    }
-
-    public async Task UpdateAsync(UserDocument user, CancellationToken ct)
-    {
-        await users.ReplaceByFilterAsync(x => x.Id == user.Id, user, ct);
-    }
-}
-
-public sealed class IdentityService(
+public sealed partial class IdentityService(
     IUserRepository users,
+    IRefreshSessionStore sessions,
+    IDurableTransactionRunner transactions,
     IPasswordHasher passwordHasher,
     ITokenIssuer tokenIssuer,
     IOptions<JwtOptions> jwtOptions,
@@ -174,13 +87,32 @@ public sealed class IdentityService(
     IDistributedLockProvider distributedLockProvider,
     IOptions<DistributedLockOptions> distributedLockOptions,
     IClock clock,
-    ICurrentUser currentUser)
+    ICurrentUser currentUser,
+    IRegistrationProvisioningPolicy? registrationProvisioningPolicy = null,
+    ISessionClientContext? sessionClientContext = null,
+    IIdentityAuditWriter? audit = null)
 {
     public async Task<AuthResponse> RegisterAsync(RegisterUserRequest request, CancellationToken ct)
     {
-        GuardRegister(request);
+        RegisterUserValidator.Validate(request);
 
         await using var registrationLock = await AcquireRegistrationLockAsync(ct);
+
+        var isBootstrap = ValidateBootstrapRequest(request);
+        await (registrationProvisioningPolicy ?? LocalDemoRegistrationProvisioningPolicy.Instance)
+            .EnsureAllowedAsync(
+                new RegistrationProvisioningRequest(
+                    request.Email.Trim().ToLowerInvariant(),
+                    request.OrganizationId.Trim().ToLowerInvariant(),
+                    isBootstrap),
+                ct);
+
+        if (isBootstrap && await users.HasSystemAdminAsync(ct))
+        {
+            throw new ConflictException(
+                "BOOTSTRAP_ALREADY_COMPLETED",
+                "System administrator bootstrap has already been completed.");
+        }
 
         if (await users.GetByUsernameOrEmailAsync(request.Username, ct) is not null
             || await users.GetByUsernameOrEmailAsync(request.Email, ct) is not null)
@@ -189,24 +121,47 @@ public sealed class IdentityService(
         }
 
         var now = clock.UtcNow;
-        var roles = ResolveRegistrationRoles(request);
+        var roles = isBootstrap ? new List<string> { "User", "SystemAdmin" } : ["User"];
         var user = new UserDocument
         {
             Username = request.Username.Trim(),
             Email = request.Email.Trim().ToLowerInvariant(),
-            OrganizationId = request.OrganizationId.Trim(),
+            OrganizationId = request.OrganizationId.Trim().ToLowerInvariant(),
             PasswordHash = passwordHasher.Hash(request.Password),
             SecurityStamp = Guid.NewGuid().ToString("N"),
             CreatedAt = now,
             Roles = roles
         };
 
-        var response = IssueTokens(user, now);
-        await users.AddAsync(user, ct);
-        return response;
+        return await transactions.ExecuteAsync(
+            "Identity",
+            async token =>
+            {
+                await users.AddAsync(user, token);
+                return await IssueTokensAsync(user, now, token);
+            },
+            ct);
     }
 
     public async Task<AuthResponse> LoginAsync(LoginRequest request, CancellationToken ct)
+    {
+        DocumentConcurrencyException? lastConflict = null;
+        for (var attempt = 0; attempt < 3; attempt++)
+        {
+            try
+            {
+                return await LoginAttemptAsync(request, ct);
+            }
+            catch (DocumentConcurrencyException conflict)
+            {
+                lastConflict = conflict;
+            }
+        }
+
+        throw lastConflict!;
+    }
+
+    private async Task<AuthResponse> LoginAttemptAsync(LoginRequest request, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(request.UsernameOrEmail) || string.IsNullOrWhiteSpace(request.Password))
         {
@@ -215,7 +170,6 @@ public sealed class IdentityService(
 
         var candidate = await users.GetByUsernameOrEmailAsync(request.UsernameOrEmail, ct)
             ?? throw new UnauthorizedException("Username or password is invalid.");
-        await using var userLock = await AcquireUserLockAsync(candidate.Id, ct);
         var user = await users.GetByIdAsync(candidate.Id, ct)
             ?? throw new UnauthorizedException("Username or password is invalid.");
         var now = clock.UtcNow;
@@ -251,6 +205,11 @@ public sealed class IdentityService(
             throw new ForbiddenException("User account is inactive.");
         }
 
+        if (passwordHasher.NeedsRehash(user.PasswordHash))
+        {
+            user.PasswordHash = passwordHasher.Hash(request.Password);
+        }
+
         if (user.MfaEnabled)
         {
             if (string.IsNullOrWhiteSpace(request.MfaCode))
@@ -267,12 +226,46 @@ public sealed class IdentityService(
 
         user.FailedLoginCount = 0;
         user.LockedUntil = null;
-        var response = IssueTokens(user, now);
-        await users.UpdateAsync(user, ct);
-        return response;
+        return await transactions.ExecuteAsync(
+            "Identity",
+            async token =>
+            {
+                await users.UpdateAsync(user, token);
+                return await IssueTokensAsync(user, now, token);
+            },
+            ct);
     }
 
     public async Task<AuthResponse> RefreshAsync(RefreshTokenRequest request, CancellationToken ct)
+    {
+        DocumentConcurrencyException? lastConflict = null;
+        for (var attempt = 0; attempt < 3; attempt++)
+        {
+            try
+            {
+                var result = await transactions.ExecuteAsync(
+                    "Identity",
+                    token => RefreshAttemptAsync(request, token),
+                    ct);
+                if (result.ReuseDetected)
+                {
+                    throw new UnauthorizedException("Refresh token reuse was detected.");
+                }
+
+                return result.Response!;
+            }
+            catch (DocumentConcurrencyException conflict)
+            {
+                lastConflict = conflict;
+            }
+        }
+
+        throw lastConflict!;
+    }
+
+    private async Task<RefreshAttemptResult> RefreshAttemptAsync(
+        RefreshTokenRequest request,
+        CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(request.RefreshToken))
         {
@@ -280,71 +273,98 @@ public sealed class IdentityService(
         }
 
         var now = clock.UtcNow;
-        var user = await users.GetByRefreshTokenAsync(request.RefreshToken, ct)
+        var oldSession = await GetOrImportRefreshSessionAsync(request.RefreshToken, ct)
             ?? throw new UnauthorizedException("Refresh token is invalid.");
-        var tokenHash = RefreshTokenSecurity.Hash(request.RefreshToken);
-        var oldToken = user.RefreshTokens.SingleOrDefault(x => x.TokenHash == tokenHash);
+        var user = await users.GetByIdAsync(oldSession.UserId, ct)
+            ?? throw new UnauthorizedException("Refresh token is invalid.");
 
-        if (!user.IsActive)
+        if (!user.IsActive || user.OrganizationId != oldSession.OrganizationId)
         {
             throw new ForbiddenException("User account is inactive.");
         }
 
-        if (oldToken is null)
+        if (oldSession.RevokedAt is not null)
         {
-            throw new UnauthorizedException("Refresh token is invalid.");
-        }
-
-        if (oldToken.RevokedAt is not null)
-        {
-            RevokeAllSessions(user, now);
+            await sessions.RevokeAllAsync(user.Id, user.OrganizationId, now, ct);
+            LegacyRefreshSessionCompatibility.RevokeAll(user, now);
             user.SecurityStamp = Guid.NewGuid().ToString("N");
             await users.UpdateAsync(user, ct);
-            throw new UnauthorizedException("Refresh token reuse was detected.");
+            return RefreshAttemptResult.Reused;
         }
 
-        if (oldToken.ExpiresAt <= now)
+        if (oldSession.ExpiresAt <= now)
         {
             throw new UnauthorizedException("Refresh token is expired.");
         }
 
-        oldToken.RevokedAt = now;
-        var response = IssueTokens(user, now);
-        await users.UpdateAsync(user, ct);
-        return response;
+        var replacement = CreateTokenResponse(user, now, oldSession);
+        if (!await sessions.RevokeAsync(oldSession, now, replacement.Session.Id, ct))
+        {
+            throw new UnauthorizedException("Refresh token is no longer active.");
+        }
+
+        await sessions.CreateAsync(replacement.Session, ct);
+        return new RefreshAttemptResult(replacement.Response, false);
     }
 
     public async Task<LogoutResponse> LogoutAsync(LogoutRequest request, CancellationToken ct)
+    {
+        DocumentConcurrencyException? lastConflict = null;
+        for (var attempt = 0; attempt < 3; attempt++)
+        {
+            try
+            {
+                return await transactions.ExecuteAsync(
+                    "Identity",
+                    token => LogoutAttemptAsync(request, token),
+                    ct);
+            }
+            catch (DocumentConcurrencyException conflict)
+            {
+                lastConflict = conflict;
+            }
+        }
+
+        throw lastConflict!;
+    }
+
+    private async Task<LogoutResponse> LogoutAttemptAsync(LogoutRequest request, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(request.RefreshToken))
         {
             throw new ValidationException("Refresh token is required.");
         }
 
-        var user = await users.GetByRefreshTokenAsync(request.RefreshToken, ct);
-        if (user is null)
+        var target = await GetOrImportRefreshSessionAsync(request.RefreshToken, ct);
+        if (target is null)
         {
             return new LogoutResponse(true, 0);
         }
 
         var now = clock.UtcNow;
-        var tokenHash = RefreshTokenSecurity.Hash(request.RefreshToken);
-        var target = user.RefreshTokens.SingleOrDefault(x => x.TokenHash == tokenHash);
-        var canRevokeAll = request.AllSessions && target?.IsActive(now) == true;
-        var revokedSessions = canRevokeAll
-            ? RevokeAllSessions(user, now)
-            : RevokeSession(target, now);
-
+        var canRevokeAll = request.AllSessions && target.IsActive(now);
+        var revokedSessions = await RevokeSessionAsync(target, now, ct);
         if (canRevokeAll)
         {
-            user.SecurityStamp = Guid.NewGuid().ToString("N");
+            revokedSessions += await sessions.RevokeAllAsync(target.UserId, target.OrganizationId, now, ct);
+            var user = await users.GetByIdAsync(target.UserId, ct);
+            if (user is not null && user.OrganizationId == target.OrganizationId
+                && LegacyRefreshSessionCompatibility.RevokeAll(user, now))
+            {
+                await users.UpdateAsync(user, ct);
+            }
         }
 
-        await users.UpdateAsync(user, ct);
         return new LogoutResponse(true, revokedSessions);
     }
 
-    public async Task<AuthResponse> ChangePasswordAsync(ChangePasswordRequest request, CancellationToken ct)
+    public Task<AuthResponse> ChangePasswordAsync(ChangePasswordRequest request, CancellationToken ct) =>
+        ChangePasswordAsync(request, "system", ct);
+
+    public async Task<AuthResponse> ChangePasswordAsync(
+        ChangePasswordRequest request,
+        string correlationId,
+        CancellationToken ct)
     {
         var user = await GetCurrentUserAsync(ct);
         if (!user.IsActive)
@@ -365,11 +385,19 @@ public sealed class IdentityService(
         }
 
         var now = clock.UtcNow;
-        user.PasswordHash = passwordHasher.Hash(request.NewPassword);
-        user.SecurityStamp = Guid.NewGuid().ToString("N");
-        RevokeAllSessions(user, now);
-        var response = IssueTokens(user, now);
-        await users.UpdateAsync(user, ct);
+        var response = await transactions.ExecuteAsync(
+            "Identity",
+            async token =>
+            {
+                user.PasswordHash = passwordHasher.Hash(request.NewPassword);
+                user.SecurityStamp = Guid.NewGuid().ToString("N");
+                LegacyRefreshSessionCompatibility.RevokeAll(user, now);
+                await sessions.RevokeAllAsync(user.Id, user.OrganizationId, now, token);
+                await users.UpdateAsync(user, token);
+                return await IssueTokensAsync(user, now, token);
+            },
+            ct);
+        await WriteAuditAsync("PasswordChanged", user.Id, null, null, correlationId, ct);
         return response;
     }
 
@@ -393,7 +421,6 @@ public sealed class IdentityService(
         string email;
         string rawToken;
         DateTimeOffset expiresAt;
-        await using (await AcquireUserLockAsync(candidate.Id, ct))
         {
             var user = await users.GetByIdAsync(candidate.Id, ct);
             if (user is null || !user.IsActive)
@@ -416,7 +443,13 @@ public sealed class IdentityService(
         return new PasswordResetRequestedResponse(true);
     }
 
-    public async Task<PasswordResetResponse> ResetPasswordAsync(ResetPasswordRequest request, CancellationToken ct)
+    public Task<PasswordResetResponse> ResetPasswordAsync(ResetPasswordRequest request, CancellationToken ct) =>
+        ResetPasswordAsync(request, "system", ct);
+
+    public async Task<PasswordResetResponse> ResetPasswordAsync(
+        ResetPasswordRequest request,
+        string correlationId,
+        CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(request.Token) || request.Token.Length > 256)
         {
@@ -426,7 +459,6 @@ public sealed class IdentityService(
         GuardPassword(request.NewPassword);
         var candidate = await users.GetByPasswordResetTokenAsync(request.Token, ct)
             ?? throw new UnauthorizedException("Password reset token is invalid or expired.");
-        await using var userLock = await AcquireUserLockAsync(candidate.Id, ct);
         var user = await users.GetByIdAsync(candidate.Id, ct)
             ?? throw new UnauthorizedException("Password reset token is invalid or expired.");
         var tokenHash = RefreshTokenSecurity.Hash(request.Token);
@@ -449,115 +481,83 @@ public sealed class IdentityService(
         user.SecurityStamp = Guid.NewGuid().ToString("N");
         user.FailedLoginCount = 0;
         user.LockedUntil = null;
-        RevokeAllSessions(user, now);
-        await users.UpdateAsync(user, ct);
+        LegacyRefreshSessionCompatibility.RevokeAll(user, now);
+        try
+        {
+            await transactions.ExecuteAsync(
+                "Identity",
+                async token =>
+                {
+                    await sessions.RevokeAllAsync(user.Id, user.OrganizationId, now, token);
+                    await users.UpdateAsync(user, token);
+                },
+                ct);
+        }
+        catch (DocumentConcurrencyException)
+        {
+            throw new UnauthorizedException("Password reset token is invalid or expired.");
+        }
+
+        await WriteAuditAsync("PasswordReset", user.Id, null, null, correlationId, ct);
         return new PasswordResetResponse(true);
     }
 
-    public async Task<BeginMfaSetupResponse> BeginMfaSetupAsync(BeginMfaSetupRequest request, CancellationToken ct)
+    public async Task<IReadOnlyList<SessionResponse>> ListSessionsAsync(CancellationToken ct)
     {
         var user = await GetCurrentUserAsync(ct);
-        await using var userLock = await AcquireUserLockAsync(user.Id, ct);
-        user = await users.GetByIdAsync(user.Id, ct)
-            ?? throw new UnauthorizedException("Authenticated user was not found.");
-        if (user.MfaEnabled)
-        {
-            throw new ConflictException("MFA_ALREADY_ENABLED", "Multi-factor authentication is already enabled.");
-        }
-
-        if (string.IsNullOrWhiteSpace(request.Password)
-            || !passwordHasher.Verify(request.Password, user.PasswordHash))
-        {
-            throw new UnauthorizedException("Password is invalid.");
-        }
-
-        var secret = TotpSecurity.GenerateSecret();
-        var expiresAt = clock.UtcNow.AddMinutes(10);
-        user.PendingMfaSecretProtected = mfaSecretProtector.Protect(secret);
-        user.PendingMfaExpiresAt = expiresAt;
-        await users.UpdateAsync(user, ct);
-        var issuer = Uri.EscapeDataString("Zumbo");
-        var account = Uri.EscapeDataString(user.Email);
-        var provisioningUri = $"otpauth://totp/{issuer}:{account}?secret={secret}&issuer={issuer}&digits=6&period=30";
-        return new BeginMfaSetupResponse(secret, provisioningUri, expiresAt);
+        var ownedSessions = await sessions.ListOwnedAsync(user.Id, user.OrganizationId, ct);
+        return ownedSessions
+            .Select(session => new SessionResponse(
+                session.Id,
+                session.DeviceName,
+                session.ClientFingerprint,
+                session.CreatedAt,
+                session.LastSeenAt == default ? session.CreatedAt : session.LastSeenAt,
+                session.ExpiresAt,
+                session.RevokedAt))
+            .ToList();
     }
 
-    public async Task<ConfirmMfaSetupResponse> ConfirmMfaSetupAsync(
-        ConfirmMfaSetupRequest request,
-        CancellationToken ct)
+    public async Task RevokeSessionAsync(string sessionId, string correlationId, CancellationToken ct)
     {
+        if (string.IsNullOrWhiteSpace(sessionId) || sessionId.Length > 64)
+        {
+            throw new NotFoundException("SESSION_NOT_FOUND", "Session was not found.");
+        }
+
         var user = await GetCurrentUserAsync(ct);
-        await using var userLock = await AcquireUserLockAsync(user.Id, ct);
-        user = await users.GetByIdAsync(user.Id, ct)
-            ?? throw new UnauthorizedException("Authenticated user was not found.");
-        if (user.MfaEnabled)
+        DocumentConcurrencyException? lastConflict = null;
+        for (var attempt = 0; attempt < 3; attempt++)
         {
-            throw new ConflictException("MFA_ALREADY_ENABLED", "Multi-factor authentication is already enabled.");
+            var session = await sessions.GetByIdAsync(sessionId, user.Id, user.OrganizationId, ct)
+                ?? throw new NotFoundException("SESSION_NOT_FOUND", "Session was not found.");
+            if (session.RevokedAt is not null)
+            {
+                return;
+            }
+
+            try
+            {
+                if (!await sessions.RevokeAsync(session, clock.UtcNow, null, ct))
+                {
+                    continue;
+                }
+
+                await WriteAuditAsync("SessionRevoked", user.Id, session.Id, null, correlationId, ct);
+                return;
+            }
+            catch (DocumentConcurrencyException conflict)
+            {
+                lastConflict = conflict;
+            }
         }
 
-        if (user.PendingMfaExpiresAt <= clock.UtcNow || string.IsNullOrWhiteSpace(user.PendingMfaSecretProtected))
+        if (lastConflict is not null)
         {
-            user.PendingMfaSecretProtected = null;
-            user.PendingMfaExpiresAt = null;
-            await users.UpdateAsync(user, ct);
-            throw new AuthenticationChallengeException("MFA_SETUP_EXPIRED", "Multi-factor authentication setup has expired.");
+            throw lastConflict;
         }
 
-        var secret = mfaSecretProtector.Unprotect(user.PendingMfaSecretProtected);
-        if (!TotpSecurity.Verify(secret, request.Code, clock.UtcNow))
-        {
-            throw new AuthenticationChallengeException("MFA_INVALID", "Multi-factor authentication code is invalid.");
-        }
-
-        var recoveryCodes = Enumerable.Range(0, 8).Select(_ => TotpSecurity.GenerateRecoveryCode()).ToList();
-        user.MfaEnabled = true;
-        user.MfaSecretProtected = user.PendingMfaSecretProtected;
-        user.PendingMfaSecretProtected = null;
-        user.PendingMfaExpiresAt = null;
-        user.MfaRecoveryCodeHashes = recoveryCodes.Select(TotpSecurity.HashRecoveryCode).ToList();
-        user.SecurityStamp = Guid.NewGuid().ToString("N");
-        RevokeAllSessions(user, clock.UtcNow);
-        await users.UpdateAsync(user, ct);
-        return new ConfirmMfaSetupResponse(true, recoveryCodes);
-    }
-
-    public async Task<MfaStatusResponse> DisableMfaAsync(DisableMfaRequest request, CancellationToken ct)
-    {
-        var user = await GetCurrentUserAsync(ct);
-        await using var userLock = await AcquireUserLockAsync(user.Id, ct);
-        user = await users.GetByIdAsync(user.Id, ct)
-            ?? throw new UnauthorizedException("Authenticated user was not found.");
-        if (!user.MfaEnabled)
-        {
-            return new MfaStatusResponse(false, 0);
-        }
-
-        if (string.IsNullOrWhiteSpace(request.Password)
-            || !passwordHasher.Verify(request.Password, user.PasswordHash))
-        {
-            throw new UnauthorizedException("Password is invalid.");
-        }
-
-        if (!ConsumeMfaCode(user, request.Code, clock.UtcNow))
-        {
-            throw new AuthenticationChallengeException("MFA_INVALID", "Multi-factor authentication code is invalid.");
-        }
-
-        user.MfaEnabled = false;
-        user.MfaSecretProtected = null;
-        user.PendingMfaSecretProtected = null;
-        user.PendingMfaExpiresAt = null;
-        user.MfaRecoveryCodeHashes.Clear();
-        user.SecurityStamp = Guid.NewGuid().ToString("N");
-        RevokeAllSessions(user, clock.UtcNow);
-        await users.UpdateAsync(user, ct);
-        return new MfaStatusResponse(false, 0);
-    }
-
-    public async Task<MfaStatusResponse> GetMfaStatusAsync(CancellationToken ct)
-    {
-        var user = await GetCurrentUserAsync(ct);
-        return new MfaStatusResponse(user.MfaEnabled, user.MfaRecoveryCodeHashes.Count);
+        throw new ConflictException("SESSION_REVOKE_CONFLICT", "Session could not be revoked; retry the operation.");
     }
 
     public async Task<AccountStatusResponse> DeactivateAsync(DeactivateAccountRequest request, CancellationToken ct)
@@ -572,8 +572,15 @@ public sealed class IdentityService(
         var now = clock.UtcNow;
         user.IsActive = false;
         user.SecurityStamp = Guid.NewGuid().ToString("N");
-        RevokeAllSessions(user, now);
-        await users.UpdateAsync(user, ct);
+        LegacyRefreshSessionCompatibility.RevokeAll(user, now);
+        await transactions.ExecuteAsync(
+            "Identity",
+            async token =>
+            {
+                await sessions.RevokeAllAsync(user.Id, user.OrganizationId, now, token);
+                await users.UpdateAsync(user, token);
+            },
+            ct);
         return new AccountStatusResponse(user.Id, false);
     }
 
@@ -584,24 +591,87 @@ public sealed class IdentityService(
             throw new UnauthorizedException("Authenticated user is required.");
         }
 
-        var organizationId = currentUser.Roles.Contains("SystemAdmin", StringComparer.OrdinalIgnoreCase)
+        var organizationId = PermissionCatalog.IsSystemAdministrator(currentUser.Roles)
             ? null
             : currentUser.OrganizationId
                 ?? throw new ForbiddenException("Organization scope is required.");
         return users.SearchAsync(search, organizationId, ct);
     }
 
-    private AuthResponse IssueTokens(UserDocument user, DateTimeOffset now)
+    private async Task<AuthResponse> IssueTokensAsync(
+        UserDocument user,
+        DateTimeOffset now,
+        CancellationToken ct)
+    {
+        _ = await sessions.PurgeRetainedAsync(now, 100, ct);
+        var created = CreateTokenResponse(user, now);
+        await sessions.CreateAsync(created.Session, ct);
+        return created.Response;
+    }
+
+    private async Task<RefreshSessionDocument?> GetOrImportRefreshSessionAsync(
+        string rawToken,
+        CancellationToken ct)
+    {
+        var stored = await sessions.GetByTokenAsync(rawToken, ct);
+        if (stored is not null)
+        {
+            return stored;
+        }
+
+        var legacyUser = await users.GetByRefreshTokenAsync(rawToken, ct);
+        var tokenHash = RefreshTokenSecurity.Hash(rawToken);
+        var legacy = legacyUser?.RefreshTokens.SingleOrDefault(x => x.TokenHash == tokenHash);
+        if (legacyUser is null || legacy is null)
+        {
+            return null;
+        }
+
+        var imported = new RefreshSessionDocument
+        {
+            Id = legacy.SessionId,
+            UserId = legacyUser.Id,
+            OrganizationId = legacyUser.OrganizationId,
+            TokenHash = legacy.TokenHash,
+            CreatedAt = legacy.CreatedAt,
+            LastSeenAt = legacy.CreatedAt,
+            DeviceName = "Legacy session",
+            ExpiresAt = legacy.ExpiresAt,
+            ExpiresAtUtc = legacy.ExpiresAt.UtcDateTime,
+            RevokedAt = legacy.RevokedAt,
+            RetainUntilUtc = (legacy.RevokedAt ?? legacy.ExpiresAt).AddDays(30).UtcDateTime
+        };
+        try
+        {
+            await sessions.CreateAsync(imported, ct);
+            return imported;
+        }
+        catch (DocumentConflictException)
+        {
+            return await sessions.GetByTokenAsync(rawToken, ct);
+        }
+    }
+
+    private TokenResponseWithSession CreateTokenResponse(
+        UserDocument user,
+        DateTimeOffset now,
+        RefreshSessionDocument? previousSession = null)
     {
         var options = jwtOptions.Value;
-        user.RefreshTokens.RemoveAll(x => x.ExpiresAt < now.AddDays(-30));
         var rawRefreshToken = tokenIssuer.CreateRefreshToken();
-        var refreshToken = new RefreshTokenDocument
+        var client = GetSessionClientInfo(previousSession);
+        var refreshSession = new RefreshSessionDocument
         {
+            UserId = user.Id,
+            OrganizationId = user.OrganizationId,
             TokenHash = RefreshTokenSecurity.Hash(rawRefreshToken),
-            SessionId = Guid.NewGuid().ToString("N"),
             CreatedAt = now,
-            ExpiresAt = now.AddDays(14)
+            LastSeenAt = now,
+            DeviceName = client.DeviceName,
+            ClientFingerprint = client.ClientFingerprint,
+            ExpiresAt = now.AddDays(14),
+            ExpiresAtUtc = now.AddDays(14).UtcDateTime,
+            RetainUntilUtc = now.AddDays(44).UtcDateTime
         };
         var accessToken = tokenIssuer.CreateAccessToken(
             new TokenUser(
@@ -611,37 +681,17 @@ public sealed class IdentityService(
                 user.OrganizationId,
                 user.Roles,
                 user.SecurityStamp,
-                refreshToken.SessionId),
+                refreshSession.Id),
             options,
             now);
 
-        user.RefreshTokens.Add(refreshToken);
-
-        return new AuthResponse(
-            accessToken,
-            rawRefreshToken,
-            now.AddMinutes(options.AccessTokenMinutes),
-            IdentityMappings.ToProfile(user));
-    }
-
-    private static void GuardRegister(RegisterUserRequest request)
-    {
-        if (string.IsNullOrWhiteSpace(request.Username) || request.Username.Length < 3)
-        {
-            throw new ValidationException("Username must be at least 3 characters.");
-        }
-
-        if (string.IsNullOrWhiteSpace(request.Email) || !request.Email.Contains('@'))
-        {
-            throw new ValidationException("Valid email is required.");
-        }
-
-        if (string.IsNullOrWhiteSpace(request.OrganizationId))
-        {
-            throw new ValidationException("Organization id is required.");
-        }
-
-        GuardPassword(request.Password);
+        return new TokenResponseWithSession(
+            new AuthResponse(
+                accessToken,
+                rawRefreshToken,
+                now.AddMinutes(options.AccessTokenMinutes),
+                IdentityMappings.ToProfile(user)),
+            refreshSession);
     }
 
     private async Task<UserDocument> GetCurrentUserAsync(CancellationToken ct)
@@ -656,6 +706,41 @@ public sealed class IdentityService(
             ?? throw new UnauthorizedException("Authenticated user was not found.");
     }
 
+    private SessionClientInfo GetSessionClientInfo(RefreshSessionDocument? previousSession)
+    {
+        var supplied = sessionClientContext?.GetClientInfo();
+        var deviceName = NormalizeDeviceName(supplied?.DeviceName)
+            ?? NormalizeDeviceName(previousSession?.DeviceName)
+            ?? "Unknown client";
+        var fingerprint = supplied?.ClientFingerprint?.Trim();
+        if (string.IsNullOrWhiteSpace(fingerprint) || fingerprint.Length > 128)
+        {
+            fingerprint = previousSession?.ClientFingerprint ?? string.Empty;
+        }
+
+        return new SessionClientInfo(deviceName, fingerprint);
+    }
+
+    private static string? NormalizeDeviceName(string? value)
+    {
+        var normalized = value?.Trim();
+        return string.IsNullOrWhiteSpace(normalized)
+            || normalized.Length > 80
+            || normalized.Any(char.IsControl)
+                ? null
+                : normalized;
+    }
+
+    private Task WriteAuditAsync(
+        string action,
+        string entityId,
+        string? oldValue,
+        string? newValue,
+        string correlationId,
+        CancellationToken ct) =>
+        audit?.WriteAsync(action, entityId, oldValue, newValue, correlationId, ct)
+        ?? Task.CompletedTask;
+
     private static void GuardPassword(string password)
     {
         if (string.IsNullOrWhiteSpace(password)
@@ -669,49 +754,26 @@ public sealed class IdentityService(
         }
     }
 
-    private static int RevokeAllSessions(UserDocument user, DateTimeOffset now)
+    private async Task<int> RevokeSessionAsync(
+        RefreshSessionDocument? session,
+        DateTimeOffset now,
+        CancellationToken ct)
     {
-        var active = user.RefreshTokens.Where(x => x.IsActive(now)).ToList();
-        active.ForEach(x => x.RevokedAt = now);
-        return active.Count;
-    }
-
-    private static int RevokeSession(RefreshTokenDocument? token, DateTimeOffset now)
-    {
-        if (token is null || !token.IsActive(now))
+        if (session is null || !session.IsActive(now))
         {
             return 0;
         }
 
-        token.RevokedAt = now;
-        return 1;
+        return await sessions.RevokeAsync(session, now, null, ct) ? 1 : 0;
     }
 
-    private bool ConsumeMfaCode(UserDocument user, string code, DateTimeOffset now)
+    private sealed record TokenResponseWithSession(
+        AuthResponse Response,
+        RefreshSessionDocument Session);
+
+    private sealed record RefreshAttemptResult(AuthResponse? Response, bool ReuseDetected)
     {
-        if (string.IsNullOrWhiteSpace(user.MfaSecretProtected))
-        {
-            return false;
-        }
-
-        var secret = mfaSecretProtector.Unprotect(user.MfaSecretProtected);
-        if (TotpSecurity.Verify(secret, code, now))
-        {
-            return true;
-        }
-
-        var recoveryHash = TotpSecurity.HashRecoveryCode(code);
-        var recoveryIndex = user.MfaRecoveryCodeHashes.FindIndex(x =>
-            CryptographicOperations.FixedTimeEquals(
-                Convert.FromHexString(x),
-                Convert.FromHexString(recoveryHash)));
-        if (recoveryIndex < 0)
-        {
-            return false;
-        }
-
-        user.MfaRecoveryCodeHashes.RemoveAt(recoveryIndex);
-        return true;
+        public static RefreshAttemptResult Reused { get; } = new(null, true);
     }
 
     private async Task RecordFailedLoginAsync(UserDocument user, DateTimeOffset now, CancellationToken ct)
@@ -726,15 +788,6 @@ public sealed class IdentityService(
         await users.UpdateAsync(user, ct);
     }
 
-    private async Task<IAsyncDisposable> AcquireUserLockAsync(string userId, CancellationToken ct)
-    {
-        var options = distributedLockOptions.Value;
-        var leaseTime = TimeSpan.FromSeconds(Math.Clamp(options.LeaseSeconds, 5, 300));
-        var waitTime = TimeSpan.FromSeconds(Math.Clamp(options.WaitSeconds, 0, 30));
-        return await distributedLockProvider.TryAcquireAsync("identity-user:" + userId, leaseTime, waitTime, ct)
-            ?? throw new ConflictException("IDENTITY_RESOURCE_BUSY", "The user account is busy; retry the operation.");
-    }
-
     private Task<IAsyncDisposable> AcquireRegistrationLockAsync(CancellationToken ct) =>
         AcquireLockAsync("identity-registration", "IDENTITY_REGISTRATION_BUSY", ct);
 
@@ -747,14 +800,14 @@ public sealed class IdentityService(
             ?? throw new ConflictException(errorCode, "Identity resource is busy; retry the operation.");
     }
 
-    private List<string> ResolveRegistrationRoles(RegisterUserRequest request)
+    private bool ValidateBootstrapRequest(RegisterUserRequest request)
     {
         var options = bootstrapOptions.Value;
         var isBootstrapEmail = options.AdminEmails.Any(x =>
             x.Equals(request.Email.Trim(), StringComparison.OrdinalIgnoreCase));
         if (!isBootstrapEmail)
         {
-            return ["User"];
+            return false;
         }
 
         if (string.IsNullOrWhiteSpace(options.BootstrapToken)
@@ -766,127 +819,6 @@ public sealed class IdentityService(
             throw new ForbiddenException("A valid bootstrap token is required for the configured administrator account.");
         }
 
-        return ["User", "SystemAdmin"];
+        return true;
     }
-}
-
-public static class RefreshTokenSecurity
-{
-    public static string Hash(string token) =>
-        Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(token)));
-}
-
-public static class TotpSecurity
-{
-    private const string Base32Alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
-
-    public static string GenerateSecret() => Base32Encode(RandomNumberGenerator.GetBytes(20));
-
-    public static string GenerateCode(string secret, DateTimeOffset now)
-    {
-        var key = Base32Decode(secret);
-        var counter = now.ToUnixTimeSeconds() / 30;
-        Span<byte> counterBytes = stackalloc byte[8];
-        System.Buffers.Binary.BinaryPrimitives.WriteInt64BigEndian(counterBytes, counter);
-        var hash = HMACSHA1.HashData(key, counterBytes);
-        var offset = hash[^1] & 0x0F;
-        var binary = ((hash[offset] & 0x7F) << 24)
-            | (hash[offset + 1] << 16)
-            | (hash[offset + 2] << 8)
-            | hash[offset + 3];
-        return (binary % 1_000_000).ToString("D6");
-    }
-
-    public static bool Verify(string secret, string? code, DateTimeOffset now)
-    {
-        var normalized = code?.Trim();
-        if (normalized?.Length != 6 || normalized.Any(x => !char.IsAsciiDigit(x)))
-        {
-            return false;
-        }
-
-        var supplied = Encoding.ASCII.GetBytes(normalized);
-        var valid = false;
-        for (var offset = -1; offset <= 1; offset++)
-        {
-            var expected = Encoding.ASCII.GetBytes(GenerateCode(secret, now.AddSeconds(offset * 30)));
-            valid |= CryptographicOperations.FixedTimeEquals(supplied, expected);
-        }
-
-        return valid;
-    }
-
-    public static string GenerateRecoveryCode()
-    {
-        var raw = Base32Encode(RandomNumberGenerator.GetBytes(8));
-        return $"{raw[..4]}-{raw[4..8]}-{raw[8..]}";
-    }
-
-    public static string HashRecoveryCode(string code)
-    {
-        var normalized = new string((code ?? string.Empty)
-            .Where(char.IsAsciiLetterOrDigit)
-            .Select(char.ToUpperInvariant)
-            .ToArray());
-        return Convert.ToHexString(SHA256.HashData(Encoding.ASCII.GetBytes(normalized)));
-    }
-
-    private static string Base32Encode(ReadOnlySpan<byte> data)
-    {
-        var output = new StringBuilder((data.Length * 8 + 4) / 5);
-        var buffer = 0;
-        var bitsLeft = 0;
-        foreach (var value in data)
-        {
-            buffer = (buffer << 8) | value;
-            bitsLeft += 8;
-            while (bitsLeft >= 5)
-            {
-                output.Append(Base32Alphabet[(buffer >> (bitsLeft - 5)) & 31]);
-                bitsLeft -= 5;
-            }
-        }
-
-        if (bitsLeft > 0)
-        {
-            output.Append(Base32Alphabet[(buffer << (5 - bitsLeft)) & 31]);
-        }
-
-        return output.ToString();
-    }
-
-    private static byte[] Base32Decode(string value)
-    {
-        var normalized = new string(value
-            .Where(char.IsAsciiLetterOrDigit)
-            .Select(char.ToUpperInvariant)
-            .ToArray());
-        var output = new List<byte>(normalized.Length * 5 / 8);
-        var buffer = 0;
-        var bitsLeft = 0;
-        foreach (var character in normalized)
-        {
-            var index = Base32Alphabet.IndexOf(character);
-            if (index < 0)
-            {
-                throw new CryptographicException("TOTP secret is invalid.");
-            }
-
-            buffer = (buffer << 5) | index;
-            bitsLeft += 5;
-            if (bitsLeft >= 8)
-            {
-                output.Add((byte)(buffer >> (bitsLeft - 8)));
-                bitsLeft -= 8;
-            }
-        }
-
-        return output.ToArray();
-    }
-}
-
-public static class IdentityMappings
-{
-    public static UserProfileResponse ToProfile(this UserDocument user) =>
-        new(user.Id, user.Username, user.Email, user.OrganizationId, user.Roles);
 }

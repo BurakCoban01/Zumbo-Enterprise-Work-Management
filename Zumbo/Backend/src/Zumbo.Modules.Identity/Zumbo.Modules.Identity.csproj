@@ -2,7 +2,11 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Zumbo.SharedKernel\Zumbo.SharedKernel.csproj" />
-    <ProjectReference Include="..\Zumbo.BuildingBlocks.Infrastructure\Zumbo.BuildingBlocks.Infrastructure.csproj" />
+    <ProjectReference Include="..\Zumbo.BuildingBlocks.Application\Zumbo.BuildingBlocks.Application.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
 
   <PropertyGroup>
