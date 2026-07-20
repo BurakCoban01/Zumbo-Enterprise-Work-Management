@@ -1,15 +1,24 @@
 using Microsoft.Extensions.Options;
-using Zumbo.BuildingBlocks.Infrastructure.Concurrency;
-using Zumbo.BuildingBlocks.Infrastructure.Persistence;
+using Zumbo.BuildingBlocks.Application.Concurrency;
+using Zumbo.BuildingBlocks.Application.Persistence;
 using Zumbo.SharedKernel;
 
 namespace Zumbo.Modules.Boards;
 
-public sealed record CreateBoardRequest(string ProjectId, string Name, string Type);
 public sealed record UpdateBoardRequest(string Name, string Type);
-public sealed record CreateColumnRequest(string Name, string Category, int? WipLimit);
-public sealed record UpdateColumnRequest(string Name, string Category, int? WipLimit);
+public sealed record CreateColumnRequest(
+    string Name,
+    string Category,
+    int? WipLimit,
+    IReadOnlyCollection<string>? StatusNames = null);
+public sealed record UpdateColumnRequest(
+    string Name,
+    string Category,
+    int? WipLimit,
+    IReadOnlyCollection<string>? StatusNames = null);
 public sealed record ReorderColumnsRequest(IReadOnlyList<string> ColumnIds);
+public sealed record BoardColumnStatusMappingRequest(string ColumnId, IReadOnlyCollection<string> StatusNames);
+public sealed record ConfigureBoardWorkflowMappingRequest(IReadOnlyCollection<BoardColumnStatusMappingRequest> Columns);
 public sealed record UpdateSwimlaneRequest(string Mode);
 public sealed record BoardFilterRequest(
     string? AssigneeUserId,
@@ -28,31 +37,6 @@ public sealed record UpdateBoardViewRequest(
     bool IsShared,
     string SwimlaneMode,
     BoardFilterRequest Filter);
-public sealed record BoardResponse(
-    string Id,
-    string ProjectId,
-    string Name,
-    string Type,
-    string SwimlaneMode,
-    IReadOnlyCollection<BoardColumnResponse> Columns,
-    IReadOnlyCollection<BoardViewResponse> Views,
-    bool Archived = false);
-public sealed record BoardColumnResponse(string Id, string Name, string Category, int Position, int? WipLimit);
-public sealed record BoardViewResponse(
-    string Id,
-    string Name,
-    string OwnerUserId,
-    bool IsShared,
-    string SwimlaneMode,
-    BoardFilterResponse Filter);
-public sealed record BoardFilterResponse(
-    string? AssigneeUserId,
-    string? TeamId,
-    IReadOnlyCollection<string> Statuses,
-    IReadOnlyCollection<string> Priorities,
-    IReadOnlyCollection<string> Labels,
-    string? Text);
-
 public interface IBoardProjectAccessChecker
 {
     Task EnsureCanAsync(string userId, string projectId, string permission, CancellationToken ct);
@@ -62,56 +46,17 @@ public interface IBoardColumnUsageChecker
 {
     Task<bool> HasWorkItemsAsync(string boardId, string columnId, string columnName, CancellationToken ct);
     Task<bool> HasBoardWorkItemsAsync(string boardId, CancellationToken ct);
+    Task ValidateMappingAsync(BoardDocument board, CancellationToken ct);
+}
+
+public interface IBoardWorkflowCatalog
+{
+    Task EnsureStatusesAvailableAsync(string projectId, IReadOnlyCollection<string> statuses, CancellationToken ct);
 }
 
 public interface IBoardAuditWriter
 {
     Task WriteAsync(string action, string entityId, string? oldValue, string? newValue, string correlationId, CancellationToken ct);
-}
-
-public sealed class BoardDocument : IDocument
-{
-    public string Id { get; set; } = Guid.NewGuid().ToString("N");
-    public string ProjectId { get; set; } = string.Empty;
-    public string Name { get; set; } = string.Empty;
-    public string Type { get; set; } = "Kanban";
-    public bool Archived { get; set; }
-    public string SwimlaneMode { get; set; } = "None";
-    public List<BoardColumnDocument> Columns { get; set; } = [];
-    public List<BoardViewDocument> Views { get; set; } = [];
-    public DateTimeOffset CreatedAt { get; set; }
-    public DateTimeOffset UpdatedAt { get; set; }
-}
-
-public sealed class BoardViewDocument
-{
-    public string Id { get; set; } = Guid.NewGuid().ToString("N");
-    public string Name { get; set; } = string.Empty;
-    public string OwnerUserId { get; set; } = string.Empty;
-    public bool IsShared { get; set; }
-    public string SwimlaneMode { get; set; } = "None";
-    public BoardFilterDocument Filter { get; set; } = new();
-    public DateTimeOffset CreatedAt { get; set; }
-    public DateTimeOffset UpdatedAt { get; set; }
-}
-
-public sealed class BoardFilterDocument
-{
-    public string? AssigneeUserId { get; set; }
-    public string? TeamId { get; set; }
-    public List<string> Statuses { get; set; } = [];
-    public List<string> Priorities { get; set; } = [];
-    public List<string> Labels { get; set; } = [];
-    public string? Text { get; set; }
-}
-
-public sealed class BoardColumnDocument
-{
-    public string Id { get; set; } = Guid.NewGuid().ToString("N");
-    public string Name { get; set; } = string.Empty;
-    public string Category { get; set; } = "Todo";
-    public int Position { get; set; }
-    public int? WipLimit { get; set; }
 }
 
 public sealed class BoardService(
@@ -122,17 +67,18 @@ public sealed class BoardService(
     IOptions<DistributedLockOptions> distributedLockOptions,
     IClock clock,
     ICurrentUser currentUser,
-    IBoardAuditWriter audit)
+    IBoardAuditWriter audit,
+    IExpectedVersionAccessor? expectedVersions = null,
+    IBoardWorkflowCatalog? workflowCatalog = null)
 {
+    private readonly ExpectedVersionState expectedVersion = new(expectedVersions);
+
     public Task<BoardResponse> CreateAsync(CreateBoardRequest request, CancellationToken ct) =>
         CreateAsync(request, "none", ct);
 
     public async Task<BoardResponse> CreateAsync(CreateBoardRequest request, string correlationId, CancellationToken ct)
     {
-        if (string.IsNullOrWhiteSpace(request.ProjectId) || string.IsNullOrWhiteSpace(request.Name))
-        {
-            throw new ValidationException("Project id and board name are required.");
-        }
+        CreateBoardValidator.Validate(request);
 
         await EnsurePermissionAsync(request.ProjectId.Trim(), "BoardManage", ct);
         await using var projectBoardsLock = await AcquireLockAsync("project-boards:" + request.ProjectId.Trim(), ct);
@@ -155,13 +101,14 @@ public sealed class BoardService(
             Type = type,
             CreatedAt = now,
             UpdatedAt = now,
+            WorkflowMappingVersion = 1,
             Columns =
             [
-                new BoardColumnDocument { Name = "To Do", Category = "Todo", Position = 1 },
-                new BoardColumnDocument { Name = "In Progress", Category = "InProgress", Position = 2, WipLimit = 5 },
-                new BoardColumnDocument { Name = "Code Review", Category = "Review", Position = 3, WipLimit = 3 },
-                new BoardColumnDocument { Name = "Test", Category = "Test", Position = 4, WipLimit = 4 },
-                new BoardColumnDocument { Name = "Done", Category = "Done", Position = 5 }
+                new BoardColumnDocument { Name = "To Do", Category = "Todo", Position = 1, StatusNames = ["To Do"] },
+                new BoardColumnDocument { Name = "In Progress", Category = "InProgress", Position = 2, WipLimit = 5, StatusNames = ["In Progress", "Blocked"] },
+                new BoardColumnDocument { Name = "Code Review", Category = "Review", Position = 3, WipLimit = 3, StatusNames = ["Code Review"] },
+                new BoardColumnDocument { Name = "Test", Category = "Test", Position = 4, WipLimit = 4, StatusNames = ["Test"] },
+                new BoardColumnDocument { Name = "Done", Category = "Done", Position = 5, StatusNames = ["Done"] }
             ]
         };
 
@@ -191,19 +138,21 @@ public sealed class BoardService(
 
     public async Task<BoardResponse> AddColumnAsync(string boardId, CreateColumnRequest request, string correlationId, CancellationToken ct)
     {
-        await using var boardLock = await AcquireLockAsync("board:" + boardId, ct);
         var board = await GetBoard(boardId, ct);
         await EnsurePermissionAsync(board.ProjectId, "BoardManage", ct);
         var name = NormalizeColumnName(request.Name);
         var category = NormalizeCategory(request.Category);
         ValidateWipLimit(request.WipLimit);
         EnsureUniqueColumn(board, name, category);
+        var statusNames = BoardWorkflowMappingRules.NormalizeStatusNames(request.StatusNames, name);
+        await BoardWorkflowMappingRules.EnsureAvailableAsync(workflowCatalog, board, statusNames, null, ct);
         var nextPosition = board.Columns.Count == 0 ? 1 : board.Columns.Max(x => x.Position) + 1;
         var column = new BoardColumnDocument
         {
             Name = name,
             Category = category,
             WipLimit = request.WipLimit,
+            StatusNames = statusNames,
             Position = nextPosition
         };
         board.Columns.Add(column);
@@ -218,7 +167,6 @@ public sealed class BoardService(
 
     public async Task<BoardResponse> UpdateAsync(string boardId, UpdateBoardRequest request, string correlationId, CancellationToken ct)
     {
-        await using var boardLock = await AcquireLockAsync("board:" + boardId, ct);
         var board = await GetBoard(boardId, ct);
         await EnsurePermissionAsync(board.ProjectId, "BoardManage", ct);
         var name = NormalizeName(request.Name);
@@ -254,7 +202,6 @@ public sealed class BoardService(
         string correlationId,
         CancellationToken ct)
     {
-        await using var boardLock = await AcquireLockAsync("board:" + boardId, ct);
         var board = await GetBoard(boardId, ct);
         await EnsurePermissionAsync(board.ProjectId, "BoardManage", ct);
         var column = board.Columns.SingleOrDefault(x => x.Id == columnId)
@@ -263,6 +210,10 @@ public sealed class BoardService(
         var category = NormalizeCategory(request.Category);
         ValidateWipLimit(request.WipLimit);
         EnsureUniqueColumn(board, name, category, column.Id);
+        var statusNames = request.StatusNames is null
+            ? BoardWorkflowMappingRules.EnsureStatusNames(board, column)
+            : BoardWorkflowMappingRules.NormalizeStatusNames(request.StatusNames, name);
+        await BoardWorkflowMappingRules.EnsureAvailableAsync(workflowCatalog, board, statusNames, column.Id, ct);
 
         var identityChanges = !column.Name.Equals(name, StringComparison.OrdinalIgnoreCase)
             || !column.Category.Equals(category, StringComparison.OrdinalIgnoreCase);
@@ -287,6 +238,7 @@ public sealed class BoardService(
         column.Name = name;
         column.Category = category;
         column.WipLimit = request.WipLimit;
+        column.StatusNames = statusNames;
         await SaveAsync(board, ct);
         await audit.WriteAsync("BoardColumnUpdated", board.Id, oldValue, $"{column.Id}:{column.Name}:{column.Category}:{column.WipLimit}", correlationId, ct);
         return ToResponse(board);
@@ -297,7 +249,6 @@ public sealed class BoardService(
 
     public async Task<BoardResponse> ReorderColumnsAsync(string boardId, ReorderColumnsRequest request, string correlationId, CancellationToken ct)
     {
-        await using var boardLock = await AcquireLockAsync("board:" + boardId, ct);
         var board = await GetBoard(boardId, ct);
         await EnsurePermissionAsync(board.ProjectId, "BoardManage", ct);
         if (request.ColumnIds is null
@@ -325,7 +276,6 @@ public sealed class BoardService(
 
     public async Task<BoardResponse> DeleteColumnAsync(string boardId, string columnId, string correlationId, CancellationToken ct)
     {
-        await using var boardLock = await AcquireLockAsync("board:" + boardId, ct);
         var board = await GetBoard(boardId, ct);
         await EnsurePermissionAsync(board.ProjectId, "BoardManage", ct);
         var column = board.Columns.SingleOrDefault(x => x.Id == columnId)
@@ -367,7 +317,6 @@ public sealed class BoardService(
 
     public async Task ArchiveAsync(string boardId, string correlationId, CancellationToken ct)
     {
-        await using var boardLock = await AcquireLockAsync("board:" + boardId, ct);
         var board = await GetBoard(boardId, ct);
         await EnsurePermissionAsync(board.ProjectId, "BoardManage", ct);
         if (await usageChecker.HasBoardWorkItemsAsync(board.Id, ct))
@@ -385,7 +334,6 @@ public sealed class BoardService(
 
     public async Task<BoardResponse> RestoreAsync(string boardId, string correlationId, CancellationToken ct)
     {
-        await using var boardLock = await AcquireLockAsync("board:" + boardId, ct);
         var board = await GetArchivedBoard(boardId, ct);
         await EnsurePermissionAsync(board.ProjectId, "BoardManage", ct);
         var duplicate = await boards.SelectAsync(x =>
@@ -416,7 +364,6 @@ public sealed class BoardService(
         string correlationId,
         CancellationToken ct)
     {
-        await using var boardLock = await AcquireLockAsync("board:" + boardId, ct);
         var board = await GetBoard(boardId, ct);
         await EnsurePermissionAsync(board.ProjectId, "BoardManage", ct);
         var oldMode = board.SwimlaneMode;
@@ -438,7 +385,6 @@ public sealed class BoardService(
         string correlationId,
         CancellationToken ct)
     {
-        await using var boardLock = await AcquireLockAsync("board:" + boardId, ct);
         var board = await GetBoard(boardId, ct);
         await EnsurePermissionAsync(board.ProjectId, request.IsShared ? "BoardManage" : "BoardView", ct);
         var userId = CurrentUserId();
@@ -475,7 +421,6 @@ public sealed class BoardService(
         string correlationId,
         CancellationToken ct)
     {
-        await using var boardLock = await AcquireLockAsync("board:" + boardId, ct);
         var board = await GetBoard(boardId, ct);
         var view = board.Views.SingleOrDefault(x => x.Id == viewId)
             ?? throw new NotFoundException("BOARD_VIEW_NOT_FOUND", "Board view was not found.");
@@ -505,7 +450,6 @@ public sealed class BoardService(
         string correlationId,
         CancellationToken ct)
     {
-        await using var boardLock = await AcquireLockAsync("board:" + boardId, ct);
         var board = await GetBoard(boardId, ct);
         var view = board.Views.SingleOrDefault(x => x.Id == viewId)
             ?? throw new NotFoundException("BOARD_VIEW_NOT_FOUND", "Board view was not found.");
@@ -561,7 +505,17 @@ public sealed class BoardService(
     private async Task SaveAsync(BoardDocument board, CancellationToken ct)
     {
         board.UpdatedAt = clock.UtcNow;
-        await boards.ReplaceByFilterAsync(x => x.Id == board.Id, board, ct);
+        var result = await boards.ReplaceByVersionAsync(
+            x => x.Id == board.Id,
+            board,
+            expectedVersion.Consume(board.Version),
+            ct);
+        if (!result.Found)
+        {
+            throw new NotFoundException("BOARD_NOT_FOUND", "Board was not found.");
+        }
+
+        board.Version = result.Version!.Value;
     }
 
     private async Task<IAsyncDisposable> AcquireLockAsync(string resource, CancellationToken ct)
@@ -738,7 +692,7 @@ public sealed class BoardService(
             board.Type,
             board.SwimlaneMode,
             board.Columns.OrderBy(x => x.Position).Select(x =>
-                new BoardColumnResponse(x.Id, x.Name, x.Category, x.Position, x.WipLimit)).ToList(),
+                new BoardColumnResponse(x.Id, x.Name, x.Category, x.Position, x.WipLimit, BoardWorkflowMappingRules.EnsureStatusNames(board, x))).ToList(),
             board.Views
                 .Where(x => x.IsShared || x.OwnerUserId == CurrentUserId())
                 .OrderByDescending(x => x.IsShared)
@@ -757,5 +711,6 @@ public sealed class BoardService(
                         x.Filter.Labels,
                         x.Filter.Text)))
                 .ToList(),
-            board.Archived);
+            board.Archived,
+            board.Version);
 }
