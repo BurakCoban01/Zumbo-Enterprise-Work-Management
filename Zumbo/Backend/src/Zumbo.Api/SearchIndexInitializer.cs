@@ -1,4 +1,4 @@
-using Zumbo.BuildingBlocks.Infrastructure.Search;
+using Zumbo.BuildingBlocks.Application.Search;
 
 public sealed class SearchIndexInitializer(
     IWorkItemSearchIndex searchIndex,

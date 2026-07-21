@@ -29,16 +29,20 @@ public sealed class ProjectAuditWriterAdapter(AuditService audit) : IProjectAudi
         audit.WriteAsync(action, "Project", entityId, oldValue, newValue, correlationId, ct);
 }
 
-public sealed class BoardAuditWriterAdapter(AuditService audit) : IBoardAuditWriter
+public sealed class BoardAuditWriterAdapter(WriteAuditLogHandler handler) : IBoardAuditWriter
 {
-    public Task WriteAsync(
+    public async Task WriteAsync(
         string action,
         string entityId,
         string? oldValue,
         string? newValue,
         string correlationId,
-        CancellationToken ct) =>
-        audit.WriteAsync(action, "Board", entityId, oldValue, newValue, correlationId, ct);
+        CancellationToken ct)
+    {
+        await handler.HandleAsync(
+            new WriteAuditLogCommand(action, "Board", entityId, oldValue, newValue, correlationId),
+            ct);
+    }
 }
 
 public sealed class WorkflowAuditWriterAdapter(AuditService audit) : IWorkflowAuditWriter

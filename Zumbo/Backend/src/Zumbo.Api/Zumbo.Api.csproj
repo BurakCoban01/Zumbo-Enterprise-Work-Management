@@ -11,12 +11,19 @@
     <PackageReference Include="MessagePack" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
     <PackageReference Include="Microsoft.AspNetCore.SignalR.StackExchangeRedis" />
+    <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" />
+    <PackageReference Include="OpenTelemetry.Extensions.Hosting" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.Http" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.Runtime" />
     <PackageReference Include="Swashbuckle.AspNetCore" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\Zumbo.SharedKernel\Zumbo.SharedKernel.csproj" />
+    <ProjectReference Include="..\Zumbo.BuildingBlocks.Application\Zumbo.BuildingBlocks.Application.csproj" />
     <ProjectReference Include="..\Zumbo.BuildingBlocks.Infrastructure\Zumbo.BuildingBlocks.Infrastructure.csproj" />
+    <ProjectReference Include="..\Zumbo.Persistence.PostgreSql\Zumbo.Persistence.PostgreSql.csproj" />
     <ProjectReference Include="..\Zumbo.Modules.Identity\Zumbo.Modules.Identity.csproj" />
     <ProjectReference Include="..\Zumbo.Modules.Teams\Zumbo.Modules.Teams.csproj" />
     <ProjectReference Include="..\Zumbo.Modules.Projects\Zumbo.Modules.Projects.csproj" />

@@ -1,6 +1,88 @@
-@Zumbo.Api_HostAddress = http://localhost:5026
+@Zumbo.Api_HostAddress = http://127.0.0.1:58088
 
 GET {{Zumbo.Api_HostAddress}}/weatherforecast/
 Accept: application/json
+
+###
+
+@AccessToken = replace-with-access-token
+@PrivacyJobId = replace-with-job-id
+@PrivacyStatusToken = replace-with-status-token
+
+GET {{Zumbo.Api_HostAddress}}/api/auth/privacy/export.ndjson
+Authorization: Bearer {{AccessToken}}
+Accept: application/x-ndjson
+
+###
+
+POST {{Zumbo.Api_HostAddress}}/api/auth/privacy/anonymization-jobs
+Authorization: Bearer {{AccessToken}}
+Content-Type: application/json
+
+{
+  "password": "replace-with-current-password",
+  "confirmation": "ANONYMIZE"
+}
+
+###
+
+GET {{Zumbo.Api_HostAddress}}/api/auth/privacy/jobs/{{PrivacyJobId}}/status
+X-Privacy-Status-Token: {{PrivacyStatusToken}}
+Accept: application/json
+
+###
+
+POST {{Zumbo.Api_HostAddress}}/api/auth/privacy/jobs/{{PrivacyJobId}}/status/recover
+X-Privacy-Status-Token: {{PrivacyStatusToken}}
+Content-Type: application/json
+
+###
+
+DELETE {{Zumbo.Api_HostAddress}}/api/auth/privacy/jobs/{{PrivacyJobId}}/status
+X-Privacy-Status-Token: {{PrivacyStatusToken}}
+
+###
+
+@WebhookId = replace-with-webhook-id
+@WebhookDeliveryId = replace-with-delivery-id
+@WebhookVersion = 1
+
+POST {{Zumbo.Api_HostAddress}}/api/integrations/webhooks
+Authorization: Bearer {{AccessToken}}
+Content-Type: application/json
+
+{
+  "name": "Issue automation",
+  "targetUrl": "https://receiver.example.net/zumbo",
+  "eventScopes": ["work-item.created", "work-item.updated"]
+}
+
+###
+
+GET {{Zumbo.Api_HostAddress}}/api/integrations/webhooks
+Authorization: Bearer {{AccessToken}}
+Accept: application/json
+
+###
+
+POST {{Zumbo.Api_HostAddress}}/api/integrations/webhooks/{{WebhookId}}/rotate-secret
+Authorization: Bearer {{AccessToken}}
+Content-Type: application/json
+
+{
+  "expectedVersion": {{WebhookVersion}}
+}
+
+###
+
+GET {{Zumbo.Api_HostAddress}}/api/integrations/webhooks/{{WebhookId}}/deliveries?pageSize=50
+Authorization: Bearer {{AccessToken}}
+Accept: application/json
+
+###
+
+POST {{Zumbo.Api_HostAddress}}/api/integrations/webhooks/deliveries/{{WebhookDeliveryId}}/replay
+Authorization: Bearer {{AccessToken}}
+Content-Type: application/json
 
 ###

@@ -1,22 +1,55 @@
 using System.Net;
 using System.Net.Mail;
+using System.Net.Sockets;
 using Microsoft.Extensions.Options;
+using Zumbo.BuildingBlocks.Application.Runtime;
 using Zumbo.Modules.Identity;
 using Zumbo.Modules.Notifications;
-using Zumbo.Modules.WorkItems;
 
 public sealed class NotificationUserDirectoryAdapter(IUserRepository users) : INotificationUserDirectory
 {
     public async Task<NotificationUser?> FindAsync(string userId, CancellationToken ct)
     {
         var user = await users.GetByIdAsync(userId, ct);
-        return user is null ? null : new NotificationUser(user.Id, user.Email, user.IsActive);
+        return user is null ? null : new NotificationUser(user.Id, user.OrganizationId, user.Email, user.IsActive);
     }
 }
 
-public sealed class SmtpEmailNotificationSender(IOptions<EmailNotificationOptions> options) : IEmailNotificationSender
+public sealed class SmtpEmailNotificationSender : IEmailNotificationSender
 {
+    private readonly IOptions<EmailNotificationOptions> options;
+    private readonly IExternalDependencyPolicy? resiliencePolicy;
+
+    public SmtpEmailNotificationSender(IOptions<EmailNotificationOptions> options)
+        : this(options, null)
+    {
+    }
+
+    public SmtpEmailNotificationSender(
+        IOptions<EmailNotificationOptions> options,
+        IExternalDependencyPolicyProvider? policyProvider)
+    {
+        this.options = options;
+        resiliencePolicy = policyProvider?.Get(ExternalDependencyNames.Smtp);
+    }
+
     public async Task SendAsync(string recipient, string subject, string body, CancellationToken ct)
+    {
+        if (resiliencePolicy is null)
+        {
+            await SendCoreAsync(recipient, subject, body, ct);
+            return;
+        }
+
+        await resiliencePolicy.ExecuteAsync(
+            "send",
+            ExternalDependencyOperationKind.NonIdempotentWrite,
+            token => SendCoreAsync(recipient, subject, body, token),
+            IsTransient,
+            ct);
+    }
+
+    private async Task SendCoreAsync(string recipient, string subject, string body, CancellationToken ct)
     {
         var configuration = options.Value;
         if (!configuration.Enabled)
@@ -41,6 +74,9 @@ public sealed class SmtpEmailNotificationSender(IOptions<EmailNotificationOption
         };
         await client.SendMailAsync(message, ct);
     }
+
+    private static bool IsTransient(Exception exception) =>
+        exception is SmtpException or SocketException or IOException;
 }
 
 public sealed class NotificationEmailDispatcherHostedService(
@@ -48,6 +84,8 @@ public sealed class NotificationEmailDispatcherHostedService(
     IOptions<EmailNotificationOptions> options,
     ILogger<NotificationEmailDispatcherHostedService> logger) : BackgroundService
 {
+    private readonly string workerId = $"{Environment.MachineName}:{Environment.ProcessId}:{Guid.NewGuid():N}";
+
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         if (!options.Value.Enabled)
@@ -55,14 +93,18 @@ public sealed class NotificationEmailDispatcherHostedService(
             return;
         }
 
-        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(30));
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(
+            Math.Clamp(options.Value.DispatcherIntervalSeconds, 1, 3600)));
         do
         {
             try
             {
                 await using var scope = scopeFactory.CreateAsyncScope();
                 var service = scope.ServiceProvider.GetRequiredService<NotificationService>();
-                await service.DispatchPendingEmailsAsync(50, stoppingToken);
+                await service.DispatchPendingEmailsAsync(
+                    Math.Clamp(options.Value.DispatchBatchSize, 1, 100),
+                    stoppingToken,
+                    workerId);
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {
@@ -71,41 +113,6 @@ public sealed class NotificationEmailDispatcherHostedService(
             catch (Exception ex)
             {
                 logger.LogError(ex, "Notification email dispatcher iteration failed.");
-            }
-        }
-        while (await timer.WaitForNextTickAsync(stoppingToken));
-    }
-}
-
-public sealed class DueDateReminderHostedService(
-    IServiceScopeFactory scopeFactory,
-    IOptions<DueDateReminderOptions> options,
-    ILogger<DueDateReminderHostedService> logger) : BackgroundService
-{
-    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
-    {
-        if (!options.Value.Enabled)
-        {
-            return;
-        }
-
-        var interval = TimeSpan.FromMinutes(Math.Clamp(options.Value.IntervalMinutes, 1, 1440));
-        using var timer = new PeriodicTimer(interval);
-        do
-        {
-            try
-            {
-                await using var scope = scopeFactory.CreateAsyncScope();
-                var service = scope.ServiceProvider.GetRequiredService<WorkItemService>();
-                await service.SendDueDateRemindersAsync(options.Value.HorizonHours, stoppingToken);
-            }
-            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
-            {
-                return;
-            }
-            catch (Exception ex)
-            {
-                logger.LogError(ex, "Due-date reminder dispatcher iteration failed.");
             }
         }
         while (await timer.WaitForNextTickAsync(stoppingToken));

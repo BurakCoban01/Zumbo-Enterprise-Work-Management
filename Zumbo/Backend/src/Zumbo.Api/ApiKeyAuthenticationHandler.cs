@@ -2,6 +2,7 @@ using System.Security.Claims;
 using System.Text.Encodings.Web;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.Extensions.Options;
+using Zumbo.BuildingBlocks.Application.Security;
 using Zumbo.Modules.Identity;
 
 public static class ZumboAuthenticationSchemes
@@ -26,7 +27,7 @@ public sealed class ApiKeyAuthenticationHandler(
         }
 
         var principal = await apiKeyService.AuthenticateAsync(rawKey, Context.RequestAborted);
-        if (principal is null || !principal.Scopes.Contains("api:full", StringComparer.Ordinal))
+        if (principal is null || principal.Scopes.Count == 0 || principal.Scopes.Any(scope => !ApiKeyScopes.IsValid(scope)))
         {
             return AuthenticateResult.Fail("API key is invalid or expired.");
         }
