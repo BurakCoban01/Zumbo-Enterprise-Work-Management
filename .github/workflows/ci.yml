@@ -48,7 +48,9 @@ jobs:
         run: node scripts/ci/Test-CiContract.mjs
 
       - name: QA-002 manual clean Linux workflow contract
-        run: node scripts/ci/Test-Qa002Workflow.mjs
+        run: |
+          node scripts/ci/Test-Qa002Workflow.mjs
+          node scripts/ci/Test-Qa002Readiness.mjs
 
   backend-core:
     timeout-minutes: 25

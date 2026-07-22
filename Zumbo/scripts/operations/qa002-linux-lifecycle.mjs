@@ -12,6 +12,11 @@ import {
   sha256,
   syntheticSecret
 } from './qa002-common.mjs';
+import {
+  createApiRequest,
+  validateQa002ApiUrl,
+  verifyQa002Readiness
+} from './qa002-readiness.mjs';
 
 if (process.platform !== 'linux') throw new Error('QA-002 lifecycle is Linux-only.');
 
@@ -19,7 +24,11 @@ const project = assertProjectName(requireArgument('--project'));
 const environmentPath = resolve(requireArgument('--environment'));
 const outputPath = resolve(requireArgument('--output'));
 const environment = parseEnvironmentFile(environmentPath);
-const apiUrl = new URL(environment.ZUMBO_API_URL).toString().replace(/\/$/, '');
+const apiContract = validateQa002ApiUrl(environment.ZUMBO_API_URL, {
+  gatewayBindHost: environment.ZUMBO_GATEWAY_BIND_HOST,
+  gatewayPort: environment.ZUMBO_GATEWAY_PORT
+});
+const apiRequest = createApiRequest({ origin: apiContract.origin });
 const adminPassword = `Qa2!${syntheticSecret(24)}`;
 const stamp = `${process.env.GITHUB_RUN_ID || Date.now()}-${process.env.GITHUB_RUN_ATTEMPT || '1'}`.toLowerCase();
 const username = `qa002admin${stamp.replace(/[^a-z0-9]/g, '')}`.slice(0, 48);
@@ -46,7 +55,7 @@ try {
   await composeStep('composeConfig', ['config', '--quiet'], 2 * 60_000);
   await composeStep('composeBuild', ['build', '--pull', 'api', 'gateway'], 20 * 60_000);
   await composeStep('firstStart', ['up', '--detach', '--no-build', '--wait', '--wait-timeout', '600'], 12 * 60_000);
-  firstInventory = await step('firstReadiness', () => verifyReadiness('first'));
+  firstInventory = await step('firstReadiness', () => verifyReadiness('first', inventory => { firstInventory = inventory; }));
 
   const bootstrap = await step('initialBootstrap', () => register({ username, organizationId }));
   if (!bootstrap.userId || !bootstrap.accessToken || !bootstrap.roles.includes('SystemAdmin')) {
@@ -65,7 +74,7 @@ try {
   }
 
   await composeStep('resume', ['up', '--detach', '--no-build', '--wait', '--wait-timeout', '600'], 12 * 60_000);
-  secondInventory = await step('secondReadiness', () => verifyReadiness('resume'));
+  secondInventory = await step('secondReadiness', () => verifyReadiness('resume', inventory => { secondInventory = inventory; }));
   const login = await step('persistentMarkerPreserved', async () => {
     const auth = await loginAdmin();
     await verifyMarker(auth.accessToken, marker);
@@ -191,31 +200,29 @@ function run(executable, args, timeout = 60_000) {
   return completed;
 }
 
-async function verifyReadiness(stage) {
-  const deadline = Date.now() + 180_000;
-  let last = [];
-  while (Date.now() < deadline) {
-    const output = run('docker', composeArgs(['ps', '--all', '--format', 'json']), 30_000).stdout;
-    const entries = parseComposeJsonLines(output);
-    last = expectedServices.map(service => {
-      const item = entries.find(entry => (entry.Service || entry.service) === service);
-      const state = String(item?.State || item?.state || '').toLowerCase();
-      const health = String(item?.Health || item?.health || '').toLowerCase();
-      const exitCode = Number(item?.ExitCode ?? item?.exitCode ?? -1);
-      const ready = service === 'mongo-init-replica'
-        ? state === 'exited' && exitCode === 0
-        : state === 'running' && health === 'healthy';
-      return { service, state: state || 'missing', health: health || 'none', exitCode, ready };
-    });
-    if (last.every(item => item.ready)) {
-      const live = await apiRequest('/health/live', { allowText: true });
-      const ready = await apiRequest('/health/ready', { allowText: true });
-      if (live.status === 200 && ready.status === 200) return last;
-    }
-    await new Promise(accept => setTimeout(accept, 3000));
-  }
-  const failed = last.filter(item => !item.ready).map(item => `${item.service}:${item.state}/${item.health}/${item.exitCode}`);
-  throw new Error(`${stage} readiness timed out: ${failed.join(', ')}`);
+async function verifyReadiness(stage, retainInventory) {
+  return verifyQa002Readiness({
+    stage,
+    expectedServices,
+    getInventory: serviceInventory,
+    apiRequest,
+    onInventory: retainInventory
+  });
+}
+
+function serviceInventory({ timeoutMs }) {
+  const output = run('docker', composeArgs(['ps', '--all', '--format', 'json']), timeoutMs).stdout;
+  const entries = parseComposeJsonLines(output);
+  return expectedServices.map(service => {
+    const item = entries.find(entry => (entry.Service || entry.service) === service);
+    const state = String(item?.State || item?.state || '').toLowerCase();
+    const health = String(item?.Health || item?.health || '').toLowerCase();
+    const exitCode = Number(item?.ExitCode ?? item?.exitCode ?? -1);
+    const ready = service === 'mongo-init-replica'
+      ? state === 'exited' && exitCode === 0
+      : state === 'running' && health === 'healthy';
+    return { service, state: state || 'missing', health: health || 'none', exitCode, ready };
+  });
 }
 
 async function register({ username: requestedUsername, organizationId: requestedOrganization }) {
@@ -264,28 +271,6 @@ async function verifyMarker(token, marker) {
     item.id === marker.id && item.tenantKey === marker.tenantKey && item.name === marker.name);
   if (!found) throw new Error('Persistent marker was not returned by the supported API contract.');
   return { markerFingerprint: sha256(`${marker.id}\0${marker.tenantKey}\0${marker.name}`), found: true };
-}
-
-async function apiRequest(path, { method = 'GET', token, body, allowError = false, allowText = false } = {}) {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 30_000);
-  try {
-    const response = await fetch(`${apiUrl}${path}`, {
-      method,
-      headers: {
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        ...(body ? { 'Content-Type': 'application/json' } : {})
-      },
-      body: body ? JSON.stringify(body) : undefined,
-      signal: controller.signal
-    });
-    const text = await response.text();
-    const payload = allowText ? text : (text ? JSON.parse(text) : {});
-    if (!response.ok && !allowError) throw new Error(`API ${path} failed with HTTP ${response.status}.`);
-    return { status: response.status, payload };
-  } finally {
-    clearTimeout(timer);
-  }
 }
 
 function projectVolumes() {

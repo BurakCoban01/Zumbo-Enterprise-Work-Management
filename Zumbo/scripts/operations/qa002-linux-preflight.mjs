@@ -5,13 +5,16 @@ import { spawnSync } from 'node:child_process';
 import {
   assertSha,
   expectedServices,
+  parseEnvironmentFile,
   repositoryRoot,
   requireArgument
 } from './qa002-common.mjs';
+import { validateQa002ApiUrl } from './qa002-readiness.mjs';
 
 const targetSha = assertSha(requireArgument('--target-sha'), 'target SHA');
 const environmentPath = resolve(requireArgument('--environment'));
 const outputPath = resolve(requireArgument('--output'));
+const environment = parseEnvironmentFile(environmentPath);
 const checks = [];
 
 check('linuxRunner', () => {
@@ -40,6 +43,7 @@ const requiredFiles = [
   'scripts/operations/prepare-env.mjs',
   'scripts/operations/bootstrap-admin.mjs',
   'scripts/operations/qa002-common.mjs',
+  'scripts/operations/qa002-readiness.mjs',
   'scripts/operations/qa002-linux-lifecycle.mjs',
   'scripts/operations/qa002-cleanup.mjs',
   'scripts/operations/qa002-evidence.mjs',
@@ -79,14 +83,20 @@ check('serviceInventory', () => {
 const gatewayPorts = composeJson.services?.gateway?.ports || [];
 check('portAndReadinessContract', () => {
   const gateway = gatewayPorts[0];
-  if (gateway?.host_ip !== '127.0.0.1' || Number(gateway?.target) !== 8080) {
+  if (gatewayPorts.length !== 1 || gateway?.host_ip !== '127.0.0.1' || Number(gateway?.target) !== 8080) {
     throw new Error('Gateway must publish only target 8080 on loopback.');
   }
+  const apiContract = validateQa002ApiUrl(environment.ZUMBO_API_URL, {
+    gatewayBindHost: environment.ZUMBO_GATEWAY_BIND_HOST,
+    gatewayPort: environment.ZUMBO_GATEWAY_PORT,
+    composeGateway: gateway
+  });
   for (const service of expectedServices.filter(name => name !== 'gateway')) {
     if ((composeJson.services?.[service]?.ports || []).length) throw new Error(`${service} unexpectedly publishes a host port.`);
   }
   return {
     gateway: `${gateway.host_ip}:${gateway.published}->${gateway.target}`,
+    apiOrigin: apiContract.origin,
     endpoints: ['/health/live', '/health/ready'],
     frontendPortContract: '127.0.0.1:58177'
   };
