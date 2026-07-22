@@ -1,0 +1,129 @@
+name: QA-002 Clean Linux Lifecycle
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_sha:
+        description: Exact 40-character commit SHA to validate
+        required: true
+        type: string
+      confirmation:
+        description: Type RUN-QA-002 to confirm the disposable lifecycle run
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: qa-002-clean-linux
+  cancel-in-progress: false
+
+jobs:
+  clean-linux-lifecycle:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      QA002_TARGET_SHA: ${{ inputs.target_sha }}
+      QA002_CONFIRMATION: ${{ inputs.confirmation }}
+      QA002_ROOT: ${{ runner.temp }}/qa002-${{ github.run_id }}-${{ github.run_attempt }}
+      QA002_ENV_FILE: ${{ runner.temp }}/qa002-${{ github.run_id }}-${{ github.run_attempt }}/runtime.env
+      QA002_RAW_DIR: ${{ runner.temp }}/qa002-${{ github.run_id }}-${{ github.run_attempt }}/raw
+      QA002_EVIDENCE_DIR: ${{ runner.temp }}/qa002-${{ github.run_id }}-${{ github.run_attempt }}/artifact
+      QA002_PROJECT: zumbo-qa002-${{ github.run_id }}-${{ github.run_attempt }}
+      QA002_RUNNER_IMAGE: ubuntu-24.04
+    steps:
+      - name: Validate deliberate inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$QA002_TARGET_SHA" =~ ^[0-9a-fA-F]{40}$ ]] || { echo 'target_sha must be exactly 40 hexadecimal characters.' >&2; exit 2; }
+          test "$QA002_CONFIRMATION" = 'RUN-QA-002'
+
+      - name: Checkout exact target
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ inputs.target_sha }}
+          fetch-depth: 1
+          persist-credentials: false
+          clean: true
+          show-progress: false
+
+      - name: Setup Node 20
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "20.20.0"
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Prepare synthetic runtime inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$QA002_RAW_DIR" "$QA002_EVIDENCE_DIR"
+          corepack enable
+          corepack prepare pnpm@9.0.0 --activate
+          node scripts/operations/prepare-env.mjs --output "$QA002_ENV_FILE"
+          node scripts/operations/qa002-mask-environment.mjs --environment "$QA002_ENV_FILE"
+
+      - name: Clean Linux preflight
+        shell: bash
+        run: >-
+          node scripts/operations/qa002-linux-preflight.mjs
+          --target-sha "$QA002_TARGET_SHA"
+          --environment "$QA002_ENV_FILE"
+          --output "$QA002_RAW_DIR/preflight.json"
+
+      - name: Execute canonical lifecycle
+        shell: bash
+        run: >-
+          node scripts/operations/qa002-linux-lifecycle.mjs
+          --project "$QA002_PROJECT"
+          --environment "$QA002_ENV_FILE"
+          --output "$QA002_RAW_DIR/lifecycle.json"
+
+      - name: Targeted always cleanup
+        if: ${{ always() }}
+        shell: bash
+        run: >-
+          node scripts/operations/qa002-cleanup.mjs
+          --project "$QA002_PROJECT"
+          --environment "$QA002_ENV_FILE"
+          --output "$QA002_RAW_DIR/cleanup.json"
+
+      - name: Build sanitized evidence
+        if: ${{ always() }}
+        shell: bash
+        run: >-
+          node scripts/operations/qa002-evidence.mjs
+          --target-sha "$QA002_TARGET_SHA"
+          --preflight "$QA002_RAW_DIR/preflight.json"
+          --lifecycle "$QA002_RAW_DIR/lifecycle.json"
+          --cleanup "$QA002_RAW_DIR/cleanup.json"
+          --output-dir "$QA002_EVIDENCE_DIR"
+
+      - name: Validate sanitized evidence schema
+        if: ${{ always() }}
+        shell: bash
+        run: >-
+          node scripts/operations/qa002-evidence.mjs
+          --validate "$QA002_EVIDENCE_DIR/qa-002-remote-evidence.json"
+          --expected-sha "$QA002_TARGET_SHA"
+
+      - name: Upload sanitized QA-002 evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        with:
+          name: qa-002-clean-linux-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ env.QA002_EVIDENCE_DIR }}
+          if-no-files-found: error
+          include-hidden-files: false
+          retention-days: 1
+
+      - name: Remove synthetic runtime files
+        if: ${{ always() }}
+        shell: bash
+        run: rm -f "$QA002_ENV_FILE"

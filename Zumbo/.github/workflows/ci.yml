@@ -37,6 +37,13 @@ jobs:
       - name: No image push or deployment contract
         run: node scripts/ci/Test-CiContract.mjs
 
+      - name: QA-002 manual clean Linux workflow contract
+        run: node scripts/ci/Test-Qa002Workflow.mjs
+
+  backend-core:
+    timeout-minutes: 25
+    runs-on: ubuntu-latest
+    steps:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
