@@ -34,7 +34,9 @@
     "frontend",
     "runtime-browser",
     "security-containers",
-    "codeql",
+    "codeql-capability",
+    "codeql-csharp",
+    "codeql-javascript-typescript",
     "ci-summary"
   ],
   "allowedArtifactPrefixes": [

@@ -9,6 +9,10 @@ on:
 permissions:
   contents: read
 
+defaults:
+  run:
+    working-directory: Zumbo
+
 concurrency:
   group: zumbo-ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -24,15 +28,21 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Setup Node
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: "20.20.0"
 
       - name: Artifact retention and secret boundary
         run: node scripts/ci/Test-CiContract.mjs
+
+      - name: CodeQL capability policy contract
+        run: node scripts/ci/Test-CodeqlCapability.mjs
+
+      - name: CI summary policy contract
+        run: node scripts/ci/Test-CiSummary.mjs
 
       - name: No image push or deployment contract
         run: node scripts/ci/Test-CiContract.mjs
@@ -45,15 +55,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
           dotnet-version: "8.0.x"
 
       - name: Setup Node
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: "20.20.0"
 
@@ -89,14 +99,14 @@ jobs:
 
       - name: Upload core evidence
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: backend-core-evidence
           path: |
-            artifacts/contracts/generated/openapi.current.json
-            artifacts/coverage/ci/coverage-summary.json
-            artifacts/coverage/ci/unit/
-            artifacts/coverage/ci/api/
+            Zumbo/artifacts/contracts/generated/openapi.current.json
+            Zumbo/artifacts/coverage/ci/coverage-summary.json
+            Zumbo/artifacts/coverage/ci/unit/
+            Zumbo/artifacts/coverage/ci/api/
           if-no-files-found: error
           retention-days: 7
 
@@ -112,10 +122,10 @@ jobs:
       ZUMBO_TEST_MONGO_CONNECTION_STRING: mongodb://127.0.0.1:58217/?replicaSet=rs0&directConnection=true
     steps:
       - name: Checkout
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
           dotnet-version: "8.0.x"
 
@@ -141,10 +151,10 @@ jobs:
       ZUMBO_POSTGRES_CONNECTION_STRING: Host=127.0.0.1;Port=58432;Database=zumbo_ci;Username=zumbo_ci;Password=ci-only-postgres-password;Pooling=false
     steps:
       - name: Checkout
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
           dotnet-version: "8.0.x"
 
@@ -160,14 +170,17 @@ jobs:
           dotnet run --project Backend/tools/Zumbo.DatabaseMigrator/Zumbo.DatabaseMigrator.csproj --configuration Release -- script --idempotent --output artifacts/migrations/ci/postgresql.sql
           dotnet test Backend/tests/Zumbo.PostgreSqlIntegrationTests/Zumbo.PostgreSqlIntegrationTests.csproj --configuration Release --no-restore --filter "FullyQualifiedName~LatestMigration_CanRollbackAndReapplyWithoutLedgerDrift|FullyQualifiedName~MigrationScript_IsIdempotentAndDoesNotMutateTheLedger"
 
+      - name: Require migration evidence
+        run: test -f artifacts/migrations/ci/postgresql.sql
+
       - name: Upload migration evidence
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: migration-evidence
           path: |
-            artifacts/migrations/ci/postgresql.sql
-          if-no-files-found: error
+            Zumbo/artifacts/migrations/ci/postgresql.sql
+          if-no-files-found: ignore
           retention-days: 7
 
       - name: Targeted cleanup
@@ -198,10 +211,10 @@ jobs:
       ZUMBO_TEST_SMTP_PORT: "51025"
     steps:
       - name: Checkout
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
           dotnet-version: "8.0.x"
 
@@ -227,10 +240,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Setup Node
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: "20.20.0"
 
@@ -252,10 +265,10 @@ jobs:
           pnpm --dir Frontend run audit:licenses
 
       - name: Checkout
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Setup Node
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: "20.20.0"
 
@@ -265,7 +278,9 @@ jobs:
       - name: Frozen frontend install and Chromium
         run: |
           pnpm --dir Frontend install --frozen-lockfile
-          pnpm --dir Frontend exec playwright install --with-deps chromium
+          pnpm --dir Frontend run browser:install
+          pnpm --dir Frontend exec playwright-core --version
+          pnpm --dir Frontend exec node -e "const { existsSync } = require('node:fs'); const { chromium } = require('playwright-core'); const executable = chromium.executablePath(); if (!executable || !existsSync(executable)) { throw new Error('Installed Chromium executable is unavailable.'); } console.log(executable);"
 
       - name: Prepare OpenSearch host
         run: sudo sysctl -w vm.max_map_count=262144
@@ -290,15 +305,18 @@ jobs:
       - name: Browser E2E accessibility and visual smoke
         run: pnpm --dir Frontend run test:fe008:cross-browser -- --browser chromium
 
+      - name: Require browser evidence
+        run: test -f artifacts/ui/playwright/fe008-cross-browser.json
+
       - name: Upload browser evidence
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: browser-smoke-evidence
           path: |
-            artifacts/ui/playwright/fe008-cross-browser.json
-            artifacts/ui/playwright/chromium/
-          if-no-files-found: error
+            Zumbo/artifacts/ui/playwright/fe008-cross-browser.json
+            Zumbo/artifacts/ui/playwright/chromium/
+          if-no-files-found: ignore
           retention-days: 7
 
       - name: Targeted cleanup
@@ -312,15 +330,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
           dotnet-version: "8.0.x"
 
       - name: Setup Node
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: "20.20.0"
 
@@ -358,45 +376,92 @@ jobs:
 
       - name: Upload sanitized security evidence
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: security-evidence
           path: |
-            artifacts/security/SEC-008.sbom.cdx.json
-            artifacts/security/generated/summary.json
-            artifacts/security/generated/semgrep.json
-            artifacts/security/generated/trivy-source.json
-            artifacts/security/generated/api-image.json
-            artifacts/security/generated/gateway-image.json
+            Zumbo/artifacts/security/SEC-008.sbom.cdx.json
+            Zumbo/artifacts/security/generated/summary.json
+            Zumbo/artifacts/security/generated/semgrep.json
+            Zumbo/artifacts/security/generated/trivy-source.json
+            Zumbo/artifacts/security/generated/api-image.json
+            Zumbo/artifacts/security/generated/gateway-image.json
           if-no-files-found: error
           retention-days: 14
 
-  codeql:
-    timeout-minutes: 20
+  codeql-capability:
+    timeout-minutes: 5
     runs-on: ubuntu-latest
-    permissions:
-      security-events: write
-      packages: read
-      contents: read
-    strategy:
-      fail-fast: false
-      matrix:
-        language: [csharp, javascript-typescript]
+    outputs:
+      enabled: ${{ steps.evaluate.outputs.enabled }}
+      state: ${{ steps.evaluate.outputs.state }}
+      applicability: ${{ steps.evaluate.outputs.applicability }}
+      expected_codeql_result: ${{ steps.evaluate.outputs.expected_codeql_result }}
     steps:
       - name: Checkout
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "20.20.0"
+
+      - name: Evaluate CodeQL capability policy
+        id: evaluate
+        env:
+          ZUMBO_REPOSITORY_PRIVATE: ${{ github.event.repository.private }}
+          ZUMBO_CODE_SECURITY_VARIABLE: ${{ vars.GITHUB_CODE_SECURITY_ENABLED }}
+        run: node scripts/ci/Test-CodeqlCapability.mjs --runtime
+
+  codeql-csharp:
+    timeout-minutes: 20
+    runs-on: ubuntu-latest
+    needs: codeql-capability
+    if: needs.codeql-capability.outputs.enabled == 'true'
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@f52b05f4acaaa234e44466e66d29050e135ea9ef # v4.36.0
+        uses: github/codeql-action/init@c54b30b7df092240050e69945842bc67aee0f0f4 # v4.37.3
         with:
-          languages: ${{ matrix.language }}
+          languages: csharp
           build-mode: none
           queries: security-extended
 
       - name: Analyze
-        uses: github/codeql-action/analyze@f52b05f4acaaa234e44466e66d29050e135ea9ef # v4.36.0
+        uses: github/codeql-action/analyze@c54b30b7df092240050e69945842bc67aee0f0f4 # v4.37.3
         with:
-          category: /language:${{ matrix.language }}
+          category: /language:csharp
+
+  codeql-javascript-typescript:
+    timeout-minutes: 20
+    runs-on: ubuntu-latest
+    needs: codeql-capability
+    if: needs.codeql-capability.outputs.enabled == 'true'
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@c54b30b7df092240050e69945842bc67aee0f0f4 # v4.37.3
+        with:
+          languages: javascript-typescript
+          build-mode: none
+          queries: security-extended
+
+      - name: Analyze
+        uses: github/codeql-action/analyze@c54b30b7df092240050e69945842bc67aee0f0f4 # v4.37.3
+        with:
+          category: /language:javascript-typescript
 
   ci-summary:
     timeout-minutes: 5
@@ -411,19 +476,32 @@ jobs:
       - frontend
       - runtime-browser
       - security-containers
-      - codeql
+      - codeql-capability
+      - codeql-csharp
+      - codeql-javascript-typescript
     steps:
       - name: Checkout
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "20.20.0"
 
       - name: Require every gate job
-        run: |
-          test "${{ needs.ci-contract.result }}" = success
-          test "${{ needs.backend-core.result }}" = success
-          test "${{ needs.provider-mongo.result }}" = success
-          test "${{ needs.provider-postgresql.result }}" = success
-          test "${{ needs.external-dependencies.result }}" = success
-          test "${{ needs.frontend.result }}" = success
-          test "${{ needs.runtime-browser.result }}" = success
-          test "${{ needs.security-containers.result }}" = success
-          test "${{ needs.codeql.result }}" = success
+        env:
+          ZUMBO_RESULT_CI_CONTRACT: ${{ needs.ci-contract.result }}
+          ZUMBO_RESULT_BACKEND_CORE: ${{ needs.backend-core.result }}
+          ZUMBO_RESULT_PROVIDER_MONGO: ${{ needs.provider-mongo.result }}
+          ZUMBO_RESULT_PROVIDER_POSTGRESQL: ${{ needs.provider-postgresql.result }}
+          ZUMBO_RESULT_EXTERNAL_DEPENDENCIES: ${{ needs.external-dependencies.result }}
+          ZUMBO_RESULT_FRONTEND: ${{ needs.frontend.result }}
+          ZUMBO_RESULT_RUNTIME_BROWSER: ${{ needs.runtime-browser.result }}
+          ZUMBO_RESULT_SECURITY_CONTAINERS: ${{ needs.security-containers.result }}
+          ZUMBO_RESULT_CODEQL_CAPABILITY: ${{ needs.codeql-capability.result }}
+          ZUMBO_CODEQL_ENABLED: ${{ needs.codeql-capability.outputs.enabled }}
+          ZUMBO_CODEQL_STATE: ${{ needs.codeql-capability.outputs.state }}
+          ZUMBO_CODEQL_APPLICABILITY: ${{ needs.codeql-capability.outputs.applicability }}
+          ZUMBO_RESULT_CODEQL_CSHARP: ${{ needs.codeql-csharp.result }}
+          ZUMBO_RESULT_CODEQL_JAVASCRIPT_TYPESCRIPT: ${{ needs.codeql-javascript-typescript.result }}
+        run: node scripts/ci/Test-CiSummary.mjs --runtime

@@ -4,6 +4,11 @@ import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import {
+  applicationRoot,
+  assertRootWorkflowLayout,
+  rootWorkflowPath
+} from '../repository-layout.mjs';
+import {
   expectedServices,
   redact,
   repositoryRoot,
@@ -14,9 +19,17 @@ import {
 } from '../operations/qa002-common.mjs';
 import { verifyEvidenceDirectory } from '../operations/qa002-evidence.mjs';
 
-const workflowPath = resolve(repositoryRoot, '.github/workflows/qa-002-clean-linux.yml');
+assert.equal(repositoryRoot, applicationRoot, 'QA-002 scripts and workflow layout disagree about the application root.');
+assertRootWorkflowLayout();
+const workflowPath = rootWorkflowPath('qa-002-clean-linux.yml');
 const workflow = readFileSync(workflowPath, 'utf8');
 const checks = [];
+
+check('git-root-workflow-layout', () => {
+  assert.match(workflow, /^defaults:\s*\r?\n\s+run:\s*\r?\n\s+working-directory: Zumbo\s*$/m);
+  assert.match(workflow, /QA002_ENV_FILE: \$\{\{ runner\.temp \}\}\//);
+  assert.match(workflow, /QA002_EVIDENCE_DIR: \$\{\{ runner\.temp \}\}\//);
+});
 
 check('manual-trigger-only', () => {
   assert.match(workflow, /^on:\s*\r?\n\s+workflow_dispatch:/m);
@@ -42,10 +55,10 @@ check('deliberate-exact-sha-input', () => {
 check('official-full-sha-actions', () => {
   const actions = [...workflow.matchAll(/uses:\s+([^\s#]+)/g)].map(match => match[1]);
   assert.deepEqual(actions, [
-    'actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0',
-    'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020',
-    'actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9',
-    'actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f'
+    'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1',
+    'actions/setup-node@820762786026740c76f36085b0efc47a31fe5020',
+    'actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68',
+    'actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a'
   ]);
   assert.ok(actions.every(value => /^actions\/[a-z0-9-]+@[0-9a-f]{40}$/.test(value)));
 });

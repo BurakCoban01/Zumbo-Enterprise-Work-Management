@@ -19,7 +19,7 @@
     "test:assets:firefox": "pnpm run build && node tests/runtime-assets.mjs --browser firefox",
     "config:generate": "node tests/generate-runtime-config.mjs",
     "generate:pwa-icons": "node tests/generate-pwa-icons.mjs",
-    "browser:install": "playwright-core install chromium firefox webkit",
+    "browser:install": "playwright-core install --with-deps chromium",
     "pretest:e2e": "pnpm run build && node tests/generate-runtime-config.mjs",
     "test:e2e": "node tests/ui-quality.mjs --browser chromium",
     "test:e2e:chromium": "node tests/generate-runtime-config.mjs && node tests/ui-quality.mjs --browser chromium",

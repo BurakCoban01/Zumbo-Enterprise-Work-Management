@@ -14,7 +14,8 @@ public abstract class WebhookRepositoryContract
         var subscriptions = Subscriptions();
         var deliveries = Deliveries();
         var prefix = "platform007-contract-" + Guid.NewGuid().ToString("N");
-        var now = DateTimeOffset.UtcNow;
+        // Keep the equality boundary stable across JSON and provider timestamp precision.
+        var now = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero);
         var owned = new WebhookSubscriptionDocument
         {
             Id = prefix + "-subscription",
