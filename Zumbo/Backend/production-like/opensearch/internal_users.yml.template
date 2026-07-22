@@ -1,0 +1,11 @@
+---
+_meta:
+  type: "internalusers"
+  config_version: 2
+
+zumbo_admin:
+  hash: "__ZUMBO_ADMIN_HASH__"
+  reserved: true
+  backend_roles:
+    - "admin"
+  description: "Zumbo ProductionLike administrator"

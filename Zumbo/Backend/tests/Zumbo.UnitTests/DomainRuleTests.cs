@@ -1,6 +1,11 @@
 using Microsoft.Extensions.Options;
+using System.Security.Cryptography;
 using System.Text.Json;
+using Zumbo.BuildingBlocks.Application.Concurrency;
+using Zumbo.BuildingBlocks.Application.Search;
+using Zumbo.BuildingBlocks.Application.Security;
 using Zumbo.BuildingBlocks.Infrastructure.Concurrency;
+using Zumbo.BuildingBlocks.Infrastructure.Messaging;
 using Zumbo.BuildingBlocks.Infrastructure.Persistence;
 using Zumbo.BuildingBlocks.Infrastructure.Search;
 using Zumbo.BuildingBlocks.Infrastructure.Security;
@@ -177,14 +182,22 @@ public sealed class DomainRuleTests
                 Assert.Equal("created", created.EventType);
                 Assert.Equal("project-1", created.ProjectId);
                 Assert.Equal("create-correlation", created.CorrelationId);
+                Assert.Equal(WorkItemRealtimeProtocol.CurrentSchemaVersion, created.SchemaVersion);
+                Assert.Equal(created.WorkItem.Version, created.ResourceVersion);
+                Assert.True(created.ResourceVersion > 0);
             },
             moved =>
             {
                 Assert.Equal("moved", moved.EventType);
                 Assert.Equal("In Progress", moved.WorkItem.Status);
                 Assert.Equal("move-correlation", moved.CorrelationId);
+                Assert.Equal(moved.WorkItem.Version, moved.ResourceVersion);
+                Assert.True(moved.ResourceVersion > createdVersion(realtime.Changes));
                 Assert.True(JsonSerializer.SerializeToUtf8Bytes(moved).Length < 2_048);
             });
+
+        static long createdVersion(IReadOnlyList<WorkItemRealtimeChange> changes) =>
+            changes[0].ResourceVersion;
     }
 
     [Fact]
@@ -260,12 +273,54 @@ public sealed class DomainRuleTests
     }
 
     [Fact]
+    public async Task WorkItem_SearchUsesBoundedTenantFallbackWhenSearchIsUnavailable()
+    {
+        var repository = new InMemoryDocumentRepository<WorkItemDocument>();
+        foreach (var id in new[] { "item-1", "item-2", "item-3" })
+        {
+            await repository.CreateAsync(new WorkItemDocument
+            {
+                Id = id,
+                ProjectId = "project-1",
+                BoardId = "board-1",
+                ColumnId = "column-1",
+                Title = $"Fallback {id}",
+                Description = "bounded search",
+                CreatedAt = _clock.UtcNow,
+                UpdatedAt = _clock.UtcNow
+            });
+        }
+        var service = CreateWorkItemService(
+            repository,
+            searchIndex: new UnavailableWorkItemSearchIndex(),
+            degradedFallbackMaxItems: 2);
+
+        var databasePage = await service.SearchPageAsync(
+            new WorkItemSearchRequest("project-1", null, null, null, 1, 1),
+            CancellationToken.None);
+
+        var page = await service.SearchPageAsync(
+            new WorkItemSearchRequest("project-1", null, null, "fallback", 1, 100),
+            CancellationToken.None);
+
+        Assert.False(databasePage.Degraded);
+        Assert.Single(databasePage.Items);
+        Assert.Equal(3, databasePage.TotalCount);
+        Assert.True(page.Degraded);
+        Assert.Equal(2, page.TotalCount);
+        Assert.Equal(["item-1", "item-2"], page.Items.Select(x => x.Id));
+    }
+
+    [Fact]
     public async Task Identity_RegisterAndLogin_UsesHashedPasswordAndTokens()
     {
         var repository = new InMemoryDocumentRepository<UserDocument>();
         var users = new UserRepository(repository);
+        var sessionDocuments = new InMemoryDocumentRepository<RefreshSessionDocument>();
         var service = new IdentityService(
             users,
+            new RefreshSessionStore(sessionDocuments),
+            new InMemoryDurableTransactionRunner(),
             new Pbkdf2PasswordHasher(),
             new JwtTokenIssuer(),
             Options.Create(new JwtOptions { SigningKey = "unit-test-signing-key-with-more-than-32-chars" }),
@@ -290,9 +345,166 @@ public sealed class DomainRuleTests
         Assert.NotEqual("P@ssword123", stored!.PasswordHash);
         Assert.False(string.IsNullOrWhiteSpace(login.AccessToken));
         Assert.False(string.IsNullOrWhiteSpace(login.RefreshToken));
-        Assert.DoesNotContain(stored.RefreshTokens, x => x.TokenHash == registration.RefreshToken);
-        Assert.Contains(stored.RefreshTokens, x => x.TokenHash == RefreshTokenSecurity.Hash(registration.RefreshToken));
-        Assert.All(stored.RefreshTokens, x => Assert.False(string.IsNullOrWhiteSpace(x.SessionId)));
+        var storedSessions = await sessionDocuments.ListByFilterAsync(
+            x => x.UserId == stored.Id && x.OrganizationId == stored.OrganizationId,
+            cancellationToken: CancellationToken.None);
+        Assert.DoesNotContain(storedSessions, x => x.TokenHash == registration.RefreshToken);
+        Assert.Contains(storedSessions, x => x.TokenHash == RefreshTokenSecurity.Hash(registration.RefreshToken));
+        Assert.All(storedSessions, x => Assert.False(string.IsNullOrWhiteSpace(x.Id)));
+        Assert.Empty(stored.RefreshTokens);
+    }
+
+    [Fact]
+    public async Task Identity_ConcurrentRefreshConsumesOnceAndReuseRevokesReplacement()
+    {
+        var documents = new InMemoryDocumentRepository<UserDocument>();
+        var users = new UserRepository(documents);
+        var sessionDocuments = new InMemoryDocumentRepository<RefreshSessionDocument>();
+        var coordinatedStore = new CoordinatedRefreshSessionStore(new RefreshSessionStore(sessionDocuments));
+        var service = new IdentityService(
+            users,
+            coordinatedStore,
+            new InMemoryDurableTransactionRunner(),
+            new Pbkdf2PasswordHasher(),
+            new JwtTokenIssuer(),
+            Options.Create(new JwtOptions { SigningKey = "unit-test-signing-key-with-more-than-32-chars" }),
+            Options.Create(new LoginSecurityOptions()),
+            Options.Create(new IdentityBootstrapOptions()),
+            Options.Create(new PasswordResetOptions()),
+            new RecordingPasswordResetNotifier(),
+            new PlainMfaSecretProtector(),
+            new InMemoryDistributedLockProvider(),
+            Options.Create(new DistributedLockOptions()),
+            _clock,
+            _currentUser);
+        var registration = await service.RegisterAsync(
+            new RegisterUserRequest("refresh-race", "refresh-race@zumbo.local", "P@ssword123", "org-race"),
+            CancellationToken.None);
+        coordinatedStore.CoordinateNextPair();
+
+        var attempts = await Task.WhenAll(
+            CaptureRefreshAsync(service, registration.RefreshToken),
+            CaptureRefreshAsync(service, registration.RefreshToken));
+
+        var succeeded = Assert.Single(attempts, x => x.Response is not null);
+        Assert.Single(attempts, x => x.Error is UnauthorizedException);
+        await Assert.ThrowsAsync<UnauthorizedException>(() => service.RefreshAsync(
+            new RefreshTokenRequest(succeeded.Response!.RefreshToken),
+            CancellationToken.None));
+        var sessions = await sessionDocuments.ListByFilterAsync(
+            x => x.UserId == registration.User.Id,
+            cancellationToken: CancellationToken.None);
+        Assert.Equal(2, sessions.Count);
+        Assert.All(sessions, session => Assert.NotNull(session.RevokedAt));
+    }
+
+    [Fact]
+    public async Task Identity_LegacyEmbeddedRefreshTokenImportsLazilyWithoutDeletingFallback()
+    {
+        var documents = new InMemoryDocumentRepository<UserDocument>();
+        var users = new UserRepository(documents);
+        var rawToken = "legacy-refresh-token-" + Guid.NewGuid().ToString("N");
+        var legacySessionId = Guid.NewGuid().ToString("N");
+        var user = new UserDocument
+        {
+            Username = "legacy-refresh",
+            Email = "legacy-refresh@zumbo.local",
+            OrganizationId = "legacy-org",
+            PasswordHash = new Pbkdf2PasswordHasher().Hash("P@ssword123"),
+            CreatedAt = _clock.UtcNow,
+            RefreshTokens =
+            [
+                new RefreshTokenDocument
+                {
+                    SessionId = legacySessionId,
+                    TokenHash = RefreshTokenSecurity.Hash(rawToken),
+                    CreatedAt = _clock.UtcNow,
+                    ExpiresAt = _clock.UtcNow.AddDays(7)
+                }
+            ]
+        };
+        await users.AddAsync(user, CancellationToken.None);
+        var sessionDocuments = new InMemoryDocumentRepository<RefreshSessionDocument>();
+        var service = new IdentityService(
+            users,
+            new RefreshSessionStore(sessionDocuments),
+            new InMemoryDurableTransactionRunner(),
+            new Pbkdf2PasswordHasher(),
+            new JwtTokenIssuer(),
+            Options.Create(new JwtOptions { SigningKey = "unit-test-signing-key-with-more-than-32-chars" }),
+            Options.Create(new LoginSecurityOptions()),
+            Options.Create(new IdentityBootstrapOptions()),
+            Options.Create(new PasswordResetOptions()),
+            new RecordingPasswordResetNotifier(),
+            new PlainMfaSecretProtector(),
+            new InMemoryDistributedLockProvider(),
+            Options.Create(new DistributedLockOptions()),
+            _clock,
+            _currentUser);
+
+        var refreshed = await service.RefreshAsync(new RefreshTokenRequest(rawToken), CancellationToken.None);
+        var imported = await sessionDocuments.SelectAsync(x => x.Id == legacySessionId, CancellationToken.None);
+        var storedUser = await users.GetByIdAsync(user.Id, CancellationToken.None);
+
+        Assert.False(string.IsNullOrWhiteSpace(refreshed.RefreshToken));
+        Assert.NotNull(imported?.RevokedAt);
+        Assert.Single(storedUser!.RefreshTokens);
+        Assert.Equal(2, await sessionDocuments.CountByFilterAsync(x => x.UserId == user.Id));
+    }
+
+    [Fact]
+    public async Task Identity_PasswordChangeRevokesLegacyTokenBeforeMigrationRuns()
+    {
+        var documents = new InMemoryDocumentRepository<UserDocument>();
+        var users = new UserRepository(documents);
+        var rawToken = "unmigrated-refresh-" + Guid.NewGuid().ToString("N");
+        var hasher = new Pbkdf2PasswordHasher();
+        var user = new UserDocument
+        {
+            Username = "unmigrated-user",
+            Email = "unmigrated-user@zumbo.local",
+            OrganizationId = "unmigrated-org",
+            PasswordHash = hasher.Hash("P@ssword123"),
+            CreatedAt = _clock.UtcNow,
+            RefreshTokens =
+            [
+                new RefreshTokenDocument
+                {
+                    TokenHash = RefreshTokenSecurity.Hash(rawToken),
+                    CreatedAt = _clock.UtcNow,
+                    ExpiresAt = _clock.UtcNow.AddDays(7)
+                }
+            ]
+        };
+        await users.AddAsync(user, CancellationToken.None);
+        _currentUser.UserId = user.Id;
+        _currentUser.OrganizationId = user.OrganizationId;
+        var service = new IdentityService(
+            users,
+            new RefreshSessionStore(new InMemoryDocumentRepository<RefreshSessionDocument>()),
+            new InMemoryDurableTransactionRunner(),
+            hasher,
+            new JwtTokenIssuer(),
+            Options.Create(new JwtOptions { SigningKey = "unit-test-signing-key-with-more-than-32-chars" }),
+            Options.Create(new LoginSecurityOptions()),
+            Options.Create(new IdentityBootstrapOptions()),
+            Options.Create(new PasswordResetOptions()),
+            new RecordingPasswordResetNotifier(),
+            new PlainMfaSecretProtector(),
+            new InMemoryDistributedLockProvider(),
+            Options.Create(new DistributedLockOptions()),
+            _clock,
+            _currentUser);
+
+        _ = await service.ChangePasswordAsync(
+            new ChangePasswordRequest("P@ssword123", "N3wP@ssword456"),
+            CancellationToken.None);
+        var stored = await users.GetByIdAsync(user.Id, CancellationToken.None);
+
+        Assert.NotNull(Assert.Single(stored!.RefreshTokens).RevokedAt);
+        await Assert.ThrowsAsync<UnauthorizedException>(() => service.RefreshAsync(
+            new RefreshTokenRequest(rawToken),
+            CancellationToken.None));
     }
 
     [Fact]
@@ -300,9 +512,12 @@ public sealed class DomainRuleTests
     {
         var documents = new InMemoryDocumentRepository<UserDocument>();
         var users = new UserRepository(documents);
+        var sessionDocuments = new InMemoryDocumentRepository<RefreshSessionDocument>();
         var notifier = new RecordingPasswordResetNotifier();
         var service = new IdentityService(
             users,
+            new RefreshSessionStore(sessionDocuments),
+            new InMemoryDurableTransactionRunner(),
             new Pbkdf2PasswordHasher(),
             new JwtTokenIssuer(),
             Options.Create(new JwtOptions { SigningKey = "unit-test-signing-key-with-more-than-32-chars" }),
@@ -362,8 +577,11 @@ public sealed class DomainRuleTests
     {
         var repository = new InMemoryDocumentRepository<UserDocument>();
         var users = new UserRepository(repository);
+        var sessionDocuments = new InMemoryDocumentRepository<RefreshSessionDocument>();
         var service = new IdentityService(
             users,
+            new RefreshSessionStore(sessionDocuments),
+            new InMemoryDurableTransactionRunner(),
             new Pbkdf2PasswordHasher(),
             new JwtTokenIssuer(),
             Options.Create(new JwtOptions { SigningKey = "unit-test-signing-key-with-more-than-32-chars" }),
@@ -409,8 +627,11 @@ public sealed class DomainRuleTests
     {
         var documents = new InMemoryDocumentRepository<UserDocument>();
         var users = new UserRepository(documents);
+        var sessionDocuments = new InMemoryDocumentRepository<RefreshSessionDocument>();
         var service = new IdentityService(
             users,
+            new RefreshSessionStore(sessionDocuments),
+            new InMemoryDurableTransactionRunner(),
             new Pbkdf2PasswordHasher(),
             new JwtTokenIssuer(),
             Options.Create(new JwtOptions { SigningKey = "unit-test-signing-key-with-more-than-32-chars" }),
@@ -488,15 +709,27 @@ public sealed class DomainRuleTests
         _currentUser.UserId = user.Id;
         _currentUser.OrganizationId = user.OrganizationId;
         var keyDocuments = new InMemoryDocumentRepository<ApiKeyDocument>();
+        var keyStore = new ApiKeyStore(keyDocuments);
+        var conflictingStore = new OneShotApiKeyConflictStore(keyStore);
         var audit = new RecordingIdentityAuditWriter();
         var service = new ApiKeyService(
-            keyDocuments,
+            conflictingStore,
             users,
             hasher,
             new PlainMfaSecretProtector(),
             audit,
             _clock,
             _currentUser);
+
+        await Assert.ThrowsAsync<ValidationException>(() => service.CreateAsync(
+            new CreateApiKeyRequest(
+                "Invalid scope",
+                "P@ssword123",
+                null,
+                _clock.UtcNow.AddDays(30),
+                ["organization:admin"]),
+            "api-key-invalid-scope",
+            CancellationToken.None));
 
         var created = await service.CreateAsync(
             new CreateApiKeyRequest(
@@ -513,11 +746,47 @@ public sealed class DomainRuleTests
         Assert.DoesNotContain(created.Key, stored.KeyHash, StringComparison.Ordinal);
         var principal = await service.AuthenticateAsync(created.Key, CancellationToken.None);
         Assert.Equal(user.Id, principal!.UserId);
+        Assert.Equal(["api:full"], principal.Scopes);
+        var afterFirstUse = await keyDocuments.SelectAsync(x => x.Id == created.Id, CancellationToken.None);
+        Assert.NotNull(afterFirstUse!.LastUsedAt);
+        var firstUseVersion = afterFirstUse.Version;
+        Assert.NotNull(await service.AuthenticateAsync(created.Key, CancellationToken.None));
+        var afterThrottledUse = await keyDocuments.SelectAsync(x => x.Id == created.Id, CancellationToken.None);
+        Assert.Equal(firstUseVersion, afterThrottledUse!.Version);
+        var expiring = await service.CreateAsync(
+            new CreateApiKeyRequest(
+                "Expiring integration",
+                "P@ssword123",
+                null,
+                _clock.UtcNow.AddHours(2),
+                ["api:full"]),
+            "api-key-expiry",
+            CancellationToken.None);
+        var expiredDocument = await keyDocuments.SelectAsync(x => x.Id == expiring.Id, CancellationToken.None);
+        expiredDocument!.ExpiresAt = _clock.UtcNow.AddSeconds(-1);
+        expiredDocument.ExpiresAtUtc = expiredDocument.ExpiresAt.UtcDateTime;
+        Assert.True(await keyStore.ReplaceOwnedAsync(expiredDocument, CancellationToken.None));
+        Assert.Null(await service.AuthenticateAsync(expiring.Key, CancellationToken.None));
         Assert.Contains("ApiKeyCreated", audit.Actions);
 
+        conflictingStore.ConflictNextReplace();
         await service.RevokeAsync(created.Id, "api-key-revoke", CancellationToken.None);
         Assert.Null(await service.AuthenticateAsync(created.Key, CancellationToken.None));
         Assert.Contains("ApiKeyRevoked", audit.Actions);
+    }
+
+    private static async Task<(AuthResponse? Response, Exception? Error)> CaptureRefreshAsync(
+        IdentityService service,
+        string refreshToken)
+    {
+        try
+        {
+            return (await service.RefreshAsync(new RefreshTokenRequest(refreshToken), CancellationToken.None), null);
+        }
+        catch (Exception exception)
+        {
+            return (null, exception);
+        }
     }
 
     [Fact]
@@ -536,12 +805,17 @@ public sealed class DomainRuleTests
             MfaEnabled = true,
             MfaSecretProtected = "protected:SECRET"
         };
-        user.RefreshTokens.Add(new RefreshTokenDocument
+        var sessionDocuments = new InMemoryDocumentRepository<RefreshSessionDocument>();
+        await sessionDocuments.CreateAsync(new RefreshSessionDocument
         {
+            UserId = user.Id,
+            OrganizationId = user.OrganizationId,
             TokenHash = "token-hash",
             CreatedAt = _clock.UtcNow,
-            ExpiresAt = _clock.UtcNow.AddDays(1)
-        });
+            ExpiresAt = _clock.UtcNow.AddDays(1),
+            ExpiresAtUtc = _clock.UtcNow.AddDays(1).UtcDateTime,
+            RetainUntilUtc = _clock.UtcNow.AddDays(31).UtcDateTime
+        }, CancellationToken.None);
         await users.AddAsync(user, CancellationToken.None);
         _currentUser.UserId = user.Id;
         _currentUser.OrganizationId = user.OrganizationId;
@@ -559,7 +833,9 @@ public sealed class DomainRuleTests
         var audit = new RecordingIdentityAuditWriter();
         var service = new PrivacyService(
             users,
-            keyDocuments,
+            new RefreshSessionStore(sessionDocuments),
+            new ApiKeyStore(keyDocuments),
+            new InMemoryDurableTransactionRunner(),
             hasher,
             processor,
             audit,
@@ -583,7 +859,10 @@ public sealed class DomainRuleTests
         Assert.EndsWith("@invalid.local", storedUser.Email, StringComparison.Ordinal);
         Assert.False(storedUser.IsActive);
         Assert.False(storedUser.MfaEnabled);
-        Assert.All(storedUser.RefreshTokens, x => Assert.NotNull(x.RevokedAt));
+        var storedSession = await sessionDocuments.SelectAsync(
+            x => x.UserId == user.Id,
+            CancellationToken.None);
+        Assert.NotNull(storedSession!.RevokedAt);
         Assert.NotNull(storedKey!.RevokedAt);
         Assert.Equal(anonymized.Pseudonym, processor.Pseudonym);
         Assert.Contains("UserAnonymized", audit.Actions);
@@ -594,8 +873,12 @@ public sealed class DomainRuleTests
     {
         var userDocuments = new InMemoryDocumentRepository<UserDocument>();
         var userRepository = new UserRepository(userDocuments);
+        var sessionDocuments = new InMemoryDocumentRepository<RefreshSessionDocument>();
+        var sessionStore = new RefreshSessionStore(sessionDocuments);
         var identity = new IdentityService(
             userRepository,
+            sessionStore,
+            new InMemoryDurableTransactionRunner(),
             new Pbkdf2PasswordHasher(),
             new JwtTokenIssuer(),
             Options.Create(new JwtOptions { SigningKey = "unit-test-signing-key-with-more-than-32-chars" }),
@@ -629,6 +912,8 @@ public sealed class DomainRuleTests
         var administration = new IdentityAdministrationService(
             userDocuments,
             roleDocuments,
+            sessionStore,
+            new InMemoryDurableTransactionRunner(),
             new IdentityPermissionService(userDocuments, roleDocuments, _currentUser),
             audit,
             new InMemoryDistributedLockProvider(),
@@ -651,7 +936,10 @@ public sealed class DomainRuleTests
         Assert.Contains("SystemAdmin", admin.User.Roles);
         Assert.Contains("Release Manager", memberAfter!.Roles);
         Assert.NotEqual(oldStamp, memberAfter.SecurityStamp);
-        Assert.All(memberAfter.RefreshTokens, x => Assert.NotNull(x.RevokedAt));
+        var memberSessions = await sessionDocuments.ListByFilterAsync(
+            x => x.UserId == member.User.Id,
+            cancellationToken: CancellationToken.None);
+        Assert.All(memberSessions, x => Assert.NotNull(x.RevokedAt));
         await Assert.ThrowsAsync<ConflictException>(() => administration.DeleteRoleAsync(
             role.Id, "test-correlation", CancellationToken.None));
         await administration.AssignRolesAsync(
@@ -958,6 +1246,128 @@ public sealed class DomainRuleTests
     }
 
     [Fact]
+    public async Task Reporting_LargeDatasetHasNoRepositoryPageTruncation()
+    {
+        var repository = new InMemoryDocumentRepository<WorkItemDocument>();
+        var createdAt = new DateTimeOffset(2026, 7, 2, 8, 0, 0, TimeSpan.Zero);
+        for (var index = 0; index < 650; index++)
+        {
+            await repository.CreateAsync(new WorkItemDocument
+            {
+                Id = $"large-open-{index:D4}",
+                ProjectId = "project-1",
+                BoardId = "board-1",
+                ColumnId = "todo-column",
+                TeamId = "team-1",
+                AssigneeUserId = "user-2",
+                Title = $"Large open item {index}",
+                Status = "To Do",
+                DueDate = _clock.UtcNow.AddDays(1),
+                CreatedAt = createdAt,
+                UpdatedAt = createdAt,
+                WorkLogs = [new WorkLogDocument { UserId = "user-2", Hours = 1, CreatedAt = createdAt }]
+            });
+            await repository.CreateAsync(new WorkItemDocument
+            {
+                Id = $"large-done-{index:D4}",
+                ProjectId = "project-1",
+                BoardId = "board-1",
+                ColumnId = "done-column",
+                TeamId = "team-1",
+                AssigneeUserId = "user-2",
+                Title = $"Large completed item {index}",
+                Status = "Done",
+                CompletedAt = createdAt.AddDays(2),
+                CreatedAt = createdAt,
+                UpdatedAt = createdAt.AddDays(2),
+                WorkLogs = [new WorkLogDocument { UserId = "user-2", Hours = 2, CreatedAt = createdAt }],
+                StatusHistory =
+                [
+                    new WorkItemStatusHistoryDocument
+                    {
+                        FromStatus = "To Do",
+                        ToStatus = "In Progress",
+                        ChangedByUserId = "user-2",
+                        ChangedAt = createdAt.AddHours(8)
+                    },
+                    new WorkItemStatusHistoryDocument
+                    {
+                        FromStatus = "In Progress",
+                        ToStatus = "Done",
+                        ChangedByUserId = "user-2",
+                        ChangedAt = createdAt.AddDays(2)
+                    }
+                ]
+            });
+        }
+
+        var service = CreateWorkItemService(repository);
+        var from = new DateOnly(2026, 7, 1);
+        var to = new DateOnly(2026, 7, 31);
+
+        var risks = await service.DueDateRisksAsync("project-1", 14, CancellationToken.None);
+        var flow = await service.FlowTimeAsync("project-1", from, to, CancellationToken.None);
+        var completion = await service.CompletionRateAsync("project-1", from, to, CancellationToken.None);
+        var team = Assert.Single(await service.TeamPerformanceAsync(
+            "project-1", from, to, CancellationToken.None));
+
+        Assert.Equal(650, risks.Count);
+        Assert.Equal(650, flow.CompletedItems);
+        Assert.Equal(650, flow.CycleTimeSampleSize);
+        Assert.Equal(1300, completion.CreatedItems);
+        Assert.Equal(650, completion.CompletedItems);
+        Assert.Equal(1300, team.AssignedItems);
+        Assert.Equal(650, team.CompletedItems);
+        Assert.Equal(1950, team.LoggedHours);
+    }
+
+    [Fact]
+    public async Task ReadModelSnapshot_RetriesVersionRaceAndExposesFreshness()
+    {
+        var cache = new InMemoryWorkItemReadModelCache();
+        var factoryCalls = 0;
+        var snapshot = await cache.GetOrCreateSnapshotAsync(
+            "project-1",
+            "race",
+            TimeSpan.FromMinutes(1),
+            async ct =>
+            {
+                factoryCalls++;
+                if (factoryCalls == 1)
+                {
+                    await cache.InvalidateProjectAsync("project-1", ct);
+                }
+                return factoryCalls;
+            },
+            CancellationToken.None);
+
+        Assert.Equal(2, factoryCalls);
+        Assert.Equal(2, snapshot.Data);
+        Assert.Equal(1, snapshot.SourceVersion);
+        Assert.False(snapshot.Stale);
+        Assert.True(snapshot.GeneratedAt <= DateTimeOffset.UtcNow);
+
+        var unstableCache = new InMemoryWorkItemReadModelCache();
+        var unstableCalls = 0;
+        var stale = await unstableCache.GetOrCreateSnapshotAsync(
+            "project-1",
+            "unstable",
+            TimeSpan.FromMinutes(1),
+            async ct =>
+            {
+                unstableCalls++;
+                await unstableCache.InvalidateProjectAsync("project-1", ct);
+                return unstableCalls;
+            },
+            CancellationToken.None);
+
+        Assert.Equal(2, unstableCalls);
+        Assert.Equal(2, stale.Data);
+        Assert.Equal(1, stale.SourceVersion);
+        Assert.True(stale.Stale);
+    }
+
+    [Fact]
     public async Task WorkItem_CreateInvalidatesCachedProjectSummary()
     {
         var service = CreateWorkItemService();
@@ -1010,6 +1420,86 @@ public sealed class DomainRuleTests
     }
 
     [Fact]
+    public async Task Notification_TwoWorkersClaimOnceAndDeadLetterCanBeReplayed()
+    {
+        var notifications = new InMemoryDocumentRepository<NotificationDocument>();
+        var sender = new ToggleEmailNotificationSender { Fail = true };
+        var service = new NotificationService(
+            notifications,
+            new InMemoryDocumentRepository<NotificationPreferenceDocument>(),
+            new AllowNotificationUserDirectory(),
+            sender,
+            Options.Create(new EmailNotificationOptions
+            {
+                Enabled = true,
+                MaxAttempts = 2,
+                BaseRetrySeconds = 1,
+                MaximumRetrySeconds = 2,
+                LeaseSeconds = 30
+            }),
+            new InMemoryDistributedLockProvider(),
+            Options.Create(new DistributedLockOptions()),
+            _clock,
+            _currentUser);
+        await service.NotifyAsync(
+            "user-1", "Assignment", "Assigned", CancellationToken.None, "shared-delivery");
+
+        var firstRace = await Task.WhenAll(
+            service.DispatchPendingEmailsAsync(10, CancellationToken.None, "worker-a"),
+            service.DispatchPendingEmailsAsync(10, CancellationToken.None, "worker-b"));
+        Assert.Equal(0, firstRace.Sum());
+        Assert.Equal(1, sender.Attempts);
+        _clock.UtcNow = _clock.UtcNow.AddSeconds(1);
+        await service.DispatchPendingEmailsAsync(10, CancellationToken.None, "worker-c");
+
+        var deadLetter = await notifications.SelectAsync(x => x.DeduplicationKey == "shared-delivery")
+            ?? throw new InvalidOperationException();
+        Assert.Equal(NotificationEmailStatuses.DeadLetter, deadLetter.EmailStatus);
+        var metrics = await service.GetDeliveryMetricsAsync("org-1", CancellationToken.None);
+        Assert.Equal(1, metrics.DeadLetter);
+        Assert.True(await service.ReplayDeadLetterAsync("org-1", deadLetter.Id, CancellationToken.None));
+
+        sender.Fail = false;
+        Assert.Equal(1, await service.DispatchPendingEmailsAsync(
+            10, CancellationToken.None, "worker-replay"));
+        Assert.Equal(NotificationEmailStatuses.Sent,
+            (await notifications.SelectAsync(x => x.Id == deadLetter.Id))!.EmailStatus);
+    }
+
+    [Fact]
+    public async Task Notification_DailyDigestUsesTimeZoneScheduleAndGroupsMessages()
+    {
+        var notifications = new InMemoryDocumentRepository<NotificationDocument>();
+        var sender = new RecordingEmailNotificationSender();
+        var service = new NotificationService(
+            notifications,
+            new InMemoryDocumentRepository<NotificationPreferenceDocument>(),
+            new AllowNotificationUserDirectory(),
+            sender,
+            Options.Create(new EmailNotificationOptions { Enabled = true }),
+            new InMemoryDistributedLockProvider(),
+            Options.Create(new DistributedLockOptions()),
+            _clock,
+            _currentUser);
+        var preference = await service.UpdatePreferencesAsync(
+            new UpdateNotificationPreferencesRequest(
+                true, true, [], DeliveryMode: NotificationDeliveryModes.DailyDigest,
+                TimeZoneId: "UTC", DigestHourLocal: 13),
+            CancellationToken.None);
+        Assert.Equal(NotificationDeliveryModes.DailyDigest, preference.DeliveryMode);
+        Assert.Equal("UTC", preference.TimeZoneId);
+
+        await service.NotifyAsync("user-1", "Assignment", "First", CancellationToken.None, "digest-1");
+        await service.NotifyAsync("user-1", "Mention", "Second", CancellationToken.None, "digest-2");
+        Assert.Equal(0, await service.DispatchPendingEmailsAsync(10, CancellationToken.None, "early"));
+        _clock.UtcNow = new DateTimeOffset(2026, 7, 8, 13, 0, 0, TimeSpan.Zero);
+        Assert.Equal(2, await service.DispatchPendingEmailsAsync(10, CancellationToken.None, "digest"));
+        Assert.Single(sender.Recipients);
+        Assert.Contains("First", Assert.Single(sender.Bodies));
+        Assert.Contains("Second", Assert.Single(sender.Bodies));
+    }
+
+    [Fact]
     public async Task WorkItem_DueDateReminderIsIdempotentAndResetsWhenDueDateChanges()
     {
         var workItems = new InMemoryDocumentRepository<WorkItemDocument>();
@@ -1031,6 +1521,7 @@ public sealed class DomainRuleTests
             "test-correlation",
             CancellationToken.None);
 
+        _currentUser.UserId = null;
         Assert.Equal(1, await service.SendDueDateRemindersAsync(24, CancellationToken.None));
         Assert.Equal(0, await service.SendDueDateRemindersAsync(24, CancellationToken.None));
         _currentUser.UserId = "user-2";
@@ -1044,6 +1535,7 @@ public sealed class DomainRuleTests
             new UpdateWorkItemRequest(null, null, null, _clock.UtcNow.AddHours(8)),
             "test-correlation",
             CancellationToken.None);
+        _currentUser.UserId = null;
         Assert.Equal(1, await service.SendDueDateRemindersAsync(24, CancellationToken.None));
         _currentUser.UserId = "user-2";
         Assert.Equal(2, (await notificationService.ListAsync("user-2", CancellationToken.None))
@@ -1139,10 +1631,36 @@ public sealed class DomainRuleTests
             _clock,
             _currentUser,
             new FixedAuditRequestContext(),
-            new AllowAuditAccessChecker());
+            new AllowAuditAccessChecker(),
+            Options.Create(new AuditOptions
+            {
+                HashChainEnabled = true,
+                IntegrityKey = "unit-test-audit-integrity-key-32-bytes-minimum",
+                RetentionDays = 30,
+                ExportMaxRecords = 10,
+                RetentionBatchSize = 10
+            }));
         await service.WriteAsync("WorkItemCreated", "WorkItem", "item-1", null, "Task", "c1", CancellationToken.None);
         await service.WriteAsync("WorkItemMoved", "WorkItem", "item-1", "To Do", "In Progress", "c2", CancellationToken.None);
         await service.WriteAsync("WorkItemMoved", "WorkItem", "item-1", "In Progress", "Done", "c3", CancellationToken.None);
+        await service.WriteAsync(
+            "WorkItemSecured",
+            "WorkItem",
+            "item-1",
+            """{"password":"old-secret","name":"alpha"}""",
+            """{"password":"new-secret","name":"beta"}""",
+            "c4",
+            CancellationToken.None);
+        await repository.CreateAsync(new AuditLogDocument
+        {
+            Id = "foreign-audit",
+            OrganizationId = "org-2",
+            ActorUserId = "user-1",
+            Action = "Foreign",
+            EntityType = "WorkItem",
+            EntityId = "item-2",
+            CreatedAt = _clock.UtcNow
+        });
 
         var result = await service.QueryAsync(
             new AuditLogQuery("user-1", "WorkItemMoved", null, null, null, null, 1, 1),
@@ -1153,16 +1671,134 @@ public sealed class DomainRuleTests
         Assert.Equal("203.0.113.10", result.Items[0].IpAddress);
         Assert.Equal("Zumbo-Unit-Test/1.0", result.Items[0].UserAgent);
         Assert.True(result.HasNextPage);
+        Assert.NotNull(result.NextCursor);
+        Assert.Equal("org-1", result.Items[0].OrganizationId);
 
         var secondPage = await service.QueryAsync(
-            new AuditLogQuery("user-1", "WorkItemMoved", null, null, null, null, 2, 1),
+            new AuditLogQuery("user-1", "WorkItemMoved", null, null, null, null, PageSize: 1, Cursor: result.NextCursor),
             CancellationToken.None);
         Assert.Single(secondPage.Items);
         Assert.False(secondPage.HasNextPage);
+        Assert.NotEqual(result.Items[0].Id, secondPage.Items[0].Id);
+
+        var secured = await service.QueryAsync(
+            new AuditLogQuery("user-1", "WorkItemSecured", null, null, null, null),
+            CancellationToken.None);
+        var securedRecord = Assert.Single(secured.Items);
+        Assert.DoesNotContain("secret", securedRecord.OldValue, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(securedRecord.Changes!, change =>
+            change.Field == "password" && change.Redacted && change.NewValue == "[REDACTED]");
+
+        var ownTenant = await service.QueryAsync(
+            new AuditLogQuery("user-1", null, null, null, null, null),
+            CancellationToken.None);
+        Assert.DoesNotContain(ownTenant.Items, item => item.OrganizationId == "org-2");
+        Assert.Equal(4, (await service.ExportAsync(
+            new AuditLogQuery(null, null, "WorkItem", "item-1", null, null),
+            CancellationToken.None)).Count);
+
+        var integrity = await service.VerifyIntegrityAsync("org-1", CancellationToken.None);
+        Assert.True(integrity.Valid);
+        var tampered = await repository.SelectAsync(x => x.OrganizationId == "org-1" && x.ChainSequence == 1)
+            ?? throw new InvalidOperationException();
+        tampered.Action = "Tampered";
+        await repository.ReplaceByFilterAsync(x => x.Id == tampered.Id, tampered);
+        Assert.False((await service.VerifyIntegrityAsync("org-1", CancellationToken.None)).Valid);
+
+        await repository.CreateAsync(new AuditLogDocument
+        {
+            Id = "expired-audit",
+            OrganizationId = "org-1",
+            ActorUserId = "user-1",
+            Action = "Expired",
+            EntityType = "WorkItem",
+            EntityId = "item-1",
+            CreatedAt = _clock.UtcNow.AddDays(-31)
+        });
+        var retention = await service.PurgeExpiredAsync("org-1", _clock.UtcNow, CancellationToken.None);
+        Assert.Equal(1, retention.Deleted);
 
         await Assert.ThrowsAsync<ValidationException>(() => service.QueryAsync(
             new AuditLogQuery("user-1", null, "WorkItem", null, null, null),
             CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task Audit_DeduplicationIsTenantScopedAndMalformedCursorIsRejected()
+    {
+        var repository = new InMemoryDocumentRepository<AuditLogDocument>();
+        var service = new AuditService(
+            repository,
+            _clock,
+            _currentUser,
+            new FixedAuditRequestContext(),
+            new AllowAuditAccessChecker());
+        var longDeduplicationKey = new string('d', 200);
+
+        await service.WriteAsAsync(
+            "user-1", "Changed", "WorkItem", "item-1", null, "one", "c1",
+            new AuditRequestMetadata(null, null), _clock.UtcNow, longDeduplicationKey,
+            CancellationToken.None);
+        await service.WriteAsAsync(
+            "user-1", "Changed", "WorkItem", "item-1", null, "duplicate", "c1",
+            new AuditRequestMetadata(null, null), _clock.UtcNow, longDeduplicationKey,
+            CancellationToken.None);
+
+        _currentUser.OrganizationId = "org-2";
+        await service.WriteAsAsync(
+            "user-1", "Changed", "WorkItem", "item-2", null, "two", "c2",
+            new AuditRequestMetadata(null, null), _clock.UtcNow, longDeduplicationKey,
+            CancellationToken.None);
+
+        Assert.Equal(2, await repository.CountByFilterAsync());
+        Assert.Equal(1, await repository.CountByFilterAsync(x => x.OrganizationId == "org-1"));
+        Assert.Equal(1, await repository.CountByFilterAsync(x => x.OrganizationId == "org-2"));
+        var malformedCursor = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(
+            $"{long.MaxValue}|audit"));
+        await Assert.ThrowsAsync<ValidationException>(() => service.QueryAsync(
+            new AuditLogQuery("user-1", null, null, null, null, null, Cursor: malformedCursor),
+            CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task Audit_RetentionReportsAValidPartialHashChainAndStillDetectsTampering()
+    {
+        var repository = new InMemoryDocumentRepository<AuditLogDocument>();
+        var service = new AuditService(
+            repository,
+            _clock,
+            _currentUser,
+            new FixedAuditRequestContext(),
+            new AllowAuditAccessChecker(),
+            Options.Create(new AuditOptions
+            {
+                HashChainEnabled = true,
+                IntegrityKey = "unit-test-audit-integrity-key-32-bytes-minimum",
+                RetentionDays = 30,
+                RetentionBatchSize = 10
+            }));
+
+        await service.WriteAsAsync(
+            "user-1", "Old", "WorkItem", "item-1", null, "old", "c1",
+            new AuditRequestMetadata(null, null), _clock.UtcNow.AddDays(-31), null,
+            CancellationToken.None);
+        await service.WriteAsAsync(
+            "user-1", "Current", "WorkItem", "item-1", "old", "current", "c2",
+            new AuditRequestMetadata(null, null), _clock.UtcNow, null,
+            CancellationToken.None);
+
+        Assert.Equal(1, (await service.PurgeExpiredAsync("org-1", _clock.UtcNow, CancellationToken.None)).Deleted);
+        var integrity = await service.VerifyIntegrityAsync("org-1", CancellationToken.None);
+        Assert.True(integrity.Valid);
+        Assert.False(integrity.CompleteHistory);
+        Assert.Equal(2, integrity.FirstSequence);
+        Assert.NotNull(integrity.AnchorHash);
+
+        var retained = await repository.SelectAsync(x => x.OrganizationId == "org-1")
+            ?? throw new InvalidOperationException();
+        retained.NewValue = "tampered";
+        await repository.ReplaceByFilterAsync(x => x.Id == retained.Id, retained);
+        Assert.False((await service.VerifyIntegrityAsync("org-1", CancellationToken.None)).Valid);
     }
 
     [Fact]
@@ -1292,6 +1928,112 @@ public sealed class DomainRuleTests
     }
 
     [Fact]
+    public async Task Organization_LifecycleOwnershipPaginationAndRetention_AreEnforced()
+    {
+        var audit = new RecordingLifecycleAuditWriter();
+        var service = new OrganizationService(
+            new InMemoryDocumentRepository<OrganizationDocument>(),
+            new AllowOrganizationMemberDirectory(),
+            new InMemoryDistributedLockProvider(),
+            Options.Create(new DistributedLockOptions()),
+            _clock,
+            _currentUser,
+            audit,
+            lifecycleOptions: Options.Create(new OrganizationLifecycleOptions { ArchiveRetentionDays = 90 }));
+        var organization = await service.CreateAsync(
+            new CreateOrganizationRequest("Lifecycle", "org-1"),
+            CancellationToken.None);
+
+        var immutable = await Assert.ThrowsAsync<ConflictException>(() => service.UpdateAsync(
+            organization.Id,
+            new UpdateOrganizationRequest("Lifecycle", "org-renamed"),
+            CancellationToken.None));
+        Assert.Equal("TENANT_KEY_IMMUTABLE", immutable.Code);
+
+        foreach (var index in Enumerable.Range(1, 3))
+        {
+            organization = await service.CreateDepartmentAsync(
+                organization.Id,
+                new CreateDepartmentRequest("Department " + index, null),
+                CancellationToken.None);
+            var department = organization.Departments.Single(item => item.Name == "Department " + index);
+            organization = await service.AssignMemberAsync(
+                organization.Id,
+                department.Id,
+                new AssignDepartmentMemberRequest("user-" + (index + 1), "Position " + index),
+                CancellationToken.None);
+        }
+
+        var firstPage = await service.ListMembersAsync(organization.Id, null, 2, CancellationToken.None);
+        var secondPage = await service.ListMembersAsync(
+            organization.Id,
+            firstPage.NextCursor,
+            2,
+            CancellationToken.None);
+        Assert.Equal(["user-2", "user-3"], firstPage.Items.Select(item => item.UserId));
+        Assert.Equal("user-3", firstPage.NextCursor);
+        Assert.Equal("user-4", Assert.Single(secondPage.Items).UserId);
+        Assert.Null(secondPage.NextCursor);
+
+        organization = await service.TransferOwnershipAsync(
+            organization.Id,
+            new TransferOrganizationOwnershipRequest("user-2"),
+            "ownership-correlation",
+            CancellationToken.None);
+        Assert.Equal("user-2", organization.OwnerUserId);
+
+        var formerOwner = await Assert.ThrowsAsync<ForbiddenException>(() => service.SuspendAsync(
+            organization.Id,
+            new SuspendOrganizationRequest("maintenance"),
+            "suspend-correlation",
+            CancellationToken.None));
+        Assert.Equal("Organization management permission is required.", formerOwner.Message);
+
+        _currentUser.UserId = "user-2";
+        organization = await service.SuspendAsync(
+            organization.Id,
+            new SuspendOrganizationRequest("maintenance"),
+            "suspend-correlation",
+            CancellationToken.None);
+        Assert.Equal(OrganizationStatuses.Suspended, organization.Status);
+        var inactive = await Assert.ThrowsAsync<ConflictException>(() => service.CreateDepartmentAsync(
+            organization.Id,
+            new CreateDepartmentRequest("Blocked", null),
+            CancellationToken.None));
+        Assert.Equal("ORGANIZATION_NOT_ACTIVE", inactive.Code);
+
+        organization = await service.RestoreAsync(
+            organization.Id,
+            "restore-correlation",
+            CancellationToken.None);
+        organization = await service.ArchiveAsync(
+            organization.Id,
+            "archive-correlation",
+            CancellationToken.None);
+        Assert.Equal(OrganizationStatuses.Archived, organization.Status);
+        Assert.Equal(_clock.UtcNow.AddDays(90), organization.RetainUntil);
+        organization = await service.RestoreAsync(
+            organization.Id,
+            "restore-correlation-2",
+            CancellationToken.None);
+        organization = await service.ArchiveAsync(
+            organization.Id,
+            "archive-correlation-2",
+            CancellationToken.None);
+        _clock.UtcNow = organization.RetainUntil!.Value;
+        var expired = await Assert.ThrowsAsync<ConflictException>(() => service.RestoreAsync(
+            organization.Id,
+            "expired-correlation",
+            CancellationToken.None));
+        Assert.Equal("ORGANIZATION_RETENTION_EXPIRED", expired.Code);
+        Assert.True(organization.Version >= 12);
+        Assert.Contains("OrganizationOwnershipTransferred", audit.Actions);
+        Assert.Contains("OrganizationSuspended", audit.Actions);
+        Assert.Contains("OrganizationArchived", audit.Actions);
+        Assert.Contains("OrganizationRestored", audit.Actions);
+    }
+
+    [Fact]
     public async Task Team_InviteAndOwnershipLifecycle_EnforcesRecipientAndOwnerRules()
     {
         var audit = new RecordingLifecycleAuditWriter();
@@ -1299,10 +2041,12 @@ public sealed class DomainRuleTests
         [
             new TeamUserDirectoryEntry("user-1", "owner@zumbo.local", "org-1", true),
             new TeamUserDirectoryEntry("user-2", "member@zumbo.local", "org-1", true),
-            new TeamUserDirectoryEntry("user-3", "other@zumbo.local", "org-1", true)
+            new TeamUserDirectoryEntry("user-3", "other@zumbo.local", "org-1", true),
+            new TeamUserDirectoryEntry("user-4", "inactive@zumbo.local", "org-1", false)
         ]);
+        var repository = new InMemoryDocumentRepository<TeamDocument>();
         var service = new TeamService(
-            new InMemoryDocumentRepository<TeamDocument>(),
+            repository,
             directory,
             audit,
             _clock,
@@ -1314,15 +2058,27 @@ public sealed class DomainRuleTests
             team.Id,
             new InviteTeamMemberRequest("member@zumbo.local", "Member"),
             CancellationToken.None);
-        var inviteId = team.Members.Single(x => x.Email == "member@zumbo.local").Id;
+        var inviteToken = Assert.IsType<string>(team.InvitationToken);
+        var persistedInvite = (await repository.SelectAsync(x => x.Id == team.Id))!
+            .Members.Single(x => x.Email == "member@zumbo.local");
+        Assert.NotNull(persistedInvite.InvitationTokenHash);
+        Assert.DoesNotContain(inviteToken, persistedInvite.InvitationTokenHash, StringComparison.Ordinal);
 
         _currentUser.UserId = "user-3";
         await Assert.ThrowsAsync<ForbiddenException>(() =>
-            service.AcceptInviteAsync(team.Id, inviteId, CancellationToken.None));
+            service.AcceptInviteAsync(team.Id, new TeamInviteTokenRequest(inviteToken), CancellationToken.None));
 
         _currentUser.UserId = "user-2";
-        team = await service.AcceptInviteAsync(team.Id, inviteId, CancellationToken.None);
+        team = await service.AcceptInviteAsync(
+            team.Id,
+            new TeamInviteTokenRequest(inviteToken),
+            CancellationToken.None);
         Assert.Contains(team.Members, x => x.UserId == "user-2" && x.Status == "Active");
+        var reused = await Assert.ThrowsAsync<ConflictException>(() => service.AcceptInviteAsync(
+            team.Id,
+            new TeamInviteTokenRequest(inviteToken),
+            CancellationToken.None));
+        Assert.Equal("TEAM_INVITE_NOT_PENDING", reused.Code);
 
         _currentUser.UserId = "user-1";
         team = await service.ChangeMemberRoleAsync(
@@ -1343,18 +2099,19 @@ public sealed class DomainRuleTests
             CancellationToken.None));
         var ownerError = await Assert.ThrowsAsync<ConflictException>(() =>
             service.RemoveMemberAsync(team.Id, "user-2", CancellationToken.None));
-        Assert.Equal("TEAM_OWNER_REMOVE_FORBIDDEN", ownerError.Code);
+        Assert.Equal("TEAM_LAST_OWNER", ownerError.Code);
 
         _currentUser.UserId = "user-2";
         team = await service.InviteAsync(
             team.Id,
             new InviteTeamMemberRequest("other@zumbo.local", "Member"),
             CancellationToken.None);
+        var expiringToken = Assert.IsType<string>(team.InvitationToken);
         var expiringInviteId = team.Members.Single(x => x.Email == "other@zumbo.local" && x.Status == "Invited").Id;
         _clock.UtcNow = _clock.UtcNow.AddDays(8);
         _currentUser.UserId = "user-3";
         var expired = await Assert.ThrowsAsync<ConflictException>(() =>
-            service.AcceptInviteAsync(team.Id, expiringInviteId, CancellationToken.None));
+            service.AcceptInviteAsync(team.Id, new TeamInviteTokenRequest(expiringToken), CancellationToken.None));
         Assert.Equal("TEAM_INVITE_EXPIRED", expired.Code);
         team = (await service.ListAsync("org-1", CancellationToken.None)).Single(x => x.Id == team.Id);
         Assert.Contains(team.Members, x => x.Id == expiringInviteId && x.Status == "Expired");
@@ -1364,16 +2121,26 @@ public sealed class DomainRuleTests
             team.Id,
             new InviteTeamMemberRequest("other@zumbo.local", "Member"),
             CancellationToken.None);
-        var rejectedInviteId = team.Members.Single(x => x.Email == "other@zumbo.local" && x.Status == "Invited").Id;
+        var declinedToken = Assert.IsType<string>(team.InvitationToken);
+        var declinedInviteId = team.Members.Single(x => x.Email == "other@zumbo.local" && x.Status == "Invited").Id;
         _currentUser.UserId = "user-3";
-        team = await service.RejectInviteAsync(team.Id, rejectedInviteId, CancellationToken.None);
-        Assert.Contains(team.Members, x => x.Id == rejectedInviteId && x.Status == "Rejected");
+        team = await service.DeclineInviteAsync(
+            team.Id,
+            new TeamInviteTokenRequest(declinedToken),
+            CancellationToken.None);
+        Assert.Contains(team.Members, x => x.Id == declinedInviteId && x.Status == "Declined");
+        _currentUser.UserId = "user-2";
+        var inactive = await Assert.ThrowsAsync<ConflictException>(() => service.InviteAsync(
+            team.Id,
+            new InviteTeamMemberRequest("inactive@zumbo.local", "Member"),
+            CancellationToken.None));
+        Assert.Equal("USER_INACTIVE", inactive.Code);
         Assert.Contains("TeamCreated", audit.Actions);
         Assert.Contains("TeamMemberInvited", audit.Actions);
         Assert.Contains("TeamInviteAccepted", audit.Actions);
         Assert.Contains("TeamMemberRoleChanged", audit.Actions);
         Assert.Contains("TeamOwnershipTransferred", audit.Actions);
-        Assert.Contains("TeamInviteRejected", audit.Actions);
+        Assert.Contains("TeamInviteDeclined", audit.Actions);
     }
 
     private WorkItemService CreateWorkItemService(
@@ -1381,7 +2148,9 @@ public sealed class DomainRuleTests
         bool requiresApprovalForDone = false,
         IWorkflowPolicy? workflowPolicy = null,
         NotificationService? notificationService = null,
-        IWorkItemRealtimePublisher? realtimePublisher = null)
+        IWorkItemRealtimePublisher? realtimePublisher = null,
+        IWorkItemSearchIndex? searchIndex = null,
+        int degradedFallbackMaxItems = 1_000)
     {
         var notifications = new NotificationService(
             new InMemoryDocumentRepository<NotificationDocument>(),
@@ -1393,16 +2162,13 @@ public sealed class DomainRuleTests
             Options.Create(new DistributedLockOptions()),
             _clock,
             _currentUser);
-        var audit = new AuditService(
-            new InMemoryDocumentRepository<AuditLogDocument>(),
-            _clock,
-            _currentUser,
-            new FixedAuditRequestContext(),
-            new AllowAuditAccessChecker());
+        var search = searchIndex ?? new InMemoryWorkItemSearchIndex();
+        var cache = new InMemoryWorkItemReadModelCache();
+        var workItemRepository = repository ?? new InMemoryDocumentRepository<WorkItemDocument>();
         return new WorkItemService(
-            repository ?? new InMemoryDocumentRepository<WorkItemDocument>(),
-            notificationService ?? notifications,
-            audit,
+            workItemRepository,
+            new DirectNotificationPublisher(notificationService ?? notifications),
+            new NoOpWorkItemAuditPublisher(),
             _clock,
             _currentUser,
             new AllowPermissionChecker(),
@@ -1412,10 +2178,28 @@ public sealed class DomainRuleTests
             new InMemoryAttachmentStorage(),
             new InMemoryDistributedLockProvider(),
             Options.Create(new DistributedLockOptions()),
-            new InMemoryWorkItemSearchIndex(),
+            search,
+            new DirectWorkItemSearchPublisher(search),
             realtimePublisher ?? new NoOpWorkItemRealtimePublisher(),
-            new InMemoryWorkItemReadModelCache(),
-            Options.Create(new WorkItemReadModelCacheOptions()));
+            cache,
+            new DirectCacheInvalidationPublisher(cache),
+            Options.Create(new WorkItemReadModelCacheOptions()),
+            new WorkItemActivityStore(
+                new InMemoryDocumentRepository<WorkItemCommentActivityDocument>(),
+                new InMemoryDocumentRepository<WorkItemCommentRevisionActivityDocument>(),
+                new InMemoryDocumentRepository<WorkItemAttachmentActivityDocument>(),
+                new InMemoryDocumentRepository<WorkItemWorkLogActivityDocument>(),
+                new InMemoryDocumentRepository<WorkItemApprovalActivityDocument>(),
+                new InMemoryDocumentRepository<WorkItemTimelineActivityDocument>()),
+            new WorkItemGraphService(
+                new InMemoryDocumentRepository<WorkItemRelationEdgeDocument>(),
+                workItemRepository,
+                Options.Create(new WorkItemGraphOptions()),
+                _clock),
+            searchOptions: Options.Create(new SearchOptions
+            {
+                DegradedFallbackMaxItems = degradedFallbackMaxItems
+            }));
     }
 
     private sealed class FixedClock : IClock
@@ -1432,13 +2216,74 @@ public sealed class DomainRuleTests
 
     private sealed class AllowPermissionChecker : IProjectPermissionChecker
     {
-        public Task EnsureCanAsync(string userId, string projectId, string permission, CancellationToken ct) =>
-            Task.CompletedTask;
+        public Task<ProjectResourceAuthorization> EnsureCanAsync(
+            string userId,
+            string projectId,
+            string permission,
+            CancellationToken ct) =>
+            Task.FromResult(new ProjectResourceAuthorization(projectId, "org-1", userId, "ProjectOwner", false));
     }
 
     private sealed class NoOpWorkItemRealtimePublisher : IWorkItemRealtimePublisher
     {
         public Task PublishAsync(WorkItemRealtimeChange change, CancellationToken ct) => Task.CompletedTask;
+    }
+
+    private sealed class NoOpWorkItemAuditPublisher : IWorkItemAuditPublisher
+    {
+        public Task WriteAsync(
+            string action,
+            string entityType,
+            string entityId,
+            string? oldValue,
+            string? newValue,
+            string correlationId,
+            CancellationToken ct) => Task.CompletedTask;
+    }
+
+    private sealed class DirectNotificationPublisher(NotificationService service)
+        : IWorkItemNotificationPublisher
+    {
+        public Task NotifyAsync(
+            string userId,
+            string type,
+            string message,
+            CancellationToken ct,
+            string? deduplicationKey = null) =>
+            service.NotifyAsync(userId, type, message, ct, deduplicationKey);
+    }
+
+    private sealed class DirectWorkItemSearchPublisher(IWorkItemSearchIndex search)
+        : IWorkItemSearchPublisher
+    {
+        public Task IndexAsync(WorkItemSearchRecord record, CancellationToken ct) =>
+            search.IndexAsync(record, ct);
+
+        public Task DeleteAsync(string workItemId, CancellationToken ct) =>
+            search.DeleteAsync(workItemId, ct);
+    }
+
+    private sealed class UnavailableWorkItemSearchIndex : IWorkItemSearchIndex
+    {
+        public Task InitializeAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+        public Task IndexAsync(WorkItemSearchRecord record, CancellationToken cancellationToken = default) =>
+            Task.CompletedTask;
+        public Task DeleteAsync(string id, CancellationToken cancellationToken = default) => Task.CompletedTask;
+        public Task<WorkItemSearchResult> SearchAsync(
+            WorkItemSearchQuery query,
+            CancellationToken cancellationToken = default) =>
+            Task.FromException<WorkItemSearchResult>(new WorkItemSearchUnavailableException("offline"));
+        public Task<WorkItemSearchRebuildResult> RebuildAsync(
+            IReadOnlyCollection<WorkItemSearchRecord> records,
+            CancellationToken cancellationToken = default) =>
+            Task.FromException<WorkItemSearchRebuildResult>(new WorkItemSearchUnavailableException("offline"));
+    }
+
+    private sealed class DirectCacheInvalidationPublisher(IWorkItemReadModelCache cache)
+        : IWorkItemCacheInvalidationPublisher
+    {
+        public Task InvalidateProjectAsync(string projectId, CancellationToken ct) =>
+            cache.InvalidateProjectAsync(projectId, ct);
     }
 
     private sealed class RecordingWorkItemRealtimePublisher : IWorkItemRealtimePublisher
@@ -1478,11 +2323,14 @@ public sealed class DomainRuleTests
             Task.FromResult(false);
 
         public Task<bool> HasBoardWorkItemsAsync(string boardId, CancellationToken ct) => Task.FromResult(false);
+
+        public Task ValidateMappingAsync(BoardDocument board, CancellationToken ct) => Task.CompletedTask;
     }
 
     private sealed class AllowAuditAccessChecker : IAuditAccessChecker
     {
-        public Task EnsureCanReadAsync(AuditLogQuery query, CancellationToken ct) => Task.CompletedTask;
+        public Task<AuditReadScope> EnsureCanReadAsync(AuditLogQuery query, CancellationToken ct) =>
+            Task.FromResult(new AuditReadScope("org-1"));
     }
 
     private sealed class RecordingIdentityAuditWriter : IIdentityAuditWriter
@@ -1548,6 +2396,124 @@ public sealed class DomainRuleTests
         public string Unprotect(string protectedSecret) => protectedSecret["protected:".Length..];
     }
 
+    private sealed class CoordinatedRefreshSessionStore(IRefreshSessionStore inner) : IRefreshSessionStore
+    {
+        private TaskCompletionSource<bool>? pairReady;
+        private int arrivals;
+
+        public void CoordinateNextPair()
+        {
+            arrivals = 0;
+            pairReady = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        }
+
+        public async Task<RefreshSessionDocument?> GetByTokenAsync(string rawToken, CancellationToken ct)
+        {
+            var result = await inner.GetByTokenAsync(rawToken, ct);
+            var barrier = pairReady;
+            if (barrier is null)
+            {
+                return result;
+            }
+
+            if (Interlocked.Increment(ref arrivals) == 2)
+            {
+                pairReady = null;
+                barrier.TrySetResult(true);
+            }
+            else
+            {
+                await barrier.Task.WaitAsync(ct);
+            }
+
+            return result;
+        }
+
+        public Task<RefreshSessionDocument?> GetByIdAsync(
+            string sessionId,
+            string userId,
+            string organizationId,
+            CancellationToken ct) =>
+            inner.GetByIdAsync(sessionId, userId, organizationId, ct);
+
+        public Task<IReadOnlyList<RefreshSessionDocument>> ListOwnedAsync(
+            string userId,
+            string organizationId,
+            CancellationToken ct) =>
+            inner.ListOwnedAsync(userId, organizationId, ct);
+
+        public Task CreateAsync(RefreshSessionDocument session, CancellationToken ct) =>
+            inner.CreateAsync(session, ct);
+
+        public Task<bool> RevokeAsync(
+            RefreshSessionDocument session,
+            DateTimeOffset revokedAt,
+            string? replacedBySessionId,
+            CancellationToken ct) =>
+            inner.RevokeAsync(session, revokedAt, replacedBySessionId, ct);
+
+        public Task<int> RevokeAllAsync(
+            string userId,
+            string organizationId,
+            DateTimeOffset revokedAt,
+            CancellationToken ct) =>
+            inner.RevokeAllAsync(userId, organizationId, revokedAt, ct);
+
+        public Task<int> PurgeRetainedAsync(DateTimeOffset now, int batchSize, CancellationToken ct) =>
+            inner.PurgeRetainedAsync(now, batchSize, ct);
+    }
+
+    private sealed class OneShotApiKeyConflictStore(IApiKeyStore inner) : IApiKeyStore
+    {
+        private bool conflictNextReplace;
+
+        public void ConflictNextReplace() => conflictNextReplace = true;
+
+        public Task CreateAsync(ApiKeyDocument apiKey, CancellationToken ct) => inner.CreateAsync(apiKey, ct);
+
+        public Task<ApiKeyDocument?> GetByIdAsync(string apiKeyId, CancellationToken ct) =>
+            inner.GetByIdAsync(apiKeyId, ct);
+
+        public Task<ApiKeyDocument?> GetOwnedAsync(
+            string apiKeyId,
+            string userId,
+            string organizationId,
+            CancellationToken ct) =>
+            inner.GetOwnedAsync(apiKeyId, userId, organizationId, ct);
+
+        public Task<IReadOnlyList<ApiKeyDocument>> ListOwnedAsync(
+            string userId,
+            string organizationId,
+            CancellationToken ct) =>
+            inner.ListOwnedAsync(userId, organizationId, ct);
+
+        public Task<IReadOnlyList<ApiKeyDocument>> ListAllOwnedAsync(
+            string userId,
+            string organizationId,
+            CancellationToken ct) =>
+            inner.ListAllOwnedAsync(userId, organizationId, ct);
+
+        public async Task<bool> ReplaceOwnedAsync(ApiKeyDocument apiKey, CancellationToken ct)
+        {
+            if (conflictNextReplace)
+            {
+                conflictNextReplace = false;
+                var concurrent = await inner.GetOwnedAsync(
+                    apiKey.Id,
+                    apiKey.UserId,
+                    apiKey.OrganizationId,
+                    ct);
+                concurrent!.LastUsedAt = (concurrent.LastUsedAt ?? DateTimeOffset.UtcNow).AddSeconds(1);
+                Assert.True(await inner.ReplaceOwnedAsync(concurrent, ct));
+            }
+
+            return await inner.ReplaceOwnedAsync(apiKey, ct);
+        }
+
+        public Task<int> PurgeExpiredAsync(DateTimeOffset now, int batchSize, CancellationToken ct) =>
+            inner.PurgeExpiredAsync(now, batchSize, ct);
+    }
+
     private sealed class RecordingPrivacyDataProcessor : IPrivacyDataProcessor
     {
         public string? Pseudonym { get; private set; }
@@ -1558,6 +2524,17 @@ public sealed class DomainRuleTests
             CancellationToken ct) =>
             Task.FromResult<IReadOnlyCollection<PrivacyDataGroup>>(
                 [new PrivacyDataGroup("work-items", [new PrivacyDataReference("item-1", "assignee")], false)]);
+
+        public async Task<long> WriteExportAsync(
+            string userId,
+            string organizationId,
+            UserProfileResponse profile,
+            Stream destination,
+            CancellationToken ct)
+        {
+            await destination.WriteAsync("{}\n"u8.ToArray(), ct);
+            return 1;
+        }
 
         public Task EnsureCanAnonymizeAsync(string userId, string organizationId, CancellationToken ct) =>
             Task.CompletedTask;
@@ -1612,16 +2589,33 @@ public sealed class DomainRuleTests
     private sealed class AllowNotificationUserDirectory : INotificationUserDirectory
     {
         public Task<NotificationUser?> FindAsync(string userId, CancellationToken ct) =>
-            Task.FromResult<NotificationUser?>(new NotificationUser(userId, userId + "@zumbo.local", true));
+            Task.FromResult<NotificationUser?>(new NotificationUser(userId, "org-1", userId + "@zumbo.local", true));
     }
 
     private sealed class RecordingEmailNotificationSender : IEmailNotificationSender
     {
         public List<string> Recipients { get; } = [];
+        public List<string> Subjects { get; } = [];
+        public List<string> Bodies { get; } = [];
 
         public Task SendAsync(string recipient, string subject, string body, CancellationToken ct)
         {
             Recipients.Add(recipient);
+            Subjects.Add(subject);
+            Bodies.Add(body);
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class ToggleEmailNotificationSender : IEmailNotificationSender
+    {
+        public bool Fail { get; set; }
+        public int Attempts { get; private set; }
+
+        public Task SendAsync(string recipient, string subject, string body, CancellationToken ct)
+        {
+            Attempts++;
+            if (Fail) throw new InvalidOperationException("Synthetic SMTP failure.");
             return Task.CompletedTask;
         }
     }
@@ -1646,11 +2640,26 @@ public sealed class DomainRuleTests
 
             var key = Guid.NewGuid().ToString("N");
             _files[key] = buffer.ToArray();
-            return new StoredAttachment(fileName, contentType, buffer.Length, key);
+            return new StoredAttachment(
+                fileName,
+                contentType,
+                buffer.Length,
+                key,
+                Convert.ToHexString(SHA256.HashData(buffer.ToArray())));
         }
 
-        public Task<Stream> OpenReadAsync(string storagePath, string contentType, CancellationToken ct) =>
+        public Task<StoredAttachment> ReprocessAsync(StoredAttachment attachment, CancellationToken ct) =>
+            Task.FromResult(attachment with { SecurityState = AttachmentSecurityStates.Clean });
+
+        public Task<Stream> OpenReadAsync(
+            string storagePath,
+            string contentType,
+            string expectedChecksumSha256,
+            CancellationToken ct) =>
             Task.FromResult<Stream>(new MemoryStream(_files[storagePath], writable: false));
+
+        public Task<IReadOnlyList<StoredAttachmentObject>> ListObjectsAsync(int maxCount, CancellationToken ct) =>
+            Task.FromResult<IReadOnlyList<StoredAttachmentObject>>([]);
 
         public Task DeleteAsync(string storagePath, CancellationToken ct)
         {
@@ -1672,6 +2681,7 @@ public sealed class DomainRuleTests
     {
         public Task<WorkflowTransitionRule> EnsureTransitionAllowedAsync(
             string projectId,
+            string issueType,
             string fromStatus,
             string toStatus,
             CancellationToken ct)
@@ -1707,6 +2717,7 @@ public sealed class DomainRuleTests
     {
         public Task<WorkflowTransitionRule> EnsureTransitionAllowedAsync(
             string projectId,
+            string issueType,
             string fromStatus,
             string toStatus,
             CancellationToken ct) =>

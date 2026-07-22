@@ -21,6 +21,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\src\Zumbo.BuildingBlocks.Application\Zumbo.BuildingBlocks.Application.csproj" />
     <ProjectReference Include="..\..\src\Zumbo.SharedKernel\Zumbo.SharedKernel.csproj" />
     <ProjectReference Include="..\..\src\Zumbo.Modules.Identity\Zumbo.Modules.Identity.csproj" />
     <ProjectReference Include="..\..\src\Zumbo.Modules.WorkItems\Zumbo.Modules.WorkItems.csproj" />

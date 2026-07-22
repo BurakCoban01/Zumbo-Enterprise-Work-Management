@@ -1,0 +1,16 @@
+{
+  "title": "Zumbo Service Overview",
+  "uid": "zumbo-overview",
+  "schemaVersion": 41,
+  "refresh": "15s",
+  "tags": ["zumbo", "slo"],
+  "time": { "from": "now-1h", "to": "now" },
+  "panels": [
+    { "id": 1, "type": "timeseries", "title": "HTTP request rate", "gridPos": { "x": 0, "y": 0, "w": 8, "h": 7 }, "targets": [{ "expr": "sum(rate(http_server_request_duration_seconds_count[5m]))", "legendFormat": "requests/s" }] },
+    { "id": 2, "type": "timeseries", "title": "HTTP p95 latency", "gridPos": { "x": 8, "y": 0, "w": 8, "h": 7 }, "targets": [{ "expr": "histogram_quantile(0.95, sum by (le) (rate(http_server_request_duration_seconds_bucket[5m])))", "legendFormat": "p95" }] },
+    { "id": 3, "type": "timeseries", "title": "HTTP 5xx ratio", "gridPos": { "x": 16, "y": 0, "w": 8, "h": 7 }, "targets": [{ "expr": "sum(rate(http_server_request_duration_seconds_count{http_response_status_code=~\"5..\"}[5m])) / clamp_min(sum(rate(http_server_request_duration_seconds_count[5m])), 1)", "legendFormat": "5xx ratio" }] },
+    { "id": 4, "type": "timeseries", "title": "External dependency latency", "gridPos": { "x": 0, "y": 7, "w": 8, "h": 7 }, "targets": [{ "expr": "histogram_quantile(0.95, sum by (le, dependency) (rate(zumbo_external_duration_milliseconds_bucket[5m])))", "legendFormat": "{{dependency}}" }] },
+    { "id": 5, "type": "timeseries", "title": "Outbox pending age", "gridPos": { "x": 8, "y": 7, "w": 8, "h": 7 }, "targets": [{ "expr": "histogram_quantile(0.95, sum by (le) (rate(zumbo_outbox_pending_age_seconds_bucket[10m])))", "legendFormat": "p95 age" }] },
+    { "id": 6, "type": "timeseries", "title": "Realtime connections and failures", "gridPos": { "x": 16, "y": 7, "w": 8, "h": 7 }, "targets": [{ "expr": "sum(zumbo_realtime_active_connections)", "legendFormat": "connections" }, { "expr": "sum(rate(zumbo_realtime_publish_failures_total[5m]))", "legendFormat": "failures/s" }] }
+  ]
+}

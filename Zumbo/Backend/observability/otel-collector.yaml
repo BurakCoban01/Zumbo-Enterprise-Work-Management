@@ -1,0 +1,52 @@
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 192
+    spike_limit_mib: 48
+  batch:
+    timeout: 2s
+    send_batch_size: 512
+    send_batch_max_size: 1024
+
+exporters:
+  prometheus:
+    endpoint: 0.0.0.0:9464
+    enable_open_metrics: true
+  file/traces:
+    path: /var/lib/otel/traces.json
+    rotation:
+      max_megabytes: 20
+      max_days: 1
+      max_backups: 2
+  file/logs:
+    path: /var/lib/otel/logs.json
+    rotation:
+      max_megabytes: 20
+      max_days: 1
+      max_backups: 2
+
+service:
+  telemetry:
+    logs:
+      level: info
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [file/traces]
+    metrics:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [prometheus]
+    logs:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [file/logs]

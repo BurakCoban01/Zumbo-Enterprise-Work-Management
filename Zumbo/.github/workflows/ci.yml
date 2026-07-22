@@ -6,26 +6,417 @@ on:
   pull_request:
     branches: ["main", "master"]
 
+permissions:
+  contents: read
+
+concurrency:
+  group: zumbo-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+  DOTNET_NOLOGO: "1"
+  NUGET_XMLDOC_MODE: skip
+
 jobs:
-  backend:
+  ci-contract:
+    timeout-minutes: 5
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "20.20.0"
+
+      - name: Artifact retention and secret boundary
+        run: node scripts/ci/Test-CiContract.mjs
+
+      - name: No image push or deployment contract
+        run: node scripts/ci/Test-CiContract.mjs
+
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
         with:
           dotnet-version: "8.0.x"
 
-      - name: Restore
-        run: dotnet restore Backend/Zumbo.sln
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "20.20.0"
 
-      - name: Build
-        run: dotnet build Backend/Zumbo.sln --configuration Release --no-restore
+      - name: Restore and validate dependency manifests
+        shell: pwsh
+        run: |
+          ./scripts/ci/Test-DependencyManifests.ps1
+          dotnet restore Backend/Zumbo.sln
 
-      - name: Test
-        run: dotnet test Backend/Zumbo.sln --configuration Release --no-build
+      - name: Changed-scope format and analyzers
+        run: |
+          dotnet format analyzers Backend/Zumbo.sln --verify-no-changes --no-restore --severity warn
+          dotnet build Backend/Zumbo.sln --configuration Release --no-restore --warnaserror /p:ContinuousIntegrationBuild=true
 
-      - name: Docker build
-        run: docker build -f Backend/src/Zumbo.Api/Dockerfile Backend
+      - name: Release build
+        run: dotnet build Backend/Zumbo.sln --configuration Release --no-restore --warnaserror /p:ContinuousIntegrationBuild=true
+
+      - name: Unit and architecture tests
+        run: |
+          dotnet test Backend/tests/Zumbo.UnitTests/Zumbo.UnitTests.csproj --configuration Release --no-build --no-restore --collect:"XPlat Code Coverage" --results-directory artifacts/coverage/ci/unit
+          dotnet test Backend/tests/Zumbo.ApiTests/Zumbo.ApiTests.csproj --configuration Release --no-build --no-restore --collect:"XPlat Code Coverage" --results-directory artifacts/coverage/ci/api
+          dotnet test Backend/tests/Zumbo.ArchitectureTests/Zumbo.ArchitectureTests.csproj --configuration Release --no-build --no-restore
+          dotnet test Backend/tests/Zumbo.GatewayTests/Zumbo.GatewayTests.csproj --configuration Release --no-build --no-restore
+
+      - name: Coverage thresholds
+        shell: pwsh
+        run: ./scripts/ci/Test-Coverage.ps1 -ResultsDirectory artifacts/coverage/ci -MinimumLinePercent 60 -MinimumBranchPercent 40
+
+      - name: OpenAPI generation and breaking change check
+        run: |
+          node scripts/ci/Test-OpenApiCompatibility.mjs
+          node scripts/ci/Test-OpenApiContract.mjs
+
+      - name: Upload core evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: backend-core-evidence
+          path: |
+            artifacts/contracts/generated/openapi.current.json
+            artifacts/coverage/ci/coverage-summary.json
+            artifacts/coverage/ci/unit/
+            artifacts/coverage/ci/api/
+          if-no-files-found: error
+          retention-days: 7
+
+  provider-mongo:
+    timeout-minutes: 25
+    runs-on: ubuntu-latest
+    env:
+      ZUMBO_JWT_SIGNING_KEY: ci-only-signing-key-000000000000000000000000000000000000000000000000
+      ZUMBO_MINIO_ROOT_USER: ci-minio-user
+      ZUMBO_MINIO_ROOT_PASSWORD: ci-only-minio-password-00000000
+      ZUMBO_DOCKER_SUBNET: 10.250.1.0/24
+      ZUMBO_MONGO_HOST_PORT: "58217"
+      ZUMBO_TEST_MONGO_CONNECTION_STRING: mongodb://127.0.0.1:58217/?replicaSet=rs0&directConnection=true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Start Mongo replica set
+        run: docker compose --project-name zumbo-ci-mongo --env-file Backend/.env.example -f Backend/docker-compose.yml -f Backend/docker-compose.host-access.yml up --detach --wait mongo mongo-init-replica
+
+      - name: Mongo provider contracts
+        run: dotnet test Backend/tests/Zumbo.PersistenceIntegrationTests/Zumbo.PersistenceIntegrationTests.csproj --configuration Release --filter FullyQualifiedName!~MailpitNotificationDeliveryTests
+
+      - name: Targeted cleanup
+        if: always()
+        run: docker compose --project-name zumbo-ci-mongo --env-file Backend/.env.example -f Backend/docker-compose.yml -f Backend/docker-compose.host-access.yml down --volumes --remove-orphans
+
+  provider-postgresql:
+    timeout-minutes: 25
+    runs-on: ubuntu-latest
+    env:
+      ZUMBO_POSTGRES_TEST_DATABASE: zumbo_ci
+      ZUMBO_POSTGRES_TEST_USER: zumbo_ci
+      ZUMBO_POSTGRES_TEST_PASSWORD: ci-only-postgres-password
+      ZUMBO_POSTGRES_TEST_PORT: "58432"
+      ZUMBO_TEST_POSTGRES_CONNECTION_STRING: Host=127.0.0.1;Port=58432;Database=zumbo_ci;Username=zumbo_ci;Password=ci-only-postgres-password;Pooling=false
+      ZUMBO_POSTGRES_CONNECTION_STRING: Host=127.0.0.1;Port=58432;Database=zumbo_ci;Username=zumbo_ci;Password=ci-only-postgres-password;Pooling=false
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Start PostgreSQL
+        run: docker compose --project-name zumbo-ci-postgresql --env-file Backend/.env.example -f Backend/docker-compose.postgresql.test.yml --profile postgresql-test up --detach --wait
+
+      - name: PostgreSQL provider contracts
+        run: dotnet test Backend/tests/Zumbo.PostgreSqlIntegrationTests/Zumbo.PostgreSqlIntegrationTests.csproj --configuration Release
+
+      - name: Migration dry-run and rollback checks
+        run: |
+          mkdir -p artifacts/migrations/ci
+          dotnet run --project Backend/tools/Zumbo.DatabaseMigrator/Zumbo.DatabaseMigrator.csproj --configuration Release -- script --idempotent --output artifacts/migrations/ci/postgresql.sql
+          dotnet test Backend/tests/Zumbo.PostgreSqlIntegrationTests/Zumbo.PostgreSqlIntegrationTests.csproj --configuration Release --no-restore --filter "FullyQualifiedName~LatestMigration_CanRollbackAndReapplyWithoutLedgerDrift|FullyQualifiedName~MigrationScript_IsIdempotentAndDoesNotMutateTheLedger"
+
+      - name: Upload migration evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: migration-evidence
+          path: |
+            artifacts/migrations/ci/postgresql.sql
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Targeted cleanup
+        if: always()
+        run: docker compose --project-name zumbo-ci-postgresql --env-file Backend/.env.example -f Backend/docker-compose.postgresql.test.yml --profile postgresql-test down --volumes --remove-orphans
+
+  external-dependencies:
+    timeout-minutes: 30
+    runs-on: ubuntu-latest
+    env:
+      ZUMBO_JWT_SIGNING_KEY: ci-only-signing-key-000000000000000000000000000000000000000000000000
+      ZUMBO_MINIO_ROOT_USER: ci-minio-user
+      ZUMBO_MINIO_ROOT_PASSWORD: ci-only-minio-password-00000000
+      ZUMBO_DOCKER_SUBNET: 10.250.2.0/24
+      ZUMBO_REDIS_HOST_PORT: "58379"
+      ZUMBO_MINIO_API_HOST_PORT: "58400"
+      ZUMBO_MINIO_CONSOLE_HOST_PORT: "58401"
+      ZUMBO_OPENSEARCH_HOST_PORT: "59200"
+      ZUMBO_MAILPIT_HTTP_HOST_PORT: "58825"
+      ZUMBO_MAILPIT_SMTP_HOST_PORT: "51025"
+      ZUMBO_REDIS_CONNECTION_STRING: 127.0.0.1:58379,abortConnect=false
+      ZUMBO_TEST_MINIO_ENDPOINT: http://127.0.0.1:58400
+      ZUMBO_TEST_MINIO_ACCESS_KEY: ci-minio-user
+      ZUMBO_TEST_MINIO_SECRET_KEY: ci-only-minio-password-00000000
+      ZUMBO_TEST_OPENSEARCH_URL: http://127.0.0.1:59200
+      ZUMBO_TEST_MAILPIT_API_URL: http://127.0.0.1:58825
+      ZUMBO_TEST_SMTP_HOST: 127.0.0.1
+      ZUMBO_TEST_SMTP_PORT: "51025"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Prepare OpenSearch host
+        run: sudo sysctl -w vm.max_map_count=262144
+
+      - name: Start external dependencies
+        run: docker compose --project-name zumbo-ci-external --env-file Backend/.env.example -f Backend/docker-compose.yml -f Backend/docker-compose.host-access.yml -f Backend/docker-compose.baseline.yml -f Backend/docker-compose.ci.yml up --detach --wait redis minio opensearch mailpit
+
+      - name: Redis storage and search integration
+        run: |
+          dotnet test Backend/tests/Zumbo.ApiTests/Zumbo.ApiTests.csproj --configuration Release --filter FullyQualifiedName~RedisScalingIntegrationTests
+          dotnet test Backend/tests/Zumbo.StorageIntegrationTests/Zumbo.StorageIntegrationTests.csproj --configuration Release
+          dotnet test Backend/tests/Zumbo.UnitTests/Zumbo.UnitTests.csproj --configuration Release --filter FullyQualifiedName~RealOpenSearch_TenantIsolationAndAliasRebuild
+          dotnet test Backend/tests/Zumbo.PersistenceIntegrationTests/Zumbo.PersistenceIntegrationTests.csproj --configuration Release --filter FullyQualifiedName~MailpitNotificationDeliveryTests
+
+      - name: Targeted cleanup
+        if: always()
+        run: docker compose --project-name zumbo-ci-external --env-file Backend/.env.example -f Backend/docker-compose.yml -f Backend/docker-compose.host-access.yml -f Backend/docker-compose.baseline.yml -f Backend/docker-compose.ci.yml down --volumes --remove-orphans
+
+  frontend:
+    timeout-minutes: 15
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "20.20.0"
+
+      - name: Setup pnpm
+        run: corepack enable && corepack prepare pnpm@9.0.0 --activate
+
+      - name: Frozen frontend install
+        run: pnpm --dir Frontend install --frozen-lockfile
+
+      - name: Frontend lint unit and production build
+        run: |
+          pnpm --dir Frontend run lint
+          pnpm --dir Frontend run unit
+          pnpm --dir Frontend run build
+
+      - name: Frontend vulnerability and license policy
+        run: |
+          pnpm --dir Frontend run audit:dependencies
+          pnpm --dir Frontend run audit:licenses
+
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "20.20.0"
+
+      - name: Setup pnpm
+        run: corepack enable && corepack prepare pnpm@9.0.0 --activate
+
+      - name: Frozen frontend install and Chromium
+        run: |
+          pnpm --dir Frontend install --frozen-lockfile
+          pnpm --dir Frontend exec playwright install --with-deps chromium
+
+      - name: Prepare OpenSearch host
+        run: sudo sysctl -w vm.max_map_count=262144
+
+      - name: Compose config and startup smoke
+        run: |
+          docker compose --project-name zumbo-ci-runtime --env-file Backend/.env.example -f Backend/docker-compose.yml config --quiet
+          docker compose --project-name zumbo-ci-runtime --env-file Backend/.env.example -f Backend/docker-compose.yml build --pull api gateway
+          docker compose --project-name zumbo-ci-runtime --env-file Backend/.env.example -f Backend/docker-compose.yml up --detach --no-build --wait
+
+      - name: Real dependency API acceptance
+        run: node scripts/ci/Test-RealApi.mjs
+
+      - name: Start built frontend
+        run: |
+          pnpm --dir Frontend run build
+          pnpm --dir Frontend run preview >/tmp/zumbo-frontend.out 2>/tmp/zumbo-frontend.err &
+          echo $! >/tmp/zumbo-frontend.pid
+          for attempt in $(seq 1 60); do curl --fail --silent http://127.0.0.1:58177/desktop-bulma/index.html >/dev/null && exit 0; sleep 1; done
+          exit 1
+
+      - name: Browser E2E accessibility and visual smoke
+        run: pnpm --dir Frontend run test:fe008:cross-browser -- --browser chromium
+
+      - name: Upload browser evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: browser-smoke-evidence
+          path: |
+            artifacts/ui/playwright/fe008-cross-browser.json
+            artifacts/ui/playwright/chromium/
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Targeted cleanup
+        if: always()
+        run: |
+          if test -f /tmp/zumbo-frontend.pid; then kill "$(cat /tmp/zumbo-frontend.pid)" 2>/dev/null || true; fi
+          docker compose --project-name zumbo-ci-runtime --env-file Backend/.env.example -f Backend/docker-compose.yml down --volumes --remove-orphans
+
+  security-containers:
+    timeout-minutes: 35
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "20.20.0"
+
+      - name: Setup pnpm
+        run: corepack enable && corepack prepare pnpm@9.0.0 --activate
+
+      - name: Restore security inputs
+        run: |
+          dotnet restore Backend/Zumbo.sln
+          pnpm --dir Frontend install --frozen-lockfile
+
+      - name: Build validation images
+        run: |
+          docker build --pull -f Backend/src/Zumbo.Api/Dockerfile -t zumbo-api:ci Backend
+          docker build --pull -f Backend/src/Zumbo.Gateway/Dockerfile -t zumbo-gateway:ci Backend
+
+      - name: Secret and source configuration scan
+        shell: pwsh
+        run: ./scripts/Invoke-SecurityGate.ps1 -ApiImage zumbo-api:ci -GatewayImage zumbo-gateway:ci
+
+      - name: NuGet vulnerability policy
+        shell: pwsh
+        run: |
+          $summary = Get-Content artifacts/security/generated/summary.json -Raw | ConvertFrom-Json
+          if ($summary.nugetVulnerabilities -ne 0) { throw 'NuGet vulnerability gate failed.' }
+
+      - name: Generate CycloneDX SBOM
+        run: node scripts/generate-security-sbom.mjs
+
+      - name: Container build and vulnerability scan
+        shell: pwsh
+        run: |
+          $summary = Get-Content artifacts/security/generated/summary.json -Raw | ConvertFrom-Json
+          if (-not $summary.containerScanExecuted -or $summary.fixableHighCriticalImageVulnerabilities -ne 0) { throw 'Container vulnerability gate failed.' }
+
+      - name: Upload sanitized security evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: security-evidence
+          path: |
+            artifacts/security/SEC-008.sbom.cdx.json
+            artifacts/security/generated/summary.json
+            artifacts/security/generated/semgrep.json
+            artifacts/security/generated/trivy-source.json
+            artifacts/security/generated/api-image.json
+            artifacts/security/generated/gateway-image.json
+          if-no-files-found: error
+          retention-days: 14
+
+  codeql:
+    timeout-minutes: 20
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      packages: read
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [csharp, javascript-typescript]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@f52b05f4acaaa234e44466e66d29050e135ea9ef # v4.36.0
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: none
+          queries: security-extended
+
+      - name: Analyze
+        uses: github/codeql-action/analyze@f52b05f4acaaa234e44466e66d29050e135ea9ef # v4.36.0
+        with:
+          category: /language:${{ matrix.language }}
+
+  ci-summary:
+    timeout-minutes: 5
+    runs-on: ubuntu-latest
+    if: always()
+    needs:
+      - ci-contract
+      - backend-core
+      - provider-mongo
+      - provider-postgresql
+      - external-dependencies
+      - frontend
+      - runtime-browser
+      - security-containers
+      - codeql
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Require every gate job
+        run: |
+          test "${{ needs.ci-contract.result }}" = success
+          test "${{ needs.backend-core.result }}" = success
+          test "${{ needs.provider-mongo.result }}" = success
+          test "${{ needs.provider-postgresql.result }}" = success
+          test "${{ needs.external-dependencies.result }}" = success
+          test "${{ needs.frontend.result }}" = success
+          test "${{ needs.runtime-browser.result }}" = success
+          test "${{ needs.security-containers.result }}" = success
+          test "${{ needs.codeql.result }}" = success

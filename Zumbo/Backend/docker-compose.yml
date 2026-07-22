@@ -7,25 +7,43 @@ services:
     environment:
       ASPNETCORE_URLS: http://+:8080
       Persistence__Provider: Mongo
-      MongoDb__ConnectionString: mongodb://mongo:27017
+      MongoDb__ConnectionString: mongodb://mongo:27017/?replicaSet=rs0
       MongoDb__DatabaseName: Zumbo
       Jwt__SigningKey: ${ZUMBO_JWT_SIGNING_KEY:?ZUMBO_JWT_SIGNING_KEY must be set in Backend/.env}
       IdentityBootstrap__AdminEmails__0: ${ZUMBO_IDENTITY_ADMIN_EMAIL:-}
       IdentityBootstrap__BootstrapToken: ${ZUMBO_IDENTITY_BOOTSTRAP_TOKEN:-}
+      RegistrationProvisioning__Mode: ${ZUMBO_REGISTRATION_PROVISIONING_MODE:-ProductionLike}
+      OrganizationLifecycle__ArchiveRetentionDays: ${ZUMBO_ORGANIZATION_ARCHIVE_RETENTION_DAYS:-90}
+      ProjectLifecycle__ArchiveRetentionDays: ${ZUMBO_PROJECT_ARCHIVE_RETENTION_DAYS:-90}
+      WorkItemRank__BatchSize: ${ZUMBO_WORK_ITEM_RANK_BATCH_SIZE:-100}
+      WorkItemRank__MaxBatchesPerRun: ${ZUMBO_WORK_ITEM_RANK_MAX_BATCHES:-1000}
+      WorkItemTypeSchema__BatchSize: ${ZUMBO_WORK_ITEM_SCHEMA_BATCH_SIZE:-100}
+      WorkItemTypeSchema__MaxBatchesPerValidation: ${ZUMBO_WORK_ITEM_SCHEMA_MAX_BATCHES:-1000}
+      WorkItemGraph__MaxTraversalDepth: ${ZUMBO_WORK_ITEM_GRAPH_MAX_DEPTH:-64}
+      WorkItemGraph__MaxVisitedNodes: ${ZUMBO_WORK_ITEM_GRAPH_MAX_NODES:-1000}
+      WorkItemGraph__MaxOutgoingDependenciesPerNode: ${ZUMBO_WORK_ITEM_GRAPH_MAX_OUTGOING:-200}
+      WorkItemGraph__MaxRelationsPerWorkItem: ${ZUMBO_WORK_ITEM_GRAPH_MAX_RELATIONS:-200}
+      WorkItemGraph__MaxChildrenPerWorkItem: ${ZUMBO_WORK_ITEM_GRAPH_MAX_CHILDREN:-200}
+      Sprint__BatchSize: ${ZUMBO_SPRINT_BATCH_SIZE:-100}
+      Sprint__MaxBatchesPerOperation: ${ZUMBO_SPRINT_MAX_BATCHES:-1000}
+      RateLimiting__Provider: Redis
+      RateLimiting__Redis__ConnectionString: redis:6379,abortConnect=false
       RateLimiting__ApiPermitLimit: 1000
-      Cors__AllowedOrigins__0: http://localhost:5177
-      Cors__AllowedOrigins__1: http://127.0.0.1:5177
-      PasswordReset__FrontendResetUrl: http://localhost:5177/#/reset-password
+      Cors__AllowedOrigins__0: ${ZUMBO_FRONTEND_URL:-http://127.0.0.1:58177}
+      PasswordReset__FrontendResetUrl: ${ZUMBO_FRONTEND_URL:-http://127.0.0.1:58177}/#/reset-password
       Storage__Provider: Minio
       Storage__Minio__Endpoint: http://minio:9000
       Storage__Minio__AccessKey: ${ZUMBO_MINIO_ROOT_USER:?ZUMBO_MINIO_ROOT_USER must be set in Backend/.env}
       Storage__Minio__SecretKey: ${ZUMBO_MINIO_ROOT_PASSWORD:?ZUMBO_MINIO_ROOT_PASSWORD must be set in Backend/.env}
       Storage__Minio__BucketName: zumbo-attachments
-      Storage__Minio__PublicBaseUrl: http://localhost:9000/zumbo-attachments
+      AttachmentSecurity__ScannerProvider: ${ZUMBO_ATTACHMENT_SCANNER_PROVIDER:-PolicyOnly}
+      AttachmentSecurity__ClamAvHost: ${ZUMBO_CLAMAV_HOST:-clamav}
+      AttachmentSecurity__ClamAvPort: ${ZUMBO_CLAMAV_PORT:-3310}
       Search__Provider: OpenSearch
       Search__OpenSearch__BaseUrl: http://opensearch:9200
       Search__OpenSearch__IndexName: zumbo-work-items
       Search__OpenSearch__NumberOfReplicas: 0
+      Search__OpenSearch__AllowInsecureHttp: true
       DistributedLock__Provider: Redis
       DistributedLock__Redis__ConnectionString: redis:6379,abortConnect=false
       Realtime__Backplane: Redis
@@ -34,15 +52,16 @@ services:
       ReadModelCache__TtlSeconds: 30
       ReadModelCache__KeyPrefix: "zumbo:read-model:"
       Runtime__Role: Api
+      Runtime__InstanceId: api-1
       BackgroundJobs__Enabled: false
       DataProtection__KeyPath: /var/lib/zumbo/data-protection
-    ports:
-      - "5088:8080"
     volumes:
       - data_protection_keys:/var/lib/zumbo/data-protection
     depends_on:
       mongo:
         condition: service_healthy
+      mongo-init-replica:
+        condition: service_completed_successfully
       redis:
         condition: service_healthy
       minio:
@@ -51,26 +70,70 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+  gateway:
+    image: backend-gateway
+    build:
+      context: .
+      dockerfile: src/Zumbo.Gateway/Dockerfile
+    environment:
+      ASPNETCORE_URLS: http://+:8080
+      Gateway__UpstreamBaseUrl: http://api:8080/
+      Gateway__NotificationExtractionEnabled: ${ZUMBO_NOTIFICATION_EXTRACTION_ENABLED:-false}
+      Gateway__NotificationUpstreamBaseUrl: ${ZUMBO_NOTIFICATION_UPSTREAM_BASE_URL:-}
+      Gateway__UpstreamReadyPath: /health/ready
+      Gateway__UpstreamTimeoutSeconds: 30
+      Gateway__MaxRequestBodyBytes: 27262976
+      Gateway__PermitLimit: 1000
+      Gateway__RateWindowSeconds: 60
+      Cors__AllowedOrigins__0: ${ZUMBO_FRONTEND_URL:-http://127.0.0.1:58177}
+      AllowedHosts: localhost;127.0.0.1;gateway
+    ports:
+      - "${ZUMBO_GATEWAY_BIND_HOST:-127.0.0.1}:${ZUMBO_GATEWAY_PORT:-58089}:8080"
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
   worker:
     image: backend-api
     environment:
       ASPNETCORE_URLS: http://+:8080
       Persistence__Provider: Mongo
-      MongoDb__ConnectionString: mongodb://mongo:27017
+      MongoDb__ConnectionString: mongodb://mongo:27017/?replicaSet=rs0
       MongoDb__DatabaseName: Zumbo
       Jwt__SigningKey: ${ZUMBO_JWT_SIGNING_KEY:?ZUMBO_JWT_SIGNING_KEY must be set in Backend/.env}
       IdentityBootstrap__AdminEmails__0: ${ZUMBO_IDENTITY_ADMIN_EMAIL:-}
       IdentityBootstrap__BootstrapToken: ${ZUMBO_IDENTITY_BOOTSTRAP_TOKEN:-}
+      RegistrationProvisioning__Mode: ${ZUMBO_REGISTRATION_PROVISIONING_MODE:-ProductionLike}
+      OrganizationLifecycle__ArchiveRetentionDays: ${ZUMBO_ORGANIZATION_ARCHIVE_RETENTION_DAYS:-90}
+      ProjectLifecycle__ArchiveRetentionDays: ${ZUMBO_PROJECT_ARCHIVE_RETENTION_DAYS:-90}
+      WorkItemRank__BatchSize: ${ZUMBO_WORK_ITEM_RANK_BATCH_SIZE:-100}
+      WorkItemRank__MaxBatchesPerRun: ${ZUMBO_WORK_ITEM_RANK_MAX_BATCHES:-1000}
+      WorkItemTypeSchema__BatchSize: ${ZUMBO_WORK_ITEM_SCHEMA_BATCH_SIZE:-100}
+      WorkItemTypeSchema__MaxBatchesPerValidation: ${ZUMBO_WORK_ITEM_SCHEMA_MAX_BATCHES:-1000}
+      WorkItemGraph__MaxTraversalDepth: ${ZUMBO_WORK_ITEM_GRAPH_MAX_DEPTH:-64}
+      WorkItemGraph__MaxVisitedNodes: ${ZUMBO_WORK_ITEM_GRAPH_MAX_NODES:-1000}
+      WorkItemGraph__MaxOutgoingDependenciesPerNode: ${ZUMBO_WORK_ITEM_GRAPH_MAX_OUTGOING:-200}
+      WorkItemGraph__MaxRelationsPerWorkItem: ${ZUMBO_WORK_ITEM_GRAPH_MAX_RELATIONS:-200}
+      WorkItemGraph__MaxChildrenPerWorkItem: ${ZUMBO_WORK_ITEM_GRAPH_MAX_CHILDREN:-200}
+      Sprint__BatchSize: ${ZUMBO_SPRINT_BATCH_SIZE:-100}
+      Sprint__MaxBatchesPerOperation: ${ZUMBO_SPRINT_MAX_BATCHES:-1000}
+      RateLimiting__Provider: Redis
+      RateLimiting__Redis__ConnectionString: redis:6379,abortConnect=false
+      Cors__AllowedOrigins__0: ${ZUMBO_FRONTEND_URL:-http://127.0.0.1:58177}
       Storage__Provider: Minio
       Storage__Minio__Endpoint: http://minio:9000
       Storage__Minio__AccessKey: ${ZUMBO_MINIO_ROOT_USER:?ZUMBO_MINIO_ROOT_USER must be set in Backend/.env}
       Storage__Minio__SecretKey: ${ZUMBO_MINIO_ROOT_PASSWORD:?ZUMBO_MINIO_ROOT_PASSWORD must be set in Backend/.env}
       Storage__Minio__BucketName: zumbo-attachments
-      Storage__Minio__PublicBaseUrl: http://localhost:9000/zumbo-attachments
+      AttachmentSecurity__ScannerProvider: ${ZUMBO_ATTACHMENT_SCANNER_PROVIDER:-PolicyOnly}
+      AttachmentSecurity__ClamAvHost: ${ZUMBO_CLAMAV_HOST:-clamav}
+      AttachmentSecurity__ClamAvPort: ${ZUMBO_CLAMAV_PORT:-3310}
       Search__Provider: OpenSearch
       Search__OpenSearch__BaseUrl: http://opensearch:9200
       Search__OpenSearch__IndexName: zumbo-work-items
       Search__OpenSearch__NumberOfReplicas: 0
+      Search__OpenSearch__AllowInsecureHttp: true
       DistributedLock__Provider: Redis
       DistributedLock__Redis__ConnectionString: redis:6379,abortConnect=false
       Realtime__Backplane: Redis
@@ -79,6 +142,7 @@ services:
       ReadModelCache__TtlSeconds: 30
       ReadModelCache__KeyPrefix: "zumbo:read-model:"
       Runtime__Role: Worker
+      Runtime__InstanceId: worker-1
       BackgroundJobs__Enabled: true
       DataProtection__KeyPath: /var/lib/zumbo/data-protection
     volumes:
@@ -89,9 +153,8 @@ services:
     restart: unless-stopped
 
   mongo:
-    image: mongo:7
-    ports:
-      - "27017:27017"
+    image: mongo:7.0@sha256:340c1c56fb10e95cf79ff547f8664b96bc6ead9909bc355238cbf865a9695a6f
+    command: ["mongod", "--replSet", "rs0", "--bind_ip_all"]
     volumes:
       - mongo_data:/data/db
     healthcheck:
@@ -102,10 +165,21 @@ services:
       start_period: 10s
     restart: unless-stopped
 
+  mongo-init-replica:
+    image: mongo:7.0@sha256:340c1c56fb10e95cf79ff547f8664b96bc6ead9909bc355238cbf865a9695a6f
+    depends_on:
+      mongo:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >-
+        mongosh --host mongo:27017 --quiet --eval
+        "try { if (!db.hello().isWritablePrimary) { rs.initiate({_id:'rs0',members:[{_id:0,host:'mongo:27017'}]}) } } catch (error) { if (error.codeName !== 'AlreadyInitialized') { throw error } };
+        while (!db.hello().isWritablePrimary) { sleep(250) }"
+    restart: "no"
+
   redis:
-    image: redis:7
-    ports:
-      - "6379:6379"
+    image: redis:7@sha256:b52fce7a50c718c6836eef354f19428a9c9a6802379da6eb8a23853152e23f89
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -114,14 +188,11 @@ services:
     restart: unless-stopped
 
   minio:
-    image: minio/minio:latest
+    image: minio/minio:RELEASE.2025-07-23T15-54-02Z@sha256:d249d1fb6966de4d8ad26c04754b545205ff15a62e4fd19ebd0f26fa5baacbc0
     command: server /data --console-address ":9001"
     environment:
       MINIO_ROOT_USER: ${ZUMBO_MINIO_ROOT_USER:?ZUMBO_MINIO_ROOT_USER must be set in Backend/.env}
       MINIO_ROOT_PASSWORD: ${ZUMBO_MINIO_ROOT_PASSWORD:?ZUMBO_MINIO_ROOT_PASSWORD must be set in Backend/.env}
-    ports:
-      - "9000:9000"
-      - "9001:9001"
     volumes:
       - minio_data:/data
     healthcheck:
@@ -133,14 +204,12 @@ services:
     restart: unless-stopped
 
   opensearch:
-    image: opensearchproject/opensearch:2
+    image: opensearchproject/opensearch:2.19.6@sha256:b485da5f7f7bcb174523954bae1303c8c2ddaae9f1c2c89f10d625c98544e7cd
     environment:
       discovery.type: single-node
       DISABLE_INSTALL_DEMO_CONFIG: "true"
       DISABLE_SECURITY_PLUGIN: "true"
       OPENSEARCH_JAVA_OPTS: "-Xms512m -Xmx512m"
-    ports:
-      - "9200:9200"
     volumes:
       - opensearch_data:/usr/share/opensearch/data
     healthcheck:
@@ -151,8 +220,25 @@ services:
       start_period: 45s
     restart: unless-stopped
 
+  clamav:
+    image: clamav/clamav:1.4.3@sha256:75fb5fd95fcbe1d7e6d240c369c1572b686ee2c95949d1042b5148de8eddebb4
+    profiles: ["security-av"]
+    healthcheck:
+      test: ["CMD", "clamdscan", "--ping", "1"]
+      interval: 15s
+      timeout: 10s
+      retries: 20
+      start_period: 90s
+    restart: unless-stopped
+
 volumes:
   mongo_data:
   minio_data:
   opensearch_data:
   data_protection_keys:
+
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: ${ZUMBO_DOCKER_SUBNET:-10.248.88.0/24}

@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "task": "QA-001",
+  "section": "12.4",
+  "gates": [
+    { "number": 1, "job": "security-containers", "step": "Secret and source configuration scan" },
+    { "number": 2, "job": "backend-core", "step": "Restore and validate dependency manifests" },
+    { "number": 3, "job": "backend-core", "step": "Changed-scope format and analyzers" },
+    { "number": 4, "job": "backend-core", "step": "Release build" },
+    { "number": 5, "job": "backend-core", "step": "Unit and architecture tests" },
+    { "number": 6, "job": "provider-mongo", "step": "Mongo provider contracts" },
+    { "number": 6, "job": "provider-postgresql", "step": "PostgreSQL provider contracts" },
+    { "number": 7, "job": "external-dependencies", "step": "Redis storage and search integration" },
+    { "number": 8, "job": "runtime-browser", "step": "Real dependency API acceptance" },
+    { "number": 9, "job": "frontend", "step": "Frontend lint unit and production build" },
+    { "number": 10, "job": "backend-core", "step": "OpenAPI generation and breaking change check" },
+    { "number": 11, "job": "runtime-browser", "step": "Browser E2E accessibility and visual smoke" },
+    { "number": 12, "job": "backend-core", "step": "Coverage thresholds" },
+    { "number": 13, "job": "frontend", "step": "Frontend vulnerability and license policy" },
+    { "number": 13, "job": "security-containers", "step": "NuGet vulnerability policy" },
+    { "number": 14, "job": "security-containers", "step": "Generate CycloneDX SBOM" },
+    { "number": 15, "job": "security-containers", "step": "Container build and vulnerability scan" },
+    { "number": 16, "job": "runtime-browser", "step": "Compose config and startup smoke" },
+    { "number": 17, "job": "provider-postgresql", "step": "Migration dry-run and rollback checks" },
+    { "number": 18, "job": "ci-contract", "step": "Artifact retention and secret boundary" },
+    { "number": 19, "job": "ci-contract", "step": "No image push or deployment contract" }
+  ],
+  "requiredJobs": [
+    "ci-contract",
+    "backend-core",
+    "provider-mongo",
+    "provider-postgresql",
+    "external-dependencies",
+    "frontend",
+    "runtime-browser",
+    "security-containers",
+    "codeql",
+    "ci-summary"
+  ],
+  "allowedArtifactPrefixes": [
+    "artifacts/contracts/generated/",
+    "artifacts/coverage/ci/",
+    "artifacts/migrations/ci/",
+    "artifacts/security/SEC-008.sbom.cdx.json",
+    "artifacts/security/generated/",
+    "artifacts/ui/playwright/"
+  ]
+}

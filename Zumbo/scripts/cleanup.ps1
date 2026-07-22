@@ -1,12 +1,23 @@
 [CmdletBinding()]
 param(
     [switch]$StopDocker,
-    [switch]$RemoveVolumes
+    [switch]$RemoveVolumes,
+    [string]$ProjectName,
+    [string]$ConfirmDisposableProject
 )
 
 $ErrorActionPreference = 'Stop'
 $root = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $generatedNames = @('bin', 'obj', 'TestResults', 'node_modules', 'dist', 'coverage', '.playwright')
+
+if ($StopDocker -or $RemoveVolumes) {
+    if ([string]::IsNullOrWhiteSpace($ProjectName) -or $ProjectName -notmatch '^zumbo-[a-z0-9-]+$') {
+        throw 'Docker cleanup requires an explicit -ProjectName matching zumbo-<name>.'
+    }
+    if ($RemoveVolumes -and $ConfirmDisposableProject -cne $ProjectName) {
+        throw 'Volume removal requires -ConfirmDisposableProject to exactly match -ProjectName.'
+    }
+}
 
 $targets = Get-ChildItem -LiteralPath $root -Directory -Recurse -Force |
     Where-Object { $generatedNames -contains $_.Name } |
@@ -26,7 +37,12 @@ foreach ($target in $targets) {
 
 if ($StopDocker -or $RemoveVolumes) {
     $compose = Join-Path $root 'Backend\docker-compose.yml'
-    $arguments = @('compose', '-f', $compose, 'down', '--remove-orphans')
+    $environment = Join-Path $root 'Backend\.env'
+    $arguments = @('compose', '--project-name', $ProjectName)
+    if (Test-Path -LiteralPath $environment) {
+        $arguments += @('--env-file', $environment)
+    }
+    $arguments += @('-f', $compose, 'down', '--remove-orphans')
     if ($RemoveVolumes) {
         $arguments += '--volumes'
     }

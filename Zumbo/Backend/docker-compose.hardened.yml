@@ -1,0 +1,154 @@
+x-runtime: &runtime
+  init: true
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  pids_limit: 256
+  mem_limit: 512m
+  cpus: 1.00
+  tmpfs:
+    - /tmp:rw,noexec,nosuid,size=64m
+  logging: &bounded-logging
+    driver: json-file
+    options:
+      max-size: 10m
+      max-file: "3"
+  stop_grace_period: 30s
+
+x-data-service: &data-service
+  init: true
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  pids_limit: 512
+  mem_limit: 768m
+  cpus: 1.00
+  logging: *bounded-logging
+  stop_grace_period: 60s
+
+x-init-service: &init-service
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  pids_limit: 64
+  mem_limit: 128m
+  cpus: 0.25
+  tmpfs:
+    - /tmp:rw,noexec,nosuid,size=16m
+  logging: *bounded-logging
+
+services:
+  hardened-volume-init:
+    image: busybox:1.37.0@sha256:9532d8c39891ca2ecde4d30d7710e01fb739c87a8b9299685c63704296b16028
+    user: "0:0"
+    read_only: true
+    cap_drop: [ALL]
+    cap_add: [CHOWN, DAC_OVERRIDE]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 32
+    mem_limit: 64m
+    cpus: 0.25
+    command:
+      - sh
+      - -ec
+      - >-
+        chown -R 999:999 /volumes/mongo;
+        chown -R 999:1000 /volumes/redis;
+        chown -R 10001:10001 /volumes/minio;
+        chown -R 1000:1000 /volumes/opensearch;
+        chown -R 100:101 /volumes/clamav
+    volumes:
+      - mongo_data:/volumes/mongo
+      - redis_data:/volumes/redis
+      - minio_data:/volumes/minio
+      - opensearch_data:/volumes/opensearch
+      - clamav_signatures:/volumes/clamav
+    logging: *bounded-logging
+    restart: "no"
+
+  api:
+    <<: *runtime
+    user: "1654:1654"
+
+  gateway:
+    <<: *runtime
+    user: "1654:1654"
+    mem_limit: 256m
+    pids_limit: 128
+
+  worker:
+    <<: *runtime
+    user: "1654:1654"
+
+  mongo:
+    <<: *data-service
+    user: "999:999"
+    mem_limit: 768m
+    depends_on:
+      hardened-volume-init:
+        condition: service_completed_successfully
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m
+      - /data/configdb:rw,noexec,nosuid,size=32m,uid=999,gid=999,mode=0770
+
+  mongo-init-replica:
+    <<: *init-service
+
+  redis:
+    <<: *data-service
+    user: "999:1000"
+    mem_limit: 256m
+    pids_limit: 128
+    depends_on:
+      hardened-volume-init:
+        condition: service_completed_successfully
+    volumes:
+      - redis_data:/data
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=16m
+
+  minio:
+    <<: *data-service
+    user: "10001:10001"
+    mem_limit: 512m
+    pids_limit: 256
+    depends_on:
+      hardened-volume-init:
+        condition: service_completed_successfully
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=32m
+
+  opensearch:
+    <<: *data-service
+    user: "1000:1000"
+    mem_limit: 1g
+    pids_limit: 512
+    depends_on:
+      hardened-volume-init:
+        condition: service_completed_successfully
+    tmpfs:
+      # JNA extracts a native library here so OpenSearch can install its syscall filter.
+      - /tmp:rw,exec,nosuid,size=128m,uid=1000,gid=1000,mode=0770
+      - /usr/share/opensearch/logs:rw,noexec,nosuid,size=128m,uid=1000,gid=1000,mode=0770
+
+  clamav:
+    <<: *data-service
+    user: "100:101"
+    environment:
+      TINI_SUBREAPER: "1"
+    mem_limit: 1g
+    pids_limit: 512
+    depends_on:
+      hardened-volume-init:
+        condition: service_completed_successfully
+    volumes:
+      - clamav_signatures:/var/lib/clamav
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=128m
+      - /run/clamav:rw,noexec,nosuid,size=16m
+      - /var/lock:rw,noexec,nosuid,size=1m,uid=100,gid=101,mode=0770
+      - /var/log/clamav:rw,noexec,nosuid,size=32m,uid=100,gid=101,mode=0770
+
+volumes:
+  redis_data:
+  clamav_signatures:

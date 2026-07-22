@@ -13,7 +13,7 @@ using Zumbo.Modules.WorkItems;
 
 namespace Zumbo.Capacity;
 
-internal sealed class BenchmarkRunner(string mongoConnectionString, string apiBaseUrl)
+internal sealed class BenchmarkRunner(string mongoConnectionString, string apiBaseUrl, string capacityPassword)
 {
     private readonly MongoClient _mongo = new(mongoConnectionString);
     private readonly HttpClient _http = new() { BaseAddress = new Uri(apiBaseUrl.TrimEnd('/') + "/"), Timeout = TimeSpan.FromSeconds(30) };
@@ -40,7 +40,10 @@ internal sealed class BenchmarkRunner(string mongoConnectionString, string apiBa
                     $"api/work-items/{CapacityIds.WorkItem(profile, (index * profile.ProjectCount) % profile.WorkItemCount)}",
                     cancellationToken)),
             await MeasureAsync("ordinary-write", samples, 500, async index =>
-                await _http.PatchAsJsonAsync($"api/work-items/{workItemId}/planning", new { sprintId = "benchmark", estimatePoints = (index % 13) + 1 }, cancellationToken)),
+                await _http.PatchAsJsonAsync(
+                    $"api/work-items/{workItemId}/planning",
+                    new { sprintId = (string?)null, estimatePoints = (index % 13) + 1 },
+                    cancellationToken)),
             await MeasureAsync("board-initial-load", samples, 700, async _ =>
                 await _http.GetAsync($"api/work-items?projectId={Uri.EscapeDataString(projectId)}", cancellationToken)),
             await MeasureMovesAsync(workItemId, samples, cancellationToken),
@@ -74,7 +77,7 @@ internal sealed class BenchmarkRunner(string mongoConnectionString, string apiBa
         using var response = await _http.PostAsJsonAsync("api/auth/login", new
         {
             usernameOrEmail = CapacityIds.Username(profile, 0),
-            password = "P@ssword123"
+            password = capacityPassword
         }, ct);
         await EnsureSuccessAsync(response);
         var envelope = await response.Content.ReadFromJsonAsync<ApiEnvelope<LoginPayload>>(cancellationToken: ct);
@@ -140,6 +143,7 @@ internal sealed class BenchmarkRunner(string mongoConnectionString, string apiBa
         Func<int, Task<HttpResponseMessage>> operation)
     {
         var timings = new List<double>(samples);
+        var overall = Stopwatch.StartNew();
         for (var index = 0; index < samples; index++)
         {
             var stopwatch = Stopwatch.StartNew();
@@ -150,16 +154,26 @@ internal sealed class BenchmarkRunner(string mongoConnectionString, string apiBa
         }
 
         timings.Sort();
-        var p95 = Percentile(timings, 0.95);
+        overall.Stop();
+        var p95 = CapacityMath.Percentile(timings, 0.95);
+        var p99 = CapacityMath.Percentile(timings, 0.99);
+        var p99Budget = budgetMilliseconds * 2;
         Console.Error.WriteLine($"{name}: p95={p95:F2} ms, max={timings[^1]:F2} ms");
         return new MetricResult(
             name,
             timings.Count,
-            Percentile(timings, 0.50),
+            timings.Count,
+            0,
+            CapacityMath.Percentile(timings, 0.50),
             p95,
+            p99,
             timings[^1],
+            timings.Count / Math.Max(0.001, overall.Elapsed.TotalSeconds),
+            0,
             budgetMilliseconds,
-            p95 < budgetMilliseconds);
+            p99Budget,
+            0,
+            p95 < budgetMilliseconds && p99 < p99Budget);
     }
 
     private async Task<RealtimeResult> MeasureRealtimeAsync(
@@ -195,7 +209,9 @@ internal sealed class BenchmarkRunner(string mongoConnectionString, string apiBa
                 .Select(receipt => Stopwatch.GetElapsedTime(started, receipt.Timestamp).TotalMilliseconds)
                 .Order()
                 .ToList();
-            var p95 = Percentile(timings, 0.95);
+            var p50 = CapacityMath.Percentile(timings, 0.50);
+            var p95 = CapacityMath.Percentile(timings, 0.95);
+            var p99 = CapacityMath.Percentile(timings, 0.99);
             var maximumPayloadBytes = receipts.Max(receipt => receipt.PayloadBytes);
             const int payloadBudgetBytes = 2_048;
             Console.Error.WriteLine(
@@ -204,12 +220,14 @@ internal sealed class BenchmarkRunner(string mongoConnectionString, string apiBa
                 requestedClients,
                 clients.Length,
                 timings.Count,
+                p50,
                 p95,
+                p99,
                 timings[^1],
                 1_000,
                 maximumPayloadBytes,
                 payloadBudgetBytes,
-                p95 < 1_000 && maximumPayloadBytes < payloadBudgetBytes);
+                p95 < 1_000 && p99 < 2_000 && maximumPayloadBytes < payloadBudgetBytes);
         }
         finally
         {
@@ -234,12 +252,6 @@ internal sealed class BenchmarkRunner(string mongoConnectionString, string apiBa
 
         var body = await response.Content.ReadAsStringAsync();
         throw new HttpRequestException($"HTTP {(int)response.StatusCode} {response.ReasonPhrase}: {body}");
-    }
-
-    private static double Percentile(IReadOnlyList<double> sorted, double percentile)
-    {
-        var index = (int)Math.Ceiling(percentile * sorted.Count) - 1;
-        return sorted[Math.Clamp(index, 0, sorted.Count - 1)];
     }
 
     private sealed class SignalRClient(ClientWebSocket socket)

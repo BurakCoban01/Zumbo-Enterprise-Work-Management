@@ -1,0 +1,118 @@
+{
+  "schemaVersion": 1,
+  "task": "OPS-007",
+  "selectedModule": "Notifications",
+  "mode": "readiness-only",
+  "productionSplit": false,
+  "selection": {
+    "coreProjectReferences": [
+      "Zumbo.BuildingBlocks.Application",
+      "Zumbo.SharedKernel"
+    ],
+    "providerPackageReferences": [],
+    "ownedDocuments": 2,
+    "publicRouteRoot": "/api/notifications",
+    "rejectedAlternatives": [
+      {
+        "module": "Audit",
+        "reason": "Synchronous audit writers and authorization queries cross Identity, Organizations, Teams, Projects, Boards, Workflows and WorkItems."
+      },
+      {
+        "module": "WorkItems",
+        "reason": "Largest domain and integration surface; owns board, sprint, search, realtime, upload, webhook and reporting effects."
+      }
+    ]
+  },
+  "http": {
+    "routePattern": "/api/notifications/{**catch-all}",
+    "gatewayRouteId": "notifications-extraction",
+    "gatewayClusterId": "zumbo-notifications",
+    "enableSetting": "Gateway:NotificationExtractionEnabled",
+    "upstreamSetting": "Gateway:NotificationUpstreamBaseUrl",
+    "defaultEnabled": false,
+    "rollback": "Set Gateway:NotificationExtractionEnabled=false and restart/reload the gateway; the existing /api/{**catch-all} route returns ownership to the monolith."
+  },
+  "data": {
+    "mongo": {
+      "database": "Notifications",
+      "collections": [
+        "notifications",
+        "notificationpreferences"
+      ]
+    },
+    "postgresql": {
+      "schema": "notifications",
+      "tables": [
+        "notifications",
+        "notification_preferences"
+      ]
+    },
+    "ownershipRule": "Exactly one notification writer topology is active at a time; no dual write.",
+    "privacyBoundary": "Identity privacy export/anonymization must call a versioned notification privacy port after process extraction; direct repository access is transitional monolith coupling."
+  },
+  "consumedEvents": [
+    {
+      "owner": "WorkItems",
+      "eventType": "work-item.notification.v1",
+      "schemaVersion": 1,
+      "consumer": "work-item-notification-v1",
+      "payload": [
+        "UserId",
+        "Type",
+        "Message",
+        "DeduplicationKey"
+      ]
+    },
+    {
+      "owner": "Teams",
+      "eventType": "team.invitation-notification.v1",
+      "schemaVersion": 1,
+      "consumer": "team-invitation-notification-v1",
+      "payload": [
+        "UserId",
+        "TeamId",
+        "InviteId",
+        "TeamName",
+        "InvitedByUserId",
+        "DeduplicationKey"
+      ]
+    }
+  ],
+  "synchronousDependencies": [
+    {
+      "port": "INotificationUserDirectory",
+      "owner": "Identity",
+      "purpose": "Resolve active user, organization and email without sharing the Identity repository."
+    },
+    {
+      "port": "IEmailNotificationSender",
+      "owner": "SMTP adapter",
+      "purpose": "Non-idempotent external email delivery with durable notification retry/dead-letter ownership."
+    },
+    {
+      "port": "IDistributedLockProvider",
+      "owner": "Platform/Redis",
+      "purpose": "Deduplication and notification delivery lease coordination."
+    },
+    {
+      "port": "IPrivacyDataProcessor notification boundary",
+      "owner": "Identity privacy workflow",
+      "purpose": "Export and anonymize notification references under the existing privacy workflow."
+    }
+  ],
+  "migration": [
+    "Keep the default gateway route and all notification writes in the monolith.",
+    "Publish the two producer-owned V1 events through an outbox relay and consume with an extracted-service inbox using the existing consumer and deduplication identities.",
+    "Run the extracted process against the same logical Notifications store with exclusive worker leases; compare reads, counts, indexes and delivery metrics while HTTP routing remains on the monolith.",
+    "Move the Notifications store by snapshot plus ordered change catch-up; pause notification mutations for the final high-watermark and never dual-write.",
+    "Enable the notification-specific gateway route only after readiness, privacy, inbox lag and data parity gates pass.",
+    "During the rollback window retain the monolith code and a reverse change journal; freeze extracted writes, apply the bounded reverse delta, disable the route flag and resume the monolith worker."
+  ],
+  "rollbackGates": [
+    "Extracted worker and HTTP writers are stopped or fenced before the monolith resumes.",
+    "Notification/preference counts, deduplication keys, unread state and email lease/status deltas reconcile at one high-watermark.",
+    "Outbox relay offsets and service inbox deduplication identities are retained; messages are replayed, not regenerated.",
+    "Gateway readiness is healthy after the route flag is disabled.",
+    "No notification is delivered twice and no preference mutation is lost."
+  ]
+}

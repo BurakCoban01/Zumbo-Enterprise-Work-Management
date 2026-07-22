@@ -27,4 +27,8 @@
     <ProjectReference Include="..\..\src\Zumbo.Modules.Notifications\Zumbo.Modules.Notifications.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Content Include="RouteInventory.approved.txt" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

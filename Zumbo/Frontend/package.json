@@ -1,11 +1,51 @@
 {
   "name": "@zumbo/frontend-quality",
+  "version": "1.0.0",
   "private": true,
+  "packageManager": "pnpm@9.0.0",
+  "engines": {
+    "node": ">=20.9.0 <21",
+    "pnpm": "9.0.0"
+  },
   "scripts": {
+    "build": "node tests/build-frontend.mjs",
+    "lint": "eslint .",
+    "unit": "node --test --test-concurrency=1",
+    "audit:dependencies": "node tests/dependency-audit.mjs",
+    "audit:licenses": "node tests/license-audit.mjs",
+    "quality": "pnpm run lint && pnpm run unit && pnpm run build && pnpm run audit:dependencies && pnpm run audit:licenses",
+    "preview": "node tests/static-server.mjs dist",
+    "test:assets:chromium": "pnpm run build && node tests/runtime-assets.mjs --browser chromium",
+    "test:assets:firefox": "pnpm run build && node tests/runtime-assets.mjs --browser firefox",
+    "config:generate": "node tests/generate-runtime-config.mjs",
     "generate:pwa-icons": "node tests/generate-pwa-icons.mjs",
-    "test:e2e": "node tests/ui-quality.mjs"
+    "browser:install": "playwright-core install chromium firefox webkit",
+    "pretest:e2e": "pnpm run build && node tests/generate-runtime-config.mjs",
+    "test:e2e": "node tests/ui-quality.mjs --browser chromium",
+    "test:e2e:chromium": "node tests/generate-runtime-config.mjs && node tests/ui-quality.mjs --browser chromium",
+    "test:e2e:firefox": "node tests/generate-runtime-config.mjs && node tests/ui-quality.mjs --browser firefox",
+    "test:e2e:webkit": "node tests/generate-runtime-config.mjs && node tests/fe008-cross-browser.mjs --browser webkit",
+    "test:domain007-ui": "node tests/domain007-ui.mjs",
+    "test:scale:realtime": "node tests/ops002-realtime-probe.mjs",
+    "test:platform004:browser": "node tests/platform004-realtime-browser.mjs",
+    "test:platform005:browser": "node tests/platform005-report-browser.mjs",
+    "test:platform006:browser": "node tests/platform006-privacy-browser.mjs",
+    "test:platform007:browser": "node tests/platform007-webhook-browser.mjs",
+    "test:fe002:browser": "node tests/fe002-api-client-browser.mjs",
+    "test:fe007:browser": "node tests/fe007-pwa-browser.mjs",
+    "test:fe008:cross-browser": "node tests/fe008-cross-browser.mjs",
+    "test:ops003:browser": "node tests/ops003-browser.mjs",
+    "test:scale:rate": "node tests/sec006-rate-probe.mjs"
+  },
+  "dependencies": {
+    "@microsoft/signalr": "8.0.7",
+    "angular": "1.8.3",
+    "bulma": "1.0.2",
+    "ionic-sdk": "1.3.2",
+    "lucide": "1.24.0"
   },
   "devDependencies": {
+    "eslint": "9.39.5",
     "playwright-core": "1.61.1"
   }
 }

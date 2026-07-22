@@ -1,0 +1,24 @@
+groups:
+  - name: zumbo-slo
+    rules:
+      - alert: ZumboApiHighErrorBudgetBurn
+        expr: sum(rate(http_server_request_duration_seconds_count{http_response_status_code=~"5.."}[5m])) / clamp_min(sum(rate(http_server_request_duration_seconds_count[5m])), 1) > 0.05
+        for: 10m
+        labels: { severity: page, service: zumbo-api }
+        annotations:
+          summary: API 5xx oranı 10 dakikadır yüzde 5 üzerinde
+          runbook: docs/operations/observability-slo-runbook.md#api-high-error-budget-burn
+      - alert: ZumboExternalCircuitOpen
+        expr: zumbo_external_rejections_total{outcome="circuit-open"} > 0
+        for: 5m
+        labels: { severity: ticket, service: zumbo-api }
+        annotations:
+          summary: Bir dış bağımlılık circuit breaker tarafından reddediliyor
+          runbook: docs/operations/observability-slo-runbook.md#external-dependency-circuit
+      - alert: ZumboOutboxOldestPendingHigh
+        expr: histogram_quantile(0.95, sum by (le) (rate(zumbo_outbox_pending_age_seconds_bucket[10m]))) > 60
+        for: 15m
+        labels: { severity: page, service: zumbo-worker }
+        annotations:
+          summary: Outbox pending age p95 60 saniyeyi aştı
+          runbook: docs/operations/observability-slo-runbook.md#outbox-lag

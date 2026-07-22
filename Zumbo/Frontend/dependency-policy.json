@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "exceptions": [
+    {
+      "package": "angular",
+      "version": "1.8.3",
+      "advisoryIds": [
+        "1106731",
+        "1109545",
+        "1109550",
+        "1109557",
+        "1109558",
+        "1109559",
+        "1109560",
+        "1109561",
+        "1109562",
+        "1123687"
+      ],
+      "maxSeverity": "high",
+      "owner": "Frontend",
+      "expiresOn": "2026-10-19",
+      "reason": "AngularJS resmi olarak kullanım ömrünü tamamladı ve 1.x hattında düzeltme sürümü bulunmuyor. Framework geçişi ayrı bir yol haritası değişikliğidir.",
+      "compensatingControls": [
+        "Şablonlar uygulama paketinin parçasıdır; kullanıcı tarafından sağlanan şablon derlenmez.",
+        "API içeriği ng-bind-html veya $sce.trustAsHtml ile HTML olarak işlenmez.",
+        "CSP ve girdi sınırları güvenlik testleriyle korunur; bağımlılık istisnası süresi dolduğunda denetim kapısı kapanır."
+      ]
+    }
+  ]
+}

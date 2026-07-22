@@ -1,0 +1,25 @@
+services:
+  api:
+    environment:
+      Runtime__InstanceId: api-1
+
+  api-2:
+    extends:
+      file: docker-compose.yml
+      service: api
+    environment:
+      AllowedHosts: localhost;127.0.0.1;api-2
+      Runtime__InstanceId: api-2
+
+  gateway:
+    environment:
+      Gateway__UpstreamBaseUrls__0: http://api:8080/
+      Gateway__UpstreamBaseUrls__1: http://api-2:8080/
+      Gateway__LoadBalancingPolicy: RoundRobin
+    depends_on:
+      api-2:
+        condition: service_healthy
+
+  redis:
+    ports:
+      - "${ZUMBO_SCALE_REDIS_BIND_HOST:-127.0.0.1}:${ZUMBO_SCALE_REDIS_PORT:-58379}:6379"

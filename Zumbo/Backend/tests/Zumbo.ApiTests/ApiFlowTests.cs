@@ -1,9 +1,12 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Text.Json;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Zumbo.BuildingBlocks.Application.Persistence;
 using Zumbo.Modules.Audit;
 using Zumbo.Modules.Boards;
 using Zumbo.Modules.Identity;
@@ -20,14 +23,64 @@ namespace Zumbo.ApiTests;
 public sealed class ApiFlowTests : IClassFixture<WebApplicationFactory<Program>>
 {
     private readonly HttpClient _client;
+    private readonly IServiceProvider _services;
 
     public ApiFlowTests(WebApplicationFactory<Program> factory)
     {
-        _client = factory.WithWebHostBuilder(builder => builder.ConfigureAppConfiguration((_, configuration) =>
+        var configuredFactory = factory.WithWebHostBuilder(builder => builder.ConfigureAppConfiguration((_, configuration) =>
             configuration.AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["IdentityBootstrap:BootstrapToken"] = "development-bootstrap-token"
-            }))).CreateClient();
+        })));
+        _client = configuredFactory.CreateClient();
+        _services = configuredFactory.Services;
+    }
+
+    [Fact]
+    public async Task TeamMutation_UsesETagAndRejectsStaleIfMatchVersion()
+    {
+        var suffix = Guid.NewGuid().ToString("N");
+        var organizationId = "org-cas-" + suffix;
+        var registration = await PostAsync<AuthResponse>("/api/auth/register", new RegisterUserRequest(
+            "cas-" + suffix,
+            $"cas-{suffix}@zumbo.local",
+            "P@ssword123",
+            organizationId));
+        _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", registration.AccessToken);
+        await PostAsync<OrganizationResponse>(
+            "/api/organizations",
+            new CreateOrganizationRequest("Concurrency Organization", organizationId));
+
+        var createResponse = await _client.PostAsJsonAsync("/api/teams", new CreateTeamRequest(
+            organizationId,
+            "Concurrency Team",
+            registration.User.Id));
+        createResponse.EnsureSuccessStatusCode();
+        var created = (await createResponse.Content.ReadFromJsonAsync<ApiResponse<TeamResponse>>())!.Data!;
+        Assert.Equal(1, created.Version);
+        Assert.Equal("\"1\"", createResponse.Headers.ETag?.Tag);
+
+        using var updateRequest = new HttpRequestMessage(HttpMethod.Put, $"/api/teams/{created.Id}")
+        {
+            Content = JsonContent.Create(new UpdateTeamRequest("Concurrency Team Updated"))
+        };
+        updateRequest.Headers.TryAddWithoutValidation("If-Match", "\"1\"");
+        var updateResponse = await _client.SendAsync(updateRequest);
+        updateResponse.EnsureSuccessStatusCode();
+        var updated = (await updateResponse.Content.ReadFromJsonAsync<ApiResponse<TeamResponse>>())!.Data!;
+        Assert.Equal(2, updated.Version);
+        Assert.Equal("\"2\"", updateResponse.Headers.ETag?.Tag);
+
+        using var staleRequest = new HttpRequestMessage(HttpMethod.Put, $"/api/teams/{created.Id}")
+        {
+            Content = JsonContent.Create(new UpdateTeamRequest("Stale Team Name"))
+        };
+        staleRequest.Headers.TryAddWithoutValidation("If-Match", "\"1\"");
+        var staleResponse = await _client.SendAsync(staleRequest);
+
+        Assert.Equal(HttpStatusCode.Conflict, staleResponse.StatusCode);
+        var staleBody = await staleResponse.Content.ReadFromJsonAsync<ApiResponse<object>>();
+        Assert.Equal("CONCURRENCY_CONFLICT", staleBody!.Error!.Code);
     }
 
     [Fact]
@@ -42,6 +95,9 @@ public sealed class ApiFlowTests : IClassFixture<WebApplicationFactory<Program>>
 
         Assert.False(string.IsNullOrWhiteSpace(register.AccessToken));
         _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", register.AccessToken);
+        await PostAsync<OrganizationResponse>(
+            "/api/organizations",
+            new CreateOrganizationRequest("API Flow Organization", "org-1"));
 
         var project = await PostAsync<ProjectResponse>("/api/projects", new CreateProjectRequest(
             "org-1",
@@ -57,6 +113,12 @@ public sealed class ApiFlowTests : IClassFixture<WebApplicationFactory<Program>>
             project.Id,
             "Engineering Board",
             "Kanban"));
+        var sprint = await PostAsync<SprintResponse>("/api/sprints", new CreateSprintRequest(
+            project.Id,
+            "Sprint 1",
+            "Complete the API flow",
+            DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-1),
+            DateOnly.FromDateTime(DateTime.UtcNow).AddDays(1)));
 
         var workItem = await PostAsync<WorkItemResponse>("/api/work-items", new CreateWorkItemRequest(
             project.Id,
@@ -70,10 +132,12 @@ public sealed class ApiFlowTests : IClassFixture<WebApplicationFactory<Program>>
         Assert.Equal(workItem.Id, workItemDetail.Id);
         Assert.Equal(board.Columns.Single(x => x.Category == "Todo").Id, workItem.ColumnId);
         workItem = await PatchAsync<WorkItemResponse>($"/api/work-items/{workItem.Id}/planning", new SetWorkItemPlanningRequest(
-            "sprint-1",
+            sprint.Id,
             8));
-        Assert.Equal("sprint-1", workItem.SprintId);
+        Assert.Equal(sprint.Id, workItem.SprintId);
         Assert.Equal(8, workItem.EstimatePoints);
+        sprint = await PostAsync<SprintResponse>($"/api/sprints/{sprint.Id}/start", new { });
+        Assert.Equal(SprintStatuses.Active, sprint.Status);
 
         var secondWorkItem = await PostAsync<WorkItemResponse>("/api/work-items", new CreateWorkItemRequest(
             project.Id,
@@ -130,19 +194,52 @@ public sealed class ApiFlowTests : IClassFixture<WebApplicationFactory<Program>>
         uploadResponse.EnsureSuccessStatusCode();
         var uploadBody = await uploadResponse.Content.ReadFromJsonAsync<ApiResponse<WorkItemResponse>>();
         workItem = uploadBody!.Data!;
+        Assert.Equal(AttachmentSecurityStates.Clean, workItem.Attachments.Single().SecurityState);
+        Assert.Equal("PolicyOnly", workItem.Attachments.Single().ScanProvider);
         var attachmentId = workItem.Attachments.Single().Id;
         var preview = await _client.GetAsync($"/api/work-items/{workItem.Id}/attachments/{attachmentId}/preview");
         preview.EnsureSuccessStatusCode();
         Assert.Equal("text/plain", preview.Content.Headers.ContentType!.MediaType);
+        Assert.Contains("private", preview.Headers.CacheControl!.ToString(), StringComparison.OrdinalIgnoreCase);
+        Assert.Equal("nosniff", preview.Headers.GetValues("X-Content-Type-Options").Single());
+        Assert.Equal("sandbox; default-src 'none'", preview.Headers.GetValues("Content-Security-Policy").Single());
+        Assert.Equal("same-origin", preview.Headers.GetValues("Cross-Origin-Resource-Policy").Single());
+        Assert.Equal("inline", preview.Content.Headers.ContentDisposition!.DispositionType);
         Assert.Equal(attachmentBytes, await preview.Content.ReadAsByteArrayAsync());
         var download = await _client.GetAsync($"/api/work-items/{workItem.Id}/attachments/{attachmentId}/download");
         download.EnsureSuccessStatusCode();
         Assert.Equal("notes.txt", download.Content.Headers.ContentDisposition!.FileNameStar);
+        Assert.Equal("attachment", download.Content.Headers.ContentDisposition.DispositionType);
+        Assert.Contains("private", download.Headers.CacheControl!.ToString(), StringComparison.OrdinalIgnoreCase);
+        Assert.Equal("nosniff", download.Headers.GetValues("X-Content-Type-Options").Single());
         Assert.Equal(attachmentBytes, await download.Content.ReadAsByteArrayAsync());
         workItem = await DeleteAsync<WorkItemResponse>($"/api/work-items/{workItem.Id}/attachments/{attachmentId}");
         Assert.Empty(workItem.Attachments);
         var deletedDownload = await _client.GetAsync($"/api/work-items/{workItem.Id}/attachments/{attachmentId}/download");
         Assert.Equal(HttpStatusCode.NotFound, deletedDownload.StatusCode);
+
+        var pdfBytes = "%PDF-1.4\n1 0 obj\n<<>>\nendobj\n%%EOF\n"u8.ToArray();
+        using (var pdfMultipart = new MultipartFormDataContent())
+        {
+            var pdfContent = new ByteArrayContent(pdfBytes);
+            pdfContent.Headers.ContentType = new MediaTypeHeaderValue("application/pdf");
+            pdfMultipart.Add(pdfContent, "file", "isolated.pdf");
+            var pdfUpload = await _client.PostAsync(
+                $"/api/work-items/{workItem.Id}/attachments/upload",
+                pdfMultipart);
+            pdfUpload.EnsureSuccessStatusCode();
+            workItem = (await pdfUpload.Content.ReadFromJsonAsync<ApiResponse<WorkItemResponse>>())!.Data!;
+        }
+        var pdfAttachmentId = workItem.Attachments.Single().Id;
+        var pdfPreview = await _client.GetAsync(
+            $"/api/work-items/{workItem.Id}/attachments/{pdfAttachmentId}/preview");
+        Assert.Equal(HttpStatusCode.UnsupportedMediaType, pdfPreview.StatusCode);
+        var pdfDownload = await _client.GetAsync(
+            $"/api/work-items/{workItem.Id}/attachments/{pdfAttachmentId}/download");
+        Assert.Equal(HttpStatusCode.OK, pdfDownload.StatusCode);
+        workItem = await DeleteAsync<WorkItemResponse>(
+            $"/api/work-items/{workItem.Id}/attachments/{pdfAttachmentId}");
+        Assert.Empty(workItem.Attachments);
 
         var workflow = await GetAsync<WorkflowResponse>($"/api/workflows/{project.Id}");
         Assert.Contains(workflow.Transitions, x => x.FromStatus == "Test" && x.ToStatus == "Done" && x.RequiresCompletedChecklist);
@@ -152,21 +249,49 @@ public sealed class ApiFlowTests : IClassFixture<WebApplicationFactory<Program>>
         workItem = await PatchAsync<WorkItemResponse>($"/api/work-items/{workItem.Id}/status", new MoveWorkItemRequest("Test"));
         workItem = await PatchAsync<WorkItemResponse>($"/api/work-items/{workItem.Id}/status", new MoveWorkItemRequest("Done"));
 
-        var audit = await GetAsync<IReadOnlyList<object>>($"/api/audit/entity/WorkItem/{workItem.Id}");
+        var audit = await EventuallyAsync(
+            () => GetAsync<IReadOnlyList<object>>($"/api/audit/entity/WorkItem/{workItem.Id}"),
+            value => value.Count > 0,
+            "Work-item audit events were not consumed.");
         var auditFrom = Uri.EscapeDataString(DateTimeOffset.UtcNow.AddDays(-1).ToString("O"));
         var auditTo = Uri.EscapeDataString(DateTimeOffset.UtcNow.AddDays(1).ToString("O"));
-        var filteredAudit = await GetAsync<AuditLogPageResponse>(
-            $"/api/audit?entityType=WorkItem&entityId={workItem.Id}&action=WorkItemMoved&from={auditFrom}&to={auditTo}&page=1&pageSize=2");
-        var ownAudit = await GetAsync<AuditLogPageResponse>(
-            $"/api/audit?actorUserId={register.User.Id}&page=1&pageSize=2");
-        var notifications = await GetAsync<IReadOnlyList<object>>($"/api/notifications/{register.User.Id}");
+        var filteredAudit = await EventuallyAsync(
+            () => GetAsync<AuditLogPageResponse>(
+                $"/api/audit?entityType=WorkItem&entityId={workItem.Id}&action=WorkItemMoved&from={auditFrom}&to={auditTo}&page=1&pageSize=2"),
+            value => value.Items.Count == 2 && value.HasNextPage,
+            "Moved audit events were not consumed.");
+        var cursorAudit = await GetAsync<AuditLogPageResponse>(
+            $"/api/audit?entityType=WorkItem&entityId={workItem.Id}&action=WorkItemMoved&from={auditFrom}&to={auditTo}&pageSize=2&cursor={Uri.EscapeDataString(filteredAudit.NextCursor!)}");
+        var auditExportResponse = await _client.GetAsync(
+            $"/api/audit/export?entityType=WorkItem&entityId={workItem.Id}&from={auditFrom}&to={auditTo}");
+        auditExportResponse.EnsureSuccessStatusCode();
+        var exportedAudit = (await auditExportResponse.Content.ReadAsStringAsync())
+            .Split('\n', StringSplitOptions.RemoveEmptyEntries)
+            .Select(line => JsonSerializer.Deserialize<AuditLogResponse>(
+                line,
+                new JsonSerializerOptions(JsonSerializerDefaults.Web))!)
+            .ToList();
+        var invalidCursorResponse = await _client.GetAsync(
+            $"/api/audit?entityType=WorkItem&entityId={workItem.Id}&cursor=invalid-base64");
+        var ownAudit = await EventuallyAsync(
+            () => GetAsync<AuditLogPageResponse>(
+                $"/api/audit?actorUserId={register.User.Id}&page=1&pageSize=2"),
+            value => value.Items.Count == 2 && value.HasNextPage,
+            "Actor audit events were not consumed.");
+        var notifications = await EventuallyAsync(
+            () => GetAsync<IReadOnlyList<object>>($"/api/notifications/{register.User.Id}"),
+            value => value.Count > 0,
+            "Work-item notifications were not consumed.");
+        sprint = await PostAsync<SprintResponse>(
+            $"/api/sprints/{sprint.Id}/complete",
+            new CompleteSprintRequest(null));
         var summary = await GetAsync<ProjectSummaryResponse>($"/api/work-items/reports/project-summary/{project.Id}");
         var statusDistribution = await GetAsync<IReadOnlyList<StatusDistributionResponse>>($"/api/work-items/reports/status-distribution/{project.Id}");
         var workload = await GetAsync<IReadOnlyList<UserWorkloadResponse>>($"/api/work-items/reports/user-workload/{project.Id}");
         var start = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-1).ToString("yyyy-MM-dd");
         var end = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(1).ToString("yyyy-MM-dd");
         var burndown = await GetAsync<IReadOnlyList<SprintBurndownPointResponse>>(
-            $"/api/work-items/reports/sprint-burndown/{project.Id}/sprint-1?startDate={start}&endDate={end}");
+            $"/api/work-items/reports/sprint-burndown/{project.Id}/{sprint.Id}?startDate={start}&endDate={end}");
         var velocity = await GetAsync<IReadOnlyList<SprintVelocityResponse>>(
             $"/api/work-items/reports/sprint-velocity/{project.Id}?sprintCount=3");
         var flowTime = await GetAsync<FlowTimeReportResponse>(
@@ -182,6 +307,15 @@ public sealed class ApiFlowTests : IClassFixture<WebApplicationFactory<Program>>
         Assert.All(filteredAudit.Items, x => Assert.Equal("WorkItemMoved", x.Action));
         Assert.All(filteredAudit.Items, x => Assert.Equal("Zumbo-ApiTests/1.0", x.UserAgent));
         Assert.True(filteredAudit.HasNextPage);
+        Assert.NotEmpty(cursorAudit.Items);
+        Assert.DoesNotContain(cursorAudit.Items, item => filteredAudit.Items.Any(first => first.Id == item.Id));
+        Assert.NotEmpty(exportedAudit);
+        Assert.All(exportedAudit, item =>
+        {
+            Assert.Equal("org-1", item.OrganizationId);
+            Assert.Equal(workItem.Id, item.EntityId);
+        });
+        Assert.Equal(HttpStatusCode.BadRequest, invalidCursorResponse.StatusCode);
         Assert.Equal(2, ownAudit.Items.Count);
         Assert.True(ownAudit.HasNextPage);
         Assert.NotEmpty(notifications);
@@ -190,11 +324,81 @@ public sealed class ApiFlowTests : IClassFixture<WebApplicationFactory<Program>>
         Assert.Contains(statusDistribution, x => x.Status == "Done" && x.Count == 1);
         Assert.Contains(workload, x => x.UserId == register.User.Id);
         Assert.Contains(burndown, x => x.RemainingPoints == 0 && x.RemainingItems == 0);
-        Assert.Contains(velocity, x => x.SprintId == "sprint-1" && x.CompletedItems == 1 && x.CompletedPoints == 8);
+        Assert.Contains(velocity, x => x.SprintId == sprint.Id && x.CompletedItems == 1 && x.CompletedPoints == 8);
         Assert.Equal(1, flowTime.CompletedItems);
         Assert.Equal(1, flowTime.CycleTimeSampleSize);
         Assert.True(flowTime.AverageLeadTimeHours >= 0);
         Assert.True(flowTime.AverageCycleTimeHours >= 0);
+    }
+
+    [Fact]
+    public async Task WorkItemActivities_ComposeLegacyResponseAndExposeTenantScopedPagesWithoutLostConcurrentAdds()
+    {
+        var suffix = Guid.NewGuid().ToString("N");
+        var organizationId = "org-data007-" + suffix;
+        var owner = await PostAsync<AuthResponse>("/api/auth/register", new RegisterUserRequest(
+            "data007-owner-" + suffix,
+            $"data007-owner-{suffix}@zumbo.local",
+            "P@ssword123",
+            organizationId));
+        _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", owner.AccessToken);
+        await PostAsync<OrganizationResponse>(
+            "/api/organizations",
+            new CreateOrganizationRequest("Activity Organization", organizationId));
+        var project = await PostAsync<ProjectResponse>("/api/projects", new CreateProjectRequest(
+            organizationId,
+            "D007",
+            "Activity decomposition",
+            owner.User.Id));
+        var board = await PostAsync<BoardResponse>("/api/boards", new CreateBoardRequest(
+            project.Id,
+            "Activity board",
+            "Kanban"));
+        var item = await PostAsync<WorkItemResponse>("/api/work-items", new CreateWorkItemRequest(
+            project.Id, board.Id, "Concurrent activity", "Task", "Medium", owner.User.Id, null));
+
+        var bodies = new[] { "parallel-a", "parallel-b", "parallel-c" };
+        var writes = await Task.WhenAll(bodies.Select(body =>
+            _client.PostAsJsonAsync(
+                $"/api/work-items/{item.Id}/comments",
+                new AddCommentRequest(body, []))));
+        Assert.All(writes, response => response.EnsureSuccessStatusCode());
+
+        var detail = await GetAsync<WorkItemResponse>($"/api/work-items/{item.Id}");
+        Assert.Equal(3, detail.Comments.Count);
+        Assert.Equal(bodies.Order(), detail.Comments.Select(x => x.Body).Order());
+
+        var firstPage = await GetAsync<WorkItemActivityPage<CommentResponse>>(
+            $"/api/work-items/{item.Id}/comments?page=1&pageSize=2");
+        var secondPage = await GetAsync<WorkItemActivityPage<CommentResponse>>(
+            $"/api/work-items/{item.Id}/comments?page=2&pageSize=2");
+        Assert.Equal(3, firstPage.TotalCount);
+        Assert.Equal(2, firstPage.Items.Count);
+        Assert.Single(secondPage.Items);
+        Assert.Equal(
+            detail.Comments.Select(x => x.Id).Order(),
+            firstPage.Items.Concat(secondPage.Items).Select(x => x.Id).Order());
+
+        var timeline = await GetAsync<WorkItemActivityPage<WorkItemStatusHistoryResponse>>(
+            $"/api/work-items/{item.Id}/timeline?page=1&pageSize=10");
+        Assert.Equal(1, timeline.TotalCount);
+        Assert.Equal("To Do", Assert.Single(timeline.Items).ToStatus);
+
+        await PostAsync<WorkItemResponse>(
+            $"/api/work-items/{item.Id}/worklogs",
+            new AddWorkLogRequest(owner.User.Id, 1.25m, "Activity contract"));
+        var workLogs = await GetAsync<WorkItemActivityPage<WorkLogResponse>>(
+            $"/api/work-items/{item.Id}/worklogs?page=1&pageSize=10");
+        Assert.Equal(1.25m, Assert.Single(workLogs.Items).Hours);
+
+        var outsider = await PostAsync<AuthResponse>("/api/auth/register", new RegisterUserRequest(
+            "data007-outsider-" + suffix,
+            $"data007-outsider-{suffix}@zumbo.local",
+            "P@ssword123",
+            "other-" + organizationId));
+        _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", outsider.AccessToken);
+        var forbidden = await _client.GetAsync($"/api/work-items/{item.Id}/comments?page=1&pageSize=10");
+        Assert.Equal(HttpStatusCode.NotFound, forbidden.StatusCode);
     }
 
     [Fact]
@@ -213,6 +417,10 @@ public sealed class ApiFlowTests : IClassFixture<WebApplicationFactory<Program>>
             "P@ssword123",
             "org-2"));
 
+        await PostAsync<OrganizationResponse>(
+            "/api/organizations",
+            new CreateOrganizationRequest("Security Organization", "org-2"));
+
         var project = await PostAsync<ProjectResponse>("/api/projects", new CreateProjectRequest(
             "org-2",
             "SEC",
@@ -227,6 +435,8 @@ public sealed class ApiFlowTests : IClassFixture<WebApplicationFactory<Program>>
         var tenantScopedUsers = await GetAsync<IReadOnlyList<UserProfileResponse>>(
             "/api/auth/users?search=owner%40zumbo.local");
         Assert.Empty(tenantScopedUsers);
+        var foreignReport = await _client.GetAsync($"/api/work-items/reports/project-summary/{project.Id}");
+        Assert.Equal(HttpStatusCode.NotFound, foreignReport.StatusCode);
         _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", owner.AccessToken);
         var organizationMismatch = await _client.PostAsJsonAsync(
             $"/api/projects/{project.Id}/members",
@@ -275,6 +485,19 @@ public sealed class ApiFlowTests : IClassFixture<WebApplicationFactory<Program>>
 
         var report = await _client.GetAsync($"/api/work-items/reports/project-summary/{project.Id}");
         Assert.Equal(HttpStatusCode.OK, report.StatusCode);
+        Assert.True(DateTimeOffset.TryParse(
+            report.Headers.GetValues("X-Zumbo-Report-Generated-At").Single(),
+            out _));
+        Assert.Equal("false", report.Headers.GetValues("X-Zumbo-Report-Stale").Single());
+        Assert.True(long.TryParse(
+            report.Headers.GetValues("X-Zumbo-Report-Source-Version").Single(),
+            out _));
+        Assert.True(double.TryParse(
+            report.Headers.GetValues("X-Zumbo-Report-Age-Seconds").Single(),
+            System.Globalization.NumberStyles.Float,
+            System.Globalization.CultureInfo.InvariantCulture,
+            out var reportAge));
+        Assert.True(reportAge >= 0);
         var visibleBoards = await _client.GetAsync($"/api/boards/by-project/{project.Id}");
         Assert.Equal(HttpStatusCode.OK, visibleBoards.StatusCode);
         var forbiddenBoardCreate = await _client.PostAsJsonAsync("/api/boards", new CreateBoardRequest(
@@ -291,12 +514,89 @@ public sealed class ApiFlowTests : IClassFixture<WebApplicationFactory<Program>>
             "P@ssword123",
             "org-2"));
         _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", outsider.AccessToken);
-        var forbiddenReport = await _client.GetAsync($"/api/work-items/reports/project-summary/{project.Id}");
-        Assert.Equal(HttpStatusCode.Forbidden, forbiddenReport.StatusCode);
-        var forbiddenEntityAudit = await _client.GetAsync($"/api/audit/entity/WorkItem/{auditedWorkItem.Id}");
-        Assert.Equal(HttpStatusCode.Forbidden, forbiddenEntityAudit.StatusCode);
+        var internalReport = await _client.GetAsync($"/api/work-items/reports/project-summary/{project.Id}");
+        Assert.Equal(HttpStatusCode.OK, internalReport.StatusCode);
+        var internalEntityAudit = await _client.GetAsync($"/api/audit/entity/WorkItem/{auditedWorkItem.Id}");
+        Assert.Equal(HttpStatusCode.Forbidden, internalEntityAudit.StatusCode);
         var forbiddenUserAudit = await _client.GetAsync($"/api/audit?actorUserId={owner.User.Id}");
         Assert.Equal(HttpStatusCode.Forbidden, forbiddenUserAudit.StatusCode);
+    }
+
+    [Fact]
+    public async Task AttachmentAccess_RequiresAuthenticationAndProjectTenantPermission()
+    {
+        var stamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds().ToString();
+        var owner = await PostAsync<AuthResponse>("/api/auth/register", new RegisterUserRequest(
+            "attachment-owner-" + stamp,
+            $"attachment-owner-{stamp}@zumbo.local",
+            "P@ssword123",
+            "org-attachment-owner-" + stamp));
+        _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", owner.AccessToken);
+        await PostAsync<OrganizationResponse>(
+            "/api/organizations",
+            new CreateOrganizationRequest("Attachment Organization", owner.User.OrganizationId));
+        var project = await PostAsync<ProjectResponse>("/api/projects", new CreateProjectRequest(
+            owner.User.OrganizationId,
+            "ATT" + stamp[^3..],
+            "Attachment authorization",
+            owner.User.Id));
+        var board = await PostAsync<BoardResponse>("/api/boards", new CreateBoardRequest(
+            project.Id,
+            "Attachment board",
+            "Kanban"));
+        var workItem = await PostAsync<WorkItemResponse>("/api/work-items", new CreateWorkItemRequest(
+            project.Id,
+            board.Id,
+            "Protect attachment content",
+            "Task",
+            "High",
+            owner.User.Id,
+            null));
+
+        string? attachmentId = null;
+        try
+        {
+            using var multipart = new MultipartFormDataContent();
+            var file = new ByteArrayContent("tenant-private attachment"u8.ToArray());
+            file.Headers.ContentType = new MediaTypeHeaderValue("text/plain");
+            multipart.Add(file, "file", "private.txt");
+            var upload = await _client.PostAsync($"/api/work-items/{workItem.Id}/attachments/upload", multipart);
+            upload.EnsureSuccessStatusCode();
+            var uploadBody = await upload.Content.ReadFromJsonAsync<ApiResponse<WorkItemResponse>>();
+            attachmentId = uploadBody!.Data!.Attachments.Single().Id;
+
+            var ownerDownload = await _client.GetAsync(
+                $"/api/work-items/{workItem.Id}/attachments/{attachmentId}/download");
+            Assert.Equal(HttpStatusCode.OK, ownerDownload.StatusCode);
+
+            _client.DefaultRequestHeaders.Authorization = null;
+            var anonymousDownload = await _client.GetAsync(
+                $"/api/work-items/{workItem.Id}/attachments/{attachmentId}/download");
+            Assert.Equal(HttpStatusCode.Unauthorized, anonymousDownload.StatusCode);
+
+            var outsider = await PostAsync<AuthResponse>("/api/auth/register", new RegisterUserRequest(
+                "attachment-outsider-" + stamp,
+                $"attachment-outsider-{stamp}@zumbo.local",
+                "P@ssword123",
+                "org-attachment-outsider-" + stamp));
+            _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", outsider.AccessToken);
+            var forbiddenDownload = await _client.GetAsync(
+                $"/api/work-items/{workItem.Id}/attachments/{attachmentId}/download");
+            var forbiddenPreview = await _client.GetAsync(
+                $"/api/work-items/{workItem.Id}/attachments/{attachmentId}/preview");
+            Assert.Equal(HttpStatusCode.NotFound, forbiddenDownload.StatusCode);
+            Assert.Equal(HttpStatusCode.NotFound, forbiddenPreview.StatusCode);
+        }
+        finally
+        {
+            if (attachmentId is not null)
+            {
+                _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", owner.AccessToken);
+                var delete = await _client.DeleteAsync(
+                    $"/api/work-items/{workItem.Id}/attachments/{attachmentId}");
+                delete.EnsureSuccessStatusCode();
+            }
+        }
     }
 
     [Fact]
@@ -309,6 +609,9 @@ public sealed class ApiFlowTests : IClassFixture<WebApplicationFactory<Program>>
             "P@ssword123",
             "org-search"));
         _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", register.AccessToken);
+        await PostAsync<OrganizationResponse>(
+            "/api/organizations",
+            new CreateOrganizationRequest("Search Organization", "org-search"));
 
         var project = await PostAsync<ProjectResponse>("/api/projects", new CreateProjectRequest(
             "org-search",
@@ -326,12 +629,18 @@ public sealed class ApiFlowTests : IClassFixture<WebApplicationFactory<Program>>
             register.User.Id,
             null));
 
-        var createdSearch = await GetAsync<IReadOnlyList<WorkItemResponse>>($"/api/work-items?projectId={project.Id}&text=indexed");
+        var createdSearch = await EventuallyAsync(
+            () => GetAsync<IReadOnlyList<WorkItemResponse>>($"/api/work-items?projectId={project.Id}&text=indexed"),
+            value => value.Any(x => x.Id == workItem.Id),
+            "Created work item was not indexed.");
         Assert.Contains(createdSearch, x => x.Id == workItem.Id);
 
         var label = "search-label-" + stamp;
         workItem = await PostAsync<WorkItemResponse>($"/api/work-items/{workItem.Id}/labels", new AddLabelRequest(label));
-        var labelSearch = await GetAsync<IReadOnlyList<WorkItemResponse>>($"/api/work-items?projectId={project.Id}&text={label}");
+        var labelSearch = await EventuallyAsync(
+            () => GetAsync<IReadOnlyList<WorkItemResponse>>($"/api/work-items?projectId={project.Id}&text={label}"),
+            value => value.Any(x => x.Id == workItem.Id),
+            "Work-item label was not indexed.");
         Assert.Contains(labelSearch, x => x.Id == workItem.Id);
 
         workItem = await DeleteAsync<WorkItemResponse>($"/api/work-items/{workItem.Id}/labels/{label}");
@@ -344,7 +653,10 @@ public sealed class ApiFlowTests : IClassFixture<WebApplicationFactory<Program>>
             null));
         Assert.Equal("Renamed searchable task", updated.Title);
 
-        var updatedSearch = await GetAsync<IReadOnlyList<WorkItemResponse>>($"/api/work-items?projectId={project.Id}&text=renamed");
+        var updatedSearch = await EventuallyAsync(
+            () => GetAsync<IReadOnlyList<WorkItemResponse>>($"/api/work-items?projectId={project.Id}&text=renamed"),
+            value => value.Any(x => x.Id == workItem.Id),
+            "Updated work item was not indexed.");
         Assert.Contains(updatedSearch, x => x.Id == workItem.Id);
         var unscopedSearch = await _client.GetAsync("/api/work-items?text=renamed");
         Assert.Equal(HttpStatusCode.BadRequest, unscopedSearch.StatusCode);
@@ -352,7 +664,10 @@ public sealed class ApiFlowTests : IClassFixture<WebApplicationFactory<Program>>
         var deleteResponse = await _client.DeleteAsync($"/api/work-items/{workItem.Id}");
         deleteResponse.EnsureSuccessStatusCode();
 
-        var archivedSearch = await GetAsync<IReadOnlyList<WorkItemResponse>>($"/api/work-items?projectId={project.Id}&text=renamed");
+        var archivedSearch = await EventuallyAsync(
+            () => GetAsync<IReadOnlyList<WorkItemResponse>>($"/api/work-items?projectId={project.Id}&text=renamed"),
+            value => value.All(x => x.Id != workItem.Id),
+            "Archived work item remained in the active search index.");
         Assert.DoesNotContain(archivedSearch, x => x.Id == workItem.Id);
         var archive = await GetAsync<IReadOnlyList<WorkItemResponse>>(
             $"/api/work-items?projectId={project.Id}&archived=true&text=index&page=1&pageSize=20");
@@ -362,8 +677,11 @@ public sealed class ApiFlowTests : IClassFixture<WebApplicationFactory<Program>>
 
         var restored = await PostAsync<WorkItemResponse>($"/api/work-items/{workItem.Id}/restore", new { });
         Assert.False(restored.Archived);
-        var restoredSearch = await GetAsync<IReadOnlyList<WorkItemResponse>>(
-            $"/api/work-items?projectId={project.Id}&text=renamed");
+        var restoredSearch = await EventuallyAsync(
+            () => GetAsync<IReadOnlyList<WorkItemResponse>>(
+                $"/api/work-items?projectId={project.Id}&text=renamed"),
+            value => value.Any(x => x.Id == workItem.Id),
+            "Restored work item was not reindexed.");
         Assert.Contains(restoredSearch, x => x.Id == workItem.Id);
     }
 
@@ -403,6 +721,9 @@ public sealed class ApiFlowTests : IClassFixture<WebApplicationFactory<Program>>
             "P@ssword123",
             "org-rate-" + stamp));
         _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", registration.AccessToken);
+        await PostAsync<OrganizationResponse>(
+            "/api/organizations",
+            new CreateOrganizationRequest("Rate Organization", registration.User.OrganizationId));
         var project = await PostAsync<ProjectResponse>("/api/projects", new CreateProjectRequest(
             registration.User.OrganizationId,
             "RATE" + stamp.ToString()[^4..],
@@ -484,6 +805,34 @@ public sealed class ApiFlowTests : IClassFixture<WebApplicationFactory<Program>>
         Assert.True(status.Enabled);
         Assert.Equal(7, status.RemainingRecoveryCodes);
 
+        var statusPayload = await _client.GetStringAsync("/api/auth/mfa");
+        using (var statusDocument = JsonDocument.Parse(statusPayload))
+        {
+            var statusData = statusDocument.RootElement.GetProperty("data");
+            Assert.False(statusData.TryGetProperty("secret", out _));
+            Assert.False(statusData.TryGetProperty("recoveryCodes", out _));
+        }
+        var regenerated = await PostAsync<RegenerateMfaRecoveryCodesResponse>(
+            "/api/auth/mfa/recovery-codes",
+            new RegenerateMfaRecoveryCodesRequest(
+                "P@ssword123",
+                TotpSecurity.GenerateCode(setup.Secret, DateTimeOffset.UtcNow)));
+        Assert.Equal(8, regenerated.RecoveryCodes.Count);
+
+        _client.DefaultRequestHeaders.Authorization = null;
+        var retiredRecoveryCode = await _client.PostAsJsonAsync(
+            "/api/auth/login",
+            new LoginRequest(username, "P@ssword123", confirmation.RecoveryCodes.Skip(1).First()));
+        Assert.Equal(HttpStatusCode.Unauthorized, retiredRecoveryCode.StatusCode);
+        var regeneratedRecoveryLogin = await PostAsync<AuthResponse>(
+            "/api/auth/login",
+            new LoginRequest(username, "P@ssword123", regenerated.RecoveryCodes.First()));
+        var reusedRecoveryCode = await _client.PostAsJsonAsync(
+            "/api/auth/login",
+            new LoginRequest(username, "P@ssword123", regenerated.RecoveryCodes.First()));
+        Assert.Equal(HttpStatusCode.Unauthorized, reusedRecoveryCode.StatusCode);
+
+        _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", regeneratedRecoveryLogin.AccessToken);
         var disabled = await PostAsync<MfaStatusResponse>(
             "/api/auth/mfa/disable",
             new DisableMfaRequest("P@ssword123", TotpSecurity.GenerateCode(setup.Secret, DateTimeOffset.UtcNow)));
@@ -535,6 +884,76 @@ public sealed class ApiFlowTests : IClassFixture<WebApplicationFactory<Program>>
     }
 
     [Fact]
+    public async Task IdentityApiKey_GranularPermissionScopeAllowsOnlyMatchingEndpoints()
+    {
+        var suffix = Guid.NewGuid().ToString("N");
+        var registration = await PostAsync<AuthResponse>("/api/auth/register", new RegisterUserRequest(
+            "scoped-key-" + suffix,
+            $"scoped-key-{suffix}@zumbo.local",
+            "P@ssword123",
+            "org-scoped-key-" + suffix));
+        _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", registration.AccessToken);
+
+        var invalid = await _client.PostAsJsonAsync(
+            "/api/auth/api-keys",
+            new CreateApiKeyRequest(
+                "Invalid permission",
+                "P@ssword123",
+                null,
+                DateTimeOffset.UtcNow.AddDays(30),
+                ["permission:NotInCatalog"]));
+        Assert.Equal(HttpStatusCode.BadRequest, invalid.StatusCode);
+
+        var created = await PostAsync<CreatedApiKeyResponse>(
+            "/api/auth/api-keys",
+            new CreateApiKeyRequest(
+                "Profile reader",
+                "P@ssword123",
+                null,
+                DateTimeOffset.UtcNow.AddDays(30),
+                ["permission:ProfileRead"]));
+        Assert.Equal(["permission:profileread"], created.Scopes);
+
+        var listResponse = await _client.GetAsync("/api/auth/api-keys");
+        listResponse.EnsureSuccessStatusCode();
+        Assert.DoesNotContain(created.Key, await listResponse.Content.ReadAsStringAsync(), StringComparison.Ordinal);
+
+        _client.DefaultRequestHeaders.Authorization = null;
+        _client.DefaultRequestHeaders.Add("X-API-Key", created.Key);
+        var allowed = await _client.GetAsync("/api/auth/users");
+        var forbidden = await _client.GetAsync("/api/organizations");
+        Assert.Equal(HttpStatusCode.OK, allowed.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, forbidden.StatusCode);
+        _client.DefaultRequestHeaders.Remove("X-API-Key");
+    }
+
+    [Fact]
+    public async Task IdentitySessions_ListDeviceMetadataAndRevocationInvalidatesAccessImmediately()
+    {
+        var suffix = Guid.NewGuid().ToString("N");
+        _client.DefaultRequestHeaders.UserAgent.ParseAdd("Zumbo-Sec004-Tests/1.0");
+        _client.DefaultRequestHeaders.Add("X-Zumbo-Device-Name", "Security test laptop");
+        var registration = await PostAsync<AuthResponse>("/api/auth/register", new RegisterUserRequest(
+            "session-user-" + suffix,
+            $"session-user-{suffix}@zumbo.local",
+            "P@ssword123",
+            "org-session-" + suffix));
+        _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", registration.AccessToken);
+
+        var sessions = await GetAsync<IReadOnlyList<SessionResponse>>("/api/auth/sessions");
+        var current = Assert.Single(sessions);
+        Assert.Equal("Security test laptop", current.DeviceName);
+        Assert.Equal(64, current.ClientFingerprint.Length);
+        Assert.DoesNotContain("Zumbo-Sec004-Tests", current.ClientFingerprint, StringComparison.Ordinal);
+
+        var revoke = await _client.DeleteAsync($"/api/auth/sessions/{current.Id}");
+        revoke.EnsureSuccessStatusCode();
+        var rejected = await _client.GetAsync("/api/auth/sessions");
+        Assert.Equal(HttpStatusCode.Unauthorized, rejected.StatusCode);
+        _client.DefaultRequestHeaders.Remove("X-Zumbo-Device-Name");
+    }
+
+    [Fact]
     public async Task WorkItemBulkActions_AreBoundedAndInvalidateProjectSummary()
     {
         var stamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
@@ -545,6 +964,9 @@ public sealed class ApiFlowTests : IClassFixture<WebApplicationFactory<Program>>
             "P@ssword123",
             organizationId));
         _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", registration.AccessToken);
+        await PostAsync<OrganizationResponse>(
+            "/api/organizations",
+            new CreateOrganizationRequest("Bulk Organization", organizationId));
         var project = await PostAsync<ProjectResponse>("/api/projects", new CreateProjectRequest(
             organizationId,
             "BULK",
@@ -570,7 +992,10 @@ public sealed class ApiFlowTests : IClassFixture<WebApplicationFactory<Program>>
         var archived = await PostAsync<BulkWorkItemResponse>(
             "/api/work-items/bulk/archive",
             new BulkArchiveWorkItemsRequest(ids));
-        var refreshedSummary = await GetAsync<ProjectSummaryResponse>($"/api/work-items/reports/project-summary/{project.Id}");
+        var refreshedSummary = await EventuallyAsync(
+            () => GetAsync<ProjectSummaryResponse>($"/api/work-items/reports/project-summary/{project.Id}"),
+            value => value.Total == 0,
+            "Project summary cache was not invalidated after bulk archive.");
 
         Assert.Equal(2, initialSummary.Total);
         Assert.Equal(2, moved.Succeeded);
@@ -607,6 +1032,18 @@ public sealed class ApiFlowTests : IClassFixture<WebApplicationFactory<Program>>
         var export = await GetAsync<PrivacyExportResponse>("/api/auth/privacy/export");
         Assert.Equal(registration.User.Id, export.Profile.Id);
         Assert.Contains(export.Data, x => x.Category == "audit");
+        var streamExport = await _client.GetAsync("/api/auth/privacy/export.ndjson");
+        streamExport.EnsureSuccessStatusCode();
+        Assert.Equal("application/x-ndjson", streamExport.Content.Headers.ContentType!.MediaType);
+        Assert.Equal("ndjson-v1", streamExport.Headers.GetValues("X-Zumbo-Export-Format").Single());
+        var streamLines = (await streamExport.Content.ReadAsStringAsync())
+            .Split('\n', StringSplitOptions.RemoveEmptyEntries);
+        Assert.NotEmpty(streamLines);
+        using (var profileLine = JsonDocument.Parse(streamLines[0]))
+        {
+            Assert.Equal("profile", profileLine.RootElement.GetProperty("kind").GetString());
+            Assert.Equal(registration.User.Id, profileLine.RootElement.GetProperty("resourceId").GetString());
+        }
         var wrongConfirmation = await _client.PostAsJsonAsync(
             "/api/auth/privacy/anonymize",
             new AnonymizeAccountRequest("P@ssword123", "DELETE"));
@@ -654,6 +1091,102 @@ public sealed class ApiFlowTests : IClassFixture<WebApplicationFactory<Program>>
         Assert.Equal("PRIVACY_OWNERSHIP_TRANSFER_REQUIRED", body!.Error!.Code);
         var stillActive = await _client.GetAsync("/api/auth/users");
         Assert.Equal(HttpStatusCode.OK, stillActive.StatusCode);
+    }
+
+    [Fact]
+    public async Task IdentityPrivacy_DurableWorkflowExposesTokenStatusAfterCredentialRevocation()
+    {
+        var stamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        var registration = await PostAsync<AuthResponse>("/api/auth/register", new RegisterUserRequest(
+            "privacy-job" + stamp,
+            $"privacy-job-{stamp}@zumbo.local",
+            "P@ssword123",
+            "org-privacy-job-" + stamp));
+        _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
+            "Bearer",
+            registration.AccessToken);
+        var response = await _client.PostAsJsonAsync(
+            "/api/auth/privacy/anonymization-jobs",
+            new AnonymizeAccountRequest("P@ssword123", "ANONYMIZE"));
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var envelope = await response.Content.ReadFromJsonAsync<ApiResponse<PrivacyWorkflowReceipt>>();
+        var receipt = envelope!.Data!;
+        Assert.Equal(PrivacyWorkflowStates.Pending, receipt.Job.State);
+        Assert.NotEmpty(receipt.StatusToken);
+
+        _client.DefaultRequestHeaders.Authorization = null;
+        PrivacyWorkflowPublicStatus? status = null;
+        for (var attempt = 0; attempt < 80; attempt++)
+        {
+            using var statusRequest = new HttpRequestMessage(
+                HttpMethod.Get,
+                $"/api/auth/privacy/jobs/{receipt.Job.Id}/status");
+            statusRequest.Headers.Add("X-Privacy-Status-Token", receipt.StatusToken);
+            using var statusResponse = await _client.SendAsync(statusRequest);
+            statusResponse.EnsureSuccessStatusCode();
+            status = (await statusResponse.Content.ReadFromJsonAsync<ApiResponse<PrivacyWorkflowPublicStatus>>())!.Data;
+            if (status!.State == PrivacyWorkflowStates.Completed) break;
+            await Task.Delay(100);
+        }
+
+        Assert.NotNull(status);
+        Assert.Equal(PrivacyWorkflowStates.Completed, status!.State);
+        Assert.Equal(100, status.ProgressPercent);
+        using var wrongTokenRequest = new HttpRequestMessage(
+            HttpMethod.Get,
+            $"/api/auth/privacy/jobs/{receipt.Job.Id}/status");
+        wrongTokenRequest.Headers.Add("X-Privacy-Status-Token", "wrong");
+        using var wrongToken = await _client.SendAsync(wrongTokenRequest);
+        Assert.Equal(HttpStatusCode.NotFound, wrongToken.StatusCode);
+    }
+
+    [Fact]
+    public async Task IdentityPrivacy_NdjsonExportStreamsBeyondLegacyCategoryLimit()
+    {
+        var stamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        var organizationId = "org-privacy-stream-" + stamp;
+        var registration = await PostAsync<AuthResponse>("/api/auth/register", new RegisterUserRequest(
+            "privacy-stream" + stamp,
+            $"privacy-stream-{stamp}@zumbo.local",
+            "P@ssword123",
+            organizationId));
+        _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
+            "Bearer",
+            registration.AccessToken);
+        using (var scope = _services.CreateScope())
+        {
+            var notifications = scope.ServiceProvider
+                .GetRequiredService<IDocumentRepository<NotificationDocument>>();
+            await Task.WhenAll(Enumerable.Range(0, 5001).Select(index =>
+                notifications.CreateAsync(new NotificationDocument
+                {
+                    Id = $"privacy-stream-{stamp}-{index:D5}",
+                    OrganizationId = organizationId,
+                    UserId = registration.User.Id,
+                    Type = "PrivacyExport",
+                    Message = "record-" + index,
+                    CreatedAt = DateTimeOffset.UtcNow
+                }, CancellationToken.None)));
+        }
+
+        using var request = new HttpRequestMessage(HttpMethod.Get, "/api/auth/privacy/export.ndjson");
+        using var response = await _client.SendAsync(
+            request,
+            HttpCompletionOption.ResponseHeadersRead);
+        response.EnsureSuccessStatusCode();
+        await using var content = await response.Content.ReadAsStreamAsync();
+        using var reader = new StreamReader(content);
+        var notificationsSeen = 0;
+        while (await reader.ReadLineAsync() is { } line)
+        {
+            using var record = JsonDocument.Parse(line);
+            if (record.RootElement.TryGetProperty("category", out var category)
+                && category.GetString() == "notifications")
+            {
+                notificationsSeen++;
+            }
+        }
+        Assert.Equal(5001, notificationsSeen);
     }
 
     [Fact]
@@ -709,6 +1242,37 @@ public sealed class ApiFlowTests : IClassFixture<WebApplicationFactory<Program>>
         Assert.Equal(HttpStatusCode.Forbidden, deactivatedRefresh.StatusCode);
         var deactivatedLogin = await _client.PostAsJsonAsync("/api/auth/login", new LoginRequest(username, newPassword));
         Assert.Equal(HttpStatusCode.Forbidden, deactivatedLogin.StatusCode);
+    }
+
+    [Fact]
+    public async Task IdentityRefresh_ConcurrentReuseAllowsOneRotationAndRevokesItsReplacement()
+    {
+        var suffix = Guid.NewGuid().ToString("N");
+        var registration = await PostAsync<AuthResponse>("/api/auth/register", new RegisterUserRequest(
+            "refresh-api-" + suffix,
+            $"refresh-api-{suffix}@zumbo.local",
+            "P@ssword123",
+            "org-refresh-api-" + suffix));
+
+        var responses = await Task.WhenAll(
+            _client.PostAsJsonAsync("/api/auth/refresh", new RefreshTokenRequest(registration.RefreshToken)),
+            _client.PostAsJsonAsync("/api/auth/refresh", new RefreshTokenRequest(registration.RefreshToken)));
+
+        Assert.Single(responses, response => response.StatusCode == HttpStatusCode.OK);
+        Assert.Single(responses, response => response.StatusCode == HttpStatusCode.Unauthorized);
+        var successful = responses.Single(response => response.StatusCode == HttpStatusCode.OK);
+        var rotated = (await successful.Content.ReadFromJsonAsync<ApiResponse<AuthResponse>>())!.Data!;
+        var familyRevoked = await _client.PostAsJsonAsync(
+            "/api/auth/refresh",
+            new RefreshTokenRequest(rotated.RefreshToken));
+        Assert.Equal(HttpStatusCode.Unauthorized, familyRevoked.StatusCode);
+
+        foreach (var response in responses)
+        {
+            response.Dispose();
+        }
+
+        familyRevoked.Dispose();
     }
 
     [Fact]
@@ -795,6 +1359,9 @@ public sealed class ApiFlowTests : IClassFixture<WebApplicationFactory<Program>>
             organizationId));
 
         _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", owner.AccessToken);
+        await PostAsync<OrganizationResponse>(
+            "/api/organizations",
+            new CreateOrganizationRequest("Team Organization", organizationId));
         var team = await PostAsync<TeamResponse>("/api/teams", new CreateTeamRequest(
             organizationId,
             "Platform Team",
@@ -802,14 +1369,18 @@ public sealed class ApiFlowTests : IClassFixture<WebApplicationFactory<Program>>
         team = await PostAsync<TeamResponse>($"/api/teams/{team.Id}/members", new InviteTeamMemberRequest(
             member.User.Email,
             "Member"));
-        var inviteId = team.Members.Single(x => x.Email == member.User.Email).Id;
+        var inviteToken = Assert.IsType<string>(team.InvitationToken);
 
         _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", wrongRecipient.AccessToken);
-        var forbiddenAccept = await _client.PostAsync($"/api/teams/{team.Id}/invites/{inviteId}/accept", null);
+        var forbiddenAccept = await _client.PostAsJsonAsync(
+            $"/api/teams/{team.Id}/invites/accept",
+            new TeamInviteTokenRequest(inviteToken));
         Assert.Equal(HttpStatusCode.Forbidden, forbiddenAccept.StatusCode);
 
         _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", member.AccessToken);
-        team = await PostWithoutBodyAsync<TeamResponse>($"/api/teams/{team.Id}/invites/{inviteId}/accept");
+        team = await PostAsync<TeamResponse>(
+            $"/api/teams/{team.Id}/invites/accept",
+            new TeamInviteTokenRequest(inviteToken));
         Assert.Contains(team.Members, x => x.UserId == member.User.Id && x.Status == "Active");
 
         _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", owner.AccessToken);
@@ -861,6 +1432,9 @@ public sealed class ApiFlowTests : IClassFixture<WebApplicationFactory<Program>>
             organizationId));
 
         _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", owner.AccessToken);
+        await PostAsync<OrganizationResponse>(
+            "/api/organizations",
+            new CreateOrganizationRequest("Project Audit Organization", organizationId));
         var project = await PostAsync<ProjectResponse>("/api/projects", new CreateProjectRequest(
             organizationId,
             "PA" + stamp.ToString()[^4..],
@@ -902,6 +1476,9 @@ public sealed class ApiFlowTests : IClassFixture<WebApplicationFactory<Program>>
             "P@ssword123",
             organizationId));
         _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", owner.AccessToken);
+        await PostAsync<OrganizationResponse>(
+            "/api/organizations",
+            new CreateOrganizationRequest("Board Organization", organizationId));
         var project = await PostAsync<ProjectResponse>("/api/projects", new CreateProjectRequest(
             organizationId,
             "WIP" + stamp.ToString()[^3..],
@@ -977,6 +1554,9 @@ public sealed class ApiFlowTests : IClassFixture<WebApplicationFactory<Program>>
             "P@ssword123",
             organizationId));
         _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", owner.AccessToken);
+        await PostAsync<OrganizationResponse>(
+            "/api/organizations",
+            new CreateOrganizationRequest("Structure Organization", organizationId));
         var project = await PostAsync<ProjectResponse>("/api/projects", new CreateProjectRequest(
             organizationId,
             "STR" + stamp.ToString()[^3..],
@@ -1082,6 +1662,9 @@ public sealed class ApiFlowTests : IClassFixture<WebApplicationFactory<Program>>
             "P@ssword123",
             organizationId));
         _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", owner.AccessToken);
+        await PostAsync<OrganizationResponse>(
+            "/api/organizations",
+            new CreateOrganizationRequest("Workflow Organization", organizationId));
         var team = await PostAsync<TeamResponse>("/api/teams", new CreateTeamRequest(
             organizationId,
             "Workflow Team " + stamp,
@@ -1089,9 +1672,11 @@ public sealed class ApiFlowTests : IClassFixture<WebApplicationFactory<Program>>
         team = await PostAsync<TeamResponse>(
             $"/api/teams/{team.Id}/members",
             new InviteTeamMemberRequest(developer.User.Email, "Member"));
-        var inviteId = team.Members.Single(x => x.Email == developer.User.Email && x.Status == "Invited").Id;
+        var inviteToken = Assert.IsType<string>(team.InvitationToken);
         _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", developer.AccessToken);
-        team = await PostWithoutBodyAsync<TeamResponse>($"/api/teams/{team.Id}/invites/{inviteId}/accept");
+        team = await PostAsync<TeamResponse>(
+            $"/api/teams/{team.Id}/invites/accept",
+            new TeamInviteTokenRequest(inviteToken));
         _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", owner.AccessToken);
         var project = await PostAsync<ProjectResponse>("/api/projects", new CreateProjectRequest(
             organizationId,
@@ -1177,9 +1762,18 @@ public sealed class ApiFlowTests : IClassFixture<WebApplicationFactory<Program>>
         var approvalId = item.Approvals.Single().Id;
         var preference = await PutAsync<NotificationPreferenceResponse>(
             "/api/notifications/preferences/me",
-            new UpdateNotificationPreferencesRequest(true, false, ["Mention"]));
+            new UpdateNotificationPreferencesRequest(
+                true, false, ["Mention"],
+                DeliveryMode: NotificationDeliveryModes.DailyDigest,
+                TimeZoneId: "UTC",
+                DigestHourLocal: 9));
         Assert.False(preference.EmailEnabled);
-        var developerNotifications = await GetAsync<IReadOnlyList<NotificationResponse>>("/api/notifications?page=1&pageSize=10");
+        Assert.Equal(NotificationDeliveryModes.DailyDigest, preference.DeliveryMode);
+        Assert.Equal("UTC", preference.TimeZoneId);
+        var developerNotifications = await EventuallyAsync(
+            () => GetAsync<IReadOnlyList<NotificationResponse>>("/api/notifications?page=1&pageSize=10"),
+            value => value.Count > 0,
+            "Approval notification was not consumed.");
         var developerNotificationId = developerNotifications.First().Id;
         var developerDecision = await _client.PostAsJsonAsync(
             $"/api/work-items/{item.Id}/approvals/{approvalId}/decision",
@@ -1220,6 +1814,26 @@ public sealed class ApiFlowTests : IClassFixture<WebApplicationFactory<Program>>
         Assert.NotNull(body);
         Assert.True(body!.Success);
         return body.Data!;
+    }
+
+    private static async Task<T> EventuallyAsync<T>(
+        Func<Task<T>> read,
+        Func<T, bool> condition,
+        string failureMessage)
+    {
+        T? latest = default;
+        for (var attempt = 0; attempt < 200; attempt++)
+        {
+            latest = await read();
+            if (condition(latest))
+            {
+                return latest;
+            }
+
+            await Task.Delay(25);
+        }
+
+        throw new Xunit.Sdk.XunitException(failureMessage);
     }
 
     private async Task<T> PostAsync<T>(string url, object request)

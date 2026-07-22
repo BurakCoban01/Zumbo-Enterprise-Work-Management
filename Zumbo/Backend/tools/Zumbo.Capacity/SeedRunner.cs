@@ -4,8 +4,7 @@ using System.Text;
 using System.Text.Json;
 using MongoDB.Bson;
 using MongoDB.Driver;
-using Zumbo.BuildingBlocks.Infrastructure.Search;
-using Zumbo.BuildingBlocks.Infrastructure.Security;
+using Zumbo.BuildingBlocks.Application.Search;
 using Zumbo.Modules.Audit;
 using Zumbo.Modules.Boards;
 using Zumbo.Modules.Identity;
@@ -15,7 +14,7 @@ using Zumbo.Modules.WorkItems;
 
 namespace Zumbo.Capacity;
 
-internal sealed class SeedRunner(string mongoConnectionString, string openSearchBaseUrl)
+internal sealed class SeedRunner(string mongoConnectionString, string openSearchBaseUrl, string capacityPassword)
 {
     private const int DocumentBatchSize = 2_000;
     private const int AuditBatchSize = 5_000;
@@ -28,8 +27,8 @@ internal sealed class SeedRunner(string mongoConnectionString, string openSearch
         Console.Error.WriteLine($"{profile.Name} profili temizleniyor...");
         await DeleteExistingAsync(profile, cancellationToken);
 
-        var now = DateTimeOffset.UtcNow;
-        var passwordHash = new Pbkdf2PasswordHasher().Hash("P@ssword123");
+        var now = profile.SeedTimestamp;
+        var passwordHash = CapacityMath.CreateDeterministicPasswordHash(capacityPassword, profile);
         var users = BuildUsers(profile, passwordHash, now);
         var organizations = BuildOrganizations(profile, now);
         var projects = BuildProjects(profile, now);
@@ -56,6 +55,7 @@ internal sealed class SeedRunner(string mongoConnectionString, string openSearch
 
         var result = new SeedResult(
             profile.Name,
+            profile.RunId,
             profile.Prefix,
             organizations.Count,
             users.Count,
@@ -69,10 +69,18 @@ internal sealed class SeedRunner(string mongoConnectionString, string openSearch
         return result;
     }
 
-    public async Task<object> CleanAsync(CapacityProfile profile, CancellationToken cancellationToken)
+    public async Task<CleanupResult> CleanAsync(CapacityProfile profile, CancellationToken cancellationToken)
     {
         await DeleteExistingAsync(profile, cancellationToken);
-        return new { profile = profile.Name, prefix = profile.Prefix, deleted = true };
+        var mongoRemaining = await CountRemainingMongoAsync(profile, cancellationToken);
+        var searchRemaining = await CountRemainingSearchAsync(profile, cancellationToken);
+        return new CleanupResult(
+            profile.Name,
+            profile.RunId,
+            profile.Prefix,
+            mongoRemaining,
+            searchRemaining,
+            mongoRemaining == 0 && searchRemaining == 0);
     }
 
     private async Task DeleteExistingAsync(CapacityProfile profile, CancellationToken ct)
@@ -89,7 +97,29 @@ internal sealed class SeedRunner(string mongoConnectionString, string openSearch
         await Collection<WorkItemDocument>("ZumboWorkItems", "workitems").DeleteManyAsync(
             Builders<WorkItemDocument>.Filter.Regex("_id", prefix), ct);
         await Collection<AuditLogDocument>("ZumboAudit", "auditlogs").DeleteManyAsync(
-            Builders<AuditLogDocument>.Filter.Regex("_id", prefix), ct);
+            Builders<AuditLogDocument>.Filter.Or(
+                Builders<AuditLogDocument>.Filter.Regex("_id", prefix),
+                Builders<AuditLogDocument>.Filter.Regex(x => x.OrganizationId, prefix)), ct);
+
+        var workItemsDatabase = _mongo.GetDatabase("ZumboWorkItems");
+        var outbox = workItemsDatabase.GetCollection<BsonDocument>("outbox_messages");
+        var outboxFilter = Builders<BsonDocument>.Filter.Regex("TenantId", prefix);
+        var outboxIds = await outbox.Find(outboxFilter)
+            .Project(Builders<BsonDocument>.Projection.Include("_id"))
+            .ToListAsync(ct);
+        var messageIds = outboxIds.Select(document => document["_id"]).ToArray();
+        if (messageIds.Length > 0)
+        {
+            await workItemsDatabase.GetCollection<BsonDocument>("inbox_messages").DeleteManyAsync(
+                Builders<BsonDocument>.Filter.In("MessageId", messageIds), ct);
+        }
+        await outbox.DeleteManyAsync(outboxFilter, ct);
+
+        var notifications = _mongo.GetDatabase("ZumboNotifications").GetCollection<BsonDocument>("notifications");
+        await notifications.DeleteManyAsync(
+            Builders<BsonDocument>.Filter.Or(
+                Builders<BsonDocument>.Filter.Regex("OrganizationId", prefix),
+                Builders<BsonDocument>.Filter.Regex("UserId", prefix)), ct);
 
         var body = JsonContent.Create(new
         {
@@ -105,6 +135,50 @@ internal sealed class SeedRunner(string mongoConnectionString, string openSearch
         }
     }
 
+    private async Task<long> CountRemainingMongoAsync(CapacityProfile profile, CancellationToken ct)
+    {
+        var prefix = new BsonRegularExpression("^" + profile.Prefix);
+        var counts = new List<long>
+        {
+            await Collection<OrganizationDocument>("ZumboOrganizations", "organizations").CountDocumentsAsync(Builders<OrganizationDocument>.Filter.Regex("_id", prefix), cancellationToken: ct),
+            await Collection<UserDocument>("ZumboIdentity", "users").CountDocumentsAsync(Builders<UserDocument>.Filter.Regex("_id", prefix), cancellationToken: ct),
+            await Collection<ProjectDocument>("ZumboProjects", "projects").CountDocumentsAsync(Builders<ProjectDocument>.Filter.Regex("_id", prefix), cancellationToken: ct),
+            await Collection<BoardDocument>("ZumboBoards", "boards").CountDocumentsAsync(Builders<BoardDocument>.Filter.Regex("_id", prefix), cancellationToken: ct),
+            await Collection<WorkItemDocument>("ZumboWorkItems", "workitems").CountDocumentsAsync(Builders<WorkItemDocument>.Filter.Regex("_id", prefix), cancellationToken: ct),
+            await Collection<AuditLogDocument>("ZumboAudit", "auditlogs").CountDocumentsAsync(
+                Builders<AuditLogDocument>.Filter.Or(
+                    Builders<AuditLogDocument>.Filter.Regex("_id", prefix),
+                    Builders<AuditLogDocument>.Filter.Regex(x => x.OrganizationId, prefix)), cancellationToken: ct),
+            await _mongo.GetDatabase("ZumboWorkItems").GetCollection<BsonDocument>("outbox_messages")
+                .CountDocumentsAsync(Builders<BsonDocument>.Filter.Regex("TenantId", prefix), cancellationToken: ct),
+            await _mongo.GetDatabase("ZumboNotifications").GetCollection<BsonDocument>("notifications")
+                .CountDocumentsAsync(
+                    Builders<BsonDocument>.Filter.Or(
+                        Builders<BsonDocument>.Filter.Regex("OrganizationId", prefix),
+                        Builders<BsonDocument>.Filter.Regex("UserId", prefix)), cancellationToken: ct)
+        };
+        return counts.Sum();
+    }
+
+    private async Task<long> CountRemainingSearchAsync(CapacityProfile profile, CancellationToken ct)
+    {
+        using var body = JsonContent.Create(new
+        {
+            query = new
+            {
+                prefix = new Dictionary<string, string> { ["projectId.keyword"] = profile.Prefix }
+            }
+        });
+        using var response = await _search.PostAsync("zumbo-work-items/_count", body, ct);
+        if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            return 0;
+        }
+        response.EnsureSuccessStatusCode();
+        using var payload = JsonDocument.Parse(await response.Content.ReadAsStreamAsync(ct));
+        return payload.RootElement.GetProperty("count").GetInt64();
+    }
+
     private static List<UserDocument> BuildUsers(CapacityProfile profile, string passwordHash, DateTimeOffset now)
     {
         return Enumerable.Range(0, profile.UserCount).Select(index => new UserDocument
@@ -116,8 +190,9 @@ internal sealed class SeedRunner(string mongoConnectionString, string openSearch
             PasswordHash = passwordHash,
             IsActive = true,
             SecurityStamp = $"{profile.Prefix}stamp-{index:D6}",
-            Roles = ["User"],
-            CreatedAt = now
+            Roles = index == 0 ? ["SystemAdmin"] : ["User"],
+            CreatedAt = now,
+            Version = 1
         }).ToList();
     }
 
@@ -130,7 +205,8 @@ internal sealed class SeedRunner(string mongoConnectionString, string openSearch
             Name = $"Capacity {profile.Name} organization {index + 1}",
             OwnerUserId = CapacityIds.User(profile, index),
             CreatedAt = now,
-            UpdatedAt = now
+            UpdatedAt = now,
+            Version = 1
         }).ToList();
     }
 
@@ -155,7 +231,8 @@ internal sealed class SeedRunner(string mongoConnectionString, string openSearch
                     }
                 ],
                 CreatedAt = now,
-                UpdatedAt = now
+                UpdatedAt = now,
+                Version = 1
             };
         }).ToList();
     }
@@ -185,7 +262,8 @@ internal sealed class SeedRunner(string mongoConnectionString, string openSearch
                 WipLimit = null
             }).ToList(),
             CreatedAt = now,
-            UpdatedAt = now
+            UpdatedAt = now,
+            Version = 1
         }).ToList();
     }
 
@@ -225,7 +303,7 @@ internal sealed class SeedRunner(string mongoConnectionString, string openSearch
             Rank = createdAt.UtcTicks,
             AssigneeUserId = CapacityIds.User(profile, organizationIndex),
             DueDate = now.AddDays((index % 60) - 15),
-            SprintId = $"sprint-{index % 12:D2}",
+            SprintId = null,
             EstimatePoints = (index % 13) + 1,
             CompletedAt = statusIndex == 4 ? createdAt.AddDays(2) : null,
             Labels = ["capacity", index % 2 == 0 ? "backend" : "frontend"],
@@ -240,7 +318,8 @@ internal sealed class SeedRunner(string mongoConnectionString, string openSearch
                 }
             ],
             CreatedAt = createdAt,
-            UpdatedAt = createdAt
+            UpdatedAt = createdAt,
+            Version = 1
         };
     }
 
@@ -253,7 +332,10 @@ internal sealed class SeedRunner(string mongoConnectionString, string openSearch
             var batch = Enumerable.Range(start, count).Select(index => new AuditLogDocument
             {
                 Id = CapacityIds.Audit(profile, index),
+                OrganizationId = CapacityIds.Organization(profile, index % profile.OrganizationCount),
                 ActorUserId = CapacityIds.User(profile, index % profile.UserCount),
+                SubjectType = "WorkItem",
+                SubjectId = CapacityIds.WorkItem(profile, index % profile.WorkItemCount),
                 Action = index % 3 == 0 ? "WorkItemUpdated" : "WorkItemViewed",
                 EntityType = "WorkItem",
                 EntityId = CapacityIds.WorkItem(profile, index % profile.WorkItemCount),
@@ -261,7 +343,7 @@ internal sealed class SeedRunner(string mongoConnectionString, string openSearch
                 NewValue = $"capacity-event-{index}",
                 IpAddress = "127.0.0.1",
                 UserAgent = "Zumbo.Capacity/1.0",
-                CorrelationId = $"capacity-{profile.Name}-{index:D9}",
+                CorrelationId = $"{profile.Prefix}event-{index:D9}",
                 CreatedAt = now.AddMilliseconds(-index)
             }).ToList();
             await collection.InsertManyAsync(batch, new InsertManyOptions { IsOrdered = false }, ct);

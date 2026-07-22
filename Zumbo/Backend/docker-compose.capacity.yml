@@ -1,0 +1,14 @@
+services:
+  api:
+    image: ${ZUMBO_CAPACITY_API_IMAGE:-zumbo-capacity-api:local}
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      Logging__LogLevel__Default: Warning
+      Logging__LogLevel__Microsoft.AspNetCore: Warning
+      Runtime__Role: Worker
+      Runtime__InstanceId: capacity-api-1
+      BackgroundJobs__Enabled: "true"
+
+  opensearch:
+    environment:
+      OPENSEARCH_JAVA_OPTS: "-Xms256m -Xmx256m"

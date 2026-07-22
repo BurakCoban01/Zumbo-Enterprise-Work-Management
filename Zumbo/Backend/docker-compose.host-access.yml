@@ -1,0 +1,21 @@
+services:
+  api:
+    ports:
+      - "${ZUMBO_API_BIND_HOST:-127.0.0.1}:${ZUMBO_API_PORT:-58088}:8080"
+
+  mongo:
+    ports:
+      - "${ZUMBO_INFRA_BIND_HOST:-127.0.0.1}:${ZUMBO_MONGO_HOST_PORT:-58217}:27017"
+
+  redis:
+    ports:
+      - "${ZUMBO_INFRA_BIND_HOST:-127.0.0.1}:${ZUMBO_REDIS_HOST_PORT:-58379}:6379"
+
+  minio:
+    ports:
+      - "${ZUMBO_INFRA_BIND_HOST:-127.0.0.1}:${ZUMBO_MINIO_API_HOST_PORT:-58400}:9000"
+      - "${ZUMBO_INFRA_BIND_HOST:-127.0.0.1}:${ZUMBO_MINIO_CONSOLE_HOST_PORT:-58401}:9001"
+
+  opensearch:
+    ports:
+      - "${ZUMBO_INFRA_BIND_HOST:-127.0.0.1}:${ZUMBO_OPENSEARCH_HOST_PORT:-59200}:9200"

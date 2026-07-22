@@ -1,0 +1,67 @@
+rules:
+  - id: zumbo-dotnet-insecure-deserialization
+    message: Güvenilmeyen veri için tehlikeli .NET deserialization API'si kullanılıyor.
+    severity: ERROR
+    languages: [csharp]
+    pattern-either:
+      - pattern: new BinaryFormatter(...)
+      - pattern: new LosFormatter(...)
+      - pattern: $SETTINGS.TypeNameHandling = TypeNameHandling.All
+      - pattern: $SETTINGS.TypeNameHandling = TypeNameHandling.Auto
+
+  - id: zumbo-dotnet-tls-validation-disabled
+    message: TLS sertifika doğrulaması devre dışı bırakılamaz.
+    severity: ERROR
+    languages: [csharp]
+    pattern-either:
+      - pattern: $HANDLER.ServerCertificateCustomValidationCallback = HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
+      - pattern: ServicePointManager.ServerCertificateValidationCallback = $CALLBACK
+
+  - id: zumbo-dotnet-permissive-credentialed-cors
+    message: Credentialed CORS wildcard origin ile birleştirilemez.
+    severity: ERROR
+    languages: [csharp]
+    patterns:
+      - pattern-inside: |
+          $POLICY.AllowAnyOrigin()...;
+          ...
+          $POLICY.AllowCredentials()...;
+      - pattern: $POLICY.AllowCredentials()
+
+  - id: zumbo-dotnet-shell-execution
+    message: Uygulama sürecinden shell komutu çalıştırılması güvenlik incelemesi gerektirir.
+    severity: ERROR
+    languages: [csharp]
+    pattern-either:
+      - pattern: Process.Start(...)
+      - pattern: $INFO.UseShellExecute = true
+
+  - id: zumbo-javascript-dynamic-code-execution
+    message: Dinamik JavaScript çalıştırma yasaktır.
+    severity: ERROR
+    languages: [javascript]
+    pattern-either:
+      - pattern: eval(...)
+      - pattern: new Function(...)
+      - pattern: document.write(...)
+
+  - id: zumbo-javascript-unsafe-html-assignment
+    message: Doğrudan HTML sink'i XSS riski taşır.
+    severity: ERROR
+    languages: [javascript]
+    pattern-either:
+      - pattern: $ELEMENT.innerHTML = $VALUE
+      - pattern: $ELEMENT.outerHTML = $VALUE
+      - pattern: $ELEMENT.insertAdjacentHTML(...)
+
+  - id: zumbo-javascript-token-web-storage
+    message: Access/refresh token Web Storage içinde tutulamaz.
+    severity: ERROR
+    languages: [javascript]
+    patterns:
+      - pattern-either:
+          - pattern: localStorage.setItem($KEY, $VALUE)
+          - pattern: sessionStorage.setItem($KEY, $VALUE)
+      - metavariable-regex:
+          metavariable: $KEY
+          regex: '(?i).*(access|refresh)[_-]?token.*'

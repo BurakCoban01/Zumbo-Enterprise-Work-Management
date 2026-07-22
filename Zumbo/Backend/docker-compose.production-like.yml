@@ -1,0 +1,376 @@
+x-production-runtime: &production-runtime
+  environment: &production-runtime-environment
+    ASPNETCORE_ENVIRONMENT: Production
+    ASPNETCORE_URLS: https://+:8443
+    ASPNETCORE_Kestrel__Certificates__Default__Password: ${ZUMBO_TLS_PFX_PASSWORD:?ZUMBO_TLS_PFX_PASSWORD must be set}
+    SSL_CERT_FILE: /run/zumbo-tls/ca.crt
+  group_add: ["10001"]
+
+services:
+  production-tls-init:
+    image: busybox:1.37.0@sha256:9532d8c39891ca2ecde4d30d7710e01fb739c87a8b9299685c63704296b16028
+    user: "0:0"
+    read_only: true
+    cap_drop: [ALL]
+    cap_add: [CHOWN, DAC_OVERRIDE, FOWNER]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 32
+    mem_limit: 64m
+    cpus: 0.25
+    environment:
+      MONGO_REPLICA_KEY: ${ZUMBO_MONGO_REPLICA_KEY:?ZUMBO_MONGO_REPLICA_KEY must be set}
+    command:
+      - sh
+      - -ec
+      - >-
+        if test -s /api/api.pfx && test -s /gateway/gateway.pfx &&
+        test -s /mongo/mongo.pem && test -s /redis/redis.key &&
+        test -s /minio/private.key && test -s /opensearch/opensearch.key &&
+        test -s /mongo-key/keyfile; then exit 0; fi;
+        test -s /input/ca.crt && test -s /input/api.pfx && test -s /input/gateway.pfx;
+        rm -rf /api/* /gateway/* /mongo/* /redis/* /minio/* /opensearch/* /mongo-key/*;
+        cp /input/ca.crt /api/ca.crt;
+        cp /input/api.pfx /api/api.pfx;
+        cp /input/ca.crt /gateway/ca.crt;
+        cp /input/gateway.pfx /gateway/gateway.pfx;
+        cp /input/ca.crt /mongo/ca.crt;
+        cp /input/mongo.pem /mongo/mongo.pem;
+        cp /input/ca.crt /redis/ca.crt;
+        cp /input/redis.crt /redis/redis.crt;
+        cp /input/redis.key /redis/redis.key;
+        mkdir -p /minio/CAs;
+        cp /input/minio.crt /minio/public.crt;
+        cp /input/minio.key /minio/private.key;
+        cp /input/ca.crt /minio/CAs/ca.crt;
+        cp /input/ca.crt /opensearch/ca.crt;
+        cp /input/opensearch.crt /opensearch/opensearch.crt;
+        cp /input/opensearch.key /opensearch/opensearch.key;
+        printf '%s' "$${MONGO_REPLICA_KEY}" > /mongo-key/keyfile;
+        chown -R 0:10001 /api /gateway /mongo /redis /minio /opensearch;
+        chmod 0550 /api /gateway /mongo /redis /minio /minio/CAs /opensearch;
+        find /api /gateway /mongo /redis /minio /opensearch -type f -name '*.key' -exec chmod 0440 {} +;
+        chmod 0440 /api/*.pfx /gateway/*.pfx /mongo/mongo.pem;
+        find /api /gateway /mongo /redis /minio /opensearch -type f ! -name '*.key' ! -name '*.pfx' ! -name 'mongo.pem' -exec chmod 0444 {} +;
+        chown 1000:1000 /opensearch/*;
+        chmod 0600 /opensearch/*;
+        chown 999:999 /mongo-key/keyfile;
+        chmod 0400 /mongo-key/keyfile
+    volumes:
+      - ${ZUMBO_PRODUCTION_TLS_DIR:-./.production-like/tls}:/input:ro
+      - api_tls:/api
+      - gateway_tls:/gateway
+      - mongo_tls:/mongo
+      - redis_tls:/redis
+      - minio_tls:/minio
+      - opensearch_tls:/opensearch
+      - mongo_key:/mongo-key
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=8m
+    logging:
+      driver: json-file
+      options: { max-size: 1m, max-file: "1" }
+    restart: "no"
+
+  opensearch-security-init:
+    image: opensearchproject/opensearch:2.19.6@sha256:b485da5f7f7bcb174523954bae1303c8c2ddaae9f1c2c89f10d625c98544e7cd
+    user: "0:0"
+    read_only: true
+    cap_drop: [ALL]
+    cap_add: [CHOWN, DAC_OVERRIDE, FOWNER]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 256
+    mem_limit: 1g
+    cpus: 1.00
+    environment:
+      OPENSEARCH_ADMIN_PASSWORD: ${ZUMBO_OPENSEARCH_ADMIN_PASSWORD:?ZUMBO_OPENSEARCH_ADMIN_PASSWORD must be set}
+    entrypoint: ["/bin/bash", "-ec"]
+    command:
+      - >-
+        if test -s /output/internal_users.yml; then exit 0; fi;
+        rm -rf /output/*;
+        cp -a /usr/share/opensearch/config/opensearch-security/. /output/;
+        hash="$$(/usr/share/opensearch/plugins/opensearch-security/tools/hash.sh -p "$${OPENSEARCH_ADMIN_PASSWORD}" | tail -n 1)";
+        sed "s|__ZUMBO_ADMIN_HASH__|$${hash}|" /template/internal_users.yml.template > /output/internal_users.yml;
+        rm -f /output/opensearch.yml.example;
+        chown -R 1000:1000 /output;
+        chmod -R u=rwX,g=rX,o= /output
+    volumes:
+      - ./production-like/opensearch:/template:ro
+      - opensearch_security:/output
+    tmpfs:
+      - /tmp:rw,nosuid,size=64m
+    logging:
+      driver: json-file
+      options: { max-size: 1m, max-file: "1" }
+    restart: "no"
+
+  opensearch-config-init:
+    image: opensearchproject/opensearch:2.19.6@sha256:b485da5f7f7bcb174523954bae1303c8c2ddaae9f1c2c89f10d625c98544e7cd
+    user: "0:0"
+    read_only: true
+    cap_drop: [ALL]
+    cap_add: [CHOWN, DAC_OVERRIDE, FOWNER]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 64
+    mem_limit: 256m
+    cpus: 0.25
+    entrypoint: ["/bin/bash", "-ec"]
+    command:
+      - >-
+        mkdir -p /output/certs /output/opensearch-security;
+        if test -s /output/opensearch.yml; then
+        chown 1000:1000 /output /output/certs /output/opensearch-security;
+        chmod 0750 /output /output/certs /output/opensearch-security;
+        exit 0; fi;
+        rm -rf /output/*;
+        cp -R --no-preserve=mode,ownership,timestamps /usr/share/opensearch/config/. /output/;
+        mkdir -p /output/certs /output/opensearch-security;
+        chown -R 1000:1000 /output;
+        chmod -R u=rwX,g=rX,o= /output
+    volumes:
+      - opensearch_config:/output
+    tmpfs:
+      - /tmp:rw,nosuid,size=32m
+    logging:
+      driver: json-file
+      options: { max-size: 1m, max-file: "1" }
+    restart: "no"
+
+  api:
+    <<: *production-runtime
+    image: ${ZUMBO_API_IMAGE:?ZUMBO_API_IMAGE must be an immutable image reference with sha256 digest}
+    build: !reset null
+    environment:
+      <<: *production-runtime-environment
+      ASPNETCORE_Kestrel__Certificates__Default__Path: /run/zumbo-tls/api.pfx
+      AllowedHosts: api;localhost;127.0.0.1
+      Persistence__Provider: Mongo
+      MongoDb__ConnectionString: mongodb://${ZUMBO_MONGO_ROOT_USERNAME:?ZUMBO_MONGO_ROOT_USERNAME must be set}:${ZUMBO_MONGO_ROOT_PASSWORD:?ZUMBO_MONGO_ROOT_PASSWORD must be set}@mongo:27017/?replicaSet=rs0&authSource=admin&tls=true&tlsCAFile=/run/zumbo-tls/ca.crt
+      RateLimiting__Redis__ConnectionString: redis:6379,password=${ZUMBO_REDIS_PASSWORD:?ZUMBO_REDIS_PASSWORD must be set},ssl=true,sslHost=redis,abortConnect=false
+      Storage__Minio__Endpoint: https://minio:9000
+      Search__OpenSearch__BaseUrl: https://opensearch:9200
+      Search__OpenSearch__Username: zumbo_admin
+      Search__OpenSearch__Password: ${ZUMBO_OPENSEARCH_ADMIN_PASSWORD:?ZUMBO_OPENSEARCH_ADMIN_PASSWORD must be set}
+      Search__OpenSearch__AllowInsecureHttp: "false"
+      DistributedLock__Redis__ConnectionString: redis:6379,password=${ZUMBO_REDIS_PASSWORD:?ZUMBO_REDIS_PASSWORD must be set},ssl=true,sslHost=redis,abortConnect=false
+      Realtime__Redis__ConnectionString: redis:6379,password=${ZUMBO_REDIS_PASSWORD:?ZUMBO_REDIS_PASSWORD must be set},ssl=true,sslHost=redis,abortConnect=false
+      DataProtection__Redis__ConnectionString: redis:6379,password=${ZUMBO_REDIS_PASSWORD:?ZUMBO_REDIS_PASSWORD must be set},ssl=true,sslHost=redis,abortConnect=false
+    volumes:
+      - api_tls:/run/zumbo-tls:ro
+    healthcheck:
+      test: ["CMD-SHELL", "curl --fail --silent --show-error --cacert /run/zumbo-tls/ca.crt https://localhost:8443/health/ready >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 120s
+    depends_on:
+      production-tls-init: { condition: service_completed_successfully }
+
+  gateway:
+    <<: *production-runtime
+    image: ${ZUMBO_GATEWAY_IMAGE:?ZUMBO_GATEWAY_IMAGE must be an immutable image reference with sha256 digest}
+    build: !reset null
+    environment:
+      <<: *production-runtime-environment
+      ASPNETCORE_Kestrel__Certificates__Default__Path: /run/zumbo-tls/gateway.pfx
+      Gateway__UpstreamBaseUrl: https://api:8443/
+      AllowedHosts: localhost;127.0.0.1;gateway
+    volumes:
+      - gateway_tls:/run/zumbo-tls:ro
+    ports: !override
+      - "${ZUMBO_PRODUCTION_BIND_HOST:-127.0.0.1}:${ZUMBO_PRODUCTION_HTTPS_PORT:-59443}:8443"
+    networks:
+      - default
+      - edge
+    healthcheck:
+      test: ["CMD-SHELL", "curl --fail --silent --show-error --cacert /run/zumbo-tls/ca.crt https://localhost:8443/health/ready >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 60s
+    depends_on:
+      production-tls-init: { condition: service_completed_successfully }
+
+  worker:
+    <<: *production-runtime
+    image: ${ZUMBO_API_IMAGE:?ZUMBO_API_IMAGE must be an immutable image reference with sha256 digest}
+    build: !reset null
+    environment:
+      <<: *production-runtime-environment
+      ASPNETCORE_Kestrel__Certificates__Default__Path: /run/zumbo-tls/api.pfx
+      Persistence__Provider: Mongo
+      MongoDb__ConnectionString: mongodb://${ZUMBO_MONGO_ROOT_USERNAME:?ZUMBO_MONGO_ROOT_USERNAME must be set}:${ZUMBO_MONGO_ROOT_PASSWORD:?ZUMBO_MONGO_ROOT_PASSWORD must be set}@mongo:27017/?replicaSet=rs0&authSource=admin&tls=true&tlsCAFile=/run/zumbo-tls/ca.crt
+      RateLimiting__Redis__ConnectionString: redis:6379,password=${ZUMBO_REDIS_PASSWORD:?ZUMBO_REDIS_PASSWORD must be set},ssl=true,sslHost=redis,abortConnect=false
+      Storage__Minio__Endpoint: https://minio:9000
+      Search__OpenSearch__BaseUrl: https://opensearch:9200
+      Search__OpenSearch__Username: zumbo_admin
+      Search__OpenSearch__Password: ${ZUMBO_OPENSEARCH_ADMIN_PASSWORD:?ZUMBO_OPENSEARCH_ADMIN_PASSWORD must be set}
+      Search__OpenSearch__AllowInsecureHttp: "false"
+      DistributedLock__Redis__ConnectionString: redis:6379,password=${ZUMBO_REDIS_PASSWORD:?ZUMBO_REDIS_PASSWORD must be set},ssl=true,sslHost=redis,abortConnect=false
+      Realtime__Redis__ConnectionString: redis:6379,password=${ZUMBO_REDIS_PASSWORD:?ZUMBO_REDIS_PASSWORD must be set},ssl=true,sslHost=redis,abortConnect=false
+      DataProtection__Redis__ConnectionString: redis:6379,password=${ZUMBO_REDIS_PASSWORD:?ZUMBO_REDIS_PASSWORD must be set},ssl=true,sslHost=redis,abortConnect=false
+    volumes:
+      - api_tls:/run/zumbo-tls:ro
+    healthcheck:
+      test: ["CMD-SHELL", "curl --fail --silent --show-error --cacert /run/zumbo-tls/ca.crt https://localhost:8443/health/live >/dev/null"]
+      interval: 15s
+      timeout: 5s
+      retries: 12
+      start_period: 120s
+    depends_on:
+      production-tls-init: { condition: service_completed_successfully }
+
+  mongo:
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${ZUMBO_MONGO_ROOT_USERNAME:?ZUMBO_MONGO_ROOT_USERNAME must be set}
+      MONGO_INITDB_ROOT_PASSWORD: ${ZUMBO_MONGO_ROOT_PASSWORD:?ZUMBO_MONGO_ROOT_PASSWORD must be set}
+    command:
+      - mongod
+      - --replSet
+      - rs0
+      - --bind_ip_all
+      - --auth
+      - --keyFile
+      - /run/mongo-key/keyfile
+      - --tlsMode
+      - requireTLS
+      - --tlsCertificateKeyFile
+      - /run/zumbo-tls/mongo.pem
+      - --tlsCAFile
+      - /run/zumbo-tls/ca.crt
+      - --tlsAllowConnectionsWithoutCertificates
+    volumes:
+      - mongo_tls:/run/zumbo-tls:ro
+      - mongo_key:/run/mongo-key:ro
+    group_add: ["10001"]
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -x mongod >/dev/null"]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+    depends_on:
+      hardened-volume-init: { condition: service_completed_successfully }
+      production-tls-init: { condition: service_completed_successfully }
+
+  mongo-init-replica:
+    environment:
+      HOME: /tmp
+      MONGO_INITDB_ROOT_USERNAME: ${ZUMBO_MONGO_ROOT_USERNAME:?ZUMBO_MONGO_ROOT_USERNAME must be set}
+      MONGO_INITDB_ROOT_PASSWORD: ${ZUMBO_MONGO_ROOT_PASSWORD:?ZUMBO_MONGO_ROOT_PASSWORD must be set}
+    command:
+      - >-
+        until timeout 90 mongosh --host mongo:27017 --quiet --tls --tlsCAFile /run/zumbo-tls/ca.crt
+        -u "$${MONGO_INITDB_ROOT_USERNAME}" -p "$${MONGO_INITDB_ROOT_PASSWORD}" --authenticationDatabase admin
+        --eval "quit(db.adminCommand('ping').ok ? 0 : 2)"; do sleep 10; done;
+        timeout 120 mongosh --host mongo:27017 --quiet --tls --tlsCAFile /run/zumbo-tls/ca.crt
+        -u "$${MONGO_INITDB_ROOT_USERNAME}" -p "$${MONGO_INITDB_ROOT_PASSWORD}" --authenticationDatabase admin --eval
+        "try { if (!db.hello().isWritablePrimary) { rs.initiate({_id:'rs0',members:[{_id:0,host:'mongo:27017'}]}) } } catch (error) { if (error.codeName !== 'AlreadyInitialized') { throw error } };
+        while (!db.hello().isWritablePrimary) { sleep(250) }"
+    volumes:
+      - mongo_tls:/run/zumbo-tls:ro
+    group_add: ["10001"]
+    depends_on:
+      mongo: { condition: service_healthy }
+
+  redis:
+    environment:
+      REDISCLI_AUTH: ${ZUMBO_REDIS_PASSWORD:?ZUMBO_REDIS_PASSWORD must be set}
+    command:
+      - redis-server
+      - --port
+      - "0"
+      - --tls-port
+      - "6379"
+      - --tls-cert-file
+      - /run/zumbo-tls/redis.crt
+      - --tls-key-file
+      - /run/zumbo-tls/redis.key
+      - --tls-ca-cert-file
+      - /run/zumbo-tls/ca.crt
+      - --tls-auth-clients
+      - "no"
+      - --requirepass
+      - ${ZUMBO_REDIS_PASSWORD:?ZUMBO_REDIS_PASSWORD must be set}
+      - --appendonly
+      - "yes"
+    volumes:
+      - redis_tls:/run/zumbo-tls:ro
+    group_add: ["10001"]
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli --tls --cacert /run/zumbo-tls/ca.crt -h redis ping | grep -q PONG"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+    depends_on:
+      hardened-volume-init: { condition: service_completed_successfully }
+      production-tls-init: { condition: service_completed_successfully }
+
+  minio:
+    command: ["server", "/data", "--console-address", ":9001", "--certs-dir", "/run/zumbo-tls/minio"]
+    volumes:
+      - minio_tls:/run/zumbo-tls/minio:ro
+    group_add: ["10001"]
+    healthcheck:
+      test: ["CMD-SHELL", "curl --fail --silent --show-error --cacert /run/zumbo-tls/minio/CAs/ca.crt https://minio:9000/minio/health/live >/dev/null"]
+      interval: 20s
+      timeout: 10s
+      retries: 12
+      start_period: 60s
+    depends_on:
+      hardened-volume-init: { condition: service_completed_successfully }
+      production-tls-init: { condition: service_completed_successfully }
+
+  opensearch:
+    volumes:
+      - opensearch_config:/usr/share/opensearch/config
+      - opensearch_tls:/usr/share/opensearch/config/certs:ro
+      - opensearch_security:/usr/share/opensearch/config/opensearch-security:ro
+    group_add: ["10001"]
+    healthcheck:
+      test: ["CMD-SHELL", "curl --fail --silent --show-error --cacert /usr/share/opensearch/config/certs/ca.crt -u \"zumbo_admin:$${OPENSEARCH_ADMIN_PASSWORD}\" https://opensearch:9200/_cluster/health >/dev/null"]
+      interval: 15s
+      timeout: 5s
+      retries: 30
+      start_period: 90s
+    environment:
+      discovery.type: single-node
+      DISABLE_INSTALL_DEMO_CONFIG: "true"
+      DISABLE_SECURITY_PLUGIN: null
+      OPENSEARCH_JAVA_OPTS: "-Xms512m -Xmx512m"
+      OPENSEARCH_ADMIN_PASSWORD: ${ZUMBO_OPENSEARCH_ADMIN_PASSWORD:?ZUMBO_OPENSEARCH_ADMIN_PASSWORD must be set}
+      plugins.security.ssl.transport.pemcert_filepath: certs/opensearch.crt
+      plugins.security.ssl.transport.pemkey_filepath: certs/opensearch.key
+      plugins.security.ssl.transport.pemtrustedcas_filepath: certs/ca.crt
+      plugins.security.ssl.transport.enforce_hostname_verification: "true"
+      plugins.security.ssl.http.enabled: "true"
+      plugins.security.ssl.http.pemcert_filepath: certs/opensearch.crt
+      plugins.security.ssl.http.pemkey_filepath: certs/opensearch.key
+      plugins.security.ssl.http.pemtrustedcas_filepath: certs/ca.crt
+      plugins.security.authcz.admin_dn: CN=zumbo-admin,O=Zumbo
+      plugins.security.nodes_dn: CN=opensearch,O=Zumbo
+      plugins.security.allow_default_init_securityindex: "true"
+    depends_on:
+      hardened-volume-init: { condition: service_completed_successfully }
+      production-tls-init: { condition: service_completed_successfully }
+      opensearch-security-init: { condition: service_completed_successfully }
+      opensearch-config-init: { condition: service_completed_successfully }
+
+networks:
+  default:
+    internal: true
+  edge:
+    driver: bridge
+    internal: false
+
+volumes:
+  api_tls:
+  gateway_tls:
+  mongo_tls:
+  redis_tls:
+  minio_tls:
+  opensearch_tls:
+  opensearch_config:
+  mongo_key:
+  opensearch_security:
