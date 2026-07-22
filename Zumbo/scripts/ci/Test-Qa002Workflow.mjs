@@ -24,11 +24,44 @@ assertRootWorkflowLayout();
 const workflowPath = rootWorkflowPath('qa-002-clean-linux.yml');
 const workflow = readFileSync(workflowPath, 'utf8');
 const checks = [];
+const jobStart = workflow.indexOf('  clean-linux-lifecycle:');
+assert.ok(jobStart >= 0, 'QA-002 lifecycle job is missing.');
+const jobSource = workflow.slice(jobStart);
+const jobEnv = jobSource.match(/^    env:\s*\r?\n([\s\S]*?)^    steps:/m)?.[1];
+assert.ok(jobEnv, 'QA-002 lifecycle job env block is missing.');
+const initializationStart = workflow.indexOf('      - name: Validate inputs and initialize runtime paths');
+const checkoutStart = workflow.indexOf('      - name: Checkout exact target');
+assert.ok(initializationStart >= 0 && checkoutStart > initializationStart, 'Runtime initialization must precede checkout.');
+const initializationStep = workflow.slice(initializationStart, checkoutStart);
+const initializationRun = initializationStep.split(/\s+run: \|\r?\n/, 2)[1];
+assert.ok(initializationRun, 'Runtime initialization shell body is missing.');
 
 check('git-root-workflow-layout', () => {
   assert.match(workflow, /^defaults:\s*\r?\n\s+run:\s*\r?\n\s+working-directory: Zumbo\s*$/m);
-  assert.match(workflow, /QA002_ENV_FILE: \$\{\{ runner\.temp \}\}\//);
-  assert.match(workflow, /QA002_EVIDENCE_DIR: \$\{\{ runner\.temp \}\}\//);
+  assert.doesNotMatch(jobEnv, /runner\.temp/);
+  assert.equal(jobEnv.trim(), 'QA002_RUNNER_IMAGE: ubuntu-24.04');
+});
+check('runner-runtime-path-initialization', () => {
+  assert.match(jobSource, /^    steps:\s*\r?\n      - name: Validate inputs and initialize runtime paths/m);
+  assert.match(initializationStep, /working-directory: \$\{\{ github\.workspace \}\}/);
+  assert.match(initializationStep, /QA002_TARGET_SHA_INPUT: \$\{\{ inputs\.target_sha \}\}/);
+  assert.match(initializationStep, /QA002_CONFIRMATION_INPUT: \$\{\{ inputs\.confirmation \}\}/);
+  assert.doesNotMatch(initializationRun, /\$\{\{/);
+  assert.match(initializationRun, /\$RUNNER_TEMP\/qa002-\$\{GITHUB_RUN_ID\}-\$\{GITHUB_RUN_ATTEMPT\}/);
+  assert.match(initializationRun, /umask 077/);
+  assert.match(initializationRun, /mkdir -p "\$qa002_root\/raw" "\$qa002_root\/artifact"/);
+  assert.match(initializationRun, />> "\$GITHUB_ENV"/);
+  for (const variable of [
+    'QA002_TARGET_SHA',
+    'QA002_ROOT',
+    'QA002_ENV_FILE',
+    'QA002_RAW_DIR',
+    'QA002_EVIDENCE_DIR',
+    'QA002_PROJECT'
+  ]) {
+    assert.match(initializationRun, new RegExp(`printf '${variable}=`), `${variable} must be written with printf to GITHUB_ENV.`);
+  }
+  assert.doesNotMatch(workflow.slice(checkoutStart), /^\s+working-directory:/m);
 });
 
 check('manual-trigger-only', () => {
@@ -48,8 +81,8 @@ check('least-privilege', () => {
 check('deliberate-exact-sha-input', () => {
   assert.match(workflow, /target_sha:/);
   assert.match(workflow, /confirmation:/);
-  assert.match(workflow, /RUN-QA-002/);
-  assert.match(workflow, /\{40\}/);
+  assert.match(initializationRun, /\^\[0-9a-fA-F\]\{40\}\$/);
+  assert.match(initializationRun, /test "\$QA002_CONFIRMATION_INPUT" = 'RUN-QA-002'/);
   assert.match(workflow, /ref: \$\{\{ inputs\.target_sha \}\}/);
 });
 check('official-full-sha-actions', () => {
