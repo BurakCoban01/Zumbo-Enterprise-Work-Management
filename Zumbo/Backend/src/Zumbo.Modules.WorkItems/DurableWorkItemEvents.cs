@@ -71,6 +71,18 @@ public interface IWorkItemAuditPublisher
         CancellationToken ct);
 }
 
+public interface IWorkItemOperationsAuditWriter
+{
+    Task WriteAsync(
+        string action,
+        string entityType,
+        string entityId,
+        string? oldValue,
+        string? newValue,
+        string correlationId,
+        CancellationToken ct);
+}
+
 public interface IWorkItemNotificationPublisher
 {
     Task NotifyAsync(

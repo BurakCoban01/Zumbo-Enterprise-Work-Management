@@ -192,6 +192,7 @@ public sealed class WorkItemWebhookService(
     IWebhookTargetPolicy targetPolicy,
     IWebhookSender sender,
     IWebhookAuthorization authorization,
+    IWorkItemAuditPublisher audit,
     IOptions<WebhookOptions> options,
     IClock clock,
     ICurrentUser currentUser,
@@ -201,7 +202,8 @@ public sealed class WorkItemWebhookService(
 
     public async Task<WebhookSecretReceipt> CreateAsync(
         CreateWebhookSubscriptionRequest request,
-        CancellationToken ct)
+        CancellationToken ct,
+        string? correlationId = null)
     {
         var organizationId = RequireOrganization();
         await authorization.EnsureCanManageAsync(organizationId, ct);
@@ -221,6 +223,14 @@ public sealed class WorkItemWebhookService(
             CreatedAtUtc = now,
             UpdatedAtUtc = now
         }, ct);
+        await WriteAuditAsync(
+            "WebhookSubscriptionCreated",
+            "WebhookSubscription",
+            document.Id,
+            null,
+            SubscriptionAuditValue(document),
+            correlationId,
+            ct);
         return new WebhookSecretReceipt(ToResponse(document), rawSecret);
     }
 
@@ -247,22 +257,34 @@ public sealed class WorkItemWebhookService(
     public async Task<WebhookSubscriptionResponse> UpdateAsync(
         string id,
         UpdateWebhookSubscriptionRequest request,
-        CancellationToken ct)
+        CancellationToken ct,
+        string? correlationId = null)
     {
         var document = await FindOwnedAsync(id, ct);
+        var oldValue = SubscriptionAuditValue(document);
         var targetUrl = RequireTarget(request.TargetUrl);
         await targetPolicy.ValidateAsync(targetUrl, ct);
         document.Name = RequireName(request.Name);
         document.TargetUrl = targetUrl;
         document.EventScopes = NormalizeScopes(request.EventScopes);
         document.UpdatedAtUtc = clock.UtcNow;
-        return ToResponse(await ReplaceAsync(document, request.ExpectedVersion, ct));
+        var updated = await ReplaceAsync(document, request.ExpectedVersion, ct);
+        await WriteAuditAsync(
+            "WebhookSubscriptionUpdated",
+            "WebhookSubscription",
+            updated.Id,
+            oldValue,
+            SubscriptionAuditValue(updated),
+            correlationId,
+            ct);
+        return ToResponse(updated);
     }
 
     public async Task<WebhookSecretReceipt> RotateSecretAsync(
         string id,
         RotateWebhookSecretRequest request,
-        CancellationToken ct)
+        CancellationToken ct,
+        string? correlationId = null)
     {
         var document = await FindOwnedAsync(id, ct);
         var rawSecret = GenerateSecret();
@@ -276,6 +298,14 @@ public sealed class WorkItemWebhookService(
         document.SecretVersion++;
         document.UpdatedAtUtc = clock.UtcNow;
         var updated = await ReplaceAsync(document, request.ExpectedVersion, ct);
+        await WriteAuditAsync(
+            "WebhookSecretRotated",
+            "WebhookSubscription",
+            updated.Id,
+            document.PreviousSecretFingerprint,
+            updated.CurrentSecretFingerprint,
+            correlationId,
+            ct);
         return new WebhookSecretReceipt(ToResponse(updated), rawSecret);
     }
 
@@ -283,12 +313,73 @@ public sealed class WorkItemWebhookService(
         string id,
         bool active,
         SetWebhookSubscriptionStateRequest request,
-        CancellationToken ct)
+        CancellationToken ct,
+        string? correlationId = null)
     {
         var document = await FindOwnedAsync(id, ct);
+        var wasActive = document.IsActive;
         document.IsActive = active;
         document.UpdatedAtUtc = clock.UtcNow;
-        return ToResponse(await ReplaceAsync(document, request.ExpectedVersion, ct));
+        var updated = await ReplaceAsync(document, request.ExpectedVersion, ct);
+        await WriteAuditAsync(
+            active ? "WebhookSubscriptionEnabled" : "WebhookSubscriptionDisabled",
+            "WebhookSubscription",
+            updated.Id,
+            wasActive.ToString(),
+            active.ToString(),
+            correlationId,
+            ct);
+        return ToResponse(updated);
+    }
+
+    public async Task<WebhookDeliveryResponse> QueueTestDeliveryAsync(
+        string id,
+        CancellationToken ct,
+        string? correlationId = null)
+    {
+        var subscription = await FindOwnedAsync(id, ct);
+        if (!subscription.IsActive)
+            throw new ConflictException(
+                "WEBHOOK_SUBSCRIPTION_DISABLED",
+                "Enable the webhook subscription before sending a test delivery.");
+
+        var now = clock.UtcNow;
+        var deliveryId = Hash($"{subscription.Id}:test:{Guid.NewGuid():N}");
+        var payload = JsonSerializer.Serialize(new
+        {
+            schemaVersion = 1,
+            specVersion = "1.0",
+            id = deliveryId,
+            type = "webhook.test",
+            source = "zumbo/integrations",
+            subject = $"webhooks/{subscription.Id}",
+            time = now,
+            tenantId = subscription.OrganizationId,
+            data = new { test = true }
+        }, JsonOptions);
+        var delivery = await deliveries.CreateAsync(new WebhookDeliveryDocument
+        {
+            Id = deliveryId,
+            OrganizationId = subscription.OrganizationId,
+            SubscriptionId = subscription.Id,
+            SourceEventId = deliveryId,
+            EventScope = "webhook.test",
+            TargetUrl = subscription.TargetUrl,
+            Payload = payload,
+            PayloadSha256 = Hash(payload),
+            NextAttemptAtUtc = now,
+            CreatedAtUtc = now,
+            UpdatedAtUtc = now
+        }, ct);
+        await WriteAuditAsync(
+            "WebhookTestDeliveryQueued",
+            "WebhookDelivery",
+            delivery.Id,
+            null,
+            subscription.Id,
+            correlationId,
+            ct);
+        return ToResponse(delivery);
     }
 
     public async Task QueueAsync(
@@ -453,7 +544,10 @@ public sealed class WorkItemWebhookService(
         return ToResponse(delivery);
     }
 
-    public async Task<WebhookDeliveryResponse> ReplayAsync(string id, CancellationToken ct)
+    public async Task<WebhookDeliveryResponse> ReplayAsync(
+        string id,
+        CancellationToken ct,
+        string? correlationId = null)
     {
         var organizationId = RequireOrganization();
         await authorization.EnsureCanManageAsync(organizationId, ct);
@@ -462,6 +556,7 @@ public sealed class WorkItemWebhookService(
                 && x.OrganizationId == organizationId
                 && x.Status == WebhookDeliveryStatuses.DeadLetter,
             ct) ?? throw DeliveryNotFound();
+        var oldErrorCode = delivery.LastErrorCode;
         delivery.Status = WebhookDeliveryStatuses.Pending;
         delivery.Attempts = 0;
         delivery.NextAttemptAtUtc = clock.UtcNow;
@@ -477,6 +572,14 @@ public sealed class WorkItemWebhookService(
             ct);
         if (result.MatchedCount != 1) throw new ConflictException(
             "WEBHOOK_DELIVERY_CONFLICT", "Webhook delivery changed concurrently; retry the operation.");
+        await WriteAuditAsync(
+            "WebhookDeliveryReplayed",
+            "WebhookDelivery",
+            delivery.Id,
+            oldErrorCode ?? WebhookDeliveryStatuses.DeadLetter,
+            WebhookDeliveryStatuses.Pending,
+            correlationId,
+            ct);
         return ToResponse(delivery);
     }
 
@@ -651,6 +754,27 @@ public sealed class WorkItemWebhookService(
             .TrimEnd('=').Replace('+', '-').Replace('/', '_');
 
     private static string Fingerprint(string value) => Hash(value)[..16];
+
+    private Task WriteAuditAsync(
+        string action,
+        string entityType,
+        string entityId,
+        string? oldValue,
+        string? newValue,
+        string? correlationId,
+        CancellationToken ct) =>
+        audit.WriteAsync(
+            action,
+            entityType,
+            entityId,
+            oldValue,
+            newValue,
+            string.IsNullOrWhiteSpace(correlationId) ? Guid.NewGuid().ToString("N") : correlationId,
+            ct);
+
+    private static string SubscriptionAuditValue(WebhookSubscriptionDocument document) =>
+        $"{document.Name}|{new Uri(document.TargetUrl).Host}|{document.IsActive}|v{document.SecretVersion}"
+        + $"|{string.Join(',', document.EventScopes)}";
 
     private static string Hash(string value) => Convert.ToHexString(
         SHA256.HashData(Encoding.UTF8.GetBytes(value))).ToLowerInvariant();

@@ -153,7 +153,7 @@ public sealed partial class WorkItemService(
     IWorkItemSprintPolicy? sprintPolicy = null,
     IWorkItemTypeSchemaPolicy? typeSchemaPolicy = null,
     WorkItemCollaborationService? collaborationService = null,
-    IOptions<SearchOptions>? searchOptions = null)
+    IOptions<SearchOptions>? searchOptions = null) : IIntakeWorkItemCreator
 {
     private readonly ExpectedVersionState expectedVersion = new(expectedVersions);
     private readonly Dictionary<string, string> authorizedOrganizationIds = new(StringComparer.Ordinal);
@@ -167,7 +167,67 @@ public sealed partial class WorkItemService(
         string? requestedId = null)
     {
         var authorization = await EnsurePermissionAsync(request.ProjectId, "WorkItemCreate", ct);
+        return await CreateCoreAsync(
+            request,
+            authorization.OrganizationId,
+            correlationId,
+            ct,
+            requestedId,
+            currentUser.UserId ?? "system",
+            null,
+            []);
+    }
 
+    async Task<WorkItemResponse> IIntakeWorkItemCreator.CreateAsync(
+        IntakeWorkItemCreation creation,
+        CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(creation.OrganizationId)
+            || string.IsNullOrWhiteSpace(creation.SubmissionId))
+        {
+            throw new ValidationException("Intake work creation requires organization and submission scope.");
+        }
+
+        authorizedOrganizationIds[creation.Request.ProjectId] = creation.OrganizationId;
+        var requestedId = IntakeStableIds.WorkItemId(creation.SubmissionId);
+        var existing = await workItems.SelectAsync(x => x.Id == requestedId, ct);
+        if (existing is not null)
+        {
+            if (existing.ProjectId != creation.Request.ProjectId
+                || existing.SourceIntakeSubmissionId != creation.SubmissionId)
+            {
+                throw new ConflictException(
+                    "INTAKE_WORK_ITEM_ID_CONFLICT",
+                    "The intake submission work item id is already in use.");
+            }
+
+            await activityStore.HydrateAsync(existing, creation.OrganizationId, ct);
+            return ToResponse(existing);
+        }
+
+        return await CreateCoreAsync(
+            creation.Request,
+            creation.OrganizationId,
+            creation.CorrelationId,
+            ct,
+            requestedId,
+            currentUser.UserId ?? "intake",
+            creation.SubmissionId,
+            creation.Attachments,
+            creation.Description);
+    }
+
+    private async Task<WorkItemResponse> CreateCoreAsync(
+        CreateWorkItemRequest request,
+        string organizationId,
+        string correlationId,
+        CancellationToken ct,
+        string? requestedId,
+        string actorUserId,
+        string? intakeSubmissionId,
+        IReadOnlyCollection<StoredAttachment> initialAttachments,
+        string description = "")
+    {
         CreateWorkItemValidator.Validate(request);
 
         var shape = await typeSchemas.ValidateAsync(request.ProjectId, request.Type, request.CustomFields, ct);
@@ -182,7 +242,6 @@ public sealed partial class WorkItemService(
         var placement = await boardPlacementPolicy.ResolveInitialAsync(request.ProjectId, request.BoardId, ct);
         var rank = await ranks.NextRankAsync(request.BoardId, placement.ColumnId, null, ct);
         var now = clock.UtcNow;
-        var organizationId = authorization.OrganizationId;
         var workItem = new WorkItemDocument
         {
             Id = string.IsNullOrWhiteSpace(requestedId) ? Guid.NewGuid().ToString("N") : requestedId,
@@ -192,6 +251,7 @@ public sealed partial class WorkItemService(
             TeamId = teamId,
             ColumnId = placement.ColumnId,
             Title = request.Title.Trim(),
+            Description = description.Trim(),
             Type = type,
             IssueTypeSchemaVersion = shape.SchemaVersion,
             CustomFields = shape.CustomFields.ToList(),
@@ -200,6 +260,7 @@ public sealed partial class WorkItemService(
             Rank = rank,
             AssigneeUserId = request.AssigneeUserId,
             DueDate = request.DueDate,
+            SourceIntakeSubmissionId = intakeSubmissionId,
             CreatedAt = now,
             UpdatedAt = now,
             ActivityStorageVersion = 1,
@@ -208,10 +269,23 @@ public sealed partial class WorkItemService(
                 new WorkItemStatusHistoryDocument
                 {
                     ToStatus = placement.Status,
-                    ChangedByUserId = currentUser.UserId ?? "system",
+                    ChangedByUserId = actorUserId,
                     ChangedAt = now
                 }
-            ]
+            ],
+            Attachments = initialAttachments.Select(stored => new AttachmentDocument
+            {
+                FileName = stored.FileName,
+                ContentType = stored.ContentType,
+                SizeBytes = stored.SizeBytes,
+                StoragePath = stored.StoragePath,
+                ChecksumSha256 = stored.ChecksumSha256,
+                SecurityState = stored.SecurityState,
+                ScanProvider = stored.ScanProvider,
+                ScanDetail = stored.ScanDetail,
+                ScannedAt = stored.ScannedAt,
+                CreatedAt = now
+            }).ToList()
         };
 
         await using (await AcquirePlacementLockAsync(request.BoardId, placement, ct))
@@ -225,7 +299,9 @@ public sealed partial class WorkItemService(
                 await wipProjection.ReserveCreateAsync(request.ProjectId, request.BoardId, placement, ct);
             }
             var initialTimeline = workItem.StatusHistory;
+            var separatedAttachments = workItem.Attachments;
             workItem.StatusHistory = [];
+            workItem.Attachments = [];
             try
             {
                 await workItems.CreateAsync(workItem, ct);
@@ -233,10 +309,17 @@ public sealed partial class WorkItemService(
             finally
             {
                 workItem.StatusHistory = initialTimeline;
+                workItem.Attachments = separatedAttachments;
             }
             await activityStore.CreateTimelineAsync(
                 WorkItemActivityStore.ToActivity(workItem, organizationId, workItem.StatusHistory[0], 0),
                 ct);
+            foreach (var attachment in workItem.Attachments)
+            {
+                await activityStore.CreateAttachmentAsync(
+                    WorkItemActivityStore.ToActivity(workItem, organizationId, attachment),
+                    ct);
+            }
         }
         await searchPublisher.IndexAsync(ToScopedSearchRecord(workItem), ct);
         await audit.WriteAsync("WorkItemCreated", "WorkItem", workItem.Id, null, workItem.Title, correlationId, ct);

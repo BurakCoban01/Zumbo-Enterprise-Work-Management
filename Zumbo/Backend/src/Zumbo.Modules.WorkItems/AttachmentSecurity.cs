@@ -83,14 +83,60 @@ public sealed record AttachmentMaintenanceResult(
     int PurgedMetadata,
     int DeletedOrphans);
 
+public sealed record AttachmentSecurityStatus(
+    long Quarantined,
+    long Clean,
+    long Rejected,
+    DateTimeOffset? OldestQuarantinedAt,
+    DateTimeOffset CapturedAt);
+
 public sealed class AttachmentSecurityMaintenanceService(
     IDocumentRepository<WorkItemAttachmentActivityDocument> attachments,
     IAttachmentStorage storage,
     IOptions<AttachmentSecurityOptions> options,
     IClock clock)
 {
-    public async Task<AttachmentMaintenanceResult> RunBatchAsync(CancellationToken ct)
+    public Task<AttachmentMaintenanceResult> RunBatchAsync(CancellationToken ct) =>
+        RunBatchAsync(null, ct);
+
+    public async Task<AttachmentSecurityStatus> GetStatusAsync(
+        string organizationId,
+        CancellationToken ct)
     {
+        organizationId = RequiredOrganizationId(organizationId);
+        var quarantined = await attachments.CountByFilterAsync(
+            x => x.OrganizationId == organizationId
+                && x.SecurityState == AttachmentSecurityStates.Quarantined,
+            ct);
+        var clean = await attachments.CountByFilterAsync(
+            x => x.OrganizationId == organizationId
+                && x.SecurityState == AttachmentSecurityStates.Clean,
+            ct);
+        var rejected = await attachments.CountByFilterAsync(
+            x => x.OrganizationId == organizationId
+                && x.SecurityState == AttachmentSecurityStates.Rejected,
+            ct);
+        var oldest = (await attachments.ListByFilterAsync(
+            x => x.OrganizationId == organizationId
+                && x.SecurityState == AttachmentSecurityStates.Quarantined,
+            x => x.CreatedAt,
+            pageSize: 1,
+            cancellationToken: ct)).SingleOrDefault();
+        return new AttachmentSecurityStatus(
+            quarantined,
+            clean,
+            rejected,
+            oldest?.CreatedAt,
+            clock.UtcNow);
+    }
+
+    public async Task<AttachmentMaintenanceResult> RunBatchAsync(
+        string? organizationId,
+        CancellationToken ct)
+    {
+        organizationId = string.IsNullOrWhiteSpace(organizationId)
+            ? null
+            : RequiredOrganizationId(organizationId);
         var now = clock.UtcNow;
         var batchSize = Math.Clamp(options.Value.MaintenanceBatchSize, 1, 500);
         var quarantineCutoff = now.AddHours(-Math.Clamp(options.Value.QuarantineRetentionHours, 1, 24 * 30));
@@ -103,7 +149,8 @@ public sealed class AttachmentSecurityMaintenanceService(
         var deletedOrphans = 0;
 
         var quarantined = await attachments.ListByFilterAsync(
-            x => x.SecurityState == AttachmentSecurityStates.Quarantined,
+            x => (organizationId == null || x.OrganizationId == organizationId)
+                && x.SecurityState == AttachmentSecurityStates.Quarantined,
             x => x.CreatedAt,
             pageSize: batchSize,
             cancellationToken: ct);
@@ -156,7 +203,9 @@ public sealed class AttachmentSecurityMaintenanceService(
         }
 
         var rejectedDocuments = await attachments.ListByFilterAsync(
-            x => x.SecurityState == AttachmentSecurityStates.Rejected && x.CreatedAt <= rejectedCutoff,
+            x => (organizationId == null || x.OrganizationId == organizationId)
+                && x.SecurityState == AttachmentSecurityStates.Rejected
+                && x.CreatedAt <= rejectedCutoff,
             x => x.CreatedAt,
             pageSize: batchSize,
             cancellationToken: ct);
@@ -170,13 +219,16 @@ public sealed class AttachmentSecurityMaintenanceService(
             purgedMetadata += checked((int)deleted);
         }
 
-        var objects = await storage.ListObjectsAsync(batchSize, ct);
-        foreach (var storedObject in objects.Where(x => x.CreatedAt <= orphanCutoff))
+        if (organizationId is null)
         {
-            if (!await attachments.ExistsByFilterAsync(x => x.StoragePath == storedObject.StoragePath, ct))
+            var objects = await storage.ListObjectsAsync(batchSize, ct);
+            foreach (var storedObject in objects.Where(x => x.CreatedAt <= orphanCutoff))
             {
-                await storage.DeleteAsync(storedObject.StoragePath, ct);
-                deletedOrphans++;
+                if (!await attachments.ExistsByFilterAsync(x => x.StoragePath == storedObject.StoragePath, ct))
+                {
+                    await storage.DeleteAsync(storedObject.StoragePath, ct);
+                    deletedOrphans++;
+                }
             }
         }
 
@@ -205,4 +257,9 @@ public sealed class AttachmentSecurityMaintenanceService(
             attachment.ScanProvider,
             attachment.ScanDetail,
             attachment.ScannedAt);
+
+    private static string RequiredOrganizationId(string value) =>
+        !string.IsNullOrWhiteSpace(value)
+            ? value.Trim()
+            : throw new ValidationException("Attachment security organization id is required.");
 }

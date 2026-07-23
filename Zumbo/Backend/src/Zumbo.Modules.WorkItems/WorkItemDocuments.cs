@@ -25,6 +25,7 @@ public sealed class WorkItemDocument : IVersionedDocument
     public string? SprintId { get; set; }
     public string? SourceTemplateId { get; set; }
     public string? SourceRecurrenceId { get; set; }
+    public string? SourceIntakeSubmissionId { get; set; }
     public DateTimeOffset? RecurrenceScheduledForUtc { get; set; }
     public decimal EstimatePoints { get; set; }
     public DateTimeOffset? CompletedAt { get; set; }
