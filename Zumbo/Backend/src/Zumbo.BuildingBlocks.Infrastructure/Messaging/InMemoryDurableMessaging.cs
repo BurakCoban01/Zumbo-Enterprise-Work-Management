@@ -188,6 +188,33 @@ public sealed class InMemoryDurableEventOutbox : IDurableEventOutbox
         }
     }
 
+    public Task<IReadOnlyList<DurableDeadLetterSummary>> ListDeadLettersAsync(
+        int pageSize,
+        CancellationToken cancellationToken = default)
+    {
+        if (pageSize is < 1 or > 50)
+        {
+            throw new ArgumentOutOfRangeException(nameof(pageSize));
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+        lock (_syncRoot)
+        {
+            var items = _entries.Values
+                .Where(entry => entry.State == DurableMessageStates.DeadLetter)
+                .OrderByDescending(entry => entry.DeadLetteredAtUtc)
+                .ThenBy(entry => entry.Message.Id, StringComparer.Ordinal)
+                .Take(pageSize)
+                .Select(entry => new DurableDeadLetterSummary(
+                    entry.Message.Id,
+                    entry.Message.EventType,
+                    entry.Attempt,
+                    entry.DeadLetteredAtUtc ?? entry.Message.OccurredAtUtc))
+                .ToList();
+            return Task.FromResult<IReadOnlyList<DurableDeadLetterSummary>>(items);
+        }
+    }
+
     public Task<DurableOutboxMetrics> GetMetricsAsync(
         DateTimeOffset nowUtc,
         CancellationToken cancellationToken = default)

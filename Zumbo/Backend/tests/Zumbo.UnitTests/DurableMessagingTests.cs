@@ -224,6 +224,40 @@ public sealed class DurableMessagingTests
         Assert.Equal(capturedAt, metrics.CapturedAtUtc);
     }
 
+    [Fact]
+    public async Task ListDeadLettersAsync_IsBoundedAndReturnsNoPayloadOrTenantData()
+    {
+        var outbox = new InMemoryDurableEventOutbox();
+        var first = Message("dead-a", Now.AddMinutes(-2));
+        var second = Message("dead-b", Now.AddMinutes(-1));
+        foreach (var message in new[] { first, second })
+        {
+            await outbox.EnqueueAsync(message);
+            var lease = Assert.Single(await outbox.ClaimAsync(
+                "worker",
+                1,
+                TimeSpan.FromMinutes(1),
+                Now));
+            _ = await outbox.FailAsync(
+                lease.Event.Id,
+                lease.LeaseToken,
+                "private provider detail",
+                1,
+                message.OccurredAtUtc,
+                Now.AddMinutes(1));
+        }
+
+        var result = await outbox.ListDeadLettersAsync(1);
+
+        var item = Assert.Single(result);
+        Assert.Equal(second.Id, item.Id);
+        Assert.Equal(second.EventType, item.EventType);
+        Assert.Equal(1, item.Attempts);
+        Assert.DoesNotContain("private", System.Text.Json.JsonSerializer.Serialize(item));
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(
+            () => outbox.ListDeadLettersAsync(51));
+    }
+
     [Theory]
     [InlineData(0, 1, 750)]
     [InlineData(1, 1, 1250)]

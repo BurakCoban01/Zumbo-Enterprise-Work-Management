@@ -1,6 +1,8 @@
 using Zumbo.BuildingBlocks.Application.Runtime;
 using Zumbo.BuildingBlocks.Application.Security;
 
+using static ApiEndpointResults;
+
 internal static class OperationsEndpoints
 {
     internal static void MapOperationsEndpoints(this RouteGroupBuilder api)
@@ -25,5 +27,23 @@ internal static class OperationsEndpoints
                 dependencies
             });
         }).RequireRateLimiting("report");
+
+        group.MapGet("/storage/security", async (
+            string organizationId,
+            OperationsStorageSecurityCoordinator coordinator,
+            CancellationToken ct) =>
+            Results.Ok(await coordinator.GetStatusAsync(organizationId, ct)))
+            .RequireRateLimiting("report");
+
+        group.MapPost("/storage/security/maintenance", async (
+            string organizationId,
+            OperationsStorageSecurityCoordinator coordinator,
+            HttpContext http,
+            CancellationToken ct) =>
+            Results.Ok(await coordinator.RunAsync(
+                organizationId,
+                CorrelationId(http),
+                ct)))
+            .RequireRateLimiting("bulk");
     }
 }

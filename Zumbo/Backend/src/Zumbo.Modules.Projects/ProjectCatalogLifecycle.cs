@@ -26,8 +26,13 @@ public sealed partial class ProjectService
         var defaults = (request.DefaultComponentNames ?? [])
             .Select(component => NormalizeLabel(component, "Default component name", 80))
             .Distinct(StringComparer.OrdinalIgnoreCase)
-            .Take(50)
             .ToList();
+        if (defaults.Count > ProjectCatalogLimits.MaximumDefaultComponentNames)
+        {
+            throw new ValidationException(
+                $"Default component names cannot contain more than {ProjectCatalogLimits.MaximumDefaultComponentNames} unique values.");
+        }
+
         ProjectTemplateDocument template;
         string action;
         string? oldValue;

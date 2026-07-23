@@ -3,6 +3,7 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
+using Zumbo.Modules.Audit;
 using Zumbo.Modules.Boards;
 using Zumbo.Modules.Identity;
 using Zumbo.Modules.Notifications;
@@ -163,6 +164,37 @@ public sealed class WorkItemCollaborationRecurrenceApiTests : IClassFixture<WebA
                 1,
                 ["operations"],
                 []));
+        var previewStart = DateTimeOffset.UtcNow.AddDays(1);
+        var preview = await PostAsync<WorkItemRecurrencePreviewResponse>(
+            "/api/work-items/recurrences/preview",
+            new PreviewWorkItemRecurrenceRequest(
+                project.Id,
+                template.Id,
+                WorkItemRecurrenceFrequencies.Weekly,
+                1,
+                previewStart,
+                previewStart.AddDays(30),
+                4,
+                3));
+        Assert.Equal(3, preview.OccurrencesUtc.Count);
+        Assert.Equal(
+            preview.OccurrencesUtc.First().AddDays(7),
+            preview.OccurrencesUtc.Skip(1).First());
+        Assert.All(preview.OccurrencesUtc, occurrence => Assert.Equal(TimeSpan.Zero, occurrence.Offset));
+
+        using (var invalidPreview = await client.PostAsJsonAsync(
+                   "/api/work-items/recurrences/preview",
+                   new PreviewWorkItemRecurrenceRequest(
+                       project.Id,
+                       template.Id,
+                       WorkItemRecurrenceFrequencies.Daily,
+                       0,
+                       previewStart,
+                       null,
+                       2)))
+        {
+            await AssertErrorAsync(invalidPreview, HttpStatusCode.BadRequest, "VALIDATION_ERROR");
+        }
         var lifecycleRecurrence = await PostAsync<WorkItemRecurrenceResponse>(
             "/api/work-items/recurrences",
             new CreateWorkItemRecurrenceRequest(
@@ -181,6 +213,28 @@ public sealed class WorkItemCollaborationRecurrenceApiTests : IClassFixture<WebA
             $"/api/work-items/recurrences/{lifecycleRecurrence.Id}/state",
             new SetWorkItemRecurrenceStateRequest(true));
         Assert.True(resumedRecurrence.Active);
+        var templateAudit = await EventuallyAsync(async () =>
+        {
+            var entries = await GetAsync<IReadOnlyList<AuditLogResponse>>(
+                $"/api/audit/entity/WorkItemTemplate/{template.Id}");
+            return entries.Any(entry => entry.Action == "WorkItemTemplateCreated")
+                   && entries.Any(entry => entry.Action == "WorkItemTemplateUpdated")
+                ? entries
+                : null;
+        });
+        Assert.Contains(templateAudit, entry => entry.Action == "WorkItemTemplateCreated");
+        Assert.Contains(templateAudit, entry => entry.Action == "WorkItemTemplateUpdated");
+        var recurrenceAudit = await EventuallyAsync(async () =>
+        {
+            var entries = await GetAsync<IReadOnlyList<AuditLogResponse>>(
+                $"/api/audit/entity/WorkItemRecurrence/{lifecycleRecurrence.Id}");
+            return entries.Any(entry => entry.Action == "WorkItemRecurrencePaused")
+                   && entries.Any(entry => entry.Action == "WorkItemRecurrenceResumed")
+                ? entries
+                : null;
+        });
+        Assert.Contains(recurrenceAudit, entry => entry.Action == "WorkItemRecurrencePaused");
+        Assert.Contains(recurrenceAudit, entry => entry.Action == "WorkItemRecurrenceResumed");
         using (var archiveLifecycleRecurrence = new HttpRequestMessage(
                    HttpMethod.Delete,
                    $"/api/work-items/recurrences/{lifecycleRecurrence.Id}"))

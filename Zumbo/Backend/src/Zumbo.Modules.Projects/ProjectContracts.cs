@@ -50,6 +50,11 @@ public static class ProjectMilestoneStatuses
     public const string Completed = "Completed";
 }
 
+public static class ProjectCatalogLimits
+{
+    public const int MaximumDefaultComponentNames = 50;
+}
+
 public sealed class ProjectLifecycleOptions
 {
     public int ArchiveRetentionDays { get; set; } = 90;

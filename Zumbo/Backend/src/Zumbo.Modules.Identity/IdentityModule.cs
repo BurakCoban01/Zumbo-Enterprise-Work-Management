@@ -36,7 +36,8 @@ public sealed record SessionResponse(
     DateTimeOffset CreatedAt,
     DateTimeOffset LastSeenAt,
     DateTimeOffset ExpiresAt,
-    DateTimeOffset? RevokedAt);
+    DateTimeOffset? RevokedAt,
+    bool IsCurrent);
 
 public interface ISessionClientContext
 {
@@ -502,7 +503,10 @@ public sealed partial class IdentityService(
         return new PasswordResetResponse(true);
     }
 
-    public async Task<IReadOnlyList<SessionResponse>> ListSessionsAsync(CancellationToken ct)
+    public Task<IReadOnlyList<SessionResponse>> ListSessionsAsync(CancellationToken ct) =>
+        ListSessionsAsync(null, ct);
+
+    public async Task<IReadOnlyList<SessionResponse>> ListSessionsAsync(string? currentSessionId, CancellationToken ct)
     {
         var user = await GetCurrentUserAsync(ct);
         var ownedSessions = await sessions.ListOwnedAsync(user.Id, user.OrganizationId, ct);
@@ -514,7 +518,8 @@ public sealed partial class IdentityService(
                 session.CreatedAt,
                 session.LastSeenAt == default ? session.CreatedAt : session.LastSeenAt,
                 session.ExpiresAt,
-                session.RevokedAt))
+                session.RevokedAt,
+                string.Equals(session.Id, currentSessionId, StringComparison.Ordinal)))
             .ToList();
     }
 

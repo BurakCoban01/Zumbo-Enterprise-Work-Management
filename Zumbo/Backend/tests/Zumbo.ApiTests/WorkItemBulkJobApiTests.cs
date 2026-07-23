@@ -4,6 +4,8 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Zumbo.BuildingBlocks.Application.Persistence;
 using Zumbo.Modules.Audit;
 using Zumbo.Modules.Boards;
 using Zumbo.Modules.Identity;
@@ -16,17 +18,19 @@ namespace Zumbo.ApiTests;
 
 public sealed class WorkItemBulkJobApiTests : IClassFixture<WebApplicationFactory<Program>>
 {
+    private readonly WebApplicationFactory<Program> application;
     private readonly HttpClient client;
 
     public WorkItemBulkJobApiTests(WebApplicationFactory<Program> factory)
     {
-        client = factory.WithWebHostBuilder(builder => builder.ConfigureAppConfiguration((_, configuration) =>
+        application = factory.WithWebHostBuilder(builder => builder.ConfigureAppConfiguration((_, configuration) =>
             configuration.AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["WorkItemBulkJobs:BatchSize"] = "2",
                 ["WorkItemBulkJobs:MaxInputItems"] = "100",
                 ["DurableMessaging:IdleDelay"] = "00:00:01"
-            }))).CreateClient();
+            })));
+        client = application.CreateClient();
     }
 
     [Fact]
@@ -55,6 +59,7 @@ public sealed class WorkItemBulkJobApiTests : IClassFixture<WebApplicationFactor
         Assert.Equal(WorkItemBulkJobStates.CompletedWithErrors, dry.State);
         Assert.Equal(1, dry.SucceededItems);
         Assert.Equal(1, dry.FailedItems);
+        Assert.Equal(dry.CompletedAt!.Value.AddDays(7), dry.ArtifactsExpireAt);
         Assert.True(dry.HasResult);
         Assert.True(dry.HasErrorFile);
         var dryErrors = await client.GetStringAsync($"/api/work-items/bulk/jobs/{dry.Id}/errors");
@@ -115,6 +120,29 @@ public sealed class WorkItemBulkJobApiTests : IClassFixture<WebApplicationFactor
         Assert.Contains("Imported one",
             await client.GetStringAsync($"/api/work-items/bulk/jobs/{export.Id}/result"),
             StringComparison.Ordinal);
+        await SetCompletedAtAsync(export.Id, DateTimeOffset.UtcNow.AddDays(-8));
+        await AssertErrorAsync(
+            await client.GetAsync($"/api/work-items/bulk/jobs/{export.Id}/result"),
+            HttpStatusCode.NotFound,
+            "WORK_ITEM_BULK_ARTIFACT_EXPIRED");
+        var expiredExport = await GetAsync<WorkItemBulkJobResponse>(
+            $"/api/work-items/bulk/jobs/{export.Id}");
+        Assert.False(expiredExport.HasResult);
+        Assert.False(expiredExport.HasErrorFile);
+        Assert.Contains("\"sourceKey\":\"one\"",
+            await client.GetStringAsync($"/api/work-items/bulk/jobs/{imported.Id}/result"),
+            StringComparison.Ordinal);
+        var exportAudit = await AwaitAuditAsync(
+            export.Id,
+            "WorkItemBulkJobArtifactsExpired");
+        Assert.Contains(exportAudit, entry => entry.Action == "WorkItemBulkJobArtifactsExpired");
+        await AssertErrorAsync(
+            await client.GetAsync($"/api/work-items/bulk/jobs/{export.Id}/result"),
+            HttpStatusCode.NotFound,
+            "WORK_ITEM_BULK_ARTIFACT_EXPIRED");
+        exportAudit = await GetAsync<IReadOnlyList<AuditLogResponse>>(
+            $"/api/audit/entity/WorkItemBulkJob/{export.Id}");
+        Assert.Single(exportAudit, entry => entry.Action == "WorkItemBulkJobArtifactsExpired");
 
         var cancellable = await SubmitJobAsync("/api/work-items/bulk/jobs",
             new CreateWorkItemBulkJobRequest(project.Id, WorkItemBulkOperations.Archive,
@@ -153,6 +181,22 @@ public sealed class WorkItemBulkJobApiTests : IClassFixture<WebApplicationFactor
         throw new Xunit.Sdk.XunitException("Bulk job did not reach a terminal state within the bounded wait.");
     }
 
+    private async Task SetCompletedAtAsync(string jobId, DateTimeOffset completedAt)
+    {
+        using var scope = application.Services.CreateScope();
+        var repository = scope.ServiceProvider
+            .GetRequiredService<IDocumentRepository<WorkItemBulkJobDocument>>();
+        var job = await repository.SelectAsync(x => x.Id == jobId, CancellationToken.None);
+        Assert.NotNull(job);
+        job.CompletedAt = completedAt;
+        var result = await repository.ReplaceByVersionAsync(
+            x => x.Id == jobId,
+            job,
+            job.Version,
+            CancellationToken.None);
+        Assert.True(result.Found);
+    }
+
     private async Task<IReadOnlyList<WorkItemResponse>> AwaitWorkItemSearchAsync(
         string projectId, string text, int expectedCount)
     {
@@ -168,16 +212,19 @@ public sealed class WorkItemBulkJobApiTests : IClassFixture<WebApplicationFactor
             $"Work-item search did not reach {expectedCount} results; observed {result.Count}.");
     }
 
-    private async Task<IReadOnlyList<AuditLogResponse>> AwaitAuditAsync(string jobId)
+    private async Task<IReadOnlyList<AuditLogResponse>> AwaitAuditAsync(
+        string jobId,
+        string expectedAction = "WorkItemBulkJobCompleted")
     {
         for (var attempt = 0; attempt < 200; attempt++)
         {
             var audit = await GetAsync<IReadOnlyList<AuditLogResponse>>(
                 $"/api/audit/entity/WorkItemBulkJob/{jobId}");
-            if (audit.Any(entry => entry.Action == "WorkItemBulkJobCompleted")) return audit;
+            if (audit.Any(entry => entry.Action == expectedAction)) return audit;
             await Task.Delay(25);
         }
-        throw new Xunit.Sdk.XunitException("Bulk job audit was not visible within the bounded wait.");
+        throw new Xunit.Sdk.XunitException(
+            $"Bulk job audit action {expectedAction} was not visible within the bounded wait.");
     }
 
     private async Task<WorkItemBulkJobResponse> SubmitJobAsync(string url, object body, string key)

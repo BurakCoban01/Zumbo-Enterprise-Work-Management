@@ -346,6 +346,67 @@ public static class MongoWorkItemBulkJobIndexes
     ];
 }
 
+public static class MongoIntakeIndexes
+{
+    public static IReadOnlyList<MongoIndexSpecification> All { get; } =
+    [
+        new(
+            "WorkItems",
+            "intakeforms",
+            "ux_intake_forms_public_id",
+            new BsonDocument { ["PublicId"] = 1 },
+            Unique: true),
+        new(
+            "WorkItems",
+            "intakeforms",
+            "ix_intake_forms_tenant_project_state",
+            new BsonDocument
+            {
+                ["OrganizationId"] = 1,
+                ["ProjectId"] = 1,
+                ["State"] = 1,
+                ["UpdatedAt"] = -1,
+                ["_id"] = 1
+            }),
+        new(
+            "WorkItems",
+            "intakeformversions",
+            "ux_intake_form_versions_number",
+            new BsonDocument { ["FormId"] = 1, ["DefinitionVersion"] = 1 },
+            Unique: true),
+        new(
+            "WorkItems",
+            "intakesubmissions",
+            "ux_intake_submissions_idempotency",
+            new BsonDocument
+            {
+                ["OrganizationId"] = 1,
+                ["FormId"] = 1,
+                ["SubmittedByUserId"] = 1,
+                ["IdempotencyKeyHash"] = 1
+            },
+            Unique: true),
+        new(
+            "WorkItems",
+            "intakesubmissions",
+            "ix_intake_submissions_triage",
+            new BsonDocument
+            {
+                ["OrganizationId"] = 1,
+                ["FormId"] = 1,
+                ["State"] = 1,
+                ["CreatedAt"] = -1,
+                ["_id"] = 1
+            }),
+        new(
+            "WorkItems",
+            "intakesubmissions",
+            "ux_intake_submissions_work_item",
+            new BsonDocument { ["WorkItemId"] = 1 },
+            Unique: true)
+    ];
+}
+
 public static class MongoAuditTenantIndexes
 {
     public static IReadOnlyList<MongoIndexSpecification> All { get; } =
@@ -685,6 +746,8 @@ public sealed class MongoMigrationRunner(
         "20260720_025_privacy_workflow_utc_index";
     public const string WebhookIndexMigrationId =
         "20260720_026_webhook_indexes";
+    public const string IntakeIndexMigrationId =
+        "20260724_027_intake_indexes";
 
     private const string LedgerCollection = "__zumbo_migrations";
     private const string BackupCollection = "__zumbo_migration_rank_backups";
@@ -731,6 +794,10 @@ public sealed class MongoMigrationRunner(
             await ApplyIndexesAsync(
                 WorkItemBulkJobIndexMigrationId,
                 MongoWorkItemBulkJobIndexes.All,
+                cancellationToken),
+            await ApplyIndexesAsync(
+                IntakeIndexMigrationId,
+                MongoIntakeIndexes.All,
                 cancellationToken),
             await ApplyIndexesAsync(
                 AuditTenantIndexMigrationId,

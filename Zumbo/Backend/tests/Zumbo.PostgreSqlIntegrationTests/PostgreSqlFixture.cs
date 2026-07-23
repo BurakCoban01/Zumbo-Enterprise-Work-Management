@@ -154,6 +154,9 @@ public sealed class PostgreSqlApi : IAsyncDisposable
         options.MapDocument<WorkItemRecurrenceOccurrenceDocument>("work_items", "work_item_recurrence_occurrences");
         options.MapDocument<WorkItemBulkJobDocument>("work_items", "work_item_bulk_jobs");
         options.MapDocument<WorkItemBulkJobItemDocument>("work_items", "work_item_bulk_job_items");
+        options.MapDocument<IntakeFormDocument>("work_items", "intake_forms");
+        options.MapDocument<IntakeFormVersionDocument>("work_items", "intake_form_versions");
+        options.MapDocument<IntakeSubmissionDocument>("work_items", "intake_submissions");
         options.MapDocument<WebhookSubscriptionDocument>("work_items", "webhook_subscriptions");
         options.MapDocument<WebhookDeliveryDocument>("work_items", "webhook_deliveries");
         var dataSource = new NpgsqlDataSourceBuilder(connectionString).Build();

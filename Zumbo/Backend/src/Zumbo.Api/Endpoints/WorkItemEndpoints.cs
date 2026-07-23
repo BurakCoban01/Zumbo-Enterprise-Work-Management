@@ -55,7 +55,8 @@ internal static class WorkItemEndpoints
                     && options.MaxInputItems is >= 1 and <= 10_000
                     && options.MaxInputBytes is >= 1_024 and <= 50 * 1024 * 1024
                     && options.MaxExportItems is >= 1 and <= 100_000
-                    && options.MaxArtifactBytes is >= 1_024 and <= 100 * 1024 * 1024,
+                    && options.MaxArtifactBytes is >= 1_024 and <= 100 * 1024 * 1024
+                    && options.ArtifactRetentionDays is >= 1 and <= 90,
                 "Work-item bulk job limits are outside the supported bounds.")
             .ValidateOnStart();
         services.AddScoped<IWorkItemBulkArtifactStorage, WorkItemBulkArtifactStorageAdapter>();
@@ -74,6 +75,8 @@ internal static class WorkItemEndpoints
             provider.GetRequiredService<WorkItemTypeSchemaService>());
         services.AddScoped<IAttachmentStorage, AttachmentStorageAdapter>();
         services.AddScoped<AttachmentSecurityMaintenanceService>();
+        services.AddScoped<OperationsStorageSecurityCoordinator>();
+        services.AddScoped<IWorkItemOperationsAuditWriter, WorkItemOperationsAuditWriterAdapter>();
         services.AddScoped<SignalRWorkItemRealtimePublisher>();
         services.AddScoped<DurableWorkItemEventPublisher>();
         services.AddScoped<IWorkItemAuditPublisher>(provider => provider.GetRequiredService<DurableWorkItemEventPublisher>());
@@ -117,6 +120,25 @@ internal static class WorkItemEndpoints
         services.AddScoped<IWorkItemActivityStore, WorkItemActivityStore>();
         services.AddScoped<WorkItemActivityQueryService>();
         services.AddScoped<WorkItemService>();
+        services.AddScoped<IIntakeWorkItemCreator>(provider =>
+            provider.GetRequiredService<WorkItemService>());
+        services.AddScoped<IIntakeRoutePolicy, IntakeRoutePolicyAdapter>();
+        services.AddOptions<IntakeOptions>()
+            .BindConfiguration("Intake")
+            .Validate(
+                options => options.MaxFields is >= 1 and <= 100
+                    && options.MaxValues is >= 1 and <= 100
+                    && options.MaxAttachments is >= 0 and <= 20
+                    && options.MaxAttachmentBytes is >= 1_024 and <= 25 * 1024 * 1024
+                    && options.MaxTotalAttachmentBytes >= options.MaxAttachmentBytes
+                    && options.MaxTotalAttachmentBytes <= 25 * 1024 * 1024
+                    && options.MaxValueCharacters is >= 100 and <= 20_000
+                    && options.MaxTotalValueCharacters >= options.MaxValueCharacters
+                    && options.MaxTotalValueCharacters <= 100_000,
+                "Intake limits are outside the supported bounds.")
+            .ValidateOnStart();
+        services.AddScoped<IntakeFormService>();
+        services.AddScoped<IntakeSubmissionService>();
         services.AddScoped<CreateWorkItemHandler>();
         services.AddScoped<SearchWorkItemsHandler>();
         if (configuration?.GetValue("BackgroundJobs:Enabled", true) == true)
@@ -143,28 +165,78 @@ internal static class WorkItemEndpoints
             Results.Ok(await outbox.GetMetricsAsync(clock.UtcNow, ct)))
             .WithZumboPermission(PermissionCatalog.OperationsManage, isGlobal: true);
 
+        group.MapGet("/durable-messaging/dead-letters", async (
+            int? pageSize,
+            IDurableEventOutbox outbox,
+            CancellationToken ct) =>
+            Results.Ok(await outbox.ListDeadLettersAsync(
+                Math.Clamp(pageSize ?? 20, 1, 50),
+                ct)))
+            .WithZumboPermission(PermissionCatalog.OperationsManage, isGlobal: true)
+            .RequireRateLimiting("report");
+
         group.MapPost("/durable-messaging/dead-letter/{messageId}/replay", async (
             string messageId,
             IDurableEventOutbox outbox,
+            IWorkItemOperationsAuditWriter audit,
             IClock clock,
+            HttpContext http,
             CancellationToken ct) =>
-            Results.Ok(new
+        {
+            var replayed = await outbox.ReplayDeadLetterAsync(messageId, clock.UtcNow, ct);
+            if (replayed)
             {
-                replayed = await outbox.ReplayDeadLetterAsync(messageId, clock.UtcNow, ct)
-            }))
+                await audit.WriteAsync(
+                    "DurableMessageReplayed",
+                    "DurableMessage",
+                    messageId,
+                    "DeadLetter",
+                    "Pending",
+                    CorrelationId(http),
+                    ct);
+            }
+
+            return Results.Ok(new { replayed });
+        })
             .WithZumboPermission(PermissionCatalog.OperationsManage, isGlobal: true);
 
         group.MapPost("/search/rebuild", async (
             SearchMaintenanceService service,
+            IWorkItemOperationsAuditWriter audit,
+            HttpContext http,
             CancellationToken ct) =>
-            Results.Ok(await service.RebuildAsync(ct)))
+        {
+            var result = await service.RebuildAsync(ct);
+            await audit.WriteAsync(
+                "SearchIndexRebuilt",
+                "Operations",
+                "work-item-search",
+                null,
+                $"{result.Indexed}:{result.Removed}:{result.AliasChanged}",
+                CorrelationId(http),
+                ct);
+            return Results.Ok(result);
+        })
             .WithZumboPermission(PermissionCatalog.OperationsManage, isGlobal: true)
             .RequireRateLimiting("bulk");
 
         group.MapPost("/search/reconcile", async (
             SearchMaintenanceService service,
+            IWorkItemOperationsAuditWriter audit,
+            HttpContext http,
             CancellationToken ct) =>
-            Results.Ok(await service.RebuildAsync(ct)))
+        {
+            var result = await service.RebuildAsync(ct);
+            await audit.WriteAsync(
+                "SearchIndexReconciled",
+                "Operations",
+                "work-item-search",
+                null,
+                $"{result.Indexed}:{result.Removed}:{result.AliasChanged}",
+                CorrelationId(http),
+                ct);
+            return Results.Ok(result);
+        })
             .WithZumboPermission(PermissionCatalog.OperationsManage, isGlobal: true)
             .RequireRateLimiting("bulk");
 
@@ -295,6 +367,14 @@ internal static class WorkItemEndpoints
             HttpContext http,
             CancellationToken ct) =>
             Created(await service.CreateRecurrenceAsync(request, CorrelationId(http), ct), http))
+            .WithZumboPermission(PermissionCatalog.WorkItemCreate);
+
+        group.MapPost("/recurrences/preview", async (
+            PreviewWorkItemRecurrenceRequest request,
+            WorkItemTemplateRecurrenceService service,
+            HttpContext http,
+            CancellationToken ct) =>
+            Ok(await service.PreviewRecurrenceAsync(request, ct), http))
             .WithZumboPermission(PermissionCatalog.WorkItemCreate);
 
         group.MapPatch("/recurrences/{recurrenceId}/state", async (

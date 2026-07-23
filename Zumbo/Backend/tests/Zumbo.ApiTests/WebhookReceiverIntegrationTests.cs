@@ -111,6 +111,7 @@ public sealed class WebhookReceiverIntegrationTests(WebApplicationFactory<Progra
             policy,
             new PinnedWebhookSender(policy, options),
             new AllowAuthorization(),
+            new NoOpAuditPublisher(),
             options,
             clock,
             new TestCurrentUser());
@@ -185,6 +186,18 @@ public sealed class WebhookReceiverIntegrationTests(WebApplicationFactory<Progra
     private sealed class AllowAuthorization : IWebhookAuthorization
     {
         public Task EnsureCanManageAsync(string organizationId, CancellationToken ct) => Task.CompletedTask;
+    }
+
+    private sealed class NoOpAuditPublisher : IWorkItemAuditPublisher
+    {
+        public Task WriteAsync(
+            string action,
+            string entityType,
+            string entityId,
+            string? oldValue,
+            string? newValue,
+            string correlationId,
+            CancellationToken ct) => Task.CompletedTask;
     }
 
     private sealed class TestCurrentUser : ICurrentUser

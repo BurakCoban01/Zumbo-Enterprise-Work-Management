@@ -182,6 +182,39 @@ public sealed class PostgreSqlDurableEventOutbox(
             nowUtc,
             cancellationToken);
 
+    public async Task<IReadOnlyList<DurableDeadLetterSummary>> ListDeadLettersAsync(
+        int pageSize,
+        CancellationToken cancellationToken = default)
+    {
+        if (pageSize is < 1 or > 50)
+        {
+            throw new ArgumentOutOfRangeException(nameof(pageSize));
+        }
+
+        const string sql = """
+            SELECT id, event_type, attempt_count, dead_lettered_at_utc
+            FROM messaging.outbox_messages
+            WHERE status='DeadLetter'
+            ORDER BY dead_lettered_at_utc DESC, id
+            LIMIT @pageSize;
+            """;
+        await using var lease = await session.LeaseAsync(cancellationToken);
+        await using var command = lease.CreateCommand(sql, options.CommandTimeoutSeconds);
+        command.Parameters.AddWithValue("pageSize", pageSize);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        var items = new List<DurableDeadLetterSummary>();
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            items.Add(new DurableDeadLetterSummary(
+                reader.GetString(0),
+                reader.GetString(1),
+                reader.GetInt32(2),
+                reader.GetFieldValue<DateTimeOffset>(3)));
+        }
+
+        return items;
+    }
+
     public async Task<DurableOutboxMetrics> GetMetricsAsync(
         DateTimeOffset nowUtc,
         CancellationToken cancellationToken = default)

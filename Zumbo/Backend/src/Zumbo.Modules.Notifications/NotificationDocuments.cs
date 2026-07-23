@@ -77,6 +77,12 @@ public sealed record NotificationDeliveryMetrics(
     DateTimeOffset? OldestPendingAt,
     DateTimeOffset CapturedAt);
 
+public sealed record NotificationDeadLetterSummary(
+    string Id,
+    string Type,
+    int Attempts,
+    DateTimeOffset DeadLetteredAt);
+
 public interface INotificationUserDirectory
 {
     Task<NotificationUser?> FindAsync(string userId, CancellationToken ct);
@@ -85,6 +91,17 @@ public interface INotificationUserDirectory
 public interface IEmailNotificationSender
 {
     Task SendAsync(string recipient, string subject, string body, CancellationToken ct);
+}
+
+public interface INotificationAuditWriter
+{
+    Task WriteAsync(
+        string action,
+        string entityId,
+        string? oldValue,
+        string? newValue,
+        string correlationId,
+        CancellationToken ct);
 }
 
 public sealed class NotificationDocument : IDocument

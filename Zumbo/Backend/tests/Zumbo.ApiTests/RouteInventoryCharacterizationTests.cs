@@ -98,6 +98,7 @@ public sealed class RouteInventoryCharacterizationTests : IClassFixture<WebAppli
             typeof(NotificationService), typeof(ListNotificationsHandler), typeof(MarkNotificationAsReadHandler),
             typeof(AuditService), typeof(WriteAuditLogHandler), typeof(QueryAuditLogHandler),
             typeof(WorkflowService), typeof(UpsertWorkflowHandler), typeof(GetWorkflowHandler),
+            typeof(IntakeFormService), typeof(IntakeSubmissionService),
             typeof(WorkItemService), typeof(CreateWorkItemHandler), typeof(SearchWorkItemsHandler)
         };
 

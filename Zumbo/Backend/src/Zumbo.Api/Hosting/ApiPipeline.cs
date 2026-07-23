@@ -61,6 +61,7 @@ internal static class ApiPipeline
         api.MapWebhookEndpoints();
         api.MapSprintEndpoints();
         api.MapWorkItemTypeSchemaEndpoints();
+        api.MapIntakeEndpoints();
         api.MapNotificationEndpoints();
         api.MapAuditEndpoints();
         api.MapOperationsEndpoints();

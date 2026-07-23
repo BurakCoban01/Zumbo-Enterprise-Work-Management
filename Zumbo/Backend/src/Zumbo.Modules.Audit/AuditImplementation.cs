@@ -255,6 +255,26 @@ public sealed class AuditService
         return result;
     }
 
+    public static async Task WriteNdjsonAsync(
+        IReadOnlyCollection<AuditLogResponse> records,
+        Stream destination,
+        CancellationToken ct)
+    {
+        await using var writer = new StreamWriter(
+            destination,
+            new UTF8Encoding(encoderShouldEmitUTF8Identifier: false),
+            bufferSize: 16 * 1024,
+            leaveOpen: true);
+        var written = 0;
+        foreach (var record in records)
+        {
+            await writer.WriteLineAsync(JsonSerializer.Serialize(record).AsMemory(), ct);
+            written++;
+            if (written % 100 == 0) await writer.FlushAsync(ct);
+        }
+        await writer.FlushAsync(ct);
+    }
+
     public async Task<AuditRetentionResult> PurgeExpiredAsync(
         string organizationId,
         DateTimeOffset now,

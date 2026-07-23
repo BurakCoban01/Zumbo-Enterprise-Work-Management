@@ -189,6 +189,26 @@ public sealed class ProjectLifecycleApiTests : IClassFixture<WebApplicationFacto
                 "PROJECT_OWNER_ROLE_LOCKED");
         }
 
+        using (var oversizedTemplate = VersionedRequest(
+            HttpMethod.Post,
+            $"/api/projects/{project.Id}/templates",
+            new UpsertProjectTemplateRequest(
+                "Oversized",
+                true,
+                Enumerable.Range(1, ProjectCatalogLimits.MaximumDefaultComponentNames + 1)
+                    .Select(index => $"Component {index}")
+                    .ToArray()),
+            project.Version))
+        {
+            await AssertErrorAsync(
+                await client.SendAsync(oversizedTemplate),
+                HttpStatusCode.BadRequest,
+                "VALIDATION_ERROR");
+        }
+        var unchangedProject = await GetAsync<ProjectResponse>($"/api/projects/{project.Id}");
+        Assert.Equal(project.Version, unchangedProject.Version);
+        Assert.Empty(unchangedProject.Templates!);
+
         project = await SendVersionedAsync(
             HttpMethod.Post,
             $"/api/projects/{project.Id}/templates",

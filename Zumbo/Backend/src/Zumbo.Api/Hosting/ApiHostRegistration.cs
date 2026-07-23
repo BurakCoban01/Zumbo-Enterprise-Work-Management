@@ -169,6 +169,15 @@ internal static class ApiHostRegistration
                         Window = TimeSpan.FromSeconds(rateLimits.StandardWindowSeconds),
                         QueueLimit = 0
                     }));
+            options.AddPolicy("intake-public", context =>
+                RateLimitPartition.GetFixedWindowLimiter(
+                    context.Connection.RemoteIpAddress?.ToString() ?? "anonymous",
+                    _ => new FixedWindowRateLimiterOptions
+                    {
+                        PermitLimit = Math.Clamp(rateLimits.IntakePublicPermitLimit, 1, 1_000),
+                        Window = TimeSpan.FromSeconds(rateLimits.StandardWindowSeconds),
+                        QueueLimit = 0
+                    }));
             options.AddPolicy("report", context =>
                 RateLimitPartition.GetFixedWindowLimiter(
                     context.User.FindFirstValue(ClaimTypes.NameIdentifier)
@@ -504,6 +513,9 @@ internal static class ApiHostRegistration
                 options.MapDocument<Zumbo.Modules.WorkItems.WorkItemRecurrenceOccurrenceDocument>("work_items", "work_item_recurrence_occurrences");
                 options.MapDocument<Zumbo.Modules.WorkItems.WorkItemBulkJobDocument>("work_items", "work_item_bulk_jobs");
                 options.MapDocument<Zumbo.Modules.WorkItems.WorkItemBulkJobItemDocument>("work_items", "work_item_bulk_job_items");
+                options.MapDocument<Zumbo.Modules.WorkItems.IntakeFormDocument>("work_items", "intake_forms");
+                options.MapDocument<Zumbo.Modules.WorkItems.IntakeFormVersionDocument>("work_items", "intake_form_versions");
+                options.MapDocument<Zumbo.Modules.WorkItems.IntakeSubmissionDocument>("work_items", "intake_submissions");
                 options.MapDocument<Zumbo.Modules.WorkItems.WebhookSubscriptionDocument>("work_items", "webhook_subscriptions");
                 options.MapDocument<Zumbo.Modules.WorkItems.WebhookDeliveryDocument>("work_items", "webhook_deliveries");
                 options.MapDocument<Zumbo.Modules.WorkItems.BoardColumnWipProjectionDocument>("work_items", "board_column_wip_projections");

@@ -24,6 +24,9 @@ public sealed class PrivacyDataProcessorAdapter(
     IDocumentRepository<WorkItemBulkJobDocument> workItemBulkJobs,
     IDocumentRepository<WorkItemBulkJobItemDocument> workItemBulkJobItems,
     IWorkItemBulkArtifactStorage workItemBulkArtifacts,
+    IDocumentRepository<IntakeFormDocument> intakeForms,
+    IDocumentRepository<IntakeFormVersionDocument> intakeFormVersions,
+    IDocumentRepository<IntakeSubmissionDocument> intakeSubmissions,
     IDocumentRepository<NotificationDocument> notifications,
     IDocumentRepository<NotificationPreferenceDocument> notificationPreferences,
     IDocumentRepository<AuditLogDocument> auditLogs) : IPrivacyDataProcessor
@@ -85,6 +88,20 @@ public sealed class PrivacyDataProcessorAdapter(
             workItemBulkJobs,
             x => x.OrganizationId == organizationId && x.RequestedByUserId == userId,
             ct);
+        var intakeFormData = await LoadAllAsync(
+            intakeForms,
+            x => x.OrganizationId == organizationId
+                && (x.CreatedByUserId == userId || x.UpdatedByUserId == userId),
+            ct);
+        var intakeVersionData = await LoadAllAsync(
+            intakeFormVersions,
+            x => x.OrganizationId == organizationId && x.PublishedByUserId == userId,
+            ct);
+        var intakeSubmissionData = await LoadAllAsync(
+            intakeSubmissions,
+            x => x.OrganizationId == organizationId
+                && (x.SubmittedByUserId == userId || x.TriagedByUserId == userId),
+            ct);
 
         var references = new List<PrivacyDataGroup>
         {
@@ -126,6 +143,14 @@ public sealed class PrivacyDataProcessorAdapter(
                 new PrivacyDataReference(item.Id, "creator"))),
             Group("work-item-bulk-jobs", bulkJobData.Select(item =>
                 new PrivacyDataReference(item.Id, $"{item.Type}:{item.State}"))),
+            Group("intake-forms", intakeFormData.Select(item =>
+                new PrivacyDataReference(item.Id, "author"))),
+            Group("intake-form-versions", intakeVersionData.Select(item =>
+                new PrivacyDataReference(item.Id, "publisher"))),
+            Group("intake-submissions", intakeSubmissionData.Select(item =>
+                new PrivacyDataReference(
+                    item.Id,
+                    item.SubmittedByUserId == userId ? "submitter" : "triage"))),
             Group("notifications", notificationData.Select(notification =>
                 new PrivacyDataReference(notification.Id, notification.Type + ":" + notification.Message))),
             Group("audit", auditData.Select(audit =>
@@ -267,6 +292,31 @@ public sealed class PrivacyDataProcessorAdapter(
             x => x.OrganizationId == organizationId && x.RequestedByUserId == userId,
             "work-item-bulk-jobs",
             item => [new PrivacyDataReference(item.Id, $"{item.Type}:{item.State}")],
+            writer,
+            ct);
+        written += await WriteDocumentsAsync(
+            intakeForms,
+            x => x.OrganizationId == organizationId
+                && (x.CreatedByUserId == userId || x.UpdatedByUserId == userId),
+            "intake-forms",
+            item => [new PrivacyDataReference(item.Id, "author")],
+            writer,
+            ct);
+        written += await WriteDocumentsAsync(
+            intakeFormVersions,
+            x => x.OrganizationId == organizationId && x.PublishedByUserId == userId,
+            "intake-form-versions",
+            item => [new PrivacyDataReference(item.Id, "publisher")],
+            writer,
+            ct);
+        written += await WriteDocumentsAsync(
+            intakeSubmissions,
+            x => x.OrganizationId == organizationId
+                && (x.SubmittedByUserId == userId || x.TriagedByUserId == userId),
+            "intake-submissions",
+            item => [new PrivacyDataReference(
+                item.Id,
+                item.SubmittedByUserId == userId ? "submitter" : "triage")],
             writer,
             ct);
         written += await WriteDocumentsAsync(
@@ -479,6 +529,49 @@ public sealed class PrivacyDataProcessorAdapter(
                 await workItemBulkArtifacts.DeleteAsync(job.ErrorStoragePath, ct);
             await workItemBulkJobItems.DeleteByFilterAsync(x => x.JobId == job.Id, ct);
             await workItemBulkJobs.DeleteByFilterAsync(x => x.Id == job.Id, ct);
+        }
+
+        var intakeFormData = await LoadAllAsync(
+            intakeForms,
+            x => x.OrganizationId == organizationId
+                && (x.CreatedByUserId == userId || x.UpdatedByUserId == userId),
+            ct);
+        foreach (var form in intakeFormData)
+        {
+            if (form.CreatedByUserId == userId) form.CreatedByUserId = pseudonym;
+            if (form.UpdatedByUserId == userId) form.UpdatedByUserId = pseudonym;
+            await intakeForms.ReplaceByFilterAsync(x => x.Id == form.Id, form, ct);
+        }
+
+        var intakeVersionData = await LoadAllAsync(
+            intakeFormVersions,
+            x => x.OrganizationId == organizationId && x.PublishedByUserId == userId,
+            ct);
+        foreach (var version in intakeVersionData)
+        {
+            version.PublishedByUserId = pseudonym;
+            await intakeFormVersions.ReplaceByFilterAsync(x => x.Id == version.Id, version, ct);
+        }
+
+        var intakeSubmissionData = await LoadAllAsync(
+            intakeSubmissions,
+            x => x.OrganizationId == organizationId
+                && (x.SubmittedByUserId == userId || x.TriagedByUserId == userId),
+            ct);
+        foreach (var submission in intakeSubmissionData)
+        {
+            if (submission.SubmittedByUserId == userId) submission.SubmittedByUserId = pseudonym;
+            if (submission.TriagedByUserId == userId) submission.TriagedByUserId = pseudonym;
+            submission.TriageNote = Scrub(submission.TriageNote, username, email);
+            foreach (var value in submission.Values)
+            {
+                value.Value = Scrub(value.Value, username, email) ?? string.Empty;
+            }
+            foreach (var attachment in submission.Attachments)
+            {
+                attachment.FileName = Scrub(attachment.FileName, username, email) ?? "attachment";
+            }
+            await intakeSubmissions.ReplaceByFilterAsync(x => x.Id == submission.Id, submission, ct);
         }
 
         await notifications.DeleteByFilterAsync(x => x.UserId == userId, ct);

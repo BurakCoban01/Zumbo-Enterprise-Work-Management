@@ -17,7 +17,13 @@ public sealed class AuditAccessCheckerAdapter(
     IDocumentRepository<TeamDocument> teams,
     IDocumentRepository<BoardDocument> boards,
     IDocumentRepository<WorkItemDocument> workItems,
+    IDocumentRepository<WorkItemTemplateDocument> workItemTemplates,
+    IDocumentRepository<WorkItemRecurrenceDocument> workItemRecurrences,
     IDocumentRepository<WorkItemBulkJobDocument> workItemBulkJobs,
+    IDocumentRepository<IntakeFormDocument> intakeForms,
+    IDocumentRepository<IntakeSubmissionDocument> intakeSubmissions,
+    IDocumentRepository<WebhookSubscriptionDocument> webhookSubscriptions,
+    IDocumentRepository<WebhookDeliveryDocument> webhookDeliveries,
     IDocumentRepository<SprintDocument> sprints,
     IdentityPermissionService permissionService,
     ICurrentUser currentUser) : IAuditAccessChecker, IAuditTenantResolver
@@ -113,6 +119,30 @@ public sealed class AuditAccessCheckerAdapter(
                 ?? await users.SelectAsync(x => x.Id == actorUserId, ct);
             return new AuditTenant(subject?.OrganizationId ?? currentUser.OrganizationId ?? "system", entityType, entityId);
         }
+        if (entityType.Equals("WebhookSubscription", StringComparison.OrdinalIgnoreCase))
+        {
+            var subscription = await webhookSubscriptions.SelectAsync(x => x.Id == entityId, ct);
+            if (subscription is not null)
+                return new AuditTenant(subscription.OrganizationId, entityType, entityId);
+        }
+        if (entityType.Equals("WebhookDelivery", StringComparison.OrdinalIgnoreCase))
+        {
+            var delivery = await webhookDeliveries.SelectAsync(x => x.Id == entityId, ct);
+            if (delivery is not null)
+                return new AuditTenant(delivery.OrganizationId, entityType, entityId);
+        }
+        if (entityType.Equals("IntakeForm", StringComparison.OrdinalIgnoreCase))
+        {
+            var form = await intakeForms.SelectAsync(x => x.Id == entityId, ct);
+            if (form is not null)
+                return new AuditTenant(form.OrganizationId, entityType, entityId);
+        }
+        if (entityType.Equals("IntakeSubmission", StringComparison.OrdinalIgnoreCase))
+        {
+            var submission = await intakeSubmissions.SelectAsync(x => x.Id == entityId, ct);
+            if (submission is not null)
+                return new AuditTenant(submission.OrganizationId, entityType, entityId);
+        }
         try
         {
             var projectId = await ResolveProjectIdAsync(entityType, entityId, ct);
@@ -133,11 +163,41 @@ public sealed class AuditAccessCheckerAdapter(
             return workItem.ProjectId;
         }
 
+        if (entityType.Equals("WorkItemTemplate", StringComparison.OrdinalIgnoreCase))
+        {
+            var template = await workItemTemplates.SelectAsync(x => x.Id == entityId, ct)
+                ?? throw new NotFoundException("WORK_ITEM_TEMPLATE_NOT_FOUND", "Work item template was not found.");
+            return template.ProjectId;
+        }
+
+        if (entityType.Equals("WorkItemRecurrence", StringComparison.OrdinalIgnoreCase))
+        {
+            var recurrence = await workItemRecurrences.SelectAsync(x => x.Id == entityId, ct)
+                ?? throw new NotFoundException("WORK_ITEM_RECURRENCE_NOT_FOUND", "Work item recurrence was not found.");
+            return recurrence.ProjectId;
+        }
+
         if (entityType.Equals("WorkItemBulkJob", StringComparison.OrdinalIgnoreCase))
         {
             var job = await workItemBulkJobs.SelectAsync(x => x.Id == entityId, ct)
                 ?? throw new NotFoundException("WORK_ITEM_BULK_JOB_NOT_FOUND", "Bulk job was not found.");
             return job.ProjectId;
+        }
+
+        if (entityType.Equals("IntakeForm", StringComparison.OrdinalIgnoreCase))
+        {
+            var form = await intakeForms.SelectAsync(x => x.Id == entityId, ct)
+                ?? throw new NotFoundException("INTAKE_FORM_NOT_FOUND", "Intake form was not found.");
+            return form.ProjectId;
+        }
+
+        if (entityType.Equals("IntakeSubmission", StringComparison.OrdinalIgnoreCase))
+        {
+            var submission = await intakeSubmissions.SelectAsync(x => x.Id == entityId, ct)
+                ?? throw new NotFoundException(
+                    "INTAKE_SUBMISSION_NOT_FOUND",
+                    "Intake submission was not found.");
+            return submission.ProjectId;
         }
 
         if (entityType.Equals("Sprint", StringComparison.OrdinalIgnoreCase))
@@ -159,7 +219,8 @@ public sealed class AuditAccessCheckerAdapter(
             return entityId;
         }
 
-        throw new ValidationException("Audit entity type must be WorkItem, WorkItemBulkJob, Sprint, Board, Project, Team or Organization.");
+        throw new ValidationException(
+            "Audit entity type is not supported.");
     }
 }
 

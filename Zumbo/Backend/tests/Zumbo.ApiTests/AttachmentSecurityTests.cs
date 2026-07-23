@@ -218,6 +218,42 @@ public sealed class AttachmentSecurityTests
     }
 
     [Fact]
+    public async Task StatusAndScopedMaintenance_DoNotCrossOrganizationBoundary()
+    {
+        await using var fixture = new AttachmentFixture(AttachmentMalwareScanStatuses.Unavailable);
+        var repository = new InMemoryDocumentRepository<WorkItemAttachmentActivityDocument>();
+        var first = await fixture.Adapter.SaveAsync(
+            new MemoryStream("first tenant"u8.ToArray()),
+            "first.txt",
+            "text/plain",
+            1024,
+            default);
+        var second = await fixture.Adapter.SaveAsync(
+            new MemoryStream("second tenant"u8.ToArray()),
+            "second.txt",
+            "text/plain",
+            1024,
+            default);
+        await repository.CreateAsync(WithOrganization(ToDocument(first, fixture.Clock.UtcNow), "org-a"));
+        var foreign = await repository.CreateAsync(
+            WithOrganization(ToDocument(second, fixture.Clock.UtcNow), "org-b"));
+        var maintenance = new AttachmentSecurityMaintenanceService(
+            repository,
+            fixture.Adapter,
+            fixture.Options,
+            fixture.Clock);
+
+        var status = await maintenance.GetStatusAsync("org-a", default);
+        var result = await maintenance.RunBatchAsync("org-a", default);
+        var untouched = await repository.SelectAsync(x => x.Id == foreign.Id);
+
+        Assert.Equal(1, status.Quarantined);
+        Assert.Equal(1, result.Retried);
+        Assert.Equal(AttachmentSecurityStates.Quarantined, untouched!.SecurityState);
+        Assert.Equal(foreign.Version, untouched.Version);
+    }
+
+    [Fact]
     public async Task ClamAvScanner_UnavailableEndpointReturnsFailClosedState()
     {
         var scanner = new ClamAvAttachmentMalwareScanner(Options.Create(new AttachmentSecurityOptions
@@ -256,6 +292,14 @@ public sealed class AttachmentSecurityTests
             ScannedAt = stored.ScannedAt,
             CreatedAt = createdAt
         };
+
+    private static WorkItemAttachmentActivityDocument WithOrganization(
+        WorkItemAttachmentActivityDocument document,
+        string organizationId)
+    {
+        document.OrganizationId = organizationId;
+        return document;
+    }
 
     private static byte[] CreateZip(params (string Name, byte[] Content)[] entries)
     {

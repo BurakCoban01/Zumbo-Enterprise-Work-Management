@@ -230,6 +230,10 @@ public sealed class MongoDurableMessagingTests : IAsyncLifetime
         var metrics = await _outbox.GetMetricsAsync(retryAt);
         Assert.Equal(1, metrics.DeadLetter);
         Assert.Equal(1, metrics.Retried);
+        var listed = Assert.Single(await _outbox.ListDeadLettersAsync(1));
+        Assert.Equal(second.Event.Id, listed.Id);
+        Assert.Equal(second.Event.EventType, listed.EventType);
+        Assert.Equal(2, listed.Attempts);
 
         Assert.True(await _outbox.ReplayDeadLetterAsync(second.Event.Id, retryAt.AddMinutes(2)));
         var replay = Assert.Single(await _outbox.ClaimAsync("replay", 1, TimeSpan.FromSeconds(30), retryAt.AddMinutes(2)));
