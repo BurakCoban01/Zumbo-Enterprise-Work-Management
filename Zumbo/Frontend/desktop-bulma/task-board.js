@@ -55,6 +55,9 @@
 
     vm.openEntityCreator = function(kind) {
       vm.createMenuOpen = false;
+      if (kind === 'task' && !vm.canCreateTask()) {
+        return vm.notify('error', 'Görev oluşturmak için projede düzenleme yetkisi ve seçili pano gerekir.');
+      }
       if (kind === 'board' && !vm.canManageProject) {
         return vm.notify('error', 'Pano oluşturmak için proje yönetim yetkisi gerekir.');
       }
@@ -80,7 +83,7 @@
       var kind = vm.entityCreator;
       var request;
       if (kind === 'task') {
-        if (!vm.project || !vm.board) return vm.notify('error', 'Görev için proje ve pano seçin.');
+        if (!vm.canCreateTask()) return vm.notify('error', 'Görev oluşturmak için projede düzenleme yetkisi ve seçili pano gerekir.');
         request = apiClient.post('/api/work-items', {
           projectId: vm.project.id,
           boardId: vm.board.id,
@@ -319,7 +322,8 @@
         var tasks = result.items || [];
         vm.searchDegraded = result.degraded === true;
         vm.taskPage = page;
-        vm.hasMoreTasks = tasks.length === pageSize;
+        vm.taskTotalCount = Number.isInteger(result.totalCount) ? result.totalCount : tasks.length;
+        vm.hasMoreTasks = page * pageSize < vm.taskTotalCount;
         vm.tasks = append ? vm.tasks.concat(tasks.filter(function(task) {
           return !vm.tasks.some(function(existing) { return existing.id === task.id; });
         })) : tasks;

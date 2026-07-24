@@ -2,12 +2,20 @@
   'use strict';
 
   angular.module('zumboDesktop')
-    .factory('desktopSettingsFeature', function($q, $window, $document, apiClient) {
+    .factory('desktopSettingsFeature', function($q, $window, apiClient) {
+      var securityCore = $window.ZumboAccountSecurityCore;
       return {
         install: function(vm, apiActionError) {
+    vm.sessions = [];
+    vm.securityLoadError = '';
+    vm.sessionActionId = null;
+    vm.mfaRecoveryDraft = { password: '', code: '' };
+
     vm.loadSettings = function() {
       if (!vm.session.currentUser) return $q.when();
       vm.settingsLoading = true;
+      vm.securityLoadError = '';
+      securityCore.clearOneTimeSecrets(vm);
       return $q.all([
         apiClient.get('/api/organizations').then(function(organizations) {
           vm.organizations = organizations;
@@ -19,16 +27,26 @@
             : { name: '', tenantKey: vm.session.currentUser.organizationId };
           return vm.loadOrganizationAudit();
         }).catch(function() { vm.organizations = []; vm.organization = null; }),
-        apiClient.get('/api/auth/mfa').then(function(status) { vm.mfaStatus = status; }).catch(angular.noop),
+        apiClient.get('/api/auth/mfa').then(function(status) { vm.mfaStatus = status; }).catch(securityLoadFailed),
+        apiClient.get('/api/auth/sessions').then(function(sessions) { vm.sessions = sessions; }).catch(function(error) {
+          vm.sessions = [];
+          securityLoadFailed(error);
+        }),
         apiClient.get('/api/auth/api-keys').then(function(keys) { vm.apiKeys = keys; }).catch(function() { vm.apiKeys = []; }),
         apiClient.get('/api/notifications/preferences/me').then(function(preferences) {
           vm.notificationPreferences = preferences;
           vm.mutedTypesText = (preferences.mutedTypes || []).join(', ');
         }).catch(angular.noop),
+        vm.loadPrivacyWorkflowStatus(),
+        vm.loadIntegrationCapabilities(),
         vm.loadUsers(),
         vm.loadRoleAdministration()
       ]).finally(function() { vm.settingsLoading = false; });
     };
+
+    function securityLoadFailed(error) {
+      vm.securityLoadError = apiActionError(error, 'Güvenlik bilgileri yüklenemedi.');
+    }
 
     function currentUserHasPermission(permission) {
       var currentRoles = (vm.session.currentUser && vm.session.currentUser.roles) || [];
@@ -278,6 +296,56 @@
         .finally(function() { vm.entitySaving = false; });
     };
 
+    vm.regenerateMfaRecoveryCodes = function() {
+      if (!vm.mfaRecoveryDraft.password || !vm.mfaRecoveryDraft.code || vm.entitySaving) return;
+      if (!$window.confirm('Mevcut kurtarma kodları hemen geçersiz olacak. Yeni kodlar oluşturulsun mu?')) return;
+      vm.entitySaving = true;
+      vm.recoveryCodes = [];
+      return apiClient.post('/api/auth/mfa/recovery-codes', vm.mfaRecoveryDraft)
+        .then(function(result) {
+          vm.recoveryCodes = result.recoveryCodes || [];
+          vm.mfaStatus.remainingRecoveryCodes = vm.recoveryCodes.length;
+          vm.mfaRecoveryDraft = { password: '', code: '' };
+          vm.notify('success', 'Yeni kurtarma kodları oluşturuldu; bu kodlar yeniden gösterilmez.');
+        }).catch(function(error) { vm.notify('error', apiActionError(error, 'Kurtarma kodları yenilenemedi.')); })
+        .finally(function() { vm.entitySaving = false; });
+    };
+
+    vm.dismissRecoveryCodes = function() {
+      vm.recoveryCodes = [];
+    };
+
+    vm.sessionIsActive = function(session) {
+      return securityCore.isSessionActive(session);
+    };
+
+    vm.visibleSessions = function() {
+      return securityCore.selectVisibleSessions(vm.sessions);
+    };
+
+    vm.revokeSession = function(session) {
+      if (!session || !vm.sessionIsActive(session) || vm.sessionActionId) return;
+      var prompt = session.isCurrent
+        ? 'Bu cihazdaki oturum kapatılacak. Devam edilsin mi?'
+        : (session.deviceName || 'Bu cihaz') + ' oturumu kapatılsın mı?';
+      if (!$window.confirm(prompt)) return;
+      vm.sessionActionId = session.id;
+      return apiClient.delete('/api/auth/sessions/' + session.id)
+        .then(function() {
+          session.revokedAt = new Date().toISOString();
+          if (session.isCurrent) {
+            apiClient.clearSession('current-session-revoked');
+            vm.project = null;
+            vm.board = null;
+            vm.tasks = [];
+            return;
+          }
+          vm.notify('success', 'Seçilen cihaz oturumu kapatıldı.');
+        })
+        .catch(function(error) { vm.notify('error', apiActionError(error, 'Oturum kapatılamadı.')); })
+        .finally(function() { vm.sessionActionId = null; });
+    };
+
     vm.createApiKey = function() {
       if (!vm.apiKeyDraft.name || !vm.apiKeyDraft.password || vm.entitySaving) return;
       vm.entitySaving = true;
@@ -320,35 +388,13 @@
     vm.saveNotificationPreferences = function() {
       if (vm.entitySaving) return;
       vm.entitySaving = true;
-      var mutedTypes = (vm.mutedTypesText || '').split(',').map(function(item) { return item.trim(); }).filter(Boolean);
+      var mutedTypes = securityCore.normalizeMutedTypes(vm.mutedTypesText);
       return apiClient.put('/api/notifications/preferences/me', {
         inAppEnabled: vm.notificationPreferences.inAppEnabled,
         emailEnabled: vm.notificationPreferences.emailEnabled,
         mutedTypes: mutedTypes
       }).then(function(preferences) { vm.notificationPreferences = preferences; vm.notify('success', 'Bildirim tercihleri kaydedildi.'); })
         .catch(function(error) { vm.notify('error', apiActionError(error, 'Bildirim tercihleri kaydedilemedi.')); })
-        .finally(function() { vm.entitySaving = false; });
-    };
-
-    vm.exportPrivacyData = function() {
-      return apiClient.get('/api/auth/privacy/export').then(function(data) {
-        var blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-        var url = URL.createObjectURL(blob);
-        var link = $document[0].createElement('a');
-        link.href = url;
-        link.download = 'zumbo-privacy-export.json';
-        link.click();
-        URL.revokeObjectURL(url);
-        vm.notify('success', 'Gizlilik dışa aktarımı hazırlandı.');
-      }).catch(function(error) { vm.notify('error', apiActionError(error, 'Gizlilik verileri aktarılamadı.')); });
-    };
-
-    vm.anonymizeAccount = function() {
-      if (!vm.privacyDraft.password || vm.privacyDraft.confirmation !== 'ANONYMIZE' || vm.entitySaving) return;
-      vm.entitySaving = true;
-      return apiClient.post('/api/auth/privacy/anonymize', vm.privacyDraft)
-        .then(function() { vm.notify('success', 'Hesap anonimleştirildi.'); return vm.logout(); })
-        .catch(function(error) { vm.notify('error', apiActionError(error, 'Hesap anonimleştirilemedi.')); })
         .finally(function() { vm.entitySaving = false; });
     };
 

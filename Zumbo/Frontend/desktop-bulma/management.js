@@ -28,6 +28,7 @@
       var existingDraft = preserveDraft && vm.project && vm.project.id === project.id
         ? vm.projectDraft
         : null;
+      apiClient.remember('/api/projects/' + project.id, project);
       vm.project = project;
       vm.projectDraft = existingDraft || { name: project.name, visibility: project.visibility };
       vm.projectMembership = membershipFor(project);
@@ -36,6 +37,9 @@
       vm.canArchiveProject = !!vm.projectMembership && vm.projectMembership.role === 'ProjectOwner';
       var index = vm.projects.findIndex(function(item) { return item.id === project.id; });
       if (index >= 0) vm.projects[index] = project;
+      if (vm.syncProjectCatalog) vm.syncProjectCatalog(project);
+      if (vm.syncIntakeContext) vm.syncIntakeContext(project);
+      if (vm.syncWorkAutomationContext) vm.syncWorkAutomationContext(project);
       return project;
     }
 
@@ -102,7 +106,7 @@
 
     vm.selectTeam = function(team, skipLocation) {
       setTeamState(team);
-      if (team && !skipLocation) updateLocation('teams', null, false);
+      if (team && !skipLocation) updateLocation('teams', null, true);
       vm.entityAudit = [];
       if (team) vm.loadTeamAudit();
     };
@@ -225,7 +229,7 @@
       apiClient.transitionContext('project:' + vm.project.id + ':board:' + board.id);
       setBoardState(board);
       vm.loadBoardAudit();
-      if (!skipLocation) updateLocation(vm.activeSection, null, false);
+      if (!skipLocation) updateLocation(vm.activeSection, null, true);
       vm.selectedTask = null;
       vm.tasks = [];
       return realtimeService.connect(vm.project.id).catch(angular.noop).then(vm.loadTasks);
@@ -396,11 +400,19 @@
       if (!project) return;
       apiClient.transitionContext('project:' + project.id);
       setProjectState(project);
-      if (!skipLocation) updateLocation(vm.activeSection, null, false);
       window.localStorage.setItem('zumbo.projectId', project.id);
       vm.board = null;
       vm.tasks = [];
       vm.archivedTasks = [];
+      vm.timelineEntries = [];
+      vm.timelineError = null;
+      vm.summary = {};
+      vm.statusDistribution = [];
+      vm.workload = [];
+      vm.dueDateRisks = [];
+      vm.velocity = [];
+      vm.sprints = [];
+      vm.backlogItems = [];
       vm.selectedTask = null;
       vm.clearSelection();
       rememberProject(project);
@@ -415,8 +427,8 @@
         var linkedBoard = boards.find(function(board) { return board.id === linkedBoardId; });
         setBoardState(linkedBoard || boards[0] || null);
         vm.loadBoardAudit();
-        if (!skipLocation && vm.board) updateLocation(vm.activeSection, null, false);
-        if (!vm.board) return;
+        if (!skipLocation) updateLocation(vm.activeSection, null, true);
+        if (!vm.board) return vm.loadTasks();
         return realtimeService.connect(project.id).catch(angular.noop).then(vm.loadTasks).then(function() {
           if (vm.activeSection === 'archive') return vm.loadArchivedTasks();
         });

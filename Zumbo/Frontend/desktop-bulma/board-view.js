@@ -99,6 +99,15 @@
         return true;
       }).sort(function(left, right) { return (left.rank || 0) - (right.rank || 0); });
       var mode = (view && view.swimlaneMode) || vm.swimlaneMode || vm.board.swimlaneMode || 'None';
+      var loadedCounts = {};
+      vm.board.columns.forEach(function(column) { loadedCounts[column.id] = 0; });
+      (vm.tasks || []).forEach(function(task) {
+        var column = vm.board.columns.find(function(candidate) {
+          var statuses = candidate.statusNames && candidate.statusNames.length ? candidate.statusNames : [candidate.name];
+          return candidate.id === task.columnId || statuses.indexOf(task.status) >= 0;
+        });
+        if (column) loadedCounts[column.id] += 1;
+      });
       var groups = {};
       tasks.forEach(function(task) {
         var key = swimlaneKey(task, mode);
@@ -110,14 +119,21 @@
         return {
           label: label,
           columns: vm.board.columns.map(function(column) {
-            var columnTasks = groups[label].filter(function(task) { return task.columnId === column.id || task.status === column.name; });
+            var statuses = column.statusNames && column.statusNames.length ? column.statusNames : [column.name];
+            var columnTasks = groups[label].filter(function(task) { return task.columnId === column.id || statuses.indexOf(task.status) >= 0; });
+            var loadedCount = loadedCounts[column.id] || 0;
+            var remaining = column.wipLimit ? column.wipLimit - loadedCount : null;
             return {
               id: column.id,
               name: column.name,
               wipLimit: column.wipLimit,
               tasks: columnTasks,
               count: columnTasks.length,
-              atWipLimit: !!column.wipLimit && columnTasks.length >= column.wipLimit,
+              loadedCount: loadedCount,
+              wipRemaining: remaining,
+              wipState: !column.wipLimit ? 'open' : remaining < 0 ? 'over' : remaining === 0 ? 'full' : remaining === 1 ? 'near' : 'open',
+              atWipLimit: !!column.wipLimit && loadedCount >= column.wipLimit,
+              partialCount: !!vm.hasMoreTasks,
               collapsed: !!vm.collapsedColumns[vm.board.id + ':' + column.id]
             };
           })

@@ -2,45 +2,385 @@
   'use strict';
 
   angular.module('zumboDesktop')
-    .factory('desktopWorkItemFeature', function($q, $window, apiClient) {
+    .factory('desktopWorkItemFeature', function($q, $window, $timeout, apiClient) {
       return {
         install: function(vm, helpers) {
           var updateLocation = helpers.updateLocation;
           var nextStatusFor = helpers.nextStatusFor;
           var apiActionError = helpers.apiActionError;
+    var detailRequestId = 0;
+    var taskCatalogProject = null;
+    var taskCatalogCache = [];
+    var streamPaths = {
+      comments: 'comments',
+      attachments: 'attachments',
+      worklogs: 'worklogs',
+      approvals: 'approvals',
+      timeline: 'timeline',
+      activity: 'activity'
+    };
+    var streamLoaders = {
+      comments: function(taskId, page) { return apiClient.get('/api/work-items/' + taskId + '/comments?page=' + page + '&pageSize=50'); },
+      attachments: function(taskId, page) { return apiClient.get('/api/work-items/' + taskId + '/attachments?page=' + page + '&pageSize=50'); },
+      worklogs: function(taskId, page) { return apiClient.get('/api/work-items/' + taskId + '/worklogs?page=' + page + '&pageSize=50'); },
+      approvals: function(taskId, page) { return apiClient.get('/api/work-items/' + taskId + '/approvals?page=' + page + '&pageSize=50'); },
+      timeline: function(taskId, page) { return apiClient.get('/api/work-items/' + taskId + '/timeline?page=' + page + '&pageSize=50'); },
+      activity: function(taskId, page) { return apiClient.get('/api/work-items/' + taskId + '/activity?page=' + page + '&pageSize=50'); }
+    };
+    vm.taskDetailMode = 'drawer';
+    vm.taskActivityTab = 'all';
+    vm.commentMentionIds = [];
+    vm.commentMentionCandidate = '';
+    resetTaskDetail();
+
+    function emptyStream() {
+      return { items: [], page: 0, pageSize: 50, totalCount: 0, loading: false, error: null };
+    }
+
+    function resetTaskDetail() {
+      vm.taskDetail = {
+        loading: false,
+        error: null,
+        partial: false,
+        actionBusy: null,
+        actionError: null,
+        draftPreserved: false,
+        collaboration: { watcherCount: 0, voteCount: 0, watching: false, voted: false, version: 0 }
+      };
+      vm.taskStreams = {
+        comments: emptyStream(),
+        attachments: emptyStream(),
+        worklogs: emptyStream(),
+        approvals: emptyStream(),
+        timeline: emptyStream(),
+        activity: emptyStream()
+      };
+    }
+
+    function currentRole() {
+      return vm.projectMembership && vm.projectMembership.role;
+    }
+
+    function systemAdministrator() {
+      var roles = vm.session.currentUser && vm.session.currentUser.roles || [];
+      return roles.indexOf('SystemAdmin') >= 0;
+    }
+
+    function editableRole() {
+      return systemAdministrator() || ['ProjectOwner', 'ProjectAdmin', 'Developer'].indexOf(currentRole()) >= 0;
+    }
+
+    function managerRole() {
+      return systemAdministrator() || ['ProjectOwner', 'ProjectAdmin'].indexOf(currentRole()) >= 0;
+    }
+
+    function mutationsUnavailable() {
+      return !!(vm.pwa && vm.pwa.offline);
+    }
+
+    vm.canEditTaskDetail = function() { return editableRole(); };
+    vm.canMoveTaskDetail = function() { return editableRole(); };
+    vm.canCommentOnTask = function() { return !!vm.projectMembership || systemAdministrator(); };
+    vm.canUploadTaskAttachment = function() { return editableRole(); };
+    vm.canDeleteTaskAttachment = function() { return editableRole(); };
+    vm.canLogTaskWork = function() { return editableRole(); };
+    vm.canLinkTask = function() { return editableRole(); };
+    vm.canApproveTask = function() { return managerRole(); };
+    vm.canArchiveTask = function() { return managerRole(); };
+    vm.taskMutationsDisabled = mutationsUnavailable;
+
+    function taskDraft(detail) {
+      return {
+        title: detail.title,
+        description: detail.description || '',
+        priority: detail.priority,
+        dueDate: detail.dueDate ? new Date(detail.dueDate) : null,
+        assigneeUserId: detail.assigneeUserId || '',
+        teamId: detail.teamId || '',
+        sprintId: detail.sprintId || '',
+        estimatePoints: detail.estimatePoints,
+        parentId: detail.parentId || '',
+        customFieldValues: customFieldModel(detail.customFields)
+      };
+    }
+
+    function comparableDraft(draft) {
+      if (!draft) return null;
+      return {
+        title: draft.title || '', description: draft.description || '', priority: draft.priority || '',
+        dueDate: dateOnly(draft.dueDate), assigneeUserId: draft.assigneeUserId || '', teamId: draft.teamId || '',
+        sprintId: draft.sprintId || '', estimatePoints: draft.estimatePoints == null ? null : Number(draft.estimatePoints),
+        parentId: draft.parentId || '', customFieldValues: draft.customFieldValues || {}
+      };
+    }
+
+    vm.taskDraftHasChanges = function() {
+      if (!vm.selectedTask || !vm.taskDraft) return false;
+      return JSON.stringify(comparableDraft(vm.taskDraft)) !== JSON.stringify(comparableDraft(taskDraft(vm.selectedTask)));
+    };
+
+    vm.refreshSelectedTaskFromRealtime = function(task) {
+      var preservedDraft = vm.taskDraftHasChanges() ? angular.copy(vm.taskDraft) : null;
+      return vm.selectTask(task, true, preservedDraft).then(function(result) {
+        if (preservedDraft) {
+          vm.taskDetail.draftPreserved = true;
+          vm.taskDetail.actionError = 'Görev güncellendi. Yerel form değişiklikleriniz korunuyor.';
+        }
+        return result;
+      });
+    };
+
+    function syncTaskStreams() {
+      if (!vm.selectedTask) return;
+      vm.selectedTask.comments = vm.taskStreams.comments.items;
+      vm.selectedTask.attachments = vm.taskStreams.attachments.items;
+      vm.selectedTask.workLogs = vm.taskStreams.worklogs.items;
+      vm.selectedTask.approvals = vm.taskStreams.approvals.items;
+      vm.selectedTask.statusHistory = vm.taskStreams.timeline.items;
+    }
+
+    function loadTaskStream(name, reset) {
+      if (!vm.selectedTask || !streamPaths[name]) return $q.when(null);
+      var stream = vm.taskStreams[name];
+      var page = reset ? 1 : stream.page + 1;
+      if (stream.loading || (!reset && stream.items.length >= stream.totalCount)) return $q.when(stream);
+      stream.loading = true;
+      stream.error = null;
+      return streamLoaders[name](vm.selectedTask.id, page).then(function(result) {
+        stream.items = reset ? (result.items || []) : stream.items.concat(result.items || []);
+        stream.page = result.page || page;
+        stream.pageSize = result.pageSize || 50;
+        stream.totalCount = Number(result.totalCount) || 0;
+        syncTaskStreams();
+        return stream;
+      }).catch(function(error) {
+        stream.error = apiActionError(error, 'Bu etkinlik bölümü yüklenemedi.');
+        vm.taskDetail.partial = true;
+        return stream;
+      }).finally(function() { stream.loading = false; });
+    }
+
+    vm.loadMoreTaskStream = function(name) { return loadTaskStream(name, false); };
+    vm.taskStreamHasMore = function(name) {
+      var stream = vm.taskStreams[name];
+      return !!stream && stream.items.length < stream.totalCount;
+    };
+
+    function loadTaskStreams() {
+      return $q.all(Object.keys(streamPaths).map(function(name) { return loadTaskStream(name, true); }));
+    }
+
+    function loadCollaboration(taskId) {
+      return apiClient.get('/api/work-items/' + taskId + '/collaboration').then(function(collaboration) {
+        vm.taskDetail.collaboration = collaboration;
+        return collaboration;
+      }).catch(function(error) {
+        vm.taskDetail.partial = true;
+        vm.taskDetail.actionError = apiActionError(error, 'Takip ve oy bilgisi yüklenemedi.');
+        return null;
+      });
+    }
+
     vm.selectTask = function(task, skipLocation) {
-      if (!task) return;
-      apiClient.get('/api/work-items/' + task.id).then(function(detail) {
+      var preservedDraft = arguments.length > 2 ? arguments[2] : null;
+      if (!task) return $q.when(null);
+      if (!skipLocation) vm.activeSection = 'board';
+      var requestId = ++detailRequestId;
+      resetTaskDetail();
+      vm.taskDetail.loading = true;
+      vm.selectedTask = { id: task.id, title: task.title || '' };
+      vm.taskDraft = null;
+      return apiClient.get('/api/work-items/' + task.id).then(function(detail) {
+        if (requestId !== detailRequestId) return null;
         vm.selectedTask = detail;
-        vm.taskDraft = {
-          title: detail.title,
-          description: detail.description || '',
-          priority: detail.priority,
-          dueDate: detail.dueDate ? new Date(detail.dueDate) : null,
-          assigneeUserId: detail.assigneeUserId || '',
-          teamId: detail.teamId || '',
-          sprintId: detail.sprintId || '',
-          estimatePoints: detail.estimatePoints,
-          parentId: detail.parentId || '',
-          customFieldValues: customFieldModel(detail.customFields)
-        };
-        vm.nextStatus = nextStatusFor(detail.status);
         if (!skipLocation) updateLocation('board', detail.id, true);
+        vm.taskDraft = preservedDraft || taskDraft(detail);
+        vm.taskDetail.draftPreserved = !!preservedDraft;
+        vm.nextStatus = nextStatusFor(detail.status);
+        return $q.all([
+          loadCollaboration(detail.id),
+          loadTaskStreams(),
+          apiClient.get('/api/audit/entity/WorkItem/' + detail.id).then(function(audit) {
+            vm.audit = audit;
+          }).catch(function() {
+            vm.audit = [];
+            vm.taskDetail.partial = true;
+          })
+        ]);
+      }).catch(function(error) {
+        if (requestId !== detailRequestId) return null;
+        vm.taskDetail.error = apiActionError(error, 'Görev ayrıntıları yüklenemedi.');
+        return null;
+      }).finally(function() {
+        if (requestId === detailRequestId) vm.taskDetail.loading = false;
       });
-      apiClient.get('/api/audit/entity/WorkItem/' + task.id).then(function(audit) {
-        vm.audit = audit;
-      });
+    };
+
+    vm.retryTaskDetail = function() {
+      if (!vm.selectedTask) return $q.when(null);
+      return vm.selectTask({ id: vm.selectedTask.id, title: vm.selectedTask.title }, true);
+    };
+
+    vm.reloadSelectedTaskAfterConflict = function() {
+      if (!vm.selectedTask || !vm.taskDraft) return $q.when(null);
+      vm.taskConflictDraft = angular.copy(vm.taskDraft);
+      vm.taskDetail.draftPreserved = true;
+      return vm.selectTask({ id: vm.selectedTask.id, title: vm.selectedTask.title }, true, vm.taskConflictDraft)
+        .then(function(result) {
+          vm.taskDetail.draftPreserved = true;
+          vm.taskDetail.actionError = 'Güncel kayıt yüklendi. Yerel değişiklikleriniz formda korunuyor.';
+          return result;
+        });
+    };
+
+    vm.openTaskPage = function() {
+      vm.taskDetailMode = 'page';
+      if (vm.selectedTask) updateLocation('board', vm.selectedTask.id, true);
+    };
+
+    vm.collapseTaskDetail = function() {
+      vm.taskDetailMode = 'drawer';
+      if (vm.selectedTask) updateLocation('board', vm.selectedTask.id, true);
     };
 
     vm.closeTask = function() {
+      var taskId = vm.selectedTask && vm.selectedTask.id;
       vm.selectedTask = null;
       vm.taskDraft = null;
       vm.audit = [];
-      updateLocation(vm.activeSection, null, false);
+      vm.taskDetailMode = 'drawer';
+      vm.commentMentionIds = [];
+      vm.commentMentionCandidate = '';
+      resetTaskDetail();
+      updateLocation(vm.activeSection, null, true);
+      $timeout(function() {
+        var target = Array.prototype.find.call(
+          $window.document.querySelectorAll('[data-work-item-id]'),
+          function(element) { return element.getAttribute('data-work-item-id') === taskId; }
+        );
+        if (target) target.focus();
+      });
+    };
+
+    function refreshStreams(names) {
+      return $q.all(names.map(function(name) { return loadTaskStream(name, true); }));
+    }
+
+    function acceptTaskMutation(task) {
+      if (task && task.id && vm.selectedTask && task.id === vm.selectedTask.id) {
+        vm.selectedTask = angular.extend({}, vm.selectedTask, task);
+        syncTaskStreams();
+      }
+      return task;
+    }
+
+    function toggleCollaboration(kind) {
+      if (!vm.selectedTask || vm.taskDetail.actionBusy || mutationsUnavailable()) return $q.when(false);
+      var collaboration = vm.taskDetail.collaboration;
+      var snapshot = angular.copy(collaboration);
+      var stateField = kind === 'watch' ? 'watching' : 'voted';
+      var countField = kind === 'watch' ? 'watcherCount' : 'voteCount';
+      var next = !collaboration[stateField];
+      collaboration[stateField] = next;
+      collaboration[countField] = Math.max(0, collaboration[countField] + (next ? 1 : -1));
+      vm.taskDetail.actionBusy = kind;
+      vm.taskDetail.actionError = null;
+      var body = kind === 'watch' ? { watching: next } : { voted: next };
+      return apiClient.put('/api/work-items/' + vm.selectedTask.id + '/' + kind, body).then(function(result) {
+        vm.taskDetail.collaboration = result;
+        vm.notify('success', kind === 'watch'
+          ? (next ? 'Görev takip ediliyor.' : 'Görev takibinden çıkıldı.')
+          : (next ? 'Göreve oy verildi.' : 'Görev oyu kaldırıldı.'));
+        return loadTaskStream('activity', true).then(function() { return true; });
+      }).catch(function(error) {
+        vm.taskDetail.collaboration = snapshot;
+        vm.taskDetail.actionError = apiActionError(error, 'İşbirliği tercihi kaydedilemedi.');
+        return false;
+      }).finally(function() { vm.taskDetail.actionBusy = null; });
+    }
+
+    vm.toggleTaskWatch = function() { return toggleCollaboration('watch'); };
+    vm.toggleTaskVote = function() { return toggleCollaboration('vote'); };
+
+    vm.commentMentionCandidates = function() {
+      var selected = new Set(vm.commentMentionIds || []);
+      var memberIds = new Set((vm.project && vm.project.members || []).map(function(member) { return member.userId; }));
+      return (vm.users || []).filter(function(user) {
+        return memberIds.has(user.id) && !selected.has(user.id);
+      });
+    };
+
+    vm.addCommentMention = function() {
+      if (!vm.commentMentionCandidate || vm.commentMentionIds.indexOf(vm.commentMentionCandidate) >= 0) return;
+      vm.commentMentionIds.push(vm.commentMentionCandidate);
+      vm.commentMentionCandidate = '';
+    };
+
+    vm.removeCommentMention = function(userId) {
+      vm.commentMentionIds = vm.commentMentionIds.filter(function(id) { return id !== userId; });
+    };
+
+    vm.taskCatalogLinks = function() {
+      if (!vm.project) return [];
+      if (taskCatalogProject === vm.project) return taskCatalogCache;
+      taskCatalogProject = vm.project;
+      var result = [];
+      (vm.project.components || []).filter(function(item) { return !item.archived; }).forEach(function(item) {
+        result.push({ id: item.id, kind: 'Bileşen', name: item.name, meta: item.description || 'Aktif' });
+      });
+      (vm.project.versions || []).filter(function(item) { return !item.archived; }).forEach(function(item) {
+        result.push({ id: item.id, kind: 'Sürüm', name: item.name, meta: item.status });
+      });
+      (vm.project.releases || []).forEach(function(item) {
+        result.push({ id: item.id, kind: 'Yayın', name: item.name, meta: item.status });
+      });
+      (vm.project.milestones || []).forEach(function(item) {
+        result.push({ id: item.id, kind: 'Kilometre taşı', name: item.name, meta: item.status });
+      });
+      taskCatalogCache = result.slice(0, 12);
+      return taskCatalogCache;
+    };
+
+    vm.activityLabel = function(type) {
+      var labels = {
+        WorkItemCreated: 'Görev oluşturuldu',
+        WorkItemUpdated: 'Ayrıntılar güncellendi',
+        WorkItemMoved: 'Durum değişti',
+        WorkItemCommentAdded: 'Yorum eklendi',
+        WorkItemCommentEdited: 'Yorum düzenlendi',
+        WorkItemCommentDeleted: 'Yorum silindi',
+        WorkItemAttachmentUploaded: 'Dosya yüklendi',
+        WorkItemAttachmentDeleted: 'Dosya kaldırıldı',
+        WorkItemWatched: 'Takip başladı',
+        WorkItemUnwatched: 'Takip sona erdi',
+        WorkItemVoted: 'Oy eklendi',
+        WorkItemVoteRemoved: 'Oy kaldırıldı'
+      };
+      return labels[type] || String(type || 'Etkinlik').replace(/([a-z])([A-Z])/g, '$1 $2');
+    };
+
+    vm.taskActivityEntries = function() {
+      if (vm.taskActivityTab === 'comments') return vm.taskStreams.comments.items;
+      if (vm.taskActivityTab === 'history') return vm.taskStreams.timeline.items;
+      if (vm.taskActivityTab === 'worklogs') return vm.taskStreams.worklogs.items;
+      return vm.taskStreams.activity.items;
+    };
+
+    vm.taskActivityStreamName = function() {
+      return vm.taskActivityTab === 'comments' ? 'comments'
+        : vm.taskActivityTab === 'history' ? 'timeline'
+          : vm.taskActivityTab === 'worklogs' ? 'worklogs' : 'activity';
+    };
+
+    vm.formatFileSize = function(bytes) {
+      var size = Number(bytes) || 0;
+      if (size < 1024) return size + ' B';
+      if (size < 1024 * 1024) return Math.round(size / 1024) + ' KB';
+      return (size / (1024 * 1024)).toFixed(1) + ' MB';
     };
 
     vm.saveSelectedTask = function() {
-      if (!vm.selectedTask || !vm.taskDraft || vm.taskSaving) return;
+      if (!vm.selectedTask || !vm.taskDraft || vm.taskSaving || !vm.canEditTaskDetail() || mutationsUnavailable()) return;
       vm.taskSaving = true;
       var taskId = vm.selectedTask.id;
       var current = vm.selectedTask;
@@ -85,15 +425,18 @@
         return apiClient.get('/api/work-items/' + taskId);
       }).then(function(task) {
         vm.selectedTask = task;
+        vm.taskDetail.draftPreserved = false;
+        vm.taskConflictDraft = null;
         vm.notify('success', 'Görev ayrıntıları kaydedildi.');
         return vm.loadTasks();
-      }).catch(function() {
-        vm.notify('error', 'Görev kaydedilemedi; alanları kontrol edin.');
+      }).catch(function(error) {
+        vm.taskDetail.actionError = apiActionError(error, 'Görev kaydedilemedi; alanları kontrol edin.');
+        vm.notify('error', vm.taskDetail.actionError);
       }).finally(function() { vm.taskSaving = false; });
     };
 
     vm.archiveSelectedTask = function() {
-      if (!vm.selectedTask || vm.taskSaving) return;
+      if (!vm.selectedTask || vm.taskSaving || !vm.canArchiveTask() || mutationsUnavailable()) return;
       var id = vm.selectedTask.id;
       vm.taskSaving = true;
       return apiClient.delete('/api/work-items/' + id).then(function() {
@@ -106,72 +449,104 @@
     };
 
     vm.addComment = function() {
-      if (!vm.selectedTask || !vm.commentBody.trim()) return;
-      return apiClient.post('/api/work-items/' + vm.selectedTask.id + '/comments', { body: vm.commentBody, mentions: [] })
-        .then(function(task) { vm.selectedTask = task; vm.commentBody = ''; vm.notify('success', 'Yorum eklendi.'); });
+      if (!vm.selectedTask || !vm.commentBody.trim() || !vm.canCommentOnTask() || mutationsUnavailable()) return;
+      vm.taskDetail.actionError = null;
+      return apiClient.post('/api/work-items/' + vm.selectedTask.id + '/comments', {
+        body: vm.commentBody,
+        mentions: vm.commentMentionIds
+      }).then(acceptTaskMutation).then(function() {
+        vm.commentBody = '';
+        vm.commentMentionIds = [];
+        vm.commentMentionCandidate = '';
+        vm.notify('success', 'Yorum eklendi.');
+        return refreshStreams(['comments', 'activity']);
+      }).catch(function(error) {
+        vm.taskDetail.actionError = apiActionError(error, 'Yorum eklenemedi.');
+      });
     };
 
     vm.editComment = function(comment) {
+      if (!vm.canCommentOnTask() || mutationsUnavailable()) return;
       comment.editing = true;
       comment.draftBody = comment.body;
     };
 
     vm.saveComment = function(comment) {
-      if (!comment || !comment.draftBody || !comment.draftBody.trim()) return;
+      if (!comment || !comment.draftBody || !comment.draftBody.trim() || !vm.canCommentOnTask() || mutationsUnavailable()) return;
       return apiClient.put('/api/work-items/' + vm.selectedTask.id + '/comments/' + comment.id, { body: comment.draftBody })
-        .then(function(task) { vm.selectedTask = task; vm.notify('success', 'Yorum güncellendi.'); });
+        .then(acceptTaskMutation).then(function() {
+          vm.notify('success', 'Yorum güncellendi.');
+          return refreshStreams(['comments', 'activity']);
+        }).catch(function(error) { vm.taskDetail.actionError = apiActionError(error, 'Yorum güncellenemedi.'); });
     };
 
     vm.deleteComment = function(comment) {
-      if (!comment) return;
+      if (!comment || !vm.canCommentOnTask() || mutationsUnavailable()) return;
       return apiClient.delete('/api/work-items/' + vm.selectedTask.id + '/comments/' + comment.id)
-        .then(function(task) { vm.selectedTask = task; vm.notify('success', 'Yorum silindi.'); });
+        .then(acceptTaskMutation).then(function() {
+          vm.notify('success', 'Yorum silindi.');
+          return refreshStreams(['comments', 'activity']);
+        }).catch(function(error) { vm.taskDetail.actionError = apiActionError(error, 'Yorum silinemedi.'); });
     };
 
     vm.addLabel = function() {
-      if (!vm.selectedTask || !vm.labelText.trim()) return;
+      if (!vm.selectedTask || !vm.labelText.trim() || !vm.canEditTaskDetail() || mutationsUnavailable()) return;
       return apiClient.post('/api/work-items/' + vm.selectedTask.id + '/labels', { label: vm.labelText })
-        .then(function(task) { vm.selectedTask = task; vm.labelText = ''; vm.notify('success', 'Etiket eklendi.'); });
+        .then(acceptTaskMutation).then(function() { vm.labelText = ''; vm.notify('success', 'Etiket eklendi.'); })
+        .catch(function(error) { vm.taskDetail.actionError = apiActionError(error, 'Etiket eklenemedi.'); });
     };
 
     vm.removeLabel = function(label) {
+      if (!vm.canEditTaskDetail() || mutationsUnavailable()) return;
       return apiClient.delete('/api/work-items/' + vm.selectedTask.id + '/labels/' + encodeURIComponent(label))
-        .then(function(task) { vm.selectedTask = task; vm.notify('success', 'Etiket kaldırıldı.'); });
+        .then(acceptTaskMutation).then(function() { vm.notify('success', 'Etiket kaldırıldı.'); })
+        .catch(function(error) { vm.taskDetail.actionError = apiActionError(error, 'Etiket kaldırılamadı.'); });
     };
 
     vm.addWorkLog = function() {
-      if (!vm.selectedTask || !vm.workLogDraft.hours) return;
+      if (!vm.selectedTask || !vm.workLogDraft.hours || !vm.canLogTaskWork() || mutationsUnavailable()) return;
       return apiClient.post('/api/work-items/' + vm.selectedTask.id + '/worklogs', {
         userId: vm.session.currentUser.id,
         hours: vm.workLogDraft.hours,
         note: vm.workLogDraft.note || null
-      }).then(function(task) {
-        vm.selectedTask = task;
+      }).then(acceptTaskMutation).then(function() {
         vm.workLogDraft = { hours: null, note: '' };
         vm.notify('success', 'İş günlüğü eklendi.');
-      });
+        return refreshStreams(['worklogs', 'activity']);
+      }).catch(function(error) { vm.taskDetail.actionError = apiActionError(error, 'İş günlüğü eklenemedi.'); });
     };
 
     vm.addChecklist = function() {
-      if (!vm.selectedTask || !vm.checklistText.trim()) return;
-      apiClient.post('/api/work-items/' + vm.selectedTask.id + '/checklist', { text: vm.checklistText })
-        .then(function(task) { vm.selectedTask = task; vm.checklistText = ''; });
+      if (!vm.selectedTask || !vm.checklistText.trim() || !vm.canEditTaskDetail() || mutationsUnavailable()) return;
+      return apiClient.post('/api/work-items/' + vm.selectedTask.id + '/checklist', { text: vm.checklistText })
+        .then(acceptTaskMutation).then(function() { vm.checklistText = ''; })
+        .catch(function(error) { vm.taskDetail.actionError = apiActionError(error, 'Kontrol listesi maddesi eklenemedi.'); });
     };
 
     vm.toggleChecklist = function(item) {
-      apiClient.patch('/api/work-items/' + vm.selectedTask.id + '/checklist/' + item.id, { completed: !item.completed })
-        .then(function(task) { vm.selectedTask = task; });
+      if (!vm.canEditTaskDetail() || mutationsUnavailable()) return;
+      return apiClient.patch('/api/work-items/' + vm.selectedTask.id + '/checklist/' + item.id, { completed: !item.completed })
+        .then(acceptTaskMutation)
+        .catch(function(error) { vm.taskDetail.actionError = apiActionError(error, 'Kontrol listesi güncellenemedi.'); });
     };
 
     vm.uploadAttachment = function() {
-      if (!vm.selectedTask || !vm.attachmentFile) return;
-      apiClient.upload('/api/work-items/' + vm.selectedTask.id + '/attachments/upload', vm.attachmentFile)
-        .then(function(task) { vm.selectedTask = task; vm.attachmentFile = null; });
+      if (!vm.selectedTask || !vm.attachmentFile || !vm.canUploadTaskAttachment() || mutationsUnavailable()) return;
+      vm.taskDetail.actionBusy = 'upload';
+      return apiClient.upload('/api/work-items/' + vm.selectedTask.id + '/attachments/upload', vm.attachmentFile)
+        .then(acceptTaskMutation).then(function() {
+          vm.attachmentFile = null;
+          vm.notify('success', 'Dosya yüklendi ve güvenlik kontrolüne alındı.');
+          return refreshStreams(['attachments', 'activity']);
+        }).catch(function(error) { vm.taskDetail.actionError = apiActionError(error, 'Dosya yüklenemedi.'); })
+        .finally(function() { vm.taskDetail.actionBusy = null; });
     };
 
     vm.deleteAttachment = function(attachment) {
-      apiClient.delete('/api/work-items/' + vm.selectedTask.id + '/attachments/' + attachment.id)
-        .then(function(task) { vm.selectedTask = task; });
+      if (!vm.canDeleteTaskAttachment() || mutationsUnavailable()) return;
+      return apiClient.delete('/api/work-items/' + vm.selectedTask.id + '/attachments/' + attachment.id)
+        .then(acceptTaskMutation).then(function() { return refreshStreams(['attachments', 'activity']); })
+        .catch(function(error) { vm.taskDetail.actionError = apiActionError(error, 'Dosya silinemedi.'); });
     };
 
     vm.downloadAttachment = function(attachment) {
@@ -187,16 +562,16 @@
     };
 
     vm.moveSelected = function() {
-      if (!vm.selectedTask) {
+      if (!vm.selectedTask || !vm.canMoveTaskDetail() || mutationsUnavailable()) {
         return;
       }
 
       apiClient.patch('/api/work-items/' + vm.selectedTask.id + '/status', { status: vm.nextStatus })
         .then(function(task) {
-          vm.selectedTask = task;
+          acceptTaskMutation(task);
           vm.nextStatus = nextStatusFor(task.status);
-          return vm.loadTasks();
-        });
+          return $q.all([vm.loadTasks(), refreshStreams(['timeline', 'activity'])]);
+        }).catch(function(error) { vm.taskDetail.actionError = apiActionError(error, 'Görev taşınamadı.'); });
     };
 
     vm.selectedTransition = function() {
@@ -308,45 +683,51 @@
     };
 
     vm.addRelation = function() {
-      if (!vm.selectedTask || !vm.relationDraft.relatedWorkItemId || vm.taskSaving) return;
+      if (!vm.selectedTask || !vm.relationDraft.relatedWorkItemId || vm.taskSaving || !vm.canLinkTask() || mutationsUnavailable()) return;
       vm.taskSaving = true;
       return apiClient.post('/api/work-items/' + vm.selectedTask.id + '/relations', vm.relationDraft)
-        .then(function(task) {
-          vm.selectedTask = task;
+        .then(acceptTaskMutation).then(function() {
           vm.relationDraft = { relatedWorkItemId: '', relationType: 'RelatesTo' };
           vm.notify('success', 'Görev ilişkisi eklendi.');
+          return loadTaskStream('activity', true);
         }).catch(function(error) { vm.notify('error', apiActionError(error, 'Görev ilişkisi eklenemedi.')); })
         .finally(function() { vm.taskSaving = false; });
     };
 
     vm.removeRelation = function(relation) {
-      if (!vm.selectedTask || !relation || vm.taskSaving) return;
+      if (!vm.selectedTask || !relation || vm.taskSaving || !vm.canLinkTask() || mutationsUnavailable()) return;
       vm.taskSaving = true;
       return apiClient.delete('/api/work-items/' + vm.selectedTask.id + '/relations/' + relation.relatedWorkItemId + '?relationType=' + encodeURIComponent(relation.relationType))
-        .then(function(task) { vm.selectedTask = task; vm.notify('success', 'Görev ilişkisi kaldırıldı.'); })
+        .then(acceptTaskMutation).then(function() {
+          vm.notify('success', 'Görev ilişkisi kaldırıldı.');
+          return loadTaskStream('activity', true);
+        })
         .catch(function(error) { vm.notify('error', apiActionError(error, 'Görev ilişkisi kaldırılamadı.')); })
         .finally(function() { vm.taskSaving = false; });
     };
 
     vm.requestApproval = function() {
-      if (!vm.selectedTask || !vm.nextStatus || vm.taskSaving) return;
+      if (!vm.selectedTask || !vm.nextStatus || vm.taskSaving || !vm.canApproveTask() || mutationsUnavailable()) return;
       vm.taskSaving = true;
       return apiClient.post('/api/work-items/' + vm.selectedTask.id + '/approvals', { targetStatus: vm.nextStatus })
-        .then(function(task) { vm.selectedTask = task; vm.notify('success', 'Geçiş onayı istendi.'); })
+        .then(acceptTaskMutation).then(function() {
+          vm.notify('success', 'Geçiş onayı istendi.');
+          return refreshStreams(['approvals', 'activity']);
+        })
         .catch(function(error) { vm.notify('error', apiActionError(error, 'Geçiş onayı istenemedi.')); })
         .finally(function() { vm.taskSaving = false; });
     };
 
     vm.decideApproval = function(approval, approved) {
-      if (!vm.selectedTask || !approval || vm.taskSaving) return;
+      if (!vm.selectedTask || !approval || vm.taskSaving || !vm.canApproveTask() || mutationsUnavailable()) return;
       vm.taskSaving = true;
       return apiClient.post('/api/work-items/' + vm.selectedTask.id + '/approvals/' + approval.id + '/decision', {
         approved: approved,
         note: vm.approvalNote || null
-      }).then(function(task) {
-        vm.selectedTask = task;
+      }).then(acceptTaskMutation).then(function() {
         vm.approvalNote = '';
         vm.notify('success', approved ? 'Geçiş onaylandı.' : 'Geçiş reddedildi.');
+        return refreshStreams(['approvals', 'timeline', 'activity']);
       }).catch(function(error) { vm.notify('error', apiActionError(error, 'Onay kararı kaydedilemedi.')); })
         .finally(function() { vm.taskSaving = false; });
     };
