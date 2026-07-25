@@ -1,0 +1,100 @@
+.mobile-automation .scroll { min-height: 100%; background: var(--surface); }
+
+.mobile-automation-head {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 16px;
+  border-bottom: 1px solid var(--line);
+  background: var(--panel);
+}
+
+.mobile-automation-head > div { min-width: 0; }
+.mobile-automation-head small { color: var(--muted); font-size: 10px; font-weight: 700; }
+.mobile-automation-head h2 { margin: 3px 0 2px; overflow-wrap: anywhere; color: var(--ink); font-size: 20px; line-height: 1.2; }
+.mobile-automation-head p { margin: 0; color: var(--muted); font-size: 11px; }
+.mobile-automation-head > button { display: grid; flex: 0 0 44px; width: 44px; min-height: 44px; place-items: center; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); color: var(--accent); font-size: 20px; }
+
+.mobile-automation-summary { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); border-bottom: 1px solid var(--line); background: var(--surface-subtle); }
+.mobile-automation-summary span { padding: 10px 16px; color: var(--muted); font-size: 10px; }
+.mobile-automation-summary span + span { border-left: 1px solid var(--line); }
+.mobile-automation-summary b { margin-right: 3px; color: var(--ink); font-size: 15px; }
+
+.mobile-automation-tabs { display: flex; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); background: var(--panel); }
+.mobile-automation-tabs button { flex: 1 1 0; min-width: 0; min-height: 46px; padding: 0 4px; border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--muted); font-size: 11px; }
+.mobile-automation-tabs button.active { border-bottom-color: var(--accent); color: var(--accent-strong); font-weight: 700; }
+
+.mobile-automation-skeleton { display: grid; gap: 10px; padding: 18px 16px; }
+.mobile-automation-skeleton span { height: 64px; border-radius: 5px; background: var(--surface-muted); animation: mobile-automation-pulse 1.2s ease-in-out infinite alternate; }
+.mobile-automation-permission { margin: 12px 16px 0; padding: 10px; border: 1px solid var(--line); border-left: 3px solid var(--warning); background: var(--surface-subtle); color: var(--ink); font-size: 11px; }
+
+.mobile-automation-section { margin-top: 14px; border-top: 2px solid var(--ink); background: var(--panel); }
+.mobile-automation-section.editor { margin: 14px 12px 0; border: 1px solid var(--line); border-top: 2px solid var(--accent); }
+.mobile-automation-section > header { display: flex; min-height: 54px; align-items: center; justify-content: space-between; padding: 10px 16px; border-bottom: 1px solid var(--line); }
+.mobile-automation-section > header h3 { margin: 0; color: var(--ink); font-size: 14px; }
+.mobile-automation-section > header small { display: block; margin-top: 2px; color: var(--muted); font-size: 10px; }
+.mobile-automation-section > header > i { color: var(--accent); font-size: 19px; }
+.mobile-automation-section > header > button { display: grid; width: 44px; min-height: 44px; place-items: center; border: 0; background: transparent; color: var(--accent); font-size: 18px; }
+
+.mobile-automation-section form { display: grid; gap: 11px; margin: 0; padding: 13px 16px; background: var(--surface-subtle); }
+.mobile-automation-section form label { display: grid; gap: 5px; min-width: 0; color: var(--muted); font-size: 10px; font-weight: 700; }
+.mobile-automation-section form input,
+.mobile-automation-section form select,
+.mobile-automation-section form textarea { width: 100%; min-height: 44px; padding: 8px 9px; border: 1px solid var(--line); border-radius: 5px; background: var(--panel); color: var(--ink); font-size: 14px; }
+.mobile-automation-section form textarea { min-height: 70px; resize: vertical; }
+.mobile-automation-section form label small { font-size: 9px; font-weight: 500; }
+.mobile-automation-section form label small.danger { color: var(--danger); font-weight: 700; }
+.mobile-automation-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
+.mobile-automation-actions { display: flex; flex-wrap: wrap; gap: 7px; }
+
+.mobile-automation-preview { margin: 0 16px 14px; padding: 10px; border: 1px solid var(--line); border-left: 3px solid var(--accent); background: var(--surface-subtle); }
+.mobile-automation-preview > strong,
+.mobile-automation-preview > small { display: block; }
+.mobile-automation-preview > strong { color: var(--ink); font-size: 11px; }
+.mobile-automation-preview > small { color: var(--muted); font-size: 9px; }
+.mobile-automation-preview ol { display: grid; gap: 5px; margin: 9px 0 0; padding: 0; list-style: none; }
+.mobile-automation-preview li { display: flex; gap: 8px; align-items: center; color: var(--ink); font-size: 10px; }
+.mobile-automation-preview li b { display: grid; width: 19px; height: 19px; place-items: center; border-radius: 50%; background: var(--accent); color: white; font-size: 9px; }
+
+.mobile-automation-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: center; min-height: 68px; padding: 9px 16px; border-bottom: 1px solid var(--line); }
+.mobile-automation-row.template > span:first-child { display: grid; gap: 3px; min-width: 0; }
+.mobile-automation-row[data-state="archived"],
+.mobile-automation-row[data-state="completed"] { opacity: 0.7; }
+.mobile-automation-row.selected { box-shadow: inset 3px 0 0 var(--accent); }
+.mobile-automation-main { display: grid; gap: 3px; min-width: 0; padding: 2px 0; border: 0; background: transparent; color: inherit; text-align: left; }
+.mobile-automation-row strong { overflow-wrap: anywhere; color: var(--ink); font-size: 12px; }
+.mobile-automation-row small,
+.mobile-automation-row time { overflow-wrap: anywhere; color: var(--muted); font-size: 9px; }
+
+.mobile-automation-state { padding: 3px 6px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface-subtle); color: var(--muted); font-size: 9px; font-weight: 700; white-space: nowrap; }
+.mobile-automation-state[data-tone="success"] { color: var(--success); }
+.mobile-automation-state[data-tone="warning"] { color: var(--warning); }
+.mobile-automation-state[data-tone="danger"] { color: var(--danger); }
+.mobile-automation-row-actions { display: flex; grid-column: 1 / -1; gap: 3px; align-items: center; justify-content: flex-end; }
+.mobile-automation-confirm { display: flex; gap: 4px; padding: 3px; border: 1px solid var(--danger); border-radius: 4px; }
+.mobile-automation-confirm button { min-height: 44px; padding: 0 8px; border: 0; border-radius: 3px; background: var(--surface); color: var(--ink); font-size: 10px; }
+
+.mobile-occurrence-row { display: flex; min-height: 48px; gap: 10px; align-items: center; justify-content: space-between; padding: 8px 16px; border-bottom: 1px solid var(--line); }
+.mobile-occurrence-row time { color: var(--muted); font-size: 10px; }
+.mobile-automation-loading,
+.mobile-automation-empty { margin: 0; padding: 20px 16px; color: var(--muted); font-size: 11px; text-align: center; }
+.mobile-automation-audit p { display: flex; min-height: 50px; align-items: center; justify-content: space-between; gap: 10px; margin: 0; padding: 8px 16px; border-bottom: 1px solid var(--line); }
+.mobile-automation-audit strong { overflow-wrap: anywhere; color: var(--ink); font-size: 11px; }
+.mobile-automation-audit time { flex: 0 0 auto; color: var(--muted); font-size: 9px; }
+.mobile-automation[data-busy="true"] .mobile-automation-section { opacity: 0.76; }
+
+@keyframes mobile-automation-pulse {
+  from { opacity: 0.55; }
+  to { opacity: 1; }
+}
+
+@media (max-width: 340px) {
+  .mobile-automation-fields { grid-template-columns: 1fr; }
+  .mobile-automation-row { grid-template-columns: 1fr; }
+  .mobile-automation-state { justify-self: start; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mobile-automation-skeleton span { animation: none; }
+}
