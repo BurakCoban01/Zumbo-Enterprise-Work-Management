@@ -2,9 +2,10 @@
   'use strict';
 
   angular.module('zumboMobile')
-  .controller('TasksController', function($scope, $state, $ionicPopup, $q, $timeout, zumboApi, sessionStore, realtimeService, apiClient) {
+  .controller('TasksController', function($scope, $state, $ionicPopup, $ionicScrollDelegate, $q, $timeout, zumboApi, sessionStore, realtimeService, apiClient, mobileActionError) {
     var vm = this;
-    vm.mode = 'my';
+    vm.mode = sessionStore.state.taskMode || 'my';
+    delete sessionStore.state.taskMode;
     vm.status = '';
     vm.tasks = [];
     vm.backlogItems = [];
@@ -12,12 +13,21 @@
     vm.sprints = [];
     vm.boardLanes = [];
     vm.sprintItems = [];
+    vm.burndown = [];
     vm.selectedBoardId = '';
     vm.selectedSprintId = '';
+    vm.backlogNextCursor = null;
+    vm.sprintNextCursor = null;
+    vm.planningBusy = false;
+    vm.planningError = null;
+    vm.loading = false;
+    vm.loadError = null;
+    vm.projectMissing = false;
     vm.page = 1;
     vm.pageSize = 50;
     vm.hasMore = false;
     vm.schema = { issueTypes: [], customFields: [], layouts: [] };
+    vm.moveError = null;
     vm.createDraft = { title: '', type: 'Task', priority: 'Medium', customFieldValues: {} };
     vm.customFieldsFor = function(typeKey) {
       var layout = (vm.schema.layouts || []).find(function(item) { return item.issueTypeKey === typeKey; });
@@ -68,7 +78,11 @@
     vm.setMode = function(mode) {
       vm.mode = mode;
       vm.status = '';
-      vm.load();
+      return vm.load().finally(function() {
+        $timeout(function() {
+          $ionicScrollDelegate.$getByHandle('taskWorkScroll').scrollTop(true);
+        });
+      });
     };
     vm.handleModeKey = function(event) {
       var modes = ['my', 'backlog', 'sprint', 'board', 'list'];
@@ -94,6 +108,7 @@
         return {
           id: column.id,
           name: column.name,
+          wipLimit: column.wipLimit,
           tasks: vm.tasks.filter(function(task) { return statuses.indexOf(task.status) >= 0; })
         };
       });
@@ -106,10 +121,204 @@
       if (board) sessionStore.state.board = board;
       rebuildBoardLanes();
     };
-    vm.selectSprint = rebuildSprintItems;
+    vm.selectedSprint = function() {
+      return vm.sprints.find(function(item) { return item.id === vm.selectedSprintId; }) || null;
+    };
+    vm.planningPoints = function() {
+      return vm.sprintItems.reduce(function(total, item) { return total + Number(item.estimatePoints || 0); }, 0);
+    };
+    vm.selectSprint = function() {
+      rebuildSprintItems();
+      vm.burndown = [];
+      if (!vm.selectedSprintId) return $q.when([]);
+      return zumboApi.sprintBurndown(vm.selectedSprintId).then(function(points) {
+        vm.burndown = points || [];
+        return vm.burndown;
+      }).catch(function() { return []; });
+    };
+    vm.canEditTasks = function() {
+      var project = sessionStore.state.project;
+      var currentUser = sessionStore.state.currentUser;
+      var membership = project && currentUser && (project.members || []).find(function(member) {
+        return member.userId === currentUser.id;
+      });
+      return !!membership && membership.role !== 'Viewer';
+    };
+    vm.plannedSprints = function() {
+      return vm.sprints.filter(function(sprint) { return sprint.status === 'Planned'; });
+    };
+    vm.carryoverTargets = function() {
+      return vm.sprints.filter(function(sprint) {
+        return sprint.status === 'Planned' && sprint.id !== vm.selectedSprintId;
+      });
+    };
+    function planningError(error) {
+      var code = error && error.data && error.data.error && error.data.error.code;
+      if (code === 'SPRINT_ACTIVE_EXISTS') return 'Bu projede zaten aktif bir sprint var.';
+      if (code === 'SPRINT_PLANNING_CLOSED') return 'Sprint başladığı için kapsam değiştirilemez.';
+      if (code === 'CONCURRENCY_CONFLICT') return 'Plan başka bir kullanıcı tarafından değiştirildi. Güncel plan yüklendi.';
+      return mobileActionError(error, 'Sprint işlemi tamamlanamadı.');
+    }
+    function runPlanning(request, successMessage, rollback) {
+      if (vm.planningBusy) return $q.when(false);
+      vm.planningBusy = true;
+      vm.planningError = null;
+      return request.then(function(result) {
+        if (result && result.id) {
+          var sprint = vm.sprints.find(function(item) { return item.id === result.id; });
+          if (sprint) angular.extend(sprint, result);
+          else vm.sprints.push(result);
+          vm.selectedSprintId = result.id;
+          vm.selectSprint();
+        }
+        vm.planningSuccess = successMessage;
+        return vm.load().then(function() { return true; });
+      }).catch(function(error) {
+        if (rollback) rollback();
+        vm.planningError = planningError(error);
+        return vm.load().then(function() { return false; });
+      }).finally(function() { vm.planningBusy = false; });
+    }
+    vm.openCreateSprint = function() {
+      if (!vm.canEditTasks() || vm.planningBusy) return;
+      var start = new Date();
+      vm.sprintDraft = {
+        name: '', goal: '', startDate: start,
+        endDate: new Date(start.getFullYear(), start.getMonth(), start.getDate() + 13)
+      };
+      vm.sprintDraftError = null;
+      return $ionicPopup.show({
+        title: 'Sprint oluştur',
+        templateUrl: 'templates/create-sprint.html',
+        scope: $scope,
+        buttons: [
+          { text: 'İptal' },
+          {
+            text: 'Oluştur', type: 'button-positive',
+            onTap: function(event) {
+              var startDate = dateOnly(vm.sprintDraft.startDate);
+              var endDate = dateOnly(vm.sprintDraft.endDate);
+              if (!vm.sprintDraft.name || !startDate || !endDate || endDate < startDate) {
+                event.preventDefault();
+                vm.sprintDraftError = 'Ad ve geçerli tarih aralığı zorunludur.';
+                return null;
+              }
+              return {
+                name: vm.sprintDraft.name,
+                goal: vm.sprintDraft.goal,
+                startDate: startDate,
+                endDate: endDate
+              };
+            }
+          }
+        ]
+      }).then(function(draft) {
+        if (!draft) return false;
+        var project = sessionStore.state.project;
+        return runPlanning(zumboApi.createSprint(project.id, draft), 'Sprint oluşturuldu.');
+      });
+    };
+    vm.planBacklogItem = function(item) {
+      var sprint = vm.selectedSprint();
+      if (!item || !vm.canEditTasks() || !sprint || sprint.status !== 'Planned') return $q.when(false);
+      var index = vm.backlogItems.indexOf(item);
+      if (index >= 0) vm.backlogItems.splice(index, 1);
+      return runPlanning(zumboApi.planSprintItem(sprint.id, item), 'İş sprint kapsamına alındı.', function() {
+        if (index >= 0 && vm.backlogItems.indexOf(item) < 0) vm.backlogItems.splice(index, 0, item);
+      });
+    };
+    vm.unplanSprintItem = function(item) {
+      var sprint = vm.selectedSprint();
+      if (!item || !vm.canEditTasks() || !sprint || sprint.status !== 'Planned') return $q.when(false);
+      var previousSprintId = item.sprintId;
+      item.sprintId = null;
+      rebuildSprintItems();
+      return runPlanning(zumboApi.unplanSprintItem(sprint.id, item), 'İş backlog alanına taşındı.', function() {
+        item.sprintId = previousSprintId;
+        rebuildSprintItems();
+      });
+    };
+    vm.startSprint = function() {
+      var sprint = vm.selectedSprint();
+      if (!vm.canEditTasks() || !sprint || sprint.status !== 'Planned') return;
+      return $ionicPopup.confirm({
+        title: 'Sprint başlatılsın mı?',
+        template: '<p class="mobile-confirm-copy">Kapsam başlangıç anında sabitlenir ve burndown takibi başlar.</p>',
+        cancelText: 'Vazgeç', okText: 'Başlat', okType: 'button-positive'
+      }).then(function(confirmed) {
+        if (!confirmed) return false;
+        return runPlanning(zumboApi.startSprint(sprint.id), 'Sprint başlatıldı.');
+      });
+    };
+    vm.completeSprint = function() {
+      var sprint = vm.selectedSprint();
+      if (!vm.canEditTasks() || !sprint || sprint.status !== 'Active') return;
+      vm.carryoverSprintId = '';
+      return $ionicPopup.show({
+        title: 'Sprint tamamla',
+        templateUrl: 'templates/complete-sprint.html',
+        scope: $scope,
+        buttons: [
+          { text: 'Vazgeç' },
+          { text: 'Tamamla', type: 'button-positive', onTap: function() { return vm.carryoverSprintId; } }
+        ]
+      }).then(function(carryoverSprintId) {
+        if (carryoverSprintId === undefined) return false;
+        return runPlanning(zumboApi.completeSprint(sprint.id, carryoverSprintId), 'Sprint tamamlandı.');
+      });
+    };
+    vm.loadMoreBacklog = function() {
+      var project = sessionStore.state.project;
+      if (!project || !vm.backlogNextCursor || vm.planningBusy) return;
+      vm.planningBusy = true;
+      return zumboApi.backlog(project.id, vm.backlogNextCursor).then(function(data) {
+        (data.items || []).forEach(function(item) {
+          if (!vm.backlogItems.some(function(existing) { return existing.id === item.id; })) vm.backlogItems.push(item);
+        });
+        vm.backlogNextCursor = data.nextCursor || null;
+      }).catch(function(error) {
+        vm.planningError = planningError(error);
+      }).finally(function() { vm.planningBusy = false; });
+    };
+    vm.canMoveTask = function(task, direction) {
+      var board = vm.boards.find(function(item) { return item.id === vm.selectedBoardId; });
+      if (!vm.canEditTasks() || !board || vm.movingTaskId === task.id) return false;
+      var index = board.columns.findIndex(function(column) {
+        var statuses = column.statusNames && column.statusNames.length ? column.statusNames : [column.name];
+        return column.id === task.columnId || statuses.indexOf(task.status) >= 0;
+      });
+      return index >= 0 && !!board.columns[index + direction];
+    };
+    vm.moveTask = function(task, direction) {
+      if (!vm.canMoveTask(task, direction)) return $q.when();
+      var board = vm.boards.find(function(item) { return item.id === vm.selectedBoardId; });
+      var current = board.columns.findIndex(function(column) {
+        var statuses = column.statusNames && column.statusNames.length ? column.statusNames : [column.name];
+        return column.id === task.columnId || statuses.indexOf(task.status) >= 0;
+      });
+      var target = board.columns[current + direction];
+      var previous = { status: task.status, columnId: task.columnId };
+      task.status = target.name;
+      task.columnId = target.id;
+      vm.movingTaskId = task.id;
+      vm.moveError = null;
+      rebuildBoardLanes();
+      return zumboApi.moveTask(task.id, target.name).then(vm.load).catch(function(error) {
+        task.status = previous.status;
+        task.columnId = previous.columnId;
+        rebuildBoardLanes();
+        var code = error.data && error.data.error && error.data.error.code;
+        vm.moveError = code === 'BOARD_WIP_LIMIT_EXCEEDED' || code === 'WIP_LIMIT_EXCEEDED'
+          ? 'Kolonun WIP limiti dolu; görev önceki kolonuna alındı.'
+          : 'Görev taşınamadı; önceki kolonuna alındı.';
+      }).finally(function() { vm.movingTaskId = null; });
+    };
     vm.load = function(page, append) {
       page = Number.isInteger(page) && page > 0 ? page : 1;
       append = append === true;
+      vm.loading = !append;
+      vm.loadError = null;
+      vm.projectMissing = false;
       var projectPromise = sessionStore.state.project
         ? $q.when(sessionStore.state.project)
         : zumboApi.projects().then(function(projects) {
@@ -119,13 +328,21 @@
       return projectPromise.then(function(project) {
         if (!project) {
           vm.tasks = [];
+          vm.projectMissing = true;
           return [];
         }
         apiClient.transitionContext('project:' + project.id);
         return realtimeService.connect(project.id).catch(angular.noop).then(function() {
           if (vm.mode === 'backlog') {
-            return zumboApi.backlog(project.id).then(function(data) {
-              vm.backlogItems = data.items || [];
+            return $q.all([zumboApi.backlog(project.id), zumboApi.sprints(project.id)]).then(function(result) {
+              vm.backlogItems = result[0].items || [];
+              vm.backlogNextCursor = result[0].nextCursor || null;
+              vm.sprints = result[1].items || [];
+              vm.sprintNextCursor = result[1].nextCursor || null;
+              if (!vm.selectedSprintId || !vm.sprints.some(function(sprint) { return sprint.id === vm.selectedSprintId; })) {
+                var planned = vm.sprints.find(function(sprint) { return sprint.status === 'Planned'; });
+                vm.selectedSprintId = planned ? planned.id : '';
+              }
               vm.tasks = [];
               vm.hasMore = false;
               return vm.backlogItems;
@@ -141,6 +358,7 @@
               vm.searchDegraded = result[0].degraded === true;
               vm.boards = result[1];
               vm.sprints = result[2].items || [];
+              vm.sprintNextCursor = result[2].nextCursor || null;
               if (!vm.selectedBoardId || !vm.boards.some(function(board) { return board.id === vm.selectedBoardId; })) {
                 vm.selectedBoardId = (sessionStore.state.board && sessionStore.state.board.id) || (vm.boards[0] && vm.boards[0].id) || '';
               }
@@ -151,7 +369,7 @@
                 vm.selectedSprintId = active ? active.id : '';
               }
               vm.selectBoard();
-              rebuildSprintItems();
+              vm.selectSprint();
               vm.hasMore = false;
               realtimeService.synchronize(vm.tasks);
               return vm.tasks;
@@ -169,6 +387,11 @@
             return items;
           });
         });
+      }).catch(function(error) {
+        vm.loadError = mobileActionError(error, 'İşler yüklenemedi.');
+        return [];
+      }).finally(function() {
+        vm.loading = false;
       });
     };
     vm.loadMore = function() {
@@ -231,8 +454,19 @@
           draft.customFields = customFieldRequests();
           return zumboApi.createTask(project.id, board.id, draft);
         });
-      }).then(vm.load);
+      }).then(vm.load, function(error) {
+        vm.createError = mobileActionError(error, 'Görev oluşturulamadı.');
+        return $ionicPopup.alert({
+          title: 'Görev oluşturulamadı',
+          template: 'İşlem tamamlanamadı. Lütfen yeniden deneyin.'
+        });
+      });
     };
+    $scope.$on('$ionicView.afterEnter', function() {
+      if (!sessionStore.state.openCreateTask) return;
+      delete sessionStore.state.openCreateTask;
+      vm.load().then(vm.quickAdd);
+    });
     vm.load();
   });
 })();

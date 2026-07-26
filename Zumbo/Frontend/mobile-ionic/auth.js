@@ -12,14 +12,25 @@ function createDemoPassword() {
 
   angular.module('zumboMobile')
   .factory('authService', function($q, apiClient, tokenStorage, sessionStore) {
+    var restorePromise = null;
     function accept(auth) {
       tokenStorage.setCsrf(auth.csrfToken);
       sessionStore.setUser(auth.user);
       return auth;
     }
+    function restore() {
+      if (!restorePromise) {
+        restorePromise = apiClient.get('/api/browser-auth/session').then(accept)
+          .catch(function(error) {
+            restorePromise = null;
+            return $q.reject(error);
+          });
+      }
+      return restorePromise;
+    }
     return {
       login: function(form) { return apiClient.post('/api/browser-auth/login', form).then(accept); },
-      restore: function() { return apiClient.get('/api/browser-auth/session').then(accept); },
+      restore: restore,
       forgotPassword: function(email) {
         return apiClient.post('/api/auth/forgot-password', { email: email });
       },
@@ -28,7 +39,10 @@ function createDemoPassword() {
       },
       logout: function() {
         return apiClient.post('/api/browser-auth/logout', { allSessions: false })
-          .finally(function() { apiClient.clearSession('logout'); });
+          .finally(function() {
+            restorePromise = null;
+            apiClient.clearSession('logout');
+          });
       },
       registerDemo: function() {
         var suffix = Date.now();
@@ -47,13 +61,17 @@ function createDemoPassword() {
     vm.pwa = mobilePwaService.state;
     mobilePwaService.start();
     vm.theme = window.localStorage.getItem('zumbo.mobileTheme') || 'light';
+    vm.sessionRestoring = true;
     vm.organizationName = function() {
       var id = vm.session.currentUser && vm.session.currentUser.organizationId;
       return displayNameResolver.organization(id, [], null);
     };
-    authService.restore().then(function() {
-      if ($state.current.name === 'login') $state.go('app.dashboard');
-    }).catch(angular.noop);
+    if ($state.current.name === 'public-intake') vm.sessionRestoring = false;
+    else authService.restore().then(function() {
+        if ($state.current.name === 'login') $state.go('app.dashboard');
+      }).catch(angular.noop).finally(function() {
+        vm.sessionRestoring = false;
+      });
     vm.toggleTheme = function() {
       vm.theme = vm.theme === 'dark' ? 'light' : 'dark';
       window.localStorage.setItem('zumbo.mobileTheme', vm.theme);
@@ -67,11 +85,15 @@ function createDemoPassword() {
       });
     };
   })
-  .controller('LoginController', function($state, authService, zumboApi, sessionStore) {
+  .controller('LoginController', function($state, authService, zumboApi, sessionStore, mobilePwaService) {
     var vm = this;
     vm.form = { usernameOrEmail: '', password: '', mfaCode: '' };
     vm.login = function() {
       vm.error = null;
+      if (mobilePwaService.state.offline) {
+        vm.error = 'Çevrimdışıyken giriş yapılamaz.';
+        return;
+      }
       authService.login(vm.form).then(function() { $state.go('app.dashboard'); }).catch(function(error) {
         var code = error.data && error.data.error && error.data.error.code;
         vm.mfaRequired = code === 'MFA_REQUIRED' || code === 'MFA_INVALID';
@@ -80,6 +102,10 @@ function createDemoPassword() {
     };
     vm.demo = function() {
       vm.error = null;
+      if (mobilePwaService.state.offline) {
+        vm.error = 'Çevrimdışıyken demo çalışma alanı oluşturulamaz.';
+        return;
+      }
       vm.demoPending = true;
       authService.registerDemo()
         .then(function() { return zumboApi.createOrganization(); })
@@ -96,11 +122,15 @@ function createDemoPassword() {
         .finally(function() { vm.demoPending = false; });
     };
   })
-  .controller('ForgotPasswordController', function($state, authService) {
+  .controller('ForgotPasswordController', function($state, authService, mobilePwaService) {
     var vm = this;
     vm.email = '';
     vm.submit = function() {
       vm.error = null;
+      if (mobilePwaService.state.offline) {
+        vm.error = 'Çevrimdışıyken sıfırlama bağlantısı gönderilemez.';
+        return;
+      }
       vm.pending = true;
       authService.forgotPassword(vm.email).then(function() {
         vm.sent = true;
@@ -112,11 +142,15 @@ function createDemoPassword() {
     };
     vm.back = function() { $state.go('login'); };
   })
-  .controller('ResetPasswordController', function($state, $stateParams, authService) {
+  .controller('ResetPasswordController', function($state, $stateParams, authService, mobilePwaService) {
     var vm = this;
     vm.form = { newPassword: '', confirmPassword: '' };
     vm.submit = function() {
       vm.error = null;
+      if (mobilePwaService.state.offline) {
+        vm.error = 'Çevrimdışıyken parola değiştirilemez.';
+        return;
+      }
       if (!vm.form.newPassword || vm.form.newPassword !== vm.form.confirmPassword) {
         vm.error = 'Parolalar eşleşmiyor.';
         return;
