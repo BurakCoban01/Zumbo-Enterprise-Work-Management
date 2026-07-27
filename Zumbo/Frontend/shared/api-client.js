@@ -172,6 +172,16 @@
     tenantSessionKeys.forEach(function(key) { session.removeItem(key); });
   }
 
+  function unwrapResponseBody(body) {
+    if (body
+        && typeof body === 'object'
+        && typeof body.success === 'boolean'
+        && Object.prototype.hasOwnProperty.call(body, 'data')) {
+      return body.data;
+    }
+    return body;
+  }
+
   var core = Object.freeze({
     resolveBaseUrl: resolveBaseUrl,
     createIdentifier: createIdentifier,
@@ -182,6 +192,7 @@
     normalizeError: normalizeError,
     createSingleFlight: createSingleFlight,
     createRequestRegistry: createRequestRegistry,
+    unwrapResponseBody: unwrapResponseBody,
     clearTenantStorage: clearTenantStorage,
     tenantLocalKeys: tenantLocalKeys,
     tenantSessionKeys: tenantSessionKeys
@@ -242,6 +253,18 @@
     var resourceVersions = Object.create(null);
 
     function resource(url) {
+      var sprintItem = url.match(/^\/api\/sprints\/[^/?]+\/items\/([^/?]+)/);
+      if (sprintItem) return { kind: 'work-items', id: sprintItem[1] };
+      var template = url.match(/^\/api\/work-items\/templates\/([^/?]+)/);
+      if (template) return { kind: 'work-item-templates', id: template[1] };
+      var recurrence = url.match(/^\/api\/work-items\/recurrences\/([^/?]+)/);
+      if (recurrence && ['preview', 'process-due'].indexOf(recurrence[1]) < 0) {
+        return { kind: 'work-item-recurrences', id: recurrence[1] };
+      }
+      var collaboration = url.match(/^\/api\/work-items\/([^/?]+)\/(?:collaboration|watch|vote|activity)(?:[/?]|$)/);
+      if (collaboration) return { kind: 'work-item-collaboration', id: collaboration[1] };
+      var intake = url.match(/^\/api\/intake\/forms(?:\/([^/?]+))?/);
+      if (intake) return { kind: 'intake-forms', id: intake[1] || null };
       var match = url.match(/^\/api\/(teams|projects|boards|work-items|workflows)(?:\/([^/?]+))?/);
       return match ? { kind: match[1], id: match[2] || null } : null;
     }
@@ -264,6 +287,7 @@
       return [
         '/api/browser-auth/login',
         '/api/browser-auth/register',
+        '/api/browser-auth/session',
         '/api/browser-auth/refresh',
         '/api/browser-auth/logout',
         '/api/auth/forgot-password',
@@ -279,6 +303,9 @@
         if (csrf) headers['X-CSRF-Token'] = csrf;
       }
       if (operation.idempotencyKey) headers['Idempotency-Key'] = operation.idempotencyKey;
+      if (operation.options.privacyStatusToken) {
+        headers['X-Privacy-Status-Token'] = String(operation.options.privacyStatusToken);
+      }
       var target = resource(operation.url);
       if (!isSafeMethod(operation.method) && target && target.id) {
         var version = resourceVersions[resourceKey(target.kind, target.id)];
@@ -382,7 +409,7 @@
           return $q.reject({ zumboCode: 'STALE_RESPONSE', zumboMessage: 'The response belongs to an inactive workspace.' });
         }
         if (options.rawResponse) return response;
-        return remember(url, response.data.data);
+        return remember(url, unwrapResponseBody(response.data));
       }).catch(function(error) {
         var target = resource(url);
         var apiError = error && error.data && error.data.error;

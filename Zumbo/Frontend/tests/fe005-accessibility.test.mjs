@@ -99,7 +99,8 @@ test('login alanlari explicit label association ve hata duyurusu tasir', async (
 test('mobil work mode tablari selected state ve roving tabindex bildirir', async () => {
   const mobile = await read('mobile-ionic/index.html');
   const tasks = await read('mobile-ionic/tasks.js');
-  const tabs = [...mobile.matchAll(/<button role="tab"[^>]+>/g)].map(match => match[0]);
+  const workModes = mobile.match(/class="segmented work-mode-segments"[\s\S]+?<\/div>/)?.[0] || '';
+  const tabs = [...workModes.matchAll(/<button role="tab"[^>]+>/g)].map(match => match[0]);
   assert.equal(tabs.length, 5);
   for (const tab of tabs) {
     assert.match(tab, /aria-selected=/);

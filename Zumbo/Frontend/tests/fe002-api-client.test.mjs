@@ -19,6 +19,19 @@ test('runtime config tek ve normalize edilmis API base URL uretir', () => {
   assert.equal(core.resolveBaseUrl({}, 'https://app.zumbo.test/'), 'https://app.zumbo.test');
 });
 
+test('API istemcisi standart zarfi acar, dogrudan operasyon govdesini korur', () => {
+  const data = { dependencies: [{ dependency: 'mongodb' }] };
+  assert.deepEqual(
+    core.unwrapResponseBody({ success: true, data, error: null, correlationId: 'corr-1' }),
+    data
+  );
+  assert.deepEqual(core.unwrapResponseBody(data), data);
+  assert.deepEqual(core.unwrapResponseBody({ data: 'domain-value', status: 'available' }), {
+    data: 'domain-value',
+    status: 'available'
+  });
+});
+
 test('refresh sonrasi replay yalniz safe method veya explicit idempotency key icin acilir', () => {
   assert.equal(core.canReplay('GET', null), true);
   assert.equal(core.canReplay('HEAD', null), true);
