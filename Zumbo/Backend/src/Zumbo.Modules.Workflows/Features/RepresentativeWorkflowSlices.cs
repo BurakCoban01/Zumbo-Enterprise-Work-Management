@@ -35,7 +35,10 @@ public sealed record WorkflowResponse(
     long Version = 0,
     int PublishedVersion = 1,
     IReadOnlyCollection<WorkflowIssueTypeSchemeResponse>? IssueTypeSchemes = null,
-    bool HasDraft = false) : IVersionedResource;
+    bool HasDraft = false,
+    int PublishedVersionRetentionLimit = WorkflowRetentionPolicy.MaximumPublishedVersions,
+    int RetainedPublishedVersionCount = 0,
+    int? OldestRetainedPublishedVersion = null) : IVersionedResource;
 
 public sealed record WorkflowStatusResponse(string Name, string Category);
 

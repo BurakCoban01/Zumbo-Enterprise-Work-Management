@@ -17,7 +17,10 @@ public sealed record SetWorkItemCustomFieldsRequest(IReadOnlyCollection<WorkItem
 public sealed record AddChecklistItemRequest(string Text);
 public sealed record CompleteChecklistItemRequest(bool Completed);
 public sealed record AddLabelRequest(string Label);
-public sealed record AddCommentRequest(string Body, IReadOnlyCollection<string>? Mentions);
+public sealed record AddCommentRequest(
+    string Body,
+    IReadOnlyCollection<string>? Mentions,
+    string? IdempotencyKey = null);
 public sealed record EditCommentRequest(string Body);
 public sealed record AddWorkLogRequest(string UserId, decimal Hours, string? Note);
 public sealed record LinkWorkItemRequest(string RelatedWorkItemId, string RelationType);
@@ -153,7 +156,9 @@ public sealed partial class WorkItemService(
     IWorkItemSprintPolicy? sprintPolicy = null,
     IWorkItemTypeSchemaPolicy? typeSchemaPolicy = null,
     WorkItemCollaborationService? collaborationService = null,
-    IOptions<SearchOptions>? searchOptions = null) : IIntakeWorkItemCreator
+    IOptions<SearchOptions>? searchOptions = null,
+    IWorkItemAutomationEventPublisher? automationEvents = null,
+    IWorkItemAutomationChainContextAccessor? automationChain = null) : IIntakeWorkItemCreator
 {
     private readonly ExpectedVersionState expectedVersion = new(expectedVersions);
     private readonly Dictionary<string, string> authorizedOrganizationIds = new(StringComparer.Ordinal);
@@ -336,6 +341,13 @@ public sealed partial class WorkItemService(
         }
 
         await cacheInvalidationPublisher.InvalidateProjectAsync(workItem.ProjectId, ct);
+        await PublishAutomationAsync(
+            "WorkItemCreated",
+            workItem,
+            previousStatus: null,
+            correlationId,
+            $"created:{workItem.Version}",
+            ct);
         return ToResponse(workItem);
     }
 
@@ -478,6 +490,13 @@ public sealed partial class WorkItemService(
         }
         await PublishRealtimeAsync("updated", workItem, correlationId, ct);
         await cacheInvalidationPublisher.InvalidateProjectAsync(workItem.ProjectId, ct);
+        await PublishAutomationAsync(
+            "WorkItemUpdated",
+            workItem,
+            workItem.Status,
+            correlationId,
+            $"updated:{workItem.Version}",
+            ct);
         return ToResponse(workItem);
     }
 
@@ -509,6 +528,54 @@ public sealed partial class WorkItemService(
             workItem, "WorkItemCustomFieldsUpdated", "Custom fields updated", correlationId, ct);
         await PublishRealtimeAsync("updated", workItem, correlationId, ct);
         await cacheInvalidationPublisher.InvalidateProjectAsync(workItem.ProjectId, ct);
+        await PublishAutomationAsync(
+            "WorkItemUpdated",
+            workItem,
+            workItem.Status,
+            correlationId,
+            $"assigned:{workItem.Version}",
+            ct);
+        return ToResponse(workItem);
+    }
+
+    public async Task<WorkItemResponse> ClearAssigneeAsync(
+        string id,
+        string correlationId,
+        CancellationToken ct)
+    {
+        var workItem = await GetWorkItem(id, ct);
+        await EnsurePermissionAsync(workItem.ProjectId, PermissionCatalog.WorkItemAssign, ct);
+        if (workItem.AssigneeUserId is null)
+            return ToResponse(workItem);
+
+        var oldAssignee = workItem.AssigneeUserId;
+        workItem.AssigneeUserId = null;
+        workItem.UpdatedAt = clock.UtcNow;
+        await SaveAsync(workItem, ct);
+        await searchPublisher.IndexAsync(ToScopedSearchRecord(workItem), ct);
+        await audit.WriteAsync(
+            "WorkItemAssigneeCleared",
+            "WorkItem",
+            workItem.Id,
+            oldAssignee,
+            null,
+            correlationId,
+            ct);
+        await RecordActivityAndNotifyWatchersAsync(
+            workItem,
+            "WorkItemAssigneeCleared",
+            "Assignee cleared",
+            correlationId,
+            ct);
+        await PublishRealtimeAsync("updated", workItem, correlationId, ct);
+        await cacheInvalidationPublisher.InvalidateProjectAsync(workItem.ProjectId, ct);
+        await PublishAutomationAsync(
+            "WorkItemUpdated",
+            workItem,
+            workItem.Status,
+            correlationId,
+            $"assignee-cleared:{workItem.Version}",
+            ct);
         return ToResponse(workItem);
     }
 
@@ -782,6 +849,13 @@ public sealed partial class WorkItemService(
         }
         await PublishRealtimeAsync("moved", workItem, correlationId, ct);
         await cacheInvalidationPublisher.InvalidateProjectAsync(workItem.ProjectId, ct);
+        await PublishAutomationAsync(
+            "WorkItemTransitioned",
+            workItem,
+            oldStatus,
+            correlationId,
+            $"transitioned:{workItem.Version}",
+            ct);
         return ToResponse(workItem);
     }
 
@@ -890,6 +964,13 @@ public sealed partial class WorkItemService(
         await searchPublisher.IndexAsync(ToScopedSearchRecord(workItem), ct);
         await RecordActivityAndNotifyWatchersAsync(
             workItem, "WorkItemLabelAdded", "Label added", MutationEventId(workItem, "label:add:" + label), ct);
+        await PublishAutomationAsync(
+            "WorkItemUpdated",
+            workItem,
+            workItem.Status,
+            MutationEventId(workItem, "label:add:" + label),
+            $"label-added:{workItem.Version}:{label}",
+            ct);
         return ToResponse(workItem);
     }
 
@@ -908,13 +989,21 @@ public sealed partial class WorkItemService(
         await searchPublisher.IndexAsync(ToScopedSearchRecord(workItem), ct);
         await RecordActivityAndNotifyWatchersAsync(
             workItem, "WorkItemLabelRemoved", "Label removed", MutationEventId(workItem, "label:remove:" + label), ct);
+        await PublishAutomationAsync(
+            "WorkItemUpdated",
+            workItem,
+            workItem.Status,
+            MutationEventId(workItem, "label:remove:" + label),
+            $"label-removed:{workItem.Version}:{label}",
+            ct);
         return ToResponse(workItem);
     }
 
     public async Task<WorkItemResponse> AddCommentAsync(string id, AddCommentRequest request, string correlationId, CancellationToken ct)
     {
-        var body = NormalizeCommentBody(request.Body);
-        var mentions = NormalizeMentions(request.Mentions);
+        var body = WorkItemCommentRules.NormalizeBody(request.Body);
+        var mentions = WorkItemCommentRules.NormalizeMentions(request.Mentions);
+        var idempotencyKey = WorkItemCommentRules.NormalizeIdempotencyKey(request.IdempotencyKey);
         var workItem = await GetWorkItem(id, ct);
         await EnsurePermissionAsync(workItem.ProjectId, "CommentCreate", ct);
         var organizationId = CurrentOrganizationId(workItem.ProjectId);
@@ -927,6 +1016,25 @@ public sealed partial class WorkItemService(
                 ct);
         }
         await EnsureSeparatedAsync(workItem, ct);
+        var authorUserId = currentUser.UserId ?? "system";
+        var stableCommentId = idempotencyKey is null
+            ? null
+            : IntakeStableIds.Hash(
+                $"comment\u001f{workItem.Id}\u001f{authorUserId}\u001f{idempotencyKey}")[..32];
+        if (stableCommentId is not null
+            && workItem.Comments.SingleOrDefault(comment => comment.Id == stableCommentId) is { } existing)
+        {
+            if (existing.Body != body
+                || !existing.Mentions.Order(StringComparer.Ordinal)
+                    .SequenceEqual(mentions.Order(StringComparer.Ordinal)))
+            {
+                throw new ConflictException(
+                    "COMMENT_IDEMPOTENCY_KEY_REUSED",
+                    "Idempotency key was already used for a different comment.");
+            }
+
+            return ToResponse(workItem);
+        }
         if (workItem.Comments.Count >= 500)
         {
             throw new ConflictException("WORK_ITEM_COMMENT_LIMIT", "A work item cannot contain more than 500 comments.");
@@ -934,8 +1042,9 @@ public sealed partial class WorkItemService(
 
         var comment = new CommentDocument
         {
+            Id = stableCommentId ?? Guid.NewGuid().ToString("N"),
             Body = body,
-            AuthorUserId = currentUser.UserId ?? "system",
+            AuthorUserId = authorUserId,
             Mentions = mentions,
             CreatedAt = clock.UtcNow
         };
@@ -977,12 +1086,19 @@ public sealed partial class WorkItemService(
                 ct);
         }
 
+        await PublishAutomationAsync(
+            "WorkItemUpdated",
+            workItem,
+            workItem.Status,
+            correlationId,
+            $"comment-added:{comment.Id}",
+            ct);
         return ToResponse(workItem);
     }
 
     public async Task<WorkItemResponse> EditCommentAsync(string id, string commentId, EditCommentRequest request, string correlationId, CancellationToken ct)
     {
-        var body = NormalizeCommentBody(request.Body);
+        var body = WorkItemCommentRules.NormalizeBody(request.Body);
         var workItem = await GetWorkItem(id, ct);
         await EnsurePermissionAsync(workItem.ProjectId, "CommentCreate", ct);
         await EnsureSeparatedAsync(workItem, ct);
@@ -1829,42 +1945,6 @@ public sealed partial class WorkItemService(
 
     private static string? NormalizeOptionalId(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();
-
-    private static string NormalizeCommentBody(string? body)
-    {
-        if (string.IsNullOrWhiteSpace(body))
-        {
-            throw new ValidationException("Comment body is required.");
-        }
-
-        var normalized = body.Trim();
-        if (normalized.Length > 10_000)
-        {
-            throw new ValidationException("Comment body cannot exceed 10000 characters.");
-        }
-
-        return normalized;
-    }
-
-    private static List<string> NormalizeMentions(IReadOnlyCollection<string>? mentions)
-    {
-        var normalized = mentions?
-            .Where(x => !string.IsNullOrWhiteSpace(x))
-            .Select(x => x.Trim())
-            .Distinct(StringComparer.Ordinal)
-            .ToList() ?? [];
-        if (normalized.Count > 50)
-        {
-            throw new ValidationException("A comment cannot mention more than 50 users.");
-        }
-
-        if (normalized.Any(x => x.Length > 128))
-        {
-            throw new ValidationException("Mentioned user ids cannot exceed 128 characters.");
-        }
-
-        return normalized;
-    }
 
     private async Task<WorkItemDocument> GetWorkItem(string id, CancellationToken ct)
     {

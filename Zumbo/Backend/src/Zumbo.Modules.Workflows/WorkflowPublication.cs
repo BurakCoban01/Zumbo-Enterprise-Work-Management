@@ -81,7 +81,12 @@ internal static class WorkflowDocumentMapper
             workflow.Version,
             Math.Max(workflow.PublishedVersion, 1),
             EnsureSchemes(workflow).Select(ToResponse).ToList(),
-            workflow.Draft is not null);
+            workflow.Draft is not null,
+            WorkflowRetentionPolicy.MaximumPublishedVersions,
+            workflow.PublishedVersions.Count,
+            workflow.PublishedVersions.Count == 0
+                ? null
+                : workflow.PublishedVersions.Min(version => version.Number));
 
     public static WorkflowResponse ToDraftResponse(WorkflowDefinitionDocument workflow)
     {
@@ -95,7 +100,12 @@ internal static class WorkflowDocumentMapper
             workflow.Version,
             draft.Number,
             draft.IssueTypeSchemes.Select(ToResponse).ToList(),
-            true);
+            true,
+            WorkflowRetentionPolicy.MaximumPublishedVersions,
+            workflow.PublishedVersions.Count,
+            workflow.PublishedVersions.Count == 0
+                ? null
+                : workflow.PublishedVersions.Min(version => version.Number));
     }
 
     public static IReadOnlyCollection<WorkflowIssueTypeSchemeDocument> EnsureSchemes(WorkflowDefinitionDocument workflow)

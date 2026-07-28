@@ -26,6 +26,14 @@
     <Compile Include="..\Shared\WorkItemCollaborationRepositoryContract.cs" Link="Shared\WorkItemCollaborationRepositoryContract.cs" />
     <Compile Include="..\Shared\WorkItemBulkJobRepositoryContract.cs" Link="Shared\WorkItemBulkJobRepositoryContract.cs" />
     <Compile Include="..\Shared\IntakeRepositoryContract.cs" Link="Shared\IntakeRepositoryContract.cs" />
+    <Compile Include="..\Shared\AutomationRepositoryContract.cs" Link="Shared\AutomationRepositoryContract.cs" />
+    <Compile Include="..\Shared\AutomationRunRepositoryContract.cs" Link="Shared\AutomationRunRepositoryContract.cs" />
+    <Compile Include="..\Shared\DashboardRepositoryContract.cs" Link="Shared\DashboardRepositoryContract.cs" />
+    <Compile Include="..\Shared\PortfolioRepositoryContract.cs" Link="Shared\PortfolioRepositoryContract.cs" />
+    <Compile Include="..\Shared\GoalRepositoryContract.cs" Link="Shared\GoalRepositoryContract.cs" />
+    <Compile Include="..\Shared\CapacityPlanRepositoryContract.cs" Link="Shared\CapacityPlanRepositoryContract.cs" />
+    <Compile Include="..\Shared\KnowledgeRepositoryContract.cs" Link="Shared\KnowledgeRepositoryContract.cs" />
+    <Compile Include="..\Shared\DevelopmentIntegrationRepositoryContract.cs" Link="Shared\DevelopmentIntegrationRepositoryContract.cs" />
     <Compile Include="..\Shared\PrivacyWorkflowRepositoryContract.cs" Link="Shared\PrivacyWorkflowRepositoryContract.cs" />
     <Compile Include="..\Shared\WebhookRepositoryContract.cs" Link="Shared\WebhookRepositoryContract.cs" />
     <Compile Include="..\Shared\AuditRepositoryContract.cs" Link="Shared\AuditRepositoryContract.cs" />

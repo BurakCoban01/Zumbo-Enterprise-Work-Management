@@ -97,11 +97,12 @@ public sealed class WebhookTargetPolicy(IOptions<WebhookOptions> options) : IWeb
 
 internal sealed record WebhookResolvedTarget(Uri Uri, IReadOnlyList<IPAddress> Addresses);
 
-public sealed class PinnedWebhookSender : IWebhookSender
+public sealed class PinnedWebhookSender : IWebhookSender, IDisposable
 {
     private readonly WebhookTargetPolicy targetPolicy;
     private readonly IOptions<WebhookOptions> options;
     private readonly IExternalDependencyPolicy? resiliencePolicy;
+    private readonly PinnedHttpClientPool clientPool = new();
 
     public PinnedWebhookSender(
         WebhookTargetPolicy targetPolicy,
@@ -151,38 +152,13 @@ public sealed class PinnedWebhookSender : IWebhookSender
     private async Task<WebhookSendResult> SendCoreAsync(WebhookSendRequest request, CancellationToken ct)
     {
         var target = await targetPolicy.ResolveAsync(request.TargetUrl, ct);
-        using var handler = new SocketsHttpHandler
-        {
-            AllowAutoRedirect = false,
-            AutomaticDecompression = DecompressionMethods.None,
-            UseCookies = false,
-            UseProxy = false,
-            ConnectCallback = async (_, cancellationToken) =>
-            {
-                foreach (var address in target.Addresses)
-                {
-                    var socket = new Socket(address.AddressFamily, SocketType.Stream, ProtocolType.Tcp)
-                    {
-                        NoDelay = true
-                    };
-                    try
-                    {
-                        await socket.ConnectAsync(address, target.Uri.Port, cancellationToken);
-                        return new NetworkStream(socket, ownsSocket: true);
-                    }
-                    catch (Exception exception) when (exception is SocketException or OperationCanceledException)
-                    {
-                        socket.Dispose();
-                        if (exception is OperationCanceledException) throw;
-                    }
-                }
-                throw new WebhookDeliveryException("CONNECT_FAILED");
-            }
-        };
-        using var client = new HttpClient(handler)
-        {
-            Timeout = TimeSpan.FromSeconds(Math.Clamp(options.Value.RequestTimeoutSeconds, 1, 30))
-        };
+        var timeout = TimeSpan.FromSeconds(Math.Clamp(options.Value.RequestTimeoutSeconds, 1, 30));
+        using var clientLease = clientPool.Rent(
+            target.Uri,
+            target.Addresses,
+            timeout,
+            () => new WebhookDeliveryException("CONNECT_FAILED"));
+        var client = clientLease.Client;
         using var message = new HttpRequestMessage(HttpMethod.Post, target.Uri)
         {
             Content = new StringContent(request.Payload, Encoding.UTF8, "application/json")
@@ -233,6 +209,8 @@ public sealed class PinnedWebhookSender : IWebhookSender
         }
         return statusCode is 408 or 429 or >= 500;
     }
+
+    public void Dispose() => clientPool.Dispose();
 }
 
 public sealed class WorkItemWebhookDeliveryAdapter(WorkItemWebhookService service) : IWorkItemWebhookDelivery

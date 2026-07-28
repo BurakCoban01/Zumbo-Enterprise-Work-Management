@@ -27,6 +27,7 @@ public sealed class PrivacyDataProcessorAdapter(
     IDocumentRepository<IntakeFormDocument> intakeForms,
     IDocumentRepository<IntakeFormVersionDocument> intakeFormVersions,
     IDocumentRepository<IntakeSubmissionDocument> intakeSubmissions,
+    IDocumentRepository<DevelopmentConnectionDocument> developmentConnections,
     IDocumentRepository<NotificationDocument> notifications,
     IDocumentRepository<NotificationPreferenceDocument> notificationPreferences,
     IDocumentRepository<AuditLogDocument> auditLogs) : IPrivacyDataProcessor
@@ -102,6 +103,11 @@ public sealed class PrivacyDataProcessorAdapter(
             x => x.OrganizationId == organizationId
                 && (x.SubmittedByUserId == userId || x.TriagedByUserId == userId),
             ct);
+        var developmentConnectionData = await LoadAllAsync(
+            developmentConnections,
+            x => x.OrganizationId == organizationId
+                && x.CreatedByUserId == userId,
+            ct);
 
         var references = new List<PrivacyDataGroup>
         {
@@ -151,6 +157,8 @@ public sealed class PrivacyDataProcessorAdapter(
                 new PrivacyDataReference(
                     item.Id,
                     item.SubmittedByUserId == userId ? "submitter" : "triage"))),
+            Group("development-connections", developmentConnectionData.Select(item =>
+                new PrivacyDataReference(item.Id, $"creator:{item.Provider}"))),
             Group("notifications", notificationData.Select(notification =>
                 new PrivacyDataReference(notification.Id, notification.Type + ":" + notification.Message))),
             Group("audit", auditData.Select(audit =>
@@ -317,6 +325,14 @@ public sealed class PrivacyDataProcessorAdapter(
             item => [new PrivacyDataReference(
                 item.Id,
                 item.SubmittedByUserId == userId ? "submitter" : "triage")],
+            writer,
+            ct);
+        written += await WriteDocumentsAsync(
+            developmentConnections,
+            x => x.OrganizationId == organizationId
+                && x.CreatedByUserId == userId,
+            "development-connections",
+            item => [new PrivacyDataReference(item.Id, $"creator:{item.Provider}")],
             writer,
             ct);
         written += await WriteDocumentsAsync(
@@ -572,6 +588,21 @@ public sealed class PrivacyDataProcessorAdapter(
                 attachment.FileName = Scrub(attachment.FileName, username, email) ?? "attachment";
             }
             await intakeSubmissions.ReplaceByFilterAsync(x => x.Id == submission.Id, submission, ct);
+        }
+
+        var developmentConnectionData = await LoadAllAsync(
+            developmentConnections,
+            x => x.OrganizationId == organizationId
+                && x.CreatedByUserId == userId,
+            ct);
+        foreach (var connection in developmentConnectionData)
+        {
+            connection.CreatedByUserId = pseudonym;
+            connection.UpdatedAtUtc = DateTimeOffset.UtcNow;
+            await developmentConnections.ReplaceByFilterAsync(
+                x => x.Id == connection.Id,
+                connection,
+                ct);
         }
 
         await notifications.DeleteByFilterAsync(x => x.UserId == userId, ct);

@@ -55,10 +55,17 @@ internal static class ApiPipeline
         api.MapOrganizationsEndpoints();
         api.MapTeamsEndpoints();
         api.MapProjectsEndpoints();
+        api.MapPortfolioEndpoints();
+        api.MapGoalEndpoints();
+        api.MapKnowledgeEndpoints();
         api.MapBoardsEndpoints();
         api.MapWorkflowEndpoints();
+        api.MapAutomationEndpoints();
         api.MapWorkItemEndpoints();
+        api.MapDashboardEndpoints();
+        api.MapCapacityPlanningEndpoints();
         api.MapWebhookEndpoints();
+        api.MapDevelopmentIntegrationEndpoints();
         api.MapSprintEndpoints();
         api.MapWorkItemTypeSchemaEndpoints();
         api.MapIntakeEndpoints();

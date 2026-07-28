@@ -22,8 +22,11 @@ public sealed class AuditAccessCheckerAdapter(
     IDocumentRepository<WorkItemBulkJobDocument> workItemBulkJobs,
     IDocumentRepository<IntakeFormDocument> intakeForms,
     IDocumentRepository<IntakeSubmissionDocument> intakeSubmissions,
+    IDocumentRepository<AutomationRuleDocument> automationRules,
     IDocumentRepository<WebhookSubscriptionDocument> webhookSubscriptions,
     IDocumentRepository<WebhookDeliveryDocument> webhookDeliveries,
+    IDocumentRepository<DevelopmentConnectionDocument> developmentConnections,
+    IDocumentRepository<DevelopmentRepositoryMappingDocument> developmentMappings,
     IDocumentRepository<SprintDocument> sprints,
     IdentityPermissionService permissionService,
     ICurrentUser currentUser) : IAuditAccessChecker, IAuditTenantResolver
@@ -131,6 +134,24 @@ public sealed class AuditAccessCheckerAdapter(
             if (delivery is not null)
                 return new AuditTenant(delivery.OrganizationId, entityType, entityId);
         }
+        if (entityType.Equals("DevelopmentConnection", StringComparison.OrdinalIgnoreCase))
+        {
+            var connection = await developmentConnections.SelectAsync(
+                x => x.Id == entityId,
+                ct);
+            if (connection is not null)
+                return new AuditTenant(connection.OrganizationId, entityType, entityId);
+        }
+        if (entityType.Equals(
+                "DevelopmentRepositoryMapping",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            var mapping = await developmentMappings.SelectAsync(
+                x => x.Id == entityId,
+                ct);
+            if (mapping is not null)
+                return new AuditTenant(mapping.OrganizationId, entityType, entityId);
+        }
         if (entityType.Equals("IntakeForm", StringComparison.OrdinalIgnoreCase))
         {
             var form = await intakeForms.SelectAsync(x => x.Id == entityId, ct);
@@ -142,6 +163,12 @@ public sealed class AuditAccessCheckerAdapter(
             var submission = await intakeSubmissions.SelectAsync(x => x.Id == entityId, ct);
             if (submission is not null)
                 return new AuditTenant(submission.OrganizationId, entityType, entityId);
+        }
+        if (entityType.Equals("AutomationRule", StringComparison.OrdinalIgnoreCase))
+        {
+            var rule = await automationRules.SelectAsync(x => x.Id == entityId, ct);
+            if (rule is not null)
+                return new AuditTenant(rule.OrganizationId, entityType, entityId);
         }
         try
         {
@@ -198,6 +225,27 @@ public sealed class AuditAccessCheckerAdapter(
                     "INTAKE_SUBMISSION_NOT_FOUND",
                     "Intake submission was not found.");
             return submission.ProjectId;
+        }
+
+        if (entityType.Equals("AutomationRule", StringComparison.OrdinalIgnoreCase))
+        {
+            var rule = await automationRules.SelectAsync(x => x.Id == entityId, ct)
+                ?? throw new NotFoundException(
+                    "AUTOMATION_RULE_NOT_FOUND",
+                    "Automation rule was not found.");
+            return rule.ProjectId;
+        }
+
+        if (entityType.Equals(
+                "DevelopmentRepositoryMapping",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            var mapping = await developmentMappings.SelectAsync(
+                x => x.Id == entityId,
+                ct) ?? throw new NotFoundException(
+                    "DEVELOPMENT_REPOSITORY_MAPPING_NOT_FOUND",
+                    "Development repository mapping was not found.");
+            return mapping.ProjectId;
         }
 
         if (entityType.Equals("Sprint", StringComparison.OrdinalIgnoreCase))
@@ -343,5 +391,29 @@ public sealed class WorkflowProjectAccessCheckerAdapter(
     {
         var permission = manage ? PermissionCatalog.WorkflowManage : PermissionCatalog.WorkflowView;
         _ = await resourcePolicy.AuthorizeAsync(projectId, permission, ct);
+    }
+}
+
+public sealed class AutomationProjectAccessCheckerAdapter(
+    IProjectResourcePolicy resourcePolicy) : IAutomationProjectAccessChecker
+{
+    public Task<AutomationProjectScope> EnsureCanViewAsync(string projectId, CancellationToken ct) =>
+        EnsureAsync(projectId, manage: false, ct);
+
+    public Task<AutomationProjectScope> EnsureCanManageAsync(string projectId, CancellationToken ct) =>
+        EnsureAsync(projectId, manage: true, ct);
+
+    private async Task<AutomationProjectScope> EnsureAsync(
+        string projectId,
+        bool manage,
+        CancellationToken ct)
+    {
+        var authorization = await resourcePolicy.AuthorizeAsync(
+            projectId,
+            manage ? PermissionCatalog.WorkflowManage : PermissionCatalog.WorkflowView,
+            ct);
+        return new AutomationProjectScope(
+            authorization.OrganizationId,
+            authorization.UserId);
     }
 }

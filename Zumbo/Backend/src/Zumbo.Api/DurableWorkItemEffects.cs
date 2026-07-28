@@ -23,7 +23,9 @@ public sealed class DurableWorkItemEventPublisher(
     IWorkItemRealtimePublisher,
     IWorkItemCacheInvalidationPublisher,
     IWorkItemRecurrenceEventPublisher,
-    IWorkItemBulkJobEventPublisher
+    IWorkItemBulkJobEventPublisher,
+    IWorkItemAutomationEventPublisher,
+    IDevelopmentWebhookQueue
 {
     public Task WriteAsync(
         string action,
@@ -155,6 +157,24 @@ public sealed class DurableWorkItemEventPublisher(
             ct,
             message.OrganizationId);
     }
+
+    public Task PublishAsync(WorkItemAutomationEvent message, CancellationToken ct) =>
+        EnqueueAsync(
+            WorkItemDurableEventTypes.Automation,
+            message,
+            message.CorrelationId,
+            Key("automation", message.EventType, message.TriggerId, message.WorkItemId),
+            ct,
+            message.OrganizationId);
+
+    public Task EnqueueAsync(DevelopmentWebhookEvent message, CancellationToken ct) =>
+        EnqueueAsync(
+            WorkItemDurableEventTypes.DevelopmentWebhook,
+            message,
+            "development-webhook:" + message.DeliveryId,
+            Key("development-webhook", message.ConnectionId, message.DeliveryId),
+            ct,
+            message.OrganizationId);
 
     private Task EnqueueAsync<TPayload>(
         string eventType,
@@ -294,6 +314,20 @@ public sealed class WorkItemWebhookDurableHandler(
             message.Id,
             message.TenantId,
             DurablePayload.Read<WorkItemWebhookEvent>(message),
+            cancellationToken);
+}
+
+public sealed class DevelopmentWebhookDurableHandler(
+    DevelopmentIntegrationService service) : IDurableEventHandler
+{
+    public string ConsumerName => "work-item-development-webhook-v1";
+    public string EventType => WorkItemDurableEventTypes.DevelopmentWebhook;
+
+    public Task HandleAsync(
+        DurableEventEnvelope message,
+        CancellationToken cancellationToken) =>
+        service.ProcessWebhookAsync(
+            DurablePayload.Read<DevelopmentWebhookEvent>(message),
             cancellationToken);
 }
 

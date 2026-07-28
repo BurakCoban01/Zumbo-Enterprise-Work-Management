@@ -1044,6 +1044,24 @@ public sealed class DomainRuleTests
             new AddCommentRequest(new string('x', 10_001), []),
             "test-correlation",
             CancellationToken.None));
+
+        var idempotent = await service.AddCommentAsync(
+            item.Id,
+            new AddCommentRequest("Automated note", [], "automation:run-1:0"),
+            "automation-correlation",
+            CancellationToken.None);
+        idempotent = await service.AddCommentAsync(
+            item.Id,
+            new AddCommentRequest("Automated note", [], "automation:run-1:0"),
+            "automation-correlation",
+            CancellationToken.None);
+        Assert.Equal(2, idempotent.Comments.Count);
+        var reused = await Assert.ThrowsAsync<ConflictException>(() => service.AddCommentAsync(
+            item.Id,
+            new AddCommentRequest("Different note", [], "automation:run-1:0"),
+            "automation-correlation",
+            CancellationToken.None));
+        Assert.Equal("COMMENT_IDEMPOTENCY_KEY_REUSED", reused.Code);
     }
 
     [Fact]

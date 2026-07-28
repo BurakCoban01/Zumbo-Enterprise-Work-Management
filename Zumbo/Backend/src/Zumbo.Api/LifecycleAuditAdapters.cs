@@ -57,6 +57,19 @@ public sealed class WorkflowAuditWriterAdapter(AuditService audit) : IWorkflowAu
         audit.WriteAsync("WorkflowUpdated", "Project", projectId, oldValue, newValue, correlationId, ct);
 }
 
+public sealed class AutomationAuditWriterAdapter(AuditService audit) : IAutomationAuditWriter
+{
+    public Task WriteAsync(
+        string action,
+        string ruleId,
+        string projectId,
+        string? oldValue,
+        string? newValue,
+        string correlationId,
+        CancellationToken ct) =>
+        audit.WriteAsync(action, "AutomationRule", ruleId, oldValue, newValue, correlationId, ct);
+}
+
 public sealed class OrganizationAuditWriterAdapter(AuditService audit) : IOrganizationAuditWriter
 {
     public Task WriteAsync(

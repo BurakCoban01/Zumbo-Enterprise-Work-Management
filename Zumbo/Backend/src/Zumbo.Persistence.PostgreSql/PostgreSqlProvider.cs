@@ -24,9 +24,7 @@ public sealed class PostgreSqlProvider : IAsyncDisposable
         where TDocument : class, IDocument
     {
         options.MapDocument<TDocument>(schema, table);
-        var repository = new PostgreSqlDocumentRepository<TDocument>(session, options);
-        repository.EnsureStorageAsync().GetAwaiter().GetResult();
-        return repository;
+        return new PostgreSqlDocumentRepository<TDocument>(session, options);
     }
 
     public async Task<DbConnection> OpenConnectionAsync(CancellationToken cancellationToken) =>

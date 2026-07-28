@@ -148,6 +148,11 @@ public sealed class ProjectMembershipAggregate : AggregateRoot
             throw new ConflictException("PROJECT_MEMBER_EXISTS", "Project member already exists.");
         }
 
+        ProjectCardinalityLimits.EnsureCanGrow(
+            _state.Members.Count,
+            ProjectCardinalityLimits.MaximumMembers,
+            "PROJECT_MEMBER_LIMIT_REACHED",
+            "members");
         return normalizedUserId;
     }
 

@@ -6,11 +6,16 @@ builder.Services
     .AddOrganizationsModule()
     .AddTeamsModule()
     .AddProjectsModule()
+    .AddPortfolioModule()
+    .AddGoalModule()
+    .AddKnowledgeModule()
     .AddBoardsModule()
     .AddNotificationsModule(builder.Configuration)
     .AddAuditModule()
-    .AddWorkflowsModule()
+    .AddWorkflowsModule(builder.Configuration)
     .AddWorkItemsModule(builder.Configuration)
+    .AddDashboardModule()
+    .AddCapacityPlanningModule()
     .AddSprintsModule();
 
 var app = builder.Build();

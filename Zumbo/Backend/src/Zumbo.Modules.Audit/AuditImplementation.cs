@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Diagnostics.Metrics;
 using System.Linq.Expressions;
 using System.Security.Cryptography;
 using System.Text;
@@ -227,7 +228,7 @@ public sealed class AuditService
         if (normalized.Cursor is null && items.Count == normalized.PageSize)
         {
             hasNext = (await auditLogs.ListByFilterAsync(
-                filter, x => x.CreatedAt, true, normalized.Page + 1, 1, ct)).Count > 0;
+                filter, x => x.CreatedAt, true, normalized.Page + 1, normalized.PageSize, ct)).Count > 0;
         }
         var nextCursor = hasNext && items.Count > 0 ? EncodeCursor(items[^1]) : null;
         return new AuditLogPageResponse(
@@ -446,6 +447,10 @@ public sealed class AuditService
 
 internal static class AuditDiff
 {
+    private const int OversizedStructuredValueCharacters = 32_768;
+    private static readonly Meter Meter = new("Zumbo.Audit", "1.0.0");
+    private static readonly Counter<long> ParseFallbacks =
+        Meter.CreateCounter<long>("zumbo.audit.diff_parse_fallbacks");
     private static readonly string[] SensitiveFragments =
     [
         "password", "passwd", "token", "secret", "credential", "authorization",
@@ -456,8 +461,8 @@ internal static class AuditDiff
 
     internal static Result Create(string? oldValue, string? newValue)
     {
-        var oldFields = Parse(oldValue);
-        var newFields = Parse(newValue);
+        var oldFields = Parse(oldValue, "old");
+        var newFields = Parse(newValue, "new");
         var fields = oldFields.Keys.Union(newFields.Keys, StringComparer.Ordinal).Order(StringComparer.Ordinal);
         var changes = fields.Select(field =>
         {
@@ -475,9 +480,12 @@ internal static class AuditDiff
         return new Result(Summarize(changes, old: true), Summarize(changes, old: false), changes);
     }
 
-    private static Dictionary<string, string?> Parse(string? value)
+    private static Dictionary<string, string?> Parse(string? value, string side)
     {
         if (value is null) return new(StringComparer.Ordinal);
+        var oversized = value.Length > OversizedStructuredValueCharacters;
+        var looksStructured = LooksStructured(value);
+        if (oversized) RecordParseFallback("oversized", side, value);
         try
         {
             using var json = JsonDocument.Parse(value);
@@ -487,8 +495,34 @@ internal static class AuditDiff
                     x => x.Value.ValueKind == JsonValueKind.String ? x.Value.GetString() : x.Value.GetRawText(),
                     StringComparer.Ordinal);
         }
-        catch (JsonException) { }
+        catch (JsonException)
+        {
+            if (!oversized && looksStructured)
+                RecordParseFallback("malformed_json", side, value);
+        }
         return new(StringComparer.Ordinal) { ["value"] = value };
+    }
+
+    private static bool LooksStructured(string value)
+    {
+        var trimmed = value.AsSpan().TrimStart();
+        return !trimmed.IsEmpty && trimmed[0] is '{' or '[';
+    }
+
+    private static void RecordParseFallback(string reason, string side, string value)
+    {
+        var size = value.Length switch
+        {
+            <= 4_096 => "small",
+            <= OversizedStructuredValueCharacters => "medium",
+            _ => "large"
+        };
+        ParseFallbacks.Add(
+            1,
+            new KeyValuePair<string, object?>("reason", reason),
+            new KeyValuePair<string, object?>("side", side),
+            new KeyValuePair<string, object?>("sensitive", IsSensitive("value", value)),
+            new KeyValuePair<string, object?>("size", size));
     }
 
     private static string? Summarize(IReadOnlyList<AuditChangeDocument> changes, bool old)

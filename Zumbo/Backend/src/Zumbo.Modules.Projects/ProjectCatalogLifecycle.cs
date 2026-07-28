@@ -38,6 +38,11 @@ public sealed partial class ProjectService
         string? oldValue;
         if (string.IsNullOrWhiteSpace(templateId))
         {
+            ProjectCardinalityLimits.EnsureCanGrow(
+                project.Templates.Count,
+                ProjectCardinalityLimits.MaximumTemplates,
+                "PROJECT_TEMPLATE_LIMIT_REACHED",
+                "templates");
             template = new ProjectTemplateDocument { Name = name };
             project.Templates.Add(template);
             action = "ProjectTemplateCreated";
@@ -111,6 +116,11 @@ public sealed partial class ProjectService
         EnsureOwnerOrAdmin(project);
         var name = NormalizeLabel(request.Name, "Component name", 80);
         EnsureUniqueComponent(project, name);
+        ProjectCardinalityLimits.EnsureCanGrow(
+            project.Components.Count,
+            ProjectCardinalityLimits.MaximumComponents,
+            "PROJECT_COMPONENT_LIMIT_REACHED",
+            "components");
         var component = new ProjectComponentDocument
         {
             Name = name,
@@ -175,6 +185,11 @@ public sealed partial class ProjectService
             throw new ConflictException("PROJECT_VERSION_EXISTS", "An active project version with this name already exists.");
         }
 
+        ProjectCardinalityLimits.EnsureCanGrow(
+            project.Versions.Count,
+            ProjectCardinalityLimits.MaximumVersions,
+            "PROJECT_VERSION_LIMIT_REACHED",
+            "versions");
         var version = new ProjectVersionDocument { Name = name };
         project.Versions.Add(version);
         await SaveAsync(project, ct);
@@ -229,6 +244,11 @@ public sealed partial class ProjectService
             throw new ConflictException("PROJECT_RELEASE_EXISTS", "The project version already has a release.");
         }
 
+        ProjectCardinalityLimits.EnsureCanGrow(
+            project.Releases.Count,
+            ProjectCardinalityLimits.MaximumReleases,
+            "PROJECT_RELEASE_LIMIT_REACHED",
+            "releases");
         var release = new ProjectReleaseDocument
         {
             VersionId = version.Id,
@@ -303,6 +323,11 @@ public sealed partial class ProjectService
             throw new ConflictException("PROJECT_MILESTONE_EXISTS", "An open milestone with this name already exists.");
         }
 
+        ProjectCardinalityLimits.EnsureCanGrow(
+            project.Milestones.Count,
+            ProjectCardinalityLimits.MaximumMilestones,
+            "PROJECT_MILESTONE_LIMIT_REACHED",
+            "milestones");
         var milestone = new ProjectMilestoneDocument { Name = name, DueAt = request.DueAt };
         project.Milestones.Add(milestone);
         await SaveAsync(project, ct);

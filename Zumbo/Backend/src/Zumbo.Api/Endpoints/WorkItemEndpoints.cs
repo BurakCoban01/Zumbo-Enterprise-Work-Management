@@ -86,6 +86,9 @@ internal static class WorkItemEndpoints
         services.AddScoped<IWorkItemCacheInvalidationPublisher>(provider => provider.GetRequiredService<DurableWorkItemEventPublisher>());
         services.AddScoped<IWorkItemRecurrenceEventPublisher>(provider => provider.GetRequiredService<DurableWorkItemEventPublisher>());
         services.AddScoped<IWorkItemBulkJobEventPublisher>(provider => provider.GetRequiredService<DurableWorkItemEventPublisher>());
+        services.AddScoped<IWorkItemAutomationEventPublisher>(provider => provider.GetRequiredService<DurableWorkItemEventPublisher>());
+        services.AddScoped<IDevelopmentWebhookQueue>(provider => provider.GetRequiredService<DurableWorkItemEventPublisher>());
+        services.AddScoped<IWorkItemAutomationChainContextAccessor, WorkItemAutomationChainContextAccessor>();
         services.AddOptions<WebhookOptions>()
             .BindConfiguration("Webhooks")
             .Validate(options => options.MaximumAttempts is >= 1 and <= 20
@@ -107,6 +110,25 @@ internal static class WorkItemEndpoints
         services.AddScoped<IWebhookAuthorization, WebhookAuthorizationAdapter>();
         services.AddScoped<WorkItemWebhookService>();
         services.AddScoped<IWorkItemWebhookDelivery, WorkItemWebhookDeliveryAdapter>();
+        services.AddOptions<DevelopmentProviderOptions>()
+            .BindConfiguration("DevelopmentProviders")
+            .Validate(
+                options => options.RequestTimeoutSeconds is >= 1 and <= 30
+                    && options.MaximumResponseBytes is >= 1_024 and <= 8 * 1_024 * 1_024
+                    && options.AllowedHosts.Length is >= 1 and <= 100
+                    && options.AllowedHosts.All(host =>
+                        !string.IsNullOrWhiteSpace(host)
+                        && host.Length <= 253
+                        && !host.Contains('*')),
+                "Development provider configuration is invalid.")
+            .ValidateOnStart();
+        services.AddSingleton<DevelopmentProviderTargetPolicy>();
+        services.AddSingleton<IDevelopmentProviderGateway, DevelopmentProviderGateway>();
+        services.AddSingleton<IDevelopmentCredentialProtector, DevelopmentCredentialProtectorAdapter>();
+        services.AddScoped<IDevelopmentIntegrationAuthorization, DevelopmentIntegrationAuthorizationAdapter>();
+        services.AddScoped<IDevelopmentProjectDirectory, DevelopmentProjectDirectoryAdapter>();
+        services.AddScoped<DevelopmentIntegrationService>();
+        services.AddScoped<DevelopmentWebhookReceiptRetentionService>();
         services.AddScoped<IDurableEventHandler, WorkItemAuditDurableHandler>();
         services.AddScoped<IDurableEventHandler, WorkItemNotificationDurableHandler>();
         services.AddScoped<IDurableEventHandler, WorkItemSearchUpsertDurableHandler>();
@@ -116,6 +138,7 @@ internal static class WorkItemEndpoints
         services.AddScoped<IDurableEventHandler, WorkItemWebhookDurableHandler>();
         services.AddScoped<IDurableEventHandler, WorkItemRecurrenceDurableHandler>();
         services.AddScoped<IDurableEventHandler, WorkItemBulkJobDurableHandler>();
+        services.AddScoped<IDurableEventHandler, DevelopmentWebhookDurableHandler>();
         services.AddScoped<WorkItemTransactionFilter>();
         services.AddScoped<IWorkItemActivityStore, WorkItemActivityStore>();
         services.AddScoped<WorkItemActivityQueryService>();
@@ -146,6 +169,7 @@ internal static class WorkItemEndpoints
             services.AddHostedService<DueDateReminderHostedService>();
             services.AddHostedService<WorkItemRecurrenceSchedulerHostedService>();
             services.AddHostedService<WebhookDispatcherHostedService>();
+            services.AddHostedService<DevelopmentWebhookReceiptRetentionHostedService>();
         }
         return services;
     }

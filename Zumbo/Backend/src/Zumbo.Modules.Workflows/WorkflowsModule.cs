@@ -42,7 +42,7 @@ public sealed class WorkflowService(
         await audit.WriteAsync(
             request.ProjectId,
             previous is null ? null : $"v{Math.Max(previous.PublishedVersion, 1)}",
-            $"v{result.PublishedVersion}",
+            DescribePublishedRetention(result),
             correlationId,
             ct);
         return result;
@@ -68,7 +68,7 @@ public sealed class WorkflowService(
         var workflow = await workflows.SelectAsync(x => x.ProjectId == projectId, ct)
             ?? throw new NotFoundException("WORKFLOW_NOT_FOUND", "Workflow was not found.");
         var result = await PublishCoreAsync(workflow, ct);
-        await audit.WriteAsync(projectId, "draft", $"published-v{result.PublishedVersion}", correlationId, ct);
+        await audit.WriteAsync(projectId, "draft", DescribePublishedRetention(result), correlationId, ct);
         return result;
     }
 
@@ -178,11 +178,7 @@ public sealed class WorkflowService(
         workflow.IssueTypeSchemes = published.IssueTypeSchemes;
         workflow.PublishedVersion = published.Number;
         workflow.PublishedVersions.Add(published);
-        workflow.PublishedVersions = workflow.PublishedVersions
-            .OrderByDescending(x => x.Number)
-            .Take(25)
-            .OrderBy(x => x.Number)
-            .ToList();
+        WorkflowRetentionPolicy.RetainPublishedVersions(workflow.PublishedVersions);
         workflow.Draft = null;
         workflow.UpdatedAt = publishedAt;
         await PersistAsync(workflow, ct);
@@ -248,6 +244,12 @@ public sealed class WorkflowService(
             TimeSpan.FromSeconds(Math.Clamp(options.WaitSeconds, 0, 30)),
             ct)
             ?? throw new ConflictException("WORKFLOW_RESOURCE_BUSY", "Workflow is busy; retry the operation.");
+    }
+
+    private static string DescribePublishedRetention(WorkflowResponse workflow)
+    {
+        var oldest = workflow.OldestRetainedPublishedVersion ?? workflow.PublishedVersion;
+        return $"published-v{workflow.PublishedVersion};retained=v{oldest}-v{workflow.PublishedVersion};limit={workflow.PublishedVersionRetentionLimit}";
     }
 
 }
