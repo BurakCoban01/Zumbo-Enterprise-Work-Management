@@ -1,4 +1,5 @@
 using System.Data;
+using Microsoft.Extensions.Logging;
 using Npgsql;
 using Zumbo.BuildingBlocks.Application.Messaging;
 using Zumbo.BuildingBlocks.Application.Runtime;
@@ -22,19 +23,22 @@ public sealed class PostgreSqlSession : IAsyncDisposable
 {
     private readonly NpgsqlDataSource dataSource;
     private readonly IExternalDependencyPolicy? resiliencePolicy;
+    private readonly ILogger<PostgreSqlSession>? logger;
     private NpgsqlConnection? transactionConnection;
     private NpgsqlTransaction? transaction;
 
     public PostgreSqlSession(NpgsqlDataSource dataSource)
-        : this(dataSource, null)
+        : this(dataSource, null, null)
     {
     }
 
     public PostgreSqlSession(
         NpgsqlDataSource dataSource,
-        IExternalDependencyPolicyProvider? policyProvider)
+        IExternalDependencyPolicyProvider? policyProvider,
+        ILogger<PostgreSqlSession>? logger = null)
     {
         this.dataSource = dataSource;
+        this.logger = logger;
         resiliencePolicy = policyProvider?.Get(ExternalDependencyNames.PostgreSql);
     }
 
@@ -99,14 +103,10 @@ public sealed class PostgreSqlSession : IAsyncDisposable
     {
         if (transaction is not null)
         {
-            try
-            {
-                await transaction.RollbackAsync(CancellationToken.None);
-            }
-            catch (NpgsqlException)
-            {
-                // Disposal must still release a broken connection.
-            }
+            await PostgreSqlCompensation.RunAsync(
+                "postgres.session_dispose.rollback",
+                token => transaction.RollbackAsync(token),
+                logger);
         }
 
         await ClearTransactionAsync();
@@ -147,7 +147,9 @@ public sealed class PostgreSqlSession : IAsyncDisposable
     }
 }
 
-public sealed class PostgreSqlTransactionRunner(PostgreSqlSession session) :
+public sealed class PostgreSqlTransactionRunner(
+    PostgreSqlSession session,
+    ILogger<PostgreSqlTransactionRunner>? logger = null) :
     IPostgreSqlTransactionRunner,
     IDurableTransactionRunner
 {
@@ -180,7 +182,10 @@ public sealed class PostgreSqlTransactionRunner(PostgreSqlSession session) :
         }
         catch
         {
-            await session.RollbackAsync(CancellationToken.None);
+            await PostgreSqlCompensation.RunAsync(
+                "postgres.transaction.rollback",
+                token => session.RollbackAsync(token),
+                logger);
             throw;
         }
     }

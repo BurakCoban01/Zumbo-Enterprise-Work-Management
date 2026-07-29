@@ -118,6 +118,7 @@ test('CSRF tokeni yeni sekmede guvenli double-submit cookie degerinden kurtarili
 });
 
 test('desktop ve mobile ayni shared AngularJS istemci modulunu yukler', async () => {
+  assert.match(source, /cancelPending: function\(reason\) \{ requests\.cancelAll/);
   for (const surface of ['desktop-bulma', 'mobile-ionic']) {
     const [html, app] = await Promise.all([
       readFile(resolve(root, surface, 'index.html'), 'utf8'),

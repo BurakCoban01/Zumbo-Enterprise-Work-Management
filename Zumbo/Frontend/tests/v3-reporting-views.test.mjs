@@ -69,6 +69,8 @@ test('desktop and mobile expose freshness, drill-down, tables and permission-sco
   assert.match(desktopHtml, /kişi performansı sıralaması değildir/);
   assert.match(mobile, /controller\('ProjectReportingController'/);
   assert.match(mobile, /result\.totalCount/);
+  assert.match(mobile, /return vm\.project && vm\.project\.id \|\| \$stateParams\.projectId \|\| null/);
+  assert.doesNotMatch(mobile, /projectId: vm\.project\.id/);
   assert.match(mobileHtml, /templates\/project-reporting\.html/);
   assert.match(mobileHtml, /aria-label="Mobil içgörü görünümü"/);
   assert.match(backend, /EnsurePermissionAsync\(projectId, "WorkItemView", ct\)/);

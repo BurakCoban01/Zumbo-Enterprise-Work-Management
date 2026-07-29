@@ -30,15 +30,20 @@
 
       vm.setMode = function(mode) {
         if (['workload', 'reports', 'dashboards'].indexOf(mode) < 0) return;
+        var projectId = currentProjectId();
+        if (!projectId) return $q.when(null);
         vm.mode = mode;
-        $state.go('project-reporting', { projectId: vm.project.id, mode: mode, range: vm.rangeDays }, { notify: false, location: 'replace' });
+        $state.go('project-reporting', { projectId: projectId, mode: mode, range: vm.rangeDays }, { notify: false, location: 'replace' });
         return loadCurrentMode();
       };
       vm.setRange = function(days) {
         if ([30, 90, 180].indexOf(Number(days)) < 0) return;
+        var projectId = currentProjectId();
+        if (!projectId) return $q.when(null);
         vm.rangeDays = Number(days);
-        $state.go('project-reporting', { projectId: vm.project.id, mode: vm.mode, range: vm.rangeDays }, { notify: false, location: 'replace' });
-        if (vm.mode !== 'dashboards') loadCurrentMode();
+        $state.go('project-reporting', { projectId: projectId, mode: vm.mode, range: vm.rangeDays }, { notify: false, location: 'replace' });
+        if (vm.mode !== 'dashboards') return loadCurrentMode();
+        return $q.when(null);
       };
       vm.openTask = function(task) { if (task) $state.go('task-detail', { taskId: task.id }); };
       vm.toggleWorkload = function(row) {
@@ -304,6 +309,9 @@
         var to = new Date();
         var from = new Date(to.getFullYear(), to.getMonth(), to.getDate() - vm.rangeDays + 1);
         return '?from=' + key(from) + '&to=' + key(to);
+      }
+      function currentProjectId() {
+        return vm.project && vm.project.id || $stateParams.projectId || null;
       }
       function key(value) { return value.getFullYear() + '-' + String(value.getMonth() + 1).padStart(2, '0') + '-' + String(value.getDate()).padStart(2, '0'); }
       $scope.$on('$ionicView.beforeEnter', vm.load);

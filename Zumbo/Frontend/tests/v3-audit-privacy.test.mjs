@@ -125,8 +125,13 @@ test('privacy workflow requires exact confirmation and exposes recovery states',
 test('desktop surface is role-gated, redacted and confirmation-protected', () => {
   assert.match(desktop, /canViewAuditCenter/);
   assert.match(desktop, /core\.safeAuditChanges/);
+  assert.match(desktop, /vm\.auditReferenceLabel = shortId/);
   assert.match(desktop, /\/api\/audit\/integrity\//);
   assert.match(desktopHtml, /ng-if="vm\.canViewAuditCenter\(\)"/);
+  assert.match(desktopHtml, /<dt>Kaynak<\/dt><dd>{{vm\.auditEntityLabel\(vm\.auditCenter\.selected\)}}<\/dd>/);
+  assert.match(desktopHtml, /<dt>Korelasyon<\/dt><dd>{{vm\.auditReferenceLabel\(vm\.auditCenter\.selected\.correlationId\)}}<\/dd>/);
+  assert.doesNotMatch(desktopHtml, /selected\.entityType}} · {{vm\.auditCenter\.selected\.entityId/);
+  assert.doesNotMatch(desktopHtml, /<dd>{{vm\.auditCenter\.selected\.correlationId}}<\/dd>/);
   assert.doesNotMatch(desktopHtml, /selected\.oldValue|selected\.newValue|statusToken/);
   assert.match(desktopPrivacy, /\$window\.confirm/);
   assert.match(desktopPrivacy, /privacyStatusToken: receipt\.statusToken/);

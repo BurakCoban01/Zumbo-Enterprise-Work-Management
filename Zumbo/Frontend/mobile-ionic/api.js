@@ -291,9 +291,18 @@
       saveNotificationPreferences: function(draft) { return apiClient.put('/api/notifications/preferences/me', draft); },
       mfaStatus: function() { return apiClient.get('/api/auth/mfa'); },
       beginMfaSetup: function(password) { return apiClient.post('/api/auth/mfa/setup', { password: password }); },
-      confirmMfaSetup: function(code) { return apiClient.post('/api/auth/mfa/confirm', { code: code }); },
-      disableMfa: function(draft) { return apiClient.post('/api/auth/mfa/disable', draft); },
-      regenerateMfaRecoveryCodes: function(draft) { return apiClient.post('/api/auth/mfa/recovery-codes', draft); },
+      confirmMfaSetup: function(code) {
+        apiClient.cancelPending('mfa-confirm-session-rotation');
+        return apiClient.post('/api/auth/mfa/confirm', { code: code });
+      },
+      disableMfa: function(draft) {
+        apiClient.cancelPending('mfa-disable-session-rotation');
+        return apiClient.post('/api/auth/mfa/disable', draft);
+      },
+      regenerateMfaRecoveryCodes: function(draft) {
+        apiClient.cancelPending('mfa-recovery-session-rotation');
+        return apiClient.post('/api/auth/mfa/recovery-codes', draft);
+      },
       sessions: function() { return apiClient.get('/api/auth/sessions'); },
       revokeSession: function(sessionId) { return apiClient.delete('/api/auth/sessions/' + sessionId); },
       exportPrivacyData: function() { return apiClient.download('/api/auth/privacy/export.ndjson'); },

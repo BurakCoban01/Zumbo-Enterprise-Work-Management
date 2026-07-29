@@ -48,6 +48,38 @@ public sealed class ProjectCardinalityTests
         Assert.InRange(serializedBytes, 1, ProjectCardinalityLimits.MaximumSerializedBytes);
     }
 
+    [Fact]
+    public async Task ExistingOversizedProject_AllowsNonGrowthCatalogUpdate()
+    {
+        var repository = new InMemoryDocumentRepository<ProjectDocument>();
+        var project = BaseProject();
+        project.Components.AddRange(
+            Enumerable.Range(1, ProjectCardinalityLimits.MaximumComponents + 1)
+                .Select(index => new ProjectComponentDocument
+                {
+                    Id = $"component-{index:D4}",
+                    Name = $"Component {index:D4}"
+                }));
+        await repository.CreateAsync(project);
+        var service = CreateService(repository);
+
+        var updated = await service.UpdateComponentAsync(
+            project.Id,
+            "component-0001",
+            new UpdateProjectComponentRequest("Updated component"),
+            "test",
+            CancellationToken.None);
+
+        Assert.Equal(2, updated.Version);
+        Assert.Equal(
+            ProjectCardinalityLimits.MaximumComponents + 1,
+            updated.Components!.Count);
+        Assert.Contains(
+            updated.Components,
+            component => component.Id == "component-0001"
+                && component.Name == "Updated component");
+    }
+
     private static ProjectService CreateService(
         InMemoryDocumentRepository<ProjectDocument> repository) =>
         new(

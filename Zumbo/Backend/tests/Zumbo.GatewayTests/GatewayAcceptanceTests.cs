@@ -150,6 +150,7 @@ public sealed class GatewayAcceptanceTests(GatewayUpstreamFixture upstream)
         options.Validate();
         var config = new GatewayProxyConfigProvider(Options.Create(options)).GetConfig();
         var cluster = Assert.Single(config.Clusters);
+        Assert.False(config.ChangeToken.HasChanged);
         Assert.Equal("PowerOfTwoChoices", cluster.LoadBalancingPolicy);
         Assert.Equal(
             ["http://api-1:8080/", "http://api-2:8080/"],

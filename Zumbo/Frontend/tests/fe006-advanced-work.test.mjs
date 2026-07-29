@@ -52,7 +52,8 @@ test('pano liste backlog sprint takvim timeline ve roadmap tek erisilebilir tabl
 });
 
 test('liste ve bulk yuzeyleri ayni authoritative task koleksiyonunu kullanir', () => {
-  assert.match(desktopHtml, /ng-repeat="task in vm\.visibleListTasks\(\) track by task\.id"/);
+  assert.match(desktopHtml, /ng-repeat="task in vm\.listTasks track by task\.id"/);
+  assert.match(boardExcellence, /vm\.listTasks = \(vm\.tasks \|\| \[\]\)\.filter/);
   assert.match(desktopHtml, /vm\.toggleTaskSelection\(task\.id\)/);
   assert.match(boardExcellence, /\/api\/work-items\/bulk\/move/);
   assert.match(boardExcellence, /\/api\/work-items\/bulk\/assign/);

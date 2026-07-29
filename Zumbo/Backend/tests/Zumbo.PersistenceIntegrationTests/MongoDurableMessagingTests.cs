@@ -116,6 +116,33 @@ public sealed class MongoDurableMessagingTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task CallerCancellation_RollsBackBusinessWriteAndOutbox()
+    {
+        using var cancellation = new CancellationTokenSource();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            _transactions.ExecuteAsync(
+                "WorkItems",
+                async token =>
+                {
+                    await _repository.CreateAsync(
+                        new RepositoryContractDocument
+                        {
+                            Id = "cancelled-write",
+                            Name = "cancelled-write"
+                        },
+                        token);
+                    await _outbox.EnqueueAsync(Event("cancelled-event"), token);
+                    await cancellation.CancelAsync();
+                    token.ThrowIfCancellationRequested();
+                },
+                cancellation.Token));
+
+        Assert.False(await _repository.ExistsByFilterAsync(x => x.Id == "cancelled-write"));
+        Assert.Equal(0, (await _outbox.GetMetricsAsync(Now)).Pending);
+    }
+
+    [Fact]
     public async Task ConcurrentTransactions_RetryTransientWriteConflictWithoutLosingAnUpdate()
     {
         const string id = "transient-retry-counter";

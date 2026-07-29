@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using Zumbo.BuildingBlocks.Application.Runtime;
 
 namespace Zumbo.Capacity;
 
@@ -36,7 +37,13 @@ internal sealed class CapacityGateRunner(
         var stage = "seed";
         string? errorStage = null;
         string? errorType = null;
-        CleanupResult cleanup;
+        var cleanup = new CleanupResult(profile.Name, profile.RunId, profile.Prefix, -1, -1, false);
+        var cleanupTimeout = profile.Name switch
+        {
+            "smoke" => TimeSpan.FromSeconds(30),
+            "demo" => TimeSpan.FromMinutes(1),
+            _ => TimeSpan.FromMinutes(2)
+        };
         try
         {
             seed = await seedRunner.RunAsync(profile, ct);
@@ -66,23 +73,39 @@ internal sealed class CapacityGateRunner(
         }
         finally
         {
-            try
-            {
-                cleanup = await seedRunner.CleanAsync(profile, CancellationToken.None);
-            }
-            catch (Exception cleanupException)
+            var cleanupExecution = await CompensationExecution.RunAsync(
+                "capacity.seed.cleanup",
+                async token =>
+                {
+                    cleanup = await seedRunner.CleanAsync(profile, token);
+                },
+                cleanupTimeout);
+            if (!cleanupExecution.Succeeded)
             {
                 errorStage ??= "cleanup";
-                errorType ??= cleanupException.GetType().Name;
-                cleanup = new CleanupResult(profile.Name, profile.RunId, profile.Prefix, -1, -1, false);
+                errorType ??= cleanupExecution.Exception?.GetType().Name
+                    ?? cleanupExecution.Outcome.ToString();
             }
         }
 
         var freeAfterCleanup = CapacityMath.GetDiskFreeBytes();
-        var storageAfterCleanup = await CapacityStorageProbe.MeasureAsync(
-            mongoConnectionString,
-            openSearchBaseUrl,
-            CancellationToken.None);
+        var storageAfterCleanup = storageAfterSeed;
+        var probeExecution = await CompensationExecution.RunAsync(
+            "capacity.storage_cleanup.probe",
+            async token =>
+            {
+                storageAfterCleanup = await CapacityStorageProbe.MeasureAsync(
+                    mongoConnectionString,
+                    openSearchBaseUrl,
+                    token);
+            },
+            cleanupTimeout);
+        if (!probeExecution.Succeeded)
+        {
+            errorStage ??= "cleanup-probe";
+            errorType ??= probeExecution.Exception?.GetType().Name
+                ?? probeExecution.Outcome.ToString();
+        }
         var datasetBytes = Math.Max(0, storageAfterSeed - storageBefore);
         var disk = new DiskUsageResult(
             freeBefore,

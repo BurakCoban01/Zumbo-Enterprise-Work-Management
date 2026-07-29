@@ -144,7 +144,9 @@ try {
   const page = await ownerContext.newPage();
   diagnostics(page, 'owner');
   await page.goto(`${frontendBaseUrl}/desktop-bulma/index.html#section=reports&project=${project.id}&view=workload&range=30`, { waitUntil: 'domcontentloaded' });
-  await page.getByText(/Kapasite/).waitFor({ timeout: 45_000 });
+  await page.locator('.reporting-capacity-note')
+    .getByText('Kapasite eşiği yapılandırılmadı', { exact: true })
+    .waitFor({ timeout: 45_000 });
   await page.locator('.reporting-freshness').waitFor();
   assert.ok((await page.locator('.reporting-freshness').innerText()).trim().length > 0);
   await page.waitForFunction(() => document.querySelectorAll('.workload-table tbody tr').length === 2, null, { timeout: 45_000 });

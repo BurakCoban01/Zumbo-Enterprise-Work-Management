@@ -9,6 +9,7 @@ const source = await readFile(resolve(root, 'desktop-bulma/personal-work.js'), '
 const appSource = await readFile(resolve(root, 'desktop-bulma/app.js'), 'utf8');
 const desktopHtml = await readFile(resolve(root, 'desktop-bulma/index.html'), 'utf8');
 const mobileHtml = await readFile(resolve(root, 'mobile-ionic/index.html'), 'utf8');
+const workspaceSource = await readFile(resolve(root, 'mobile-ionic/workspace.js'), 'utf8');
 
 function createFeature(responses) {
   let provider;
@@ -138,7 +139,8 @@ test('desktop and mobile templates expose personal navigation, triage filters an
   assert.match(desktopHtml, /vm\.pendingApprovals\(\)/);
   assert.match(desktopHtml, /Bazı projeler yenilenemedi/);
   assert.match(desktopHtml, /class="board-skeleton" ng-if="vm\.activeSection === 'board' && \['overview','catalog','intake','automation','jobs'\]\.indexOf\(vm\.workMode\) < 0 && vm\.loading"/);
-  assert.match(mobileHtml, /vm\.visibleTasks\(\)/);
+  assert.match(mobileHtml, /task in vm\.visibleTaskItems track by task\.id/);
+  assert.match(workspaceSource, /function rebuildVisibleTasks\(\)/);
   assert.match(mobileHtml, /vm\.visibleNotifications\(\)/);
   assert.match(mobileHtml, /Bu filtrede bildirim yok\./);
   assert.match(appSource, /\.then\(function\(\) \{\s*loadSectionData\(vm\.activeSection\);\s*return \$q\.all\(\[vm\.loadNotifications\(\), vm\.loadTeams\(\), vm\.loadUsers\(\), vm\.loadAuditCapabilities\(\)\]\);/);

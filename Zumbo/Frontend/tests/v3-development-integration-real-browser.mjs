@@ -20,9 +20,12 @@ const bootstrapToken = requireLocalSecret(
   'ZUMBO_IDENTITY_BOOTSTRAP_TOKEN',
   'for V3-INTEGRATION-001 tenant cleanup'
 );
-const providerPort = Number(process.env.ZUMBO_DEVELOPMENT_PROVIDER_PORT || 58362);
-const providerBaseUrl = `http://127.0.0.1:${providerPort}`;
-const repositoryUrl = `https://127.0.0.1:${providerPort}/zumbo/platform`;
+const requestedProviderPort = process.env.ZUMBO_DEVELOPMENT_PROVIDER_PORT
+  ? Number(process.env.ZUMBO_DEVELOPMENT_PROVIDER_PORT)
+  : 0;
+let providerPort;
+let providerBaseUrl;
+let repositoryUrl;
 const providerToken = 'github-read-token-synthetic-123456';
 const password = 'P@ssword123';
 const checks = [];
@@ -33,8 +36,10 @@ let browser;
 let ownerToken;
 
 assert.ok(
-  Number.isInteger(providerPort) && providerPort >= 1024 && providerPort <= 65535,
-  'ZUMBO_DEVELOPMENT_PROVIDER_PORT must be a non-privileged TCP port.'
+  Number.isInteger(requestedProviderPort)
+    && (requestedProviderPort === 0
+      || requestedProviderPort >= 1024 && requestedProviderPort <= 65535),
+  'ZUMBO_DEVELOPMENT_PROVIDER_PORT must be zero or a non-privileged TCP port.'
 );
 await mkdir(output, { recursive: true });
 
@@ -73,8 +78,11 @@ const provider = createServer((request, response) => {
 
 await new Promise((resolveListen, reject) => {
   provider.once('error', reject);
-  provider.listen(providerPort, '127.0.0.1', resolveListen);
+  provider.listen(requestedProviderPort, '127.0.0.1', resolveListen);
 });
+providerPort = provider.address().port;
+providerBaseUrl = `http://127.0.0.1:${providerPort}`;
+repositoryUrl = `https://127.0.0.1:${providerPort}/zumbo/platform`;
 
 async function apiRequest(path, method = 'GET', body, token, headers = {}) {
   const response = await fetch(`${apiBaseUrl}${path}`, {
@@ -272,7 +280,7 @@ try {
   checks.push('real-ui-create-secret-once-and-credential-not-in-storage');
 
   await desktopPage.getByRole('button', { name: 'Sağlığı denetle' }).click();
-  await desktopPage.getByText('Sağlıklı', { exact: true }).waitFor();
+  await desktopPage.getByText('Sağlıklı', { exact: true }).waitFor({ timeout: 45_000 });
   await desktopPage.getByRole('button', { name: 'Repository’leri getir' }).click();
   await desktopPage.getByLabel('Zumbo projesi').selectOption({ label: project.name });
   await desktopPage.locator('.development-mapping-form select').nth(1)

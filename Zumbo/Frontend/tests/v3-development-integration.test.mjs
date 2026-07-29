@@ -135,6 +135,11 @@ test('work-item development links have desktop and mobile create/read/delete par
 
 test('one-time secrets and credentials stay memory-only and leave no unsafe projection', () => {
   assert.match(desktop, /clearDevelopmentSensitiveState/);
+  assert.match(desktop, /developmentCenter\.saving \|\| vm\.developmentCenter\.secretReceipt/);
+  assert.match(
+    desktop,
+    /\]\)\.then\(function\(results\) \{\s+if \(vm\.developmentCenter\.saving \|\| vm\.developmentCenter\.secretReceipt\)/
+  );
   assert.match(mobile, /\$ionicView\.afterLeave', clearSecret/);
   assert.doesNotMatch(desktop + mobile + desktopHtml + mobileHtml, /localStorage.*(?:accessToken|webhookSecret)/i);
   assert.doesNotMatch(desktopHtml + mobileHtml, /credentialProtected|webhookSecretProtected/);

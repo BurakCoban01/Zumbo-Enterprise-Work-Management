@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using StackExchange.Redis;
 using Zumbo.BuildingBlocks.Application.Concurrency;
@@ -141,6 +142,7 @@ public sealed class RedisDistributedLockProvider : IDistributedLockProvider
     private readonly IConnectionMultiplexer connection;
     private readonly IOptions<RedisLockOptions> redisOptions;
     private readonly IExternalDependencyPolicy? resiliencePolicy;
+    private readonly ILogger<RedisDistributedLockProvider>? logger;
     private const string RenewScript =
         "if redis.call('get', KEYS[1]) == ARGV[1] then "
         + "return redis.call('pexpire', KEYS[1], ARGV[2]) else return 0 end";
@@ -151,7 +153,7 @@ public sealed class RedisDistributedLockProvider : IDistributedLockProvider
     public RedisDistributedLockProvider(
         IConnectionMultiplexer connection,
         IOptions<RedisLockOptions> redisOptions)
-        : this(connection, redisOptions, null)
+        : this(connection, redisOptions, null, null)
     {
     }
 
@@ -159,9 +161,19 @@ public sealed class RedisDistributedLockProvider : IDistributedLockProvider
         IConnectionMultiplexer connection,
         IOptions<RedisLockOptions> redisOptions,
         IExternalDependencyPolicyProvider? policyProvider)
+        : this(connection, redisOptions, policyProvider, null)
+    {
+    }
+
+    public RedisDistributedLockProvider(
+        IConnectionMultiplexer connection,
+        IOptions<RedisLockOptions> redisOptions,
+        IExternalDependencyPolicyProvider? policyProvider,
+        ILogger<RedisDistributedLockProvider>? logger)
     {
         this.connection = connection;
         this.redisOptions = redisOptions;
+        this.logger = logger;
         resiliencePolicy = policyProvider?.Get(ExternalDependencyNames.Redis);
     }
 
@@ -196,7 +208,13 @@ public sealed class RedisDistributedLockProvider : IDistributedLockProvider
                     ct);
             if (acquired)
             {
-                return new RedisLockHandle(database, key, ownerToken, leaseTime, resiliencePolicy);
+                return new RedisLockHandle(
+                    database,
+                    key,
+                    ownerToken,
+                    leaseTime,
+                    resiliencePolicy,
+                    logger);
             }
 
             if (DateTimeOffset.UtcNow >= deadline)
@@ -216,6 +234,7 @@ public sealed class RedisDistributedLockProvider : IDistributedLockProvider
         private readonly RedisValue _ownerToken;
         private readonly TimeSpan _leaseTime;
         private readonly IExternalDependencyPolicy? _resiliencePolicy;
+        private readonly ILogger<RedisDistributedLockProvider>? _logger;
         private readonly CancellationTokenSource _renewalCancellation = new();
         private readonly Task _renewalTask;
         private int _released;
@@ -225,13 +244,15 @@ public sealed class RedisDistributedLockProvider : IDistributedLockProvider
             RedisKey key,
             RedisValue ownerToken,
             TimeSpan leaseTime,
-            IExternalDependencyPolicy? resiliencePolicy)
+            IExternalDependencyPolicy? resiliencePolicy,
+            ILogger<RedisDistributedLockProvider>? logger)
         {
             _database = database;
             _key = key;
             _ownerToken = ownerToken;
             _leaseTime = leaseTime;
             _resiliencePolicy = resiliencePolicy;
+            _logger = logger;
             _renewalTask = RenewUntilReleasedAsync();
         }
 
@@ -245,33 +266,58 @@ public sealed class RedisDistributedLockProvider : IDistributedLockProvider
             await _renewalCancellation.CancelAsync();
             try
             {
-                await _renewalTask;
-            }
-            catch (OperationCanceledException)
-            {
+                var renewal = await CompensationExecution.RunAsync(
+                    "redis.lock.renewal_stop",
+                    async token =>
+                    {
+                        try
+                        {
+                            await _renewalTask.WaitAsync(token);
+                        }
+                        catch (OperationCanceledException)
+                            when (_renewalCancellation.IsCancellationRequested
+                                && !token.IsCancellationRequested)
+                        {
+                        }
+                    });
+                Observe(renewal);
+
+                var release = await CompensationExecution.RunAsync(
+                    "redis.lock.release",
+                    async token =>
+                    {
+                        if (_resiliencePolicy is null)
+                        {
+                            await _database.ScriptEvaluateAsync(ReleaseScript, [_key], [_ownerToken])
+                                .WaitAsync(token);
+                        }
+                        else
+                        {
+                            await _resiliencePolicy.ExecuteAsync(
+                                "lock-release",
+                                ExternalDependencyOperationKind.IdempotentWrite,
+                                _ => _database.ScriptEvaluateAsync(ReleaseScript, [_key], [_ownerToken]),
+                                IsTransient,
+                                token);
+                        }
+                    });
+                Observe(release);
             }
             finally
             {
-                try
-                {
-                    if (_resiliencePolicy is null)
-                    {
-                        await _database.ScriptEvaluateAsync(ReleaseScript, [_key], [_ownerToken]);
-                    }
-                    else
-                    {
-                        await _resiliencePolicy.ExecuteAsync(
-                            "lock-release",
-                            ExternalDependencyOperationKind.IdempotentWrite,
-                            _ => _database.ScriptEvaluateAsync(ReleaseScript, [_key], [_ownerToken]),
-                            IsTransient,
-                            CancellationToken.None);
-                    }
-                }
-                finally
-                {
-                    _renewalCancellation.Dispose();
-                }
+                _renewalCancellation.Dispose();
+            }
+        }
+
+        private void Observe(CompensationResult result)
+        {
+            if (!result.Succeeded)
+            {
+                _logger?.LogWarning(
+                    "Compensation operation {Operation} ended with {Outcome}; failure type {FailureType}.",
+                    result.Operation,
+                    result.Outcome,
+                    result.Exception?.GetType().Name ?? "none");
             }
         }
 

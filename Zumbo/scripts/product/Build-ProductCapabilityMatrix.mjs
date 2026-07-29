@@ -3,10 +3,17 @@ import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { dirname, relative, resolve } from 'node:path';
 import { applicationRoot } from '../repository-layout.mjs';
+import {
+  normalizePath,
+  selectMostSpecificOperations
+} from './api-consumer-matching.mjs';
 
 const routeInventoryPath = 'Backend/tests/Zumbo.ApiTests/RouteInventory.approved.txt';
 const routeTestPath = 'Backend/tests/Zumbo.ApiTests/RouteInventoryCharacterizationTests.cs';
 const openApiPath = 'contracts/openapi.v1.json';
+const permissionCatalogPath =
+  'Backend/src/Zumbo.BuildingBlocks.Application/Security/PermissionCatalog.cs';
+const consumerOwnershipPath = 'docs/product/api-consumer-ownership.json';
 const outputJsonPath = 'docs/product/api-ui-capability-matrix.json';
 const outputMarkdownPath = 'docs/product/api-ui-capability-matrix.md';
 const frontendRoots = ['Frontend/desktop-bulma', 'Frontend/mobile-ionic'];
@@ -14,6 +21,9 @@ const supportedMethods = new Set(['get', 'post', 'put', 'patch', 'delete']);
 
 const operations = parseRouteInventory(read(routeInventoryPath));
 const openApiOperations = parseOpenApi(JSON.parse(read(openApiPath)));
+const permissionCatalog = parsePermissionCatalog(read(permissionCatalogPath));
+const consumerOwnership = parseConsumerOwnership(
+  JSON.parse(read(consumerOwnershipPath)));
 const frontendCalls = frontendRoots.flatMap(root => listJavaScript(root).flatMap(path => extractApiCalls(path, read(path))));
 
 const contractOperations = new Set(operations.filter(operation => operation.method !== '*').map(operation => operation.id));
@@ -21,12 +31,38 @@ assert.deepEqual([...openApiOperations].sort(compareCodePoints), [...contractOpe
   'OpenAPI operations must exactly match the non-transport route inventory.');
 
 for (const call of frontendCalls) {
-  call.operationIds = operations
-    .filter(operation => operation.method === call.method && patternsOverlap(call.pattern, operation.path))
-    .map(operation => operation.id)
-    .sort(compareCodePoints);
+  const candidates = selectMostSpecificOperations(
+    call.pattern,
+    operations.filter(operation => operation.method === call.method));
+  const ownership = consumerOwnership.get(consumerOwnershipKey(call));
+  if (candidates.length > 1) {
+    assert.ok(
+      ownership,
+      `Ambiguous frontend API call needs explicit ownership: ${call.source}:${call.line} ${call.method} ${call.pattern}`);
+  }
+  if (ownership) {
+    assert.equal(
+      ownership.used,
+      false,
+      `Consumer ownership policy is used twice: ${ownership.id}`);
+    const candidateIds = new Set(candidates.map(operation => operation.id));
+    assert.ok(
+      ownership.operationIds.every(operationId => candidateIds.has(operationId)),
+      `Consumer ownership policy selects a non-candidate operation: ${ownership.id}`);
+    ownership.used = true;
+    call.operationIds = [...ownership.operationIds].sort(compareCodePoints);
+    call.ownershipPolicy = ownership.id;
+  } else {
+    call.operationIds = candidates
+      .map(operation => operation.id)
+      .sort(compareCodePoints);
+    call.ownershipPolicy = null;
+  }
   assert.ok(call.operationIds.length > 0, `Frontend API call does not match the route inventory: ${call.source}:${call.line} ${call.method} ${call.pattern}`);
 }
+assert.ok(
+  [...consumerOwnership.values()].every(policy => policy.used),
+  'Every explicit consumer ownership policy must match exactly one current frontend call.');
 
 const matrixOperations = operations.map(operation => buildOperation(operation, frontendCalls));
 assert.equal(new Set(matrixOperations.map(operation => operation.id)).size, matrixOperations.length, 'Duplicate operation IDs are forbidden.');
@@ -43,12 +79,15 @@ const generatedAtUtc = checking && exists(outputJsonPath)
 const sourceHashes = {
   routeInventorySha256: sha256(read(routeInventoryPath)),
   openApiSha256: sha256(read(openApiPath)),
+  permissionCatalogSha256: sha256(read(permissionCatalogPath)),
+  consumerOwnershipSha256: sha256(read(consumerOwnershipPath)),
   frontendCallsSha256: sha256(Buffer.from(frontendCalls.map(call => `${call.source}:${call.line}|${call.method}|${call.pattern}`).join('\n'), 'utf8'))
 };
 
 const matrix = {
-  schemaVersion: 1,
+  schemaVersion: 2,
   task: 'V3-PRODUCT-001',
+  driftGate: 'V3-HARDEN-007',
   generatedAtUtc,
   statusModel: {
     surfaced: 'The exact operation has both desktop and mobile UI consumers.',
@@ -60,6 +99,8 @@ const matrix = {
     routeInventory: routeInventoryPath,
     routeCharacterizationTest: routeTestPath,
     openApi: openApiPath,
+    permissionCatalog: permissionCatalogPath,
+    consumerOwnership: consumerOwnershipPath,
     frontendRoots,
     frontendParity: 'docs/frontend-parity.json'
   },
@@ -114,6 +155,7 @@ function buildOperation(operation, calls) {
     },
     targetSurface,
     intentionalReason: policy?.reason ?? null,
+    intentionalKind: policy?.consumer ?? null,
     test: routeTestPath,
     documentation,
     source: routeInventoryPath
@@ -124,11 +166,15 @@ function validateOperation(operation) {
   assert.ok(operation.path !== '', `${operation.id} has an invalid route.`);
   assert.ok(['surfaced', 'partial', 'absent', 'intentional'].includes(operation.status), `${operation.id} is unclassified.`);
   assert.ok(operation.permission, `${operation.id} is missing permission metadata.`);
+  validatePermission(operation);
   assert.ok(operation.test && exists(operation.test), `${operation.id} is missing test evidence.`);
   assert.ok(operation.documentation.length > 0 && operation.documentation.every(exists), `${operation.id} is missing documentation evidence.`);
   const consumerCount = Object.values(operation.consumers).reduce((total, values) => total + values.length, 0);
   if (operation.status === 'intentional') {
     assert.ok(operation.intentionalReason && consumerCount > 0, `${operation.id} needs a non-UI reason and consumer.`);
+    assert.ok(
+      ['integration', 'background'].includes(operation.intentionalKind),
+      `${operation.id} needs a typed non-UI owner.`);
   } else if (operation.status === 'absent') {
     assert.ok(operation.targetSurface, `${operation.id} needs an owned target surface.`);
   } else {
@@ -163,6 +209,43 @@ function parseOpenApi(document) {
     }
   }
   return result;
+}
+
+function parsePermissionCatalog(source) {
+  return new Set(
+    [...source.matchAll(/public const string \w+ = "([^"]+)";/g)]
+      .map(match => match[1]));
+}
+
+function parseConsumerOwnership(document) {
+  assert.equal(document.schemaVersion, 1);
+  assert.ok(Array.isArray(document.policies) && document.policies.length > 0);
+  const policies = new Map();
+  for (const policy of document.policies) {
+    assert.match(policy.id, /^[a-z0-9-]+$/);
+    assert.ok(exists(policy.source));
+    assert.ok(['GET', 'POST', 'PUT', 'PATCH', 'DELETE'].includes(policy.method));
+    assert.ok(policy.pattern.startsWith('/api/'));
+    assert.ok(Array.isArray(policy.operationIds) && policy.operationIds.length > 1);
+    assert.ok(policy.reason && policy.reason.length >= 20);
+    const key = consumerOwnershipKey(policy);
+    assert.equal(policies.has(key), false, `Duplicate consumer ownership key: ${key}`);
+    policies.set(key, { ...policy, used: false });
+  }
+  return policies;
+}
+
+function consumerOwnershipKey(value) {
+  return `${value.source}|${value.method}|${normalizePath(value.pattern)}`;
+}
+
+function validatePermission(operation) {
+  if (operation.permission === 'none') return;
+  const match = operation.permission.match(/^(.+):(global|resource)$/);
+  assert.ok(match, `${operation.id} has malformed permission metadata.`);
+  assert.ok(
+    permissionCatalog.has(match[1]),
+    `${operation.id} references an unknown permission: ${match[1]}`);
 }
 
 function extractApiCalls(path, source) {
@@ -271,7 +354,12 @@ function parseLiteral(token) {
 }
 
 function toConsumer(call) {
-  return { route: surfaceRouteFor(call), source: `${call.source}:${call.line}`, requestPattern: `${call.method} ${call.pattern}` };
+  return {
+    route: surfaceRouteFor(call),
+    source: `${call.source}:${call.line}`,
+    requestPattern: `${call.method} ${call.pattern}`,
+    ownershipPolicy: call.ownershipPolicy
+  };
 }
 
 function surfaceRouteFor(call) {
@@ -317,12 +405,31 @@ function intentionalPolicy(operation) {
 
 function sharedUiConsumers(operation) {
   if (operation.id !== 'POST /api/browser-auth/refresh') return { desktop: [], mobile: [] };
-  const source = 'Frontend/shared/api-client.js:308';
+  const sourcePath = 'Frontend/shared/api-client.js';
+  const source = `${sourcePath}:${sourceLine(
+    sourcePath,
+    "'/api/browser-auth/refresh'")}`;
   const requestPattern = 'POST /api/browser-auth/refresh';
   return {
-    desktop: [{ route: '/board', source, requestPattern }],
-    mobile: [{ route: '/app/dashboard', source, requestPattern }]
+    desktop: [{
+      route: '/board',
+      source,
+      requestPattern,
+      ownershipPolicy: 'shared-browser-refresh'
+    }],
+    mobile: [{
+      route: '/app/dashboard',
+      source,
+      requestPattern,
+      ownershipPolicy: 'shared-browser-refresh'
+    }]
   };
+}
+
+function sourceLine(path, marker) {
+  const line = read(path).split('\n').findIndex(value => value.includes(marker)) + 1;
+  assert.ok(line > 0, `Shared consumer marker is missing: ${path} ${marker}`);
+  return line;
 }
 
 function documentationForTransport(path) {
@@ -436,7 +543,9 @@ function buildSummary(items, calls, background, gaps) {
     byStatus,
     duplicateOperations: 0,
     unmatchedFrontendCalls: 0,
-    unownedOperations: 0
+    unownedOperations: 0,
+    ambiguousFrontendCalls: 0,
+    explicitMultiOperationCalls: consumerOwnership.size
   };
 }
 
@@ -448,7 +557,7 @@ function renderMarkdown(matrix) {
     return `| \`${operation.method}\` | \`${operation.path}\` | ${operation.capability} | ${operation.permission} | **${operation.status}** | ${consumers} |`;
   }).join('\n');
   const gaps = matrix.capabilityGaps.map((gap, index) => `${index + 1}. **${gap.label}** - ${gap.score.total}/35, ${gap.operationIds.length} absent operation, target: \`${gap.targetSurface}\`.`).join('\n');
-  return `# API-to-UI Product Capability Matrix\n\nGenerated: ${matrix.generatedAtUtc}\n\nThis document is generated by \`scripts/product/Build-ProductCapabilityMatrix.mjs\`. Edit sources or generator policy, not this file.\n\n## Coverage\n\n- Route operations: ${matrix.summary.operations}; OpenAPI operations: ${matrix.summary.openApiOperations}.\n- Frontend calls: ${matrix.summary.frontendCalls} (${matrix.summary.desktopCalls} desktop, ${matrix.summary.mobileCalls} mobile).\n- Status: ${matrix.summary.byStatus.surfaced} surfaced, ${matrix.summary.byStatus.partial} partial, ${matrix.summary.byStatus.absent} absent, ${matrix.summary.byStatus.intentional} intentional non-UI.\n- Ownership checks: 0 duplicates, 0 unmatched frontend calls, 0 unowned operations.\n- Background consumers: ${matrix.summary.backgroundCapabilities}.\n\n## Highest-Value Gaps\n\n${gaps}\n\n## Information Architecture\n\nDesktop currently exposes \`${matrix.informationArchitecture.desktop.routes.join('`, `')}\` with project views \`${matrix.informationArchitecture.desktop.projectViews.join('`, `')}\`. Mobile exposes ${matrix.informationArchitecture.mobile.routes.length} router states and task modes \`${matrix.informationArchitecture.mobile.taskViews.join('`, `')}\`. Planned destinations are owned explicitly in the machine-readable matrix.\n\n## Operation Matrix\n\n| Method | Route | Capability | Permission | Status | Consumer or target |\n|---|---|---|---|---|---|\n${rows}\n`;
+  return `# API-to-UI Product Capability Matrix\n\nGenerated: ${matrix.generatedAtUtc}\n\nThis document is generated by \`scripts/product/Build-ProductCapabilityMatrix.mjs\`. Edit sources or generator policy, not this file.\n\n## Coverage\n\n- Route operations: ${matrix.summary.operations}; OpenAPI operations: ${matrix.summary.openApiOperations}.\n- Frontend calls: ${matrix.summary.frontendCalls} (${matrix.summary.desktopCalls} desktop, ${matrix.summary.mobileCalls} mobile).\n- Status: ${matrix.summary.byStatus.surfaced} surfaced, ${matrix.summary.byStatus.partial} partial, ${matrix.summary.byStatus.absent} absent, ${matrix.summary.byStatus.intentional} intentional non-UI.\n- Ownership checks: 0 duplicates, 0 unmatched calls, 0 unowned operations and 0 ambiguous calls; ${matrix.summary.explicitMultiOperationCalls} dynamic calls have explicit ownership policies.\n- Background consumers: ${matrix.summary.backgroundCapabilities}.\n\n## Highest-Value Gaps\n\n${gaps}\n\n## Information Architecture\n\nDesktop currently exposes \`${matrix.informationArchitecture.desktop.routes.join('`, `')}\` with project views \`${matrix.informationArchitecture.desktop.projectViews.join('`, `')}\`. Mobile exposes ${matrix.informationArchitecture.mobile.routes.length} router states and task modes \`${matrix.informationArchitecture.mobile.taskViews.join('`, `')}\`. Planned destinations are owned explicitly in the machine-readable matrix.\n\n## Operation Matrix\n\n| Method | Route | Capability | Permission | Status | Consumer or target |\n|---|---|---|---|---|---|\n${rows}\n`;
 }
 
 function listJavaScript(root) {
@@ -462,26 +571,6 @@ function listJavaScript(root) {
   };
   visit(root);
   return result.sort(compareCodePoints);
-}
-
-function normalizePath(path) {
-  const withoutQuery = path.split('?')[0].replace(
-    /\{([^}:]+):[^}]+\}/g,
-    '{$1}'
-  );
-  return withoutQuery.length > 1 ? withoutQuery.replace(/\/$/, '') : withoutQuery;
-}
-
-function patternsOverlap(clientPattern, routePath) {
-  const clientSegments = normalizePath(clientPattern).split('/');
-  const routeSegments = normalizePath(routePath).split('/');
-  if (clientSegments.length !== routeSegments.length) return false;
-  return clientSegments.every((segment, index) => {
-    const routeSegment = routeSegments[index];
-    if (/^\{[^}]+\}$/.test(routeSegment)) return true;
-    const clientMatcher = new RegExp(`^${escapeRegExp(segment).replaceAll('\\{\\*\\}', '.*')}$`);
-    return clientMatcher.test(routeSegment);
-  });
 }
 
 function exists(path) { return existsSync(resolve(applicationRoot, path)); }

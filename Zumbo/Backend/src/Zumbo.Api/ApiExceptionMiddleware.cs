@@ -15,6 +15,12 @@ public sealed class ApiExceptionMiddleware(
         {
             await next(context);
         }
+        catch (OperationCanceledException) when (context.RequestAborted.IsCancellationRequested)
+        {
+            logger.LogDebug(
+                "Request was canceled by the client. CorrelationId: {CorrelationId}",
+                context.TraceIdentifier);
+        }
         catch (Exception ex)
         {
             var (statusCode, code, message) = MapException(ex, environment.IsDevelopment());

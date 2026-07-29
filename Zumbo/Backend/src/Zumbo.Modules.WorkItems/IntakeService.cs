@@ -4,8 +4,10 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Zumbo.BuildingBlocks.Application.Persistence;
+using Zumbo.BuildingBlocks.Application.Runtime;
 using Zumbo.BuildingBlocks.Application.Security;
 using Zumbo.SharedKernel;
 
@@ -769,7 +771,8 @@ public sealed class IntakeSubmissionService(
     IWorkItemAuditPublisher audit,
     IClock clock,
     ICurrentUser currentUser,
-    IOptions<IntakeOptions>? configuredOptions = null)
+    IOptions<IntakeOptions>? configuredOptions = null,
+    ILogger<IntakeSubmissionService>? logger = null)
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private readonly IntakeOptions options = configuredOptions?.Value ?? new IntakeOptions();
@@ -886,7 +889,7 @@ public sealed class IntakeSubmissionService(
             }
             catch (DocumentConflictException exception)
             {
-                await DeleteStoredAsync(stored, CancellationToken.None);
+                await TryDeleteStoredAsync(stored);
                 var raced = await submissions.SelectAsync(
                     x => x.Id == submissionId
                         && x.OrganizationId == version.OrganizationId
@@ -914,14 +917,13 @@ public sealed class IntakeSubmissionService(
         }
         catch
         {
-            var persisted = await submissions.ExistsByFilterAsync(
-                x => x.Id == submissionId
-                    && x.OrganizationId == version.OrganizationId
-                    && x.FormId == version.FormId,
-                CancellationToken.None);
+            var persisted = await IsPersistedForCleanupAsync(
+                submissionId,
+                version.OrganizationId,
+                version.FormId);
             if (!persisted)
             {
-                await DeleteStoredAsync(stored, CancellationToken.None);
+                await TryDeleteStoredAsync(stored);
             }
             throw;
         }
@@ -1311,13 +1313,50 @@ public sealed class IntakeSubmissionService(
         }
     }
 
-    private async Task DeleteStoredAsync(
-        IEnumerable<IntakeSubmissionAttachmentDocument> attachments,
-        CancellationToken ct)
+    private async Task<bool> IsPersistedForCleanupAsync(
+        string submissionId,
+        string organizationId,
+        string formId)
     {
-        foreach (var attachment in attachments)
+        var persisted = true;
+        var result = await CompensationExecution.RunAsync(
+            "intake.submission.exists",
+            async token =>
+            {
+                persisted = await submissions.ExistsByFilterAsync(
+                    x => x.Id == submissionId
+                        && x.OrganizationId == organizationId
+                        && x.FormId == formId,
+                    token);
+            });
+        ObserveCompensation(result);
+        return result.Succeeded ? persisted : true;
+    }
+
+    private async Task TryDeleteStoredAsync(
+        IEnumerable<IntakeSubmissionAttachmentDocument> attachments)
+    {
+        var result = await CompensationExecution.RunAsync(
+            "intake.attachments.delete",
+            async token =>
+            {
+                foreach (var attachment in attachments)
+                {
+                    await attachmentStorage.DeleteAsync(attachment.StoragePath, token);
+                }
+            });
+        ObserveCompensation(result);
+    }
+
+    private void ObserveCompensation(CompensationResult result)
+    {
+        if (!result.Succeeded)
         {
-            await attachmentStorage.DeleteAsync(attachment.StoragePath, ct);
+            logger?.LogWarning(
+                "Compensation operation {Operation} ended with {Outcome}; failure type {FailureType}.",
+                result.Operation,
+                result.Outcome,
+                result.Exception?.GetType().Name ?? "none");
         }
     }
 

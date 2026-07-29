@@ -110,6 +110,20 @@ test('list preferences persist density, columns and stable domain sorting', () =
   assert.equal(persisted.columns.assignee, false);
 });
 
+test('list projection is rebuilt on explicit model changes instead of every digest read', () => {
+  const { vm } = installExcellence();
+  const initial = vm.visibleListTasks();
+  assert.strictEqual(vm.visibleListTasks(), initial);
+  vm.sortListBy('priority');
+  assert.notStrictEqual(vm.visibleListTasks(), initial);
+  assert.deepEqual(Array.from(vm.visibleListTasks(), item => item.id), ['task-high', 'task-low']);
+  const sorted = vm.visibleListTasks();
+  vm.tasks[0].priority = 'Critical';
+  vm.refreshBoardModel();
+  assert.notStrictEqual(vm.visibleListTasks(), sorted);
+  assert.deepEqual(Array.from(vm.visibleListTasks(), item => item.id), ['task-low', 'task-high']);
+});
+
 test('inline edit is optimistic and restores the authoritative snapshot on conflict', async () => {
   let remembered;
   const api = {
@@ -197,7 +211,13 @@ test('templates expose semantic table, keyboard/touch movement and permission-aw
   assert.match(desktopHtml, /data-wip-state="\{\{column\.wipState\}\}"/);
   assert.match(desktopHtml, /vm\.listEditTaskId === task\.id/);
   assert.match(desktopHtml, /vm\.canEditWorkItems\(\)/);
+  assert.match(desktopHtml, /row in vm\.boardRows track by row\.label/);
+  assert.match(desktopHtml, /column in row\.columns track by column\.id/);
+  assert.match(desktopHtml, /task in vm\.listTasks track by task\.id/);
+  assert.doesNotMatch(desktopHtml, /vm\.visibleListTasks\(\)/);
   assert.match(mobileHtml, /vm\.moveTask\(task, -1\)/);
+  assert.match(mobileHtml, /task in vm\.visibleTaskItems track by task\.id/);
+  assert.doesNotMatch(mobileHtml, /vm\.visibleTasks\(\)/);
   assert.match(mobileHtml, /'session-restoring': shell\.sessionRestoring/);
   assert.match(mobileApp, /browserSession: function\(authService\) \{ return authService\.restore\(\); \}/);
   assert.match(mobileApp, /\.state\('project-detail', protectedState\(/);

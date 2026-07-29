@@ -167,13 +167,13 @@ try {
   await ownerPage.getByText('Pilot çıkışı', { exact: true }).waitFor();
   await ownerPage.getByText('Sürüm 1.4', { exact: true }).waitFor();
   await ownerPage.getByText('Sprint 14', { exact: true }).waitFor();
-  assert.equal(await ownerPage.getByRole('tab').count(), 11);
+  assert.equal(await ownerPage.getByRole('tab').count(), 15);
   assert.ok(await ownerPage.getByText('Yakın risk var', { exact: true }).isVisible());
   checks.push('owner-overview-health-delivery', 'unified-view-switcher');
   await ownerPage.screenshot({ path: resolve(outputDir, 'owner-overview.png'), fullPage: true });
 
   await ownerPage.getByRole('tab', { name: 'İş yükü', exact: true }).click();
-  await ownerPage.locator('.insight-panel').getByText(owner.username, { exact: true }).waitFor();
+  await ownerPage.locator('.workload-table').getByText(owner.username, { exact: true }).waitFor();
   assert.match(ownerPage.url(), /section=reports/);
   assert.match(ownerPage.url(), /view=workload/);
   checks.push('workload-destination');
@@ -198,7 +198,7 @@ try {
   );
   await viewerPage.locator('.project-overview h2').getByText('Hazırlık Alanı', { exact: true }).waitFor({ timeout: 45_000 });
   await viewerPage.locator('.overview-metrics').waitFor({ timeout: 45_000 });
-  assert.equal(await viewerPage.getByRole('tab').count(), 4);
+  assert.equal(await viewerPage.getByRole('tab').count(), 8);
   assert.equal(await viewerPage.getByRole('tab', { name: 'Genel bakış', exact: true }).getAttribute('aria-selected'), 'true');
   assert.equal(await viewerPage.getByText('Pano yüklenmedi', { exact: true }).count(), 0);
   await viewerPage.locator('.create-button').click();

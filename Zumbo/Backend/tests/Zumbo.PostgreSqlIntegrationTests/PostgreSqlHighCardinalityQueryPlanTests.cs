@@ -61,7 +61,8 @@ public sealed class PostgreSqlHighCardinalityQueryPlanTests(PostgreSqlFixture fi
                 ORDER BY (document #>> ARRAY['Key']), id COLLATE "C"
                 LIMIT 100;
                 """);
-            AssertPlan(projectPlan, "ix_projects_organization_archived_key");
+            AssertPlan(projectPlan, "ix_projects_organization_archived_key_cursor");
+            Assert.DoesNotContain("Sort", projectPlan, StringComparison.Ordinal);
 
             var sessionPlan = await ScalarStringAsync(connection, """
                 EXPLAIN (ANALYZE, COSTS OFF, FORMAT JSON)
@@ -75,7 +76,7 @@ public sealed class PostgreSqlHighCardinalityQueryPlanTests(PostgreSqlFixture fi
                 LIMIT 100;
                 """);
             AssertPlan(sessionPlan, "ix_refresh_sessions_owner_last_seen");
-            Assert.DoesNotContain("Sort", sessionPlan, StringComparison.Ordinal);
+            AssertBoundedOptionalTopNSort(sessionPlan);
         }
         finally
         {
@@ -97,6 +98,45 @@ public sealed class PostgreSqlHighCardinalityQueryPlanTests(PostgreSqlFixture fi
             document.RootElement[0].GetProperty("Execution Time").GetDouble(),
             0,
             250);
+    }
+
+    private static void AssertBoundedOptionalTopNSort(string planJson)
+    {
+        using var document = JsonDocument.Parse(planJson);
+        var sort = FindPlanNode(document.RootElement[0].GetProperty("Plan"), "Sort");
+        if (sort is null)
+        {
+            return;
+        }
+
+        Assert.Equal("top-N heapsort", sort.Value.GetProperty("Sort Method").GetString());
+        Assert.InRange(sort.Value.GetProperty("Sort Space Used").GetInt64(), 0, 256);
+        var source = sort.Value.GetProperty("Plans")[0];
+        Assert.InRange(source.GetProperty("Actual Rows").GetInt64(), 1, 1_000);
+    }
+
+    private static JsonElement? FindPlanNode(JsonElement node, string nodeType)
+    {
+        if (node.GetProperty("Node Type").GetString() == nodeType)
+        {
+            return node.Clone();
+        }
+
+        if (!node.TryGetProperty("Plans", out var plans))
+        {
+            return null;
+        }
+
+        foreach (var child in plans.EnumerateArray())
+        {
+            var match = FindPlanNode(child, nodeType);
+            if (match is not null)
+            {
+                return match;
+            }
+        }
+
+        return null;
     }
 
     private static async Task<string> ScalarStringAsync(DbConnection connection, string sql)

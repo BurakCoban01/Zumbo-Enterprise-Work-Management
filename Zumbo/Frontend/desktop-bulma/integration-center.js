@@ -320,6 +320,9 @@
 
           vm.loadDevelopmentCenter = function(resetSelection) {
             if (!vm.canManageIntegrations()) return $q.when([]);
+            if (vm.developmentCenter.saving || vm.developmentCenter.secretReceipt) {
+              return $q.when(vm.developmentCenter.connections);
+            }
             vm.developmentCenter.loading = true;
             vm.developmentCenter.error = '';
             return $q.all([
@@ -334,6 +337,9 @@
                 replace: true
               }).catch(function() { return vm.projects || []; })
             ]).then(function(results) {
+              if (vm.developmentCenter.saving || vm.developmentCenter.secretReceipt) {
+                return vm.developmentCenter.connections;
+              }
               vm.developmentCenter.connections = results[0] || [];
               vm.projects = results[1] || vm.projects || [];
               var selectedId = !resetSelection && vm.developmentCenter.selected

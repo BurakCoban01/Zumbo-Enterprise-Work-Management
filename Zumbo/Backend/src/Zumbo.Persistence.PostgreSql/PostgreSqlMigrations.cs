@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using Microsoft.Extensions.Logging;
 using Npgsql;
 
 namespace Zumbo.Persistence.PostgreSql;
@@ -26,7 +27,8 @@ public interface IPostgreSqlMigrationRunner
 
 public sealed class PostgreSqlMigrationRunner(
     NpgsqlDataSource dataSource,
-    PostgreSqlPersistenceOptions options) : IPostgreSqlMigrationRunner
+    PostgreSqlPersistenceOptions options,
+    ILogger<PostgreSqlMigrationRunner>? logger = null) : IPostgreSqlMigrationRunner
 {
     private const string Ledger = "public.zumbo_schema_migrations";
     private const string LockName = "zumbo-postgresql-schema-migrations-v1";
@@ -73,7 +75,10 @@ public sealed class PostgreSqlMigrationRunner(
             }
             catch
             {
-                await transaction.RollbackAsync(CancellationToken.None);
+                await PostgreSqlCompensation.RunAsync(
+                    "postgres.migration_apply.rollback",
+                    token => transaction.RollbackAsync(token),
+                    logger);
                 throw;
             }
         }
@@ -123,7 +128,10 @@ public sealed class PostgreSqlMigrationRunner(
             }
             catch
             {
-                await transaction.RollbackAsync(CancellationToken.None);
+                await PostgreSqlCompensation.RunAsync(
+                    "postgres.migration_rollback.rollback",
+                    token => transaction.RollbackAsync(token),
+                    logger);
                 throw;
             }
         }
@@ -1897,15 +1905,23 @@ public sealed class PostgreSqlMigrationRunner(
             DROP TABLE IF EXISTS work_items.development_connections;
             """;
         const string highCardinalityIndexes = """
+            CREATE INDEX IF NOT EXISTS ix_projects_organization_archived_key_cursor
+                ON projects.projects (
+                    (document #>> ARRAY['OrganizationId']),
+                    ((document #>> ARRAY['Archived'])::boolean),
+                    (document #>> ARRAY['Key']),
+                    id COLLATE "C");
             CREATE INDEX IF NOT EXISTS ix_refresh_sessions_owner_last_seen
                 ON identity.refresh_sessions (
                     (document #>> ARRAY['OrganizationId']),
                     (document #>> ARRAY['UserId']),
-                    public.zumbo_parse_timestamptz(document #>> ARRAY['LastSeenAt']) DESC,
-                    id);
+                    public.zumbo_parse_timestamptz(
+                        document #>> ARRAY['LastSeenAt']) DESC NULLS LAST,
+                    id COLLATE "C");
             """;
         const string dropHighCardinalityIndexes = """
             DROP INDEX IF EXISTS identity.ix_refresh_sessions_owner_last_seen;
+            DROP INDEX IF EXISTS projects.ix_projects_organization_archived_key_cursor;
             """;
 
         return

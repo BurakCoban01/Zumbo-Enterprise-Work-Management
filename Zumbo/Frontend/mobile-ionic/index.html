@@ -705,13 +705,13 @@
         <div class="segmented mobile-focus-segments" role="tablist" aria-label="Kişisel iş görünümü"><button role="tab" aria-selected="{{vm.mode==='assigned'}}" tabindex="{{vm.mode==='assigned' ? 0 : -1}}" ng-class="{active:vm.mode==='assigned'}" ng-click="vm.setMode('assigned')">Açık</button><button role="tab" aria-selected="{{vm.mode==='due'}}" tabindex="{{vm.mode==='due' ? 0 : -1}}" ng-class="{active:vm.mode==='due'}" ng-click="vm.setMode('due')">Tarihli</button><button role="tab" aria-selected="{{vm.mode==='blocked'}}" tabindex="{{vm.mode==='blocked' ? 0 : -1}}" ng-class="{active:vm.mode==='blocked'}" ng-click="vm.setMode('blocked')">Engelli</button><button role="tab" aria-selected="{{vm.mode==='recent'}}" tabindex="{{vm.mode==='recent' ? 0 : -1}}" ng-class="{active:vm.mode==='recent'}" ng-click="vm.setMode('recent')">Son</button></div>
         <div class="section-title">Kişisel işler</div>
         <ion-list>
-          <ion-item class="task-row" ng-repeat="task in vm.visibleTasks()" ng-click="vm.openTask(task)">
+          <ion-item class="task-row" ng-repeat="task in vm.visibleTaskItems track by task.id" ng-click="vm.openTask(task)">
             <h2>{{task.title}}</h2>
             <p>{{task.status}} · {{task.priority}}</p>
             <time ng-if="task.dueDate">{{task.dueDate | date:'dd MMM'}}</time>
             <span class="badge badge-balanced" ng-if="task.status === 'Done'">tamam</span>
           </ion-item>
-          <ion-item ng-if="!vm.visibleTasks().length">Bu görünümde iş yok.</ion-item>
+          <ion-item ng-if="!vm.visibleTaskItems.length">Bu görünümde iş yok.</ion-item>
         </ion-list>
       </ion-content>
     </ion-view>

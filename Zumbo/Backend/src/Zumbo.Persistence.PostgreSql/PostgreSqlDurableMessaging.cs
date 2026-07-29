@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using Npgsql;
 using NpgsqlTypes;
 using Zumbo.BuildingBlocks.Application.Messaging;
@@ -6,7 +7,8 @@ namespace Zumbo.Persistence.PostgreSql;
 
 public sealed class PostgreSqlDurableEventOutbox(
     PostgreSqlSession session,
-    PostgreSqlPersistenceOptions options) : IDurableEventOutbox
+    PostgreSqlPersistenceOptions options,
+    ILogger<PostgreSqlDurableEventOutbox>? logger = null) : IDurableEventOutbox
 {
     public async Task EnqueueAsync(
         DurableEventEnvelope message,
@@ -97,7 +99,10 @@ public sealed class PostgreSqlDurableEventOutbox(
         }
         catch
         {
-            await transaction.RollbackAsync(CancellationToken.None);
+            await PostgreSqlCompensation.RunAsync(
+                "postgres.outbox_claim.rollback",
+                token => transaction.RollbackAsync(token),
+                logger);
             throw;
         }
     }

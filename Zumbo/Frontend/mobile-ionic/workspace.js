@@ -6,6 +6,7 @@
     var vm = this;
     vm.summary = {};
     vm.tasks = [];
+    vm.visibleTaskItems = [];
     vm.mode = 'assigned';
     vm.searchDegraded = false;
     function isDone(task) {
@@ -17,14 +18,21 @@
         return ['blockedby', 'dependson'].indexOf(String(relation.relationType || '').toLowerCase()) >= 0;
       });
     }
-    vm.setMode = function(mode) { vm.mode = mode; };
-    vm.visibleTasks = function() {
-      var open = vm.tasks.filter(function(task) { return !isDone(task); });
-      if (vm.mode === 'due') return open.filter(function(task) { return task.dueDate; }).sort(function(left, right) { return new Date(left.dueDate) - new Date(right.dueDate); });
-      if (vm.mode === 'blocked') return open.filter(isBlocked);
-      if (vm.mode === 'recent') return vm.tasks.slice().reverse();
-      return open;
+    vm.setMode = function(mode) {
+      vm.mode = mode;
+      rebuildVisibleTasks();
     };
+    vm.visibleTasks = function() {
+      return vm.visibleTaskItems;
+    };
+    function rebuildVisibleTasks() {
+      var open = vm.tasks.filter(function(task) { return !isDone(task); });
+      if (vm.mode === 'due') vm.visibleTaskItems = open.filter(function(task) { return task.dueDate; }).sort(function(left, right) { return new Date(left.dueDate) - new Date(right.dueDate); });
+      else if (vm.mode === 'blocked') vm.visibleTaskItems = open.filter(isBlocked);
+      else if (vm.mode === 'recent') vm.visibleTaskItems = vm.tasks.slice().reverse();
+      else vm.visibleTaskItems = open;
+      return vm.visibleTaskItems;
+    }
     var unsubscribeRealtime = realtimeService.subscribe(function(change) {
       if (change.eventType === 'resyncRequired') {
         if (sessionStore.state.project && change.projectId === sessionStore.state.project.id) vm.refresh();
@@ -38,6 +46,7 @@
       else if (visible && index >= 0) { vm.tasks[index] = change.workItem; }
       else if (visible) { vm.tasks.unshift(change.workItem); }
       vm.tasks.sort(function(left, right) { return (left.rank || 0) - (right.rank || 0); });
+      rebuildVisibleTasks();
     });
     $scope.$on('$destroy', unsubscribeRealtime);
     vm.refresh = function() {
@@ -64,6 +73,7 @@
           vm.tasks = result[1].items || [];
           vm.searchDegraded = result[1].degraded === true;
           realtimeService.synchronize(vm.tasks);
+          rebuildVisibleTasks();
         }
       }).finally(function() {
         $ionicScrollDelegate.$getByHandle('dashboardScroll').resize();

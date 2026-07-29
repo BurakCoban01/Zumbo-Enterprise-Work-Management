@@ -159,7 +159,7 @@ try {
   const ownerPage = await ownerContext.newPage();
   attachDiagnostics(ownerPage, 'owner', failures);
   await ownerPage.goto(
-    `${frontendBaseUrl}/desktop-bulma/index.html#section=board&project=${projectId}&board=${board.data.id}`,
+    `${frontendBaseUrl}/desktop-bulma/index.html#section=board&project=${projectId}&board=${board.data.id}&view=board`,
     { waitUntil: 'domcontentloaded' }
   );
   const ownerTask = ownerPage.locator('.task').first();
@@ -176,13 +176,13 @@ try {
   assertNoBrowserSecrets(await browserSecurityState(ownerPage));
 
   const nav = ownerPage.locator('.side-nav');
-  await nav.getByRole('button', { name: 'Raporlar', exact: true }).click();
-  await ownerPage.waitForFunction(() => location.hash.includes('section=reports'));
+  await nav.getByRole('button', { name: 'Projeler', exact: true }).click();
+  await ownerPage.waitForFunction(() => location.hash.includes('section=projects'));
   await nav.getByRole('button', { name: 'Ekipler', exact: true }).click();
   await ownerPage.waitForFunction(() => location.hash.includes('section=teams'));
   await ownerPage.goBack();
-  await ownerPage.waitForFunction(() => location.hash.includes('section=reports'));
-  assert.ok(await nav.getByRole('button', { name: 'Raporlar', exact: true }).evaluate(element => element.classList.contains('active')));
+  await ownerPage.waitForFunction(() => location.hash.includes('section=projects'));
+  assert.ok(await nav.getByRole('button', { name: 'Projeler', exact: true }).evaluate(element => element.classList.contains('active')));
   await ownerPage.goForward();
   await ownerPage.waitForFunction(() => location.hash.includes('section=teams'));
 
@@ -229,7 +229,7 @@ try {
   const viewerPage = await viewerContext.newPage();
   attachDiagnostics(viewerPage, 'viewer', failures);
   await viewerPage.goto(
-    `${frontendBaseUrl}/desktop-bulma/index.html#section=board&project=${projectId}&board=${shellState.boardId}`,
+    `${frontendBaseUrl}/desktop-bulma/index.html#section=board&project=${projectId}&board=${shellState.boardId}&view=board`,
     { waitUntil: 'domcontentloaded' }
   );
   await viewerPage.locator('.task').filter({ hasText: taskTitle }).waitFor({ timeout: 45_000 });
@@ -243,7 +243,7 @@ try {
 
   await ownerPage.screenshot({ path: resolve(outputDir, 'owner-shell.png'), fullPage: true });
   await ownerPage.setViewportSize({ width: 390, height: 844 });
-  await ownerPage.locator('.inspector .delete').click();
+  await ownerPage.getByRole('button', { name: 'Görev detayını kapat', exact: true }).click();
   const responsiveState = await ownerPage.evaluate(() => ({
     width: window.innerWidth,
     scrollWidth: document.documentElement.scrollWidth

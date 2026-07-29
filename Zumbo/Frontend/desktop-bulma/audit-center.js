@@ -168,6 +168,7 @@
             if (entry.entityType === 'Identity') return vm.userName(entry.entityId);
             return entry.entityType + ' · ' + shortId(entry.entityId);
           };
+          vm.auditReferenceLabel = shortId;
 
           vm.auditFieldLabel = function(field) {
             var labels = {

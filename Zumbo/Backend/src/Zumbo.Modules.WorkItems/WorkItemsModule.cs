@@ -1,7 +1,9 @@
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using System.Linq.Expressions;
 using Zumbo.BuildingBlocks.Application.Concurrency;
 using Zumbo.BuildingBlocks.Application.Persistence;
+using Zumbo.BuildingBlocks.Application.Runtime;
 using Zumbo.BuildingBlocks.Application.Search;
 using Zumbo.BuildingBlocks.Application.Security;
 using Zumbo.SharedKernel;
@@ -158,8 +160,10 @@ public sealed partial class WorkItemService(
     WorkItemCollaborationService? collaborationService = null,
     IOptions<SearchOptions>? searchOptions = null,
     IWorkItemAutomationEventPublisher? automationEvents = null,
-    IWorkItemAutomationChainContextAccessor? automationChain = null) : IIntakeWorkItemCreator
+    IWorkItemAutomationChainContextAccessor? automationChain = null,
+    ILogger<WorkItemService>? logger = null) : IIntakeWorkItemCreator
 {
+    private readonly ILogger<WorkItemService>? compensationLogger = logger;
     private readonly ExpectedVersionState expectedVersion = new(expectedVersions);
     private readonly Dictionary<string, string> authorizedOrganizationIds = new(StringComparer.Ordinal);
     private readonly WorkItemRankService ranks = rankService ?? new(workItems, clock, Options.Create(new WorkItemRankOptions()));
@@ -1230,7 +1234,10 @@ public sealed partial class WorkItemService(
         }
         catch
         {
-            await attachmentStorage.DeleteAsync(stored.StoragePath, CancellationToken.None);
+            var cleanup = await CompensationExecution.RunAsync(
+                "work_item.attachment.delete",
+                token => attachmentStorage.DeleteAsync(stored.StoragePath, token));
+            ObserveCompensation(cleanup);
             throw;
         }
 
@@ -1291,7 +1298,10 @@ public sealed partial class WorkItemService(
         }
         catch
         {
-            await activityStore.CreateAttachmentAsync(attachment, CancellationToken.None);
+            var restore = await CompensationExecution.RunAsync(
+                "work_item.attachment.restore",
+                token => activityStore.CreateAttachmentAsync(attachment, token));
+            ObserveCompensation(restore);
             workItem.Attachments.Add(new AttachmentDocument
             {
                 Id = attachment.Id,

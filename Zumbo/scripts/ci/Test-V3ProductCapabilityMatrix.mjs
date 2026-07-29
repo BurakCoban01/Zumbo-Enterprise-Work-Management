@@ -11,9 +11,20 @@ const generator = spawnSync(process.execPath, ['scripts/product/Build-ProductCap
 });
 assert.equal(generator.status, 0, generator.stderr || generator.stdout);
 
+const driftGate = spawnSync(
+  process.execPath,
+  ['scripts/ci/Test-V3Harden007DriftGate.mjs'],
+  {
+    cwd: applicationRoot,
+    encoding: 'utf8',
+    timeout: 30_000
+  });
+assert.equal(driftGate.status, 0, driftGate.stderr || driftGate.stdout);
+
 const matrix = json('docs/product/api-ui-capability-matrix.json');
-assert.equal(matrix.schemaVersion, 1);
+assert.equal(matrix.schemaVersion, 2);
 assert.equal(matrix.task, 'V3-PRODUCT-001');
+assert.equal(matrix.driftGate, 'V3-HARDEN-007');
 assert.deepEqual(matrix.summary, {
   operations: 324,
   openApiOperations: 320,
@@ -22,10 +33,12 @@ assert.deepEqual(matrix.summary, {
   mobileCalls: 239,
   backgroundCapabilities: 9,
   gapCapabilities: 3,
-  byStatus: { surfaced: 232, partial: 46, absent: 36, intentional: 10 },
+  byStatus: { surfaced: 230, partial: 46, absent: 38, intentional: 10 },
   duplicateOperations: 0,
   unmatchedFrontendCalls: 0,
-  unownedOperations: 0
+  unownedOperations: 0,
+  ambiguousFrontendCalls: 0,
+  explicitMultiOperationCalls: 5
 });
 assert.equal(new Set(matrix.operations.map(operation => operation.id)).size, matrix.summary.operations);
 assert.equal(Object.values(matrix.summary.byStatus).reduce((sum, count) => sum + count, 0), matrix.summary.operations);
@@ -43,8 +56,8 @@ for (const operation of matrix.operations) {
 
 const refresh = operation('POST /api/browser-auth/refresh');
 assert.equal(refresh.status, 'surfaced');
-assert.equal(refresh.consumers.desktop[0].source, 'Frontend/shared/api-client.js:308');
-assert.equal(refresh.consumers.mobile[0].source, 'Frontend/shared/api-client.js:308');
+assert.equal(refresh.consumers.desktop[0].source, 'Frontend/shared/api-client.js:317');
+assert.equal(refresh.consumers.mobile[0].source, 'Frontend/shared/api-client.js:317');
 assert.equal(operation('GET /').status, 'intentional');
 assert.equal(operation('POST /api/auth/login').consumers.integration.length, 1);
 assert.equal(operation('* /hubs/work-items').consumers.background.length, 1);

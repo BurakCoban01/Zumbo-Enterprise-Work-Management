@@ -2,6 +2,8 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Extensions.DependencyInjection;
+using Zumbo.BuildingBlocks.Application.Persistence;
 using Zumbo.Modules.Audit;
 using Zumbo.Modules.Boards;
 using Zumbo.Modules.Identity;
@@ -15,10 +17,66 @@ namespace Zumbo.ApiTests;
 public sealed class ProjectLifecycleApiTests : IClassFixture<WebApplicationFactory<Program>>
 {
     private readonly HttpClient client;
+    private readonly WebApplicationFactory<Program> factory;
 
     public ProjectLifecycleApiTests(WebApplicationFactory<Program> factory)
     {
+        this.factory = factory;
         client = factory.CreateClient();
+    }
+
+    [Fact]
+    public async Task MemberCardinalityLimit_ReturnsTypedConflictWithoutChangingProject()
+    {
+        var stamp = Guid.NewGuid().ToString("N");
+        var organizationId = "project-cardinality-" + stamp;
+        var owner = await RegisterAsync("project-cardinality-owner-" + stamp, organizationId);
+        Authenticate(owner);
+        _ = await PostAsync<OrganizationResponse>(
+            "/api/organizations",
+            new CreateOrganizationRequest("Project Cardinality", organizationId));
+
+        using var scope = factory.Services.CreateScope();
+        var projects = scope.ServiceProvider.GetRequiredService<IDocumentRepository<ProjectDocument>>();
+        var seeded = await projects.CreateAsync(new ProjectDocument
+        {
+            Id = "project-cardinality-" + stamp,
+            OrganizationId = organizationId,
+            Key = "CARD",
+            Name = "Cardinality Project",
+            Visibility = ProjectVisibilities.Private,
+            Members =
+            [
+                new ProjectMemberDocument
+                {
+                    UserId = owner.User.Id,
+                    Role = ProjectRoles.Owner
+                },
+                .. Enumerable.Range(1, ProjectCardinalityLimits.MaximumMembers - 1)
+                    .Select(index => new ProjectMemberDocument
+                    {
+                        UserId = $"synthetic-member-{index:D4}",
+                        Role = ProjectRoles.Viewer
+                    })
+            ],
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        });
+
+        using var request = VersionedRequest(
+            HttpMethod.Post,
+            $"/api/projects/{seeded.Id}/members",
+            new AddProjectMemberRequest("synthetic-candidate", ProjectRoles.Viewer),
+            seeded.Version);
+        await AssertErrorAsync(
+            await client.SendAsync(request),
+            HttpStatusCode.Conflict,
+            "PROJECT_MEMBER_LIMIT_REACHED");
+
+        var persisted = await projects.SelectAsync(project => project.Id == seeded.Id);
+        Assert.NotNull(persisted);
+        Assert.Equal(seeded.Version, persisted!.Version);
+        Assert.Equal(ProjectCardinalityLimits.MaximumMembers, persisted.Members.Count);
     }
 
     [Fact]

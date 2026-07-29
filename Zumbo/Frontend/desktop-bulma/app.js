@@ -118,6 +118,7 @@ angular.module('zumboDesktop', ['zumbo.shared.api', 'zumbo.shared.displayNames',
     desktopPersonalWorkFeature.install(vm, { membershipFor: membershipFor });
     vm.showSection = function(section) {
       var sectionChanged = section !== vm.activeSection;
+      if (sectionChanged && vm.clearSettingsOneTimeSecrets) vm.clearSettingsOneTimeSecrets();
       vm.activeSection = section;
       vm.closeCommandPalette();
       if (sectionChanged) {
@@ -237,6 +238,7 @@ angular.module('zumboDesktop', ['zumbo.shared.api', 'zumbo.shared.displayNames',
       var section = params.get('section');
       var sectionChanged = ['home', 'mywork', 'inbox', 'board', 'projects', 'portfolios', 'goals', 'capacity', 'knowledge', 'teams', 'reports', 'audit', 'archive', 'settings'].indexOf(section) >= 0 && vm.activeSection !== section;
       if (sectionChanged) {
+        if (vm.clearSettingsOneTimeSecrets) vm.clearSettingsOneTimeSecrets();
         vm.activeSection = section;
         loadSectionData(section);
       }

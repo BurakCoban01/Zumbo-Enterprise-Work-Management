@@ -328,7 +328,9 @@ try {
   );
   await ownerPage.locator('#knowledge-document-title').waitFor({ timeout: 45_000 });
   assert.match(await ownerPage.locator('.knowledge-render').innerText(), /Rollback sahibi/);
-  assert.match(await ownerPage.locator('.knowledge-link-list').innerText(), /Yayın kontrol listesini tamamla/);
+  await ownerPage.locator('.knowledge-link-list')
+    .getByText(/Yayın kontrol listesini tamamla/)
+    .waitFor({ timeout: 45_000 });
   assert.equal(await ownerPage.locator('.knowledge-render a[href^="javascript:"]').count(), 0);
   await ownerPage.getByRole('button', { name: /v1 · Üretim yayın runbooku/ }).click();
   await ownerPage.locator('.knowledge-version-banner').waitFor({ timeout: 45_000 });

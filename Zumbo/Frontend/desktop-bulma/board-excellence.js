@@ -65,7 +65,9 @@
           var apiActionError = helpers.apiActionError;
           var originalMove = vm.moveTaskToColumn;
           var originalDropBefore = vm.dropTaskBefore;
+          var originalRefreshBoardModel = vm.refreshBoardModel;
           vm.listPreferences = readPreferences(storage);
+          vm.listTasks = [];
           vm.listEditTaskId = null;
           vm.listEditDraft = null;
           vm.listEditError = null;
@@ -96,29 +98,40 @@
               vm.listPreferences.direction = 'asc';
             }
             savePreferences();
+            rebuildListTasks();
           };
           vm.listSortIcon = function(field) {
             if (vm.listPreferences.sort !== field) return 'chevrons-up-down';
             return vm.listPreferences.direction === 'asc' ? 'arrow-up' : 'arrow-down';
           };
           vm.visibleListTasks = function() {
+            return vm.listTasks;
+          };
+          vm.refreshBoardModel = function() {
+            var result = originalRefreshBoardModel.apply(vm, arguments);
+            rebuildListTasks();
+            return result;
+          };
+
+          function rebuildListTasks() {
             var field = vm.listPreferences.sort;
             var direction = vm.listPreferences.direction === 'desc' ? -1 : 1;
-            return (vm.tasks || []).filter(function(task) {
+            vm.listTasks = (vm.tasks || []).filter(function(task) {
               return !vm.priorityFilter || task.priority === vm.priorityFilter;
             }).slice().sort(function(left, right) {
               var result = compare(left, right, field, vm.userName);
               return result ? result * direction : compare(left, right, 'rank', vm.userName);
             });
-          };
+            return vm.listTasks;
+          }
 
           vm.allVisibleTasksSelected = function() {
-            var tasks = vm.visibleListTasks();
+            var tasks = vm.listTasks;
             return !!tasks.length && tasks.every(function(task) { return !!vm.selectedTaskIds[task.id]; });
           };
           vm.toggleVisibleTaskSelection = function() {
             var select = !vm.allVisibleTasksSelected();
-            vm.visibleListTasks().slice(0, 100).forEach(function(task) {
+            vm.listTasks.slice(0, 100).forEach(function(task) {
               vm.selectedTaskIds[task.id] = select;
             });
           };
@@ -146,6 +159,7 @@
             task.title = draft.title.trim();
             task.priority = draft.priority;
             task.dueDate = draft.dueDate || null;
+            rebuildListTasks();
             vm.pendingTaskIds[task.id] = true;
             vm.listEditError = null;
             return apiClient.put('/api/work-items/' + task.id, {
@@ -264,6 +278,8 @@
               vm.notify('error', apiActionError(error, label + ' başlatılamadı.'));
             }).finally(function() { vm.bulkBusy = false; });
           }
+
+          rebuildListTasks();
         }
       };
     });

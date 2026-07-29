@@ -49,6 +49,11 @@ public sealed class MongoHighCardinalityQueryPlanTests : IAsyncLifetime
             report.Outcomes,
             outcome => outcome.MigrationId == MongoMigrationRunner.HighCardinalityIndexMigrationId
                 && outcome.Status == MongoMigrationStates.Completed);
+        var repeated = await runner.RunAsync(CancellationToken.None);
+        Assert.Contains(
+            repeated.Outcomes,
+            outcome => outcome.MigrationId == MongoMigrationRunner.HighCardinalityIndexMigrationId
+                && outcome.Status == MongoMigrationStates.Skipped);
 
         var projects = mongo.GetCollection<BsonDocument>("projects", "Projects");
         var sessions = mongo.GetCollection<BsonDocument>("refreshsessions", "Identity");
@@ -82,7 +87,8 @@ public sealed class MongoHighCardinalityQueryPlanTests : IAsyncLifetime
             sessionExplain,
             "ix_refreshsessions_owner_last_seen",
             maximumDocumentsExamined: 200);
-        Assert.DoesNotContain("\"stage\" : \"SORT\"", sessionExplain.ToJson(), StringComparison.Ordinal);
+        var winningPlan = sessionExplain["queryPlanner"].AsBsonDocument["winningPlan"].ToJson();
+        Assert.DoesNotContain("\"stage\" : \"SORT\"", winningPlan, StringComparison.Ordinal);
     }
 
     private async Task<BsonDocument> ExplainAsync(

@@ -205,7 +205,7 @@ try {
 
   await page.screenshot({ path: resolve(artifactRoot, 'shell-desktop.png'), fullPage: true });
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.locator('.inspector .delete').click();
+  await page.getByRole('button', { name: 'Görev detayını kapat', exact: true }).click();
   await page.waitForFunction(() => document.activeElement?.getAttribute('data-work-item-id') === 'task-1');
   assert.ok(await page.locator('.command-trigger').isVisible(), 'command trigger disappeared at 390px');
   await page.locator('.command-trigger').click();

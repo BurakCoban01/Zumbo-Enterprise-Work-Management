@@ -130,6 +130,49 @@ public sealed class IntakeServiceTests
     }
 
     [Fact]
+    public async Task PartialUploadCleanup_DoesNotHidePrimaryFailureAndUsesBoundedToken()
+    {
+        var formService = CreateFormService();
+        var form = await formService.CreateAsync(
+            new CreateIntakeFormRequest(
+                "project-1",
+                "Service request",
+                null,
+                Definition(IntakeAccessPolicies.Public, "Summary")),
+            "correlation-1",
+            default);
+        form = await formService.PublishAsync(form.Id, "correlation-2", default);
+        var storage = new CapturingAttachmentStorage
+        {
+            FailSaveOnAttempt = 2,
+            FailDelete = true
+        };
+        var service = CreateSubmissionService(
+            formService,
+            new CapturingWorkItemCreator(),
+            storage);
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() => service.SubmitAsync(
+            form.PublicId!,
+            publicAccess: true,
+            new CreateIntakeSubmissionRequest(
+            [
+                new("summary", "Cannot complete request")
+            ]),
+            [
+                Upload("evidence", "first.txt", "text/plain", "first"),
+                Upload("evidence", "second.txt", "text/plain", "second")
+            ],
+            "request-key-cleanup",
+            "correlation-3",
+            default));
+
+        Assert.Equal("Synthetic primary save failure.", exception.Message);
+        Assert.Equal(1, storage.DeleteCount);
+        Assert.True(storage.DeleteToken.CanBeCanceled);
+    }
+
+    [Fact]
     public async Task AccessPolicyAndTriage_AreEnforced()
     {
         var formService = CreateFormService();
@@ -314,6 +357,9 @@ public sealed class IntakeServiceTests
     {
         public int SaveCount { get; private set; }
         public int DeleteCount { get; private set; }
+        public int? FailSaveOnAttempt { get; init; }
+        public bool FailDelete { get; init; }
+        public CancellationToken DeleteToken { get; private set; }
 
         public async Task<StoredAttachment> SaveAsync(
             Stream content,
@@ -323,6 +369,10 @@ public sealed class IntakeServiceTests
             CancellationToken ct)
         {
             SaveCount++;
+            if (SaveCount == FailSaveOnAttempt)
+            {
+                throw new InvalidOperationException("Synthetic primary save failure.");
+            }
             using var hash = SHA256.Create();
             var checksum = Convert.ToHexString(await hash.ComputeHashAsync(content, ct)).ToLowerInvariant();
             return new StoredAttachment(
@@ -352,6 +402,11 @@ public sealed class IntakeServiceTests
         public Task DeleteAsync(string storagePath, CancellationToken ct)
         {
             DeleteCount++;
+            DeleteToken = ct;
+            if (FailDelete)
+            {
+                throw new InvalidOperationException("Synthetic cleanup failure.");
+            }
             return Task.CompletedTask;
         }
     }

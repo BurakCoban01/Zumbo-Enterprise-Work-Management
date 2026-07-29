@@ -10,12 +10,15 @@
     vm.securityLoadError = '';
     vm.sessionActionId = null;
     vm.mfaRecoveryDraft = { password: '', code: '' };
+    vm.clearSettingsOneTimeSecrets = function() {
+      securityCore.clearOneTimeSecrets(vm);
+    };
 
     vm.loadSettings = function() {
       if (!vm.session.currentUser) return $q.when();
+      if (vm.entitySaving || vm.mfaSetup || vm.recoveryCodes.length) return $q.when();
       vm.settingsLoading = true;
       vm.securityLoadError = '';
-      securityCore.clearOneTimeSecrets(vm);
       return $q.all([
         apiClient.get('/api/organizations').then(function(organizations) {
           vm.organizations = organizations;
@@ -276,6 +279,7 @@
     vm.confirmMfaSetup = function() {
       if (!vm.mfaDraft.code || vm.entitySaving) return;
       vm.entitySaving = true;
+      apiClient.cancelPending('mfa-confirm-session-rotation');
       return apiClient.post('/api/auth/mfa/confirm', { code: vm.mfaDraft.code })
         .then(function(result) {
           vm.mfaStatus = { enabled: result.enabled, remainingRecoveryCodes: result.recoveryCodes.length };
@@ -290,6 +294,7 @@
     vm.disableMfa = function() {
       if (!vm.mfaDraft.password || !vm.mfaDraft.code || vm.entitySaving) return;
       vm.entitySaving = true;
+      apiClient.cancelPending('mfa-disable-session-rotation');
       return apiClient.post('/api/auth/mfa/disable', { password: vm.mfaDraft.password, code: vm.mfaDraft.code })
         .then(function(status) { vm.mfaStatus = status; vm.mfaDraft = { password: '', code: '' }; vm.notify('success', 'MFA devre dışı bırakıldı.'); })
         .catch(function(error) { vm.notify('error', apiActionError(error, 'MFA devre dışı bırakılamadı.')); })
@@ -301,6 +306,7 @@
       if (!$window.confirm('Mevcut kurtarma kodları hemen geçersiz olacak. Yeni kodlar oluşturulsun mu?')) return;
       vm.entitySaving = true;
       vm.recoveryCodes = [];
+      apiClient.cancelPending('mfa-recovery-session-rotation');
       return apiClient.post('/api/auth/mfa/recovery-codes', vm.mfaRecoveryDraft)
         .then(function(result) {
           vm.recoveryCodes = result.recoveryCodes || [];

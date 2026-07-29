@@ -250,6 +250,7 @@ try {
     'Generated work item');
   assert.equal(generatedWorkItem.title, 'Günlük operasyon kuyruğunu incele');
   await ownerPage.reload({ waitUntil: 'domcontentloaded' });
+  await ownerPage.getByRole('tab', { name: 'Yinelemeler' }).click();
   const generatedRow = ownerPage.locator('.automation-row').filter({ hasText: 'Günlük operasyon' }).first();
   await generatedRow.locator('.automation-row-main').click();
   await generatedRow.getByText('Tamamlandı', { exact: true }).waitFor();
@@ -266,6 +267,7 @@ try {
     maxOccurrences: 2
   }, ownerToken, 'Lifecycle recurrence creation');
   await ownerPage.reload({ waitUntil: 'domcontentloaded' });
+  await ownerPage.getByRole('tab', { name: 'Yinelemeler' }).click();
   const lifecycleRow = ownerPage.locator(`[data-recurrence-id="${lifecycleRecurrence.id}"]`);
   await lifecycleRow.waitFor();
   await ownerPage.waitForLoadState('networkidle');

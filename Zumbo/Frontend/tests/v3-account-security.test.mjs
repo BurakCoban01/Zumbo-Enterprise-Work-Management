@@ -52,7 +52,19 @@ test('session projection keeps active devices and only the two most recent close
 
 test('desktop settings expose current-session revoke and recovery-code lifecycle', () => {
   for (const endpoint of ['/api/auth/sessions', '/api/auth/mfa/recovery-codes']) assert.ok(desktop.includes(endpoint));
-  for (const method of ['vm.revokeSession', 'vm.regenerateMfaRecoveryCodes', 'vm.dismissRecoveryCodes']) assert.ok(desktop.includes(method));
+  for (const method of [
+    'vm.revokeSession', 'vm.regenerateMfaRecoveryCodes', 'vm.dismissRecoveryCodes',
+    'vm.clearSettingsOneTimeSecrets'
+  ]) assert.ok(desktop.includes(method));
+  assert.doesNotMatch(
+    desktop.match(/vm\.loadSettings = function\(\) \{[\s\S]*?\n    \};/)?.[0] || '',
+    /clearOneTimeSecrets/,
+    'Background settings reloads must not erase one-time MFA values.'
+  );
+  assert.match(desktop, /vm\.entitySaving \|\| vm\.mfaSetup \|\| vm\.recoveryCodes\.length/);
+  assert.match(desktop, /apiClient\.cancelPending\('mfa-recovery-session-rotation'\)/);
+  assert.match(api, /apiClient\.cancelPending\('mfa-recovery-session-rotation'\)/);
+  assert.match(desktopHtml, /ng-disabled="vm\.settingsLoading \|\| vm\.entitySaving"/);
   assert.match(desktop, /apiClient\.clearSession\('current-session-revoked'\)/);
   assert.match(desktopHtml, /session\.isCurrent/);
   assert.match(desktopHtml, /Bu liste kapatıldıktan sonra yeniden gösterilmez/);

@@ -477,6 +477,7 @@
       },
       remember: remember,
       cancelScope: function(scope) { requests.cancelScope(scope, 'scope-canceled'); },
+      cancelPending: function(reason) { requests.cancelAll(reason || 'pending-canceled'); },
       transitionContext: function(context) {
         resourceVersions = Object.create(null);
         return requests.transition(context);
