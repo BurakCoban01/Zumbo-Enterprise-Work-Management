@@ -108,6 +108,15 @@ test('logout tenant state temizler, cihaz gorunum tercihlerini korur', () => {
   assert.equal(core.tenantSessionKeys.some(key => sessionValues.has(key)), false);
 });
 
+test('CSRF tokeni yeni sekmede guvenli double-submit cookie degerinden kurtarilir', () => {
+  assert.equal(
+    core.readCookie('theme=dark; zumbo-csrf=token%2Bwith%2Fsymbols%3D; locale=tr', 'zumbo-csrf'),
+    'token+with/symbols='
+  );
+  assert.equal(core.readCookie('zumbo-csrf-malicious=wrong', 'zumbo-csrf'), null);
+  assert.equal(core.readCookie('zumbo-csrf=%E0%A4%A', 'zumbo-csrf'), null);
+});
+
 test('desktop ve mobile ayni shared AngularJS istemci modulunu yukler', async () => {
   for (const surface of ['desktop-bulma', 'mobile-ionic']) {
     const [html, app] = await Promise.all([

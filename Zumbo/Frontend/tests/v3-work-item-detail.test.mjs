@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
+import { createRequire } from 'node:module';
 import { resolve } from 'node:path';
 import test from 'node:test';
 import { clearTimeout as nodeClearTimeout } from 'node:timers';
@@ -7,6 +8,8 @@ import { URLSearchParams } from 'node:url';
 import vmModule from 'node:vm';
 
 const root = resolve(import.meta.dirname, '..');
+const require = createRequire(import.meta.url);
+const developmentCore = require(resolve(root, 'shared/development-integration-core.js'));
 const detailSource = await readFile(resolve(root, 'desktop-bulma/work-items.js'), 'utf8');
 const appSource = await readFile(resolve(root, 'desktop-bulma/app.js'), 'utf8');
 const apiClientSource = await readFile(resolve(root, 'shared/api-client.js'), 'utf8');
@@ -97,7 +100,11 @@ function model({ role = 'Developer', put } = {}) {
   };
   const feature = loadFactory(detailSource, 'desktopWorkItemFeature', [
     q,
-    { document: { querySelectorAll: () => [] }, URL: { createObjectURL() {}, revokeObjectURL() {} } },
+    {
+      document: { querySelectorAll: () => [] },
+      URL: { createObjectURL() {}, revokeObjectURL() {} },
+      ZumboDevelopmentIntegrationCore: developmentCore
+    },
     callback => callback(),
     api
   ]);

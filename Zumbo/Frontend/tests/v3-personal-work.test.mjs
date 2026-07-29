@@ -137,7 +137,7 @@ test('desktop and mobile templates expose personal navigation, triage filters an
   assert.match(desktopHtml, /vm\.savePersonalView\(\)/);
   assert.match(desktopHtml, /vm\.pendingApprovals\(\)/);
   assert.match(desktopHtml, /Bazı projeler yenilenemedi/);
-  assert.match(desktopHtml, /class="board-skeleton" ng-if="vm\.activeSection === 'board' && \['overview','catalog','automation','jobs'\]\.indexOf\(vm\.workMode\) < 0 && vm\.loading"/);
+  assert.match(desktopHtml, /class="board-skeleton" ng-if="vm\.activeSection === 'board' && \['overview','catalog','intake','automation','jobs'\]\.indexOf\(vm\.workMode\) < 0 && vm\.loading"/);
   assert.match(mobileHtml, /vm\.visibleTasks\(\)/);
   assert.match(mobileHtml, /vm\.visibleNotifications\(\)/);
   assert.match(mobileHtml, /Bu filtrede bildirim yok\./);

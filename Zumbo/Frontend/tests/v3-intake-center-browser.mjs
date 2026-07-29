@@ -309,6 +309,14 @@ try {
   checks.push('desktop-triage');
   await ownerPage.screenshot({ path: resolve(output, 'desktop-triage.png'), fullPage: true });
 
+  await ownerPage.goto(
+    `${server.origin}/desktop-bulma/index.html#public=pub-feedback`,
+    { waitUntil: 'networkidle' }
+  );
+  await ownerPage.getByRole('heading', { name: 'Müşteri geri bildirimi' }).waitFor();
+  assert.equal(await ownerPage.locator('.side-nav, .workspace, .inspector, .modal-overlay, .command-overlay').count(), 0);
+  checks.push('desktop-authenticated-public-isolated');
+
   const viewerContext = await createContext(viewer, { width: 1280, height: 900 });
   const viewerPage = await viewerContext.newPage();
   diagnostics(viewerPage, 'desktop-viewer');
@@ -359,6 +367,11 @@ try {
     { waitUntil: 'networkidle' }
   );
   await mobilePublicPage.getByRole('heading', { name: 'Müşteri geri bildirimi' }).waitFor();
+  assert.equal(
+    await mobilePublicPage.locator('.mobile-intake-honeypot').evaluate(element =>
+      window.getComputedStyle(element).display),
+    'none'
+  );
   const publicSize = await mobilePublicPage.evaluate(() => ({
     width: window.innerWidth,
     scrollWidth: document.documentElement.scrollWidth
@@ -378,11 +391,11 @@ try {
   await writeFile(resolve(output, 'result.json'), `${JSON.stringify({
     schemaVersion: 1,
     taskId: 'V3-FEATURE-001',
-    passed: failures.length === 0 && checks.length === 8,
+    passed: failures.length === 0 && checks.length === 9,
     checks,
     failures
   }, null, 2)}\n`, 'utf8');
 }
 
-assert.equal(checks.length, 8, `Expected 8 checks, received ${checks.length}`);
+assert.equal(checks.length, 9, `Expected 9 checks, received ${checks.length}`);
 console.log('V3-FEATURE-001 browser passed: desktop lifecycle, triage, Viewer, public intake and mobile parity.');

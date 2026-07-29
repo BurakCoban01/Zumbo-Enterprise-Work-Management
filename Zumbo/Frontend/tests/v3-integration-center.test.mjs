@@ -84,7 +84,10 @@ test('desktop and mobile provide the complete managed webhook lifecycle', () => 
 
 test('one-time secret is memory-only and cleared on navigation lifecycle', () => {
   assert.match(desktop, /secretReceipt = null/);
-  assert.match(desktop, /tab !== 'integrations'\) clearSensitiveState\(\)/);
+  assert.match(
+    desktop,
+    /if \(tab !== 'integrations'\) \{[\s\S]*?clearSensitiveState\(\);[\s\S]*?clearDevelopmentSensitiveState\(\);[\s\S]*?\}/
+  );
   assert.match(mobile, /\$ionicView\.afterLeave', clearSecret/);
   assert.match(mobile, /\$destroy', clearSecret/);
   assert.doesNotMatch(desktop + mobile, /localStorage.*secret|sessionStorage.*secret/i);

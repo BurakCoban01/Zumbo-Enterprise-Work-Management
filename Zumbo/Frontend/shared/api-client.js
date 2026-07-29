@@ -167,6 +167,22 @@
   ]);
   var tenantSessionKeys = Object.freeze(['zumbo.csrfToken']);
 
+  function readCookie(cookieHeader, name) {
+    if (typeof cookieHeader !== 'string' || !name) return null;
+    var prefix = encodeURIComponent(name) + '=';
+    var entry = cookieHeader.split(';').map(function(value) {
+      return value.trim();
+    }).find(function(value) {
+      return value.indexOf(prefix) === 0;
+    });
+    if (!entry) return null;
+    try {
+      return decodeURIComponent(entry.slice(prefix.length)) || null;
+    } catch (_) {
+      return null;
+    }
+  }
+
   function clearTenantStorage(local, session) {
     tenantLocalKeys.forEach(function(key) { local.removeItem(key); });
     tenantSessionKeys.forEach(function(key) { session.removeItem(key); });
@@ -193,6 +209,7 @@
     createSingleFlight: createSingleFlight,
     createRequestRegistry: createRequestRegistry,
     unwrapResponseBody: unwrapResponseBody,
+    readCookie: readCookie,
     clearTenantStorage: clearTenantStorage,
     tenantLocalKeys: tenantLocalKeys,
     tenantSessionKeys: tenantSessionKeys
@@ -218,7 +235,10 @@
         if (user) root.localStorage.setItem('zumbo.currentUser', JSON.stringify(user));
         else root.localStorage.removeItem('zumbo.currentUser');
       },
-      getCsrf: function() { return root.sessionStorage.getItem('zumbo.csrfToken'); },
+      getCsrf: function() {
+        return root.sessionStorage.getItem('zumbo.csrfToken')
+          || readCookie(root.document && root.document.cookie, 'zumbo-csrf');
+      },
       setCsrf: function(token) {
         if (token) root.sessionStorage.setItem('zumbo.csrfToken', token);
         else root.sessionStorage.removeItem('zumbo.csrfToken');
@@ -261,11 +281,17 @@
       if (recurrence && ['preview', 'process-due'].indexOf(recurrence[1]) < 0) {
         return { kind: 'work-item-recurrences', id: recurrence[1] };
       }
+      var automationRun = url.match(/^\/api\/automations\/runs\/([^/?]+)/);
+      if (automationRun) return { kind: 'automation-runs', id: automationRun[1] };
+      var automation = url.match(/^\/api\/automations\/([^/?]+)/);
+      if (automation && automation[1] !== 'runs') {
+        return { kind: 'automations', id: automation[1] };
+      }
       var collaboration = url.match(/^\/api\/work-items\/([^/?]+)\/(?:collaboration|watch|vote|activity)(?:[/?]|$)/);
       if (collaboration) return { kind: 'work-item-collaboration', id: collaboration[1] };
       var intake = url.match(/^\/api\/intake\/forms(?:\/([^/?]+))?/);
       if (intake) return { kind: 'intake-forms', id: intake[1] || null };
-      var match = url.match(/^\/api\/(teams|projects|boards|work-items|workflows)(?:\/([^/?]+))?/);
+      var match = url.match(/^\/api\/(teams|projects|boards|work-items|workflows|automations|dashboards|portfolios|goals|capacity-plans|knowledge-documents)(?:\/([^/?]+))?/);
       return match ? { kind: match[1], id: match[2] || null } : null;
     }
     function resourceKey(kind, id) { return kind + ':' + id; }

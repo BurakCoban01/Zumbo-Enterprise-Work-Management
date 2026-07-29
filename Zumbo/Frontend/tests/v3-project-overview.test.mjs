@@ -70,7 +70,7 @@ test('project view availability is membership-aware and removes board dead ends'
   const locations = [];
   feature.install(vm, { updateLocation: (...args) => locations.push(args) });
   assert.deepEqual(Array.from(vm.availableProjectViews(), item => item.id), [
-    'overview', 'board', 'list', 'backlog', 'sprint', 'calendar', 'timeline', 'roadmap', 'catalog', 'intake', 'automation', 'jobs', 'workload', 'reports'
+    'overview', 'board', 'list', 'backlog', 'sprint', 'calendar', 'timeline', 'roadmap', 'catalog', 'intake', 'automation', 'jobs', 'workload', 'reports', 'dashboards'
   ]);
   assert.equal(vm.setProjectView('workload').section, 'reports');
   assert.equal(vm.activeSection, 'reports');
@@ -78,7 +78,7 @@ test('project view availability is membership-aware and removes board dead ends'
 
   const noBoard = viewModel({ board: false });
   feature.install(noBoard, { updateLocation() {} });
-  assert.deepEqual(Array.from(noBoard.availableProjectViews(), item => item.id), ['overview', 'catalog', 'intake', 'automation', 'jobs', 'workload', 'reports']);
+  assert.deepEqual(Array.from(noBoard.availableProjectViews(), item => item.id), ['overview', 'catalog', 'intake', 'automation', 'jobs', 'workload', 'reports', 'dashboards']);
   assert.equal(noBoard.setProjectView('board').id, 'overview');
 
   const denied = viewModel();

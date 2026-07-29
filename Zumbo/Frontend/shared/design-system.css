@@ -68,6 +68,7 @@
   --surface-muted: var(--color-surface-subtle);
   --panel: var(--color-panel);
   --line: var(--color-border);
+  --border: var(--color-border);
   --line-soft: color-mix(in srgb, var(--color-border) 58%, transparent);
   --line-strong: var(--color-border-strong);
   --accent: var(--color-accent);

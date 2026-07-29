@@ -183,23 +183,35 @@ try {
   );
   await ownerPage.getByRole('heading', { name: 'Intake ve triage merkezi' }).waitFor({ timeout: 45_000 });
   await ownerPage.getByRole('button', { name: 'Yeni form' }).click();
-  await ownerPage.locator('input[ng-model="vm.intakeDraft.name"]').fill('BT erisim talepleri');
+  const formNameInput = ownerPage.locator('input[ng-model="vm.intakeDraft.name"]');
+  const boardSelect = ownerPage.locator('select[ng-model="vm.intakeDraft.definition.boardId"]');
+  await formNameInput.fill('BT erisim talepleri');
   await ownerPage.locator('textarea[ng-model="vm.intakeDraft.description"]').fill('Ekip ici erisim talepleri');
-  await ownerPage.locator('select[ng-model="vm.intakeDraft.definition.boardId"]').selectOption({ label: 'Talep Panosu' });
+  await boardSelect.selectOption({ label: 'Talep Panosu' });
+  assert.equal(await formNameInput.inputValue(), 'BT erisim talepleri', 'New intake form name must remain bound');
+  assert.equal(await boardSelect.locator('option:checked').textContent(), 'Talep Panosu', 'New intake form board must remain bound');
   await ownerPage.getByRole('button', { name: 'Alan ekle' }).click();
+  assert.equal(await formNameInput.inputValue(), 'BT erisim talepleri', 'Adding a field must preserve the form name');
+  assert.equal(await boardSelect.locator('option:checked').textContent(), 'Talep Panosu', 'Adding a field must preserve the selected board');
   const newField = ownerPage.locator('.intake-field-row').last();
   await newField.locator('input[ng-model="field.label"]').fill('Ekran goruntusu');
   await newField.locator('input[ng-model="field.key"]').fill('ekran_goruntusu');
   await newField.locator('select[ng-model="field.type"]').selectOption({ label: 'Dosya' });
-  const draftValidation = await ownerPage.locator('.intake-editor-form').evaluate(form => {
-    const scope = window.angular.element(form).scope();
-    return scope.vm.intakeDraftError();
-  });
-  assert.equal(draftValidation, null, `Intake draft remained invalid: ${draftValidation}`);
-  await ownerPage.getByRole('button', { name: 'Form olu\u015ftur' }).click();
-  await ownerPage.getByText('Form tasla\u011f\u0131 olu\u015fturuldu.', { exact: true }).waitFor();
+  assert.equal(await formNameInput.inputValue(), 'BT erisim talepleri', 'Editing a field must preserve the form name');
+  assert.equal(await boardSelect.locator('option:checked').textContent(), 'Talep Panosu', 'Editing a field must preserve the selected board');
+  const createFormButton = ownerPage.getByRole('button', { name: 'Form olu\u015ftur' });
+  if (await createFormButton.isDisabled()) {
+    const validationMessages = await ownerPage.locator('.intake-editor-form .intake-feedback.error').allTextContents();
+    assert.fail(`Intake draft remained invalid: ${validationMessages.join(' | ') || 'no visible validation message'}`);
+  }
+  await createFormButton.click();
+  await ownerPage.locator('.intake-surface').getByText(
+    'Form tasla\u011f\u0131 olu\u015fturuldu.',
+    { exact: true }).waitFor();
   await ownerPage.getByRole('button', { name: 'Yay\u0131nla', exact: true }).click();
-  await ownerPage.getByText('Formun yeni s\u00fcr\u00fcm\u00fc yay\u0131nland\u0131.', { exact: true }).waitFor();
+  await ownerPage.locator('.intake-surface').getByText(
+    'Formun yeni s\u00fcr\u00fcm\u00fc yay\u0131nland\u0131.',
+    { exact: true }).waitFor();
   checks.push('desktop-real-definition-and-publish');
 
   const viewerContext = await browser.newContext({
@@ -216,6 +228,7 @@ try {
   await viewerPage.getByText(/Viewer rol\u00fcyle formlar salt okunur/i).waitFor({ timeout: 45_000 });
   assert.equal(await viewerPage.getByRole('button', { name: 'Yeni form' }).count(), 0);
   assert.equal(await viewerPage.getByRole('button', { name: 'Yay\u0131nla', exact: true }).count(), 0);
+  assert.equal(await viewerPage.locator('.board-skeleton:visible').count(), 0);
   checks.push('desktop-real-viewer-read-only');
   await viewerPage.screenshot({ path: resolve(outputDir, 'desktop-viewer.png'), fullPage: true });
 
@@ -289,6 +302,16 @@ try {
     'Public form publish');
   assert.ok(publishedPublicForm.publicId, 'Published public form must expose an opaque public identifier');
 
+  await ownerPage.goto(
+    `${frontendBaseUrl}/desktop-bulma/index.html#public=${encodeURIComponent(publishedPublicForm.publicId)}`,
+    { waitUntil: 'domcontentloaded' }
+  );
+  await ownerPage.getByRole('heading', { name: 'Musteri geri bildirimi' }).waitFor();
+  assert.equal(
+    await ownerPage.locator('.side-nav, .workspace, .inspector, .modal-overlay, .command-overlay').count(),
+    0);
+  checks.push('real-authenticated-public-shell-isolated');
+
   const abuseProbe = await apiRequest(
     `/api/intake/public/forms/${encodeURIComponent(publishedPublicForm.publicId)}/submissions`,
     'POST',
@@ -361,7 +384,7 @@ try {
     schemaVersion: 1,
     taskId: 'V3-FEATURE-001',
     runId: runContext.runId,
-    passed: failures.length === 0 && cleanupResult.failed === 0 && checks.length === 10,
+    passed: failures.length === 0 && cleanupResult.failed === 0 && checks.length === 11,
     apiBaseUrl,
     frontendBaseUrl,
     checks,
@@ -371,5 +394,5 @@ try {
 }
 
 assert.equal(cleanupResult.failed, 0, `Cleanup failures: ${cleanupResult.results.map(result => result.error).filter(Boolean).join(' | ')}`);
-assert.equal(checks.length, 10, `Expected 10 checks, received ${checks.length}`);
+assert.equal(checks.length, 11, `Expected 11 checks, received ${checks.length}`);
 console.log('V3-FEATURE-001 real-browser passed: real publish, attachment, idempotency, triage, Viewer, public and mobile flows.');

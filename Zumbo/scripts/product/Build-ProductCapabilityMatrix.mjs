@@ -276,12 +276,20 @@ function toConsumer(call) {
 
 function surfaceRouteFor(call) {
   if (call.surface === 'mobile') {
+    if (call.pattern.startsWith('/api/integrations/')) return '/profile/integrations';
+    if (call.source.endsWith('/goal-center.js')) return '/goals';
+    if (call.source.endsWith('/capacity-center.js')) return '/capacity';
+    if (call.source.endsWith('/knowledge-center.js')) return '/knowledge';
     if (call.source.endsWith('/auth.js')) return call.pattern.includes('forgot') ? '/forgot-password' : call.pattern.includes('reset') ? '/reset-password' : '/login';
     if (call.pattern.includes('/notifications')) return '/app/notifications';
     if (call.pattern.includes('/teams/')) return '/teams/:teamId';
     if (call.pattern.includes('/projects/') && !call.pattern.includes('/work-items')) return '/projects/:projectId';
     return call.pattern.includes('/work-items/') ? '/tasks/:taskId' : '/app/tasks';
   }
+  if (call.source.endsWith('/integration-center.js')) return '/settings';
+  if (call.source.endsWith('/goal-center.js')) return '/goals';
+  if (call.source.endsWith('/capacity-center.js')) return '/capacity';
+  if (call.source.endsWith('/knowledge-center.js')) return '/knowledge';
   if (call.source.endsWith('/settings.js')) return '/settings';
   if (call.source.endsWith('/management.js')) return call.pattern.includes('/teams') ? '/teams' : call.pattern.includes('/projects') ? '/projects' : '/board';
   if (call.source.endsWith('/planning.js')) return '/board?view=planning';
@@ -293,6 +301,14 @@ function intentionalPolicy(operation) {
   if (operation.path === '/') return { consumer: 'integration', source: openApiPath, reason: 'API discovery response for clients and operators; it is not an authenticated product destination.' };
   if (operation.path.startsWith('/health/')) return { consumer: 'background', source: 'docs/runbooks/daily-use.md', reason: 'Operator and orchestrator health probe; it is not an authenticated product action.' };
   if (operation.path.startsWith('/hubs/work-items')) return { consumer: 'background', source: 'Frontend/shared/realtime-client.js', reason: 'SignalR transport endpoint consumed by the realtime client rather than direct navigation.' };
+  if (operation.method === 'POST'
+      && operation.path === '/api/integrations/development/{connectionId}/webhook') {
+    return {
+      consumer: 'integration',
+      source: openApiPath,
+      reason: 'Signed Git provider ingress consumed by configured GitHub or GitLab webhooks; it is not an authenticated product action.'
+    };
+  }
   if (['/api/auth/register', '/api/auth/login', '/api/auth/refresh', '/api/auth/logout'].includes(operation.path)) {
     return { consumer: 'integration', source: openApiPath, reason: 'Bearer-client identity contract; browser surfaces deliberately use the browser-auth BFF endpoints.' };
   }
@@ -329,6 +345,7 @@ function capabilityFor(operation) {
   const path = operation.path;
   const rules = [
     ['project-catalogs', /\/projects\/\{projectId\}\/(versions|milestones|components|templates)/],
+    ['development-integrations', /\/integrations\/development|\/development-links/],
     ['webhook-integrations', /\/integrations\/webhooks/],
     ['search-operations', /\/search\/(rebuild|reconcile)/],
     ['durable-messaging-operations', /durable-messaging/],
@@ -356,7 +373,8 @@ function buildBackgroundCapabilities() {
     ['due-date-reminders', 'DueDateReminderHostedService', 'Backend/src/Zumbo.Api/WorkItemDueDateReminderHostedService.cs', 'Backend/tests/Zumbo.ApiTests/WorkItemCollaborationRecurrenceApiTests.cs'],
     ['recurrence-scheduler', 'WorkItemRecurrenceSchedulerHostedService', 'Backend/src/Zumbo.Api/WorkItemRecurrenceSchedulerHostedService.cs', 'Backend/tests/Zumbo.ApiTests/WorkItemCollaborationRecurrenceApiTests.cs'],
     ['webhook-dispatcher', 'WebhookDispatcherHostedService', 'Backend/src/Zumbo.Api/WebhookAdapters.cs', 'Backend/tests/Zumbo.ApiTests/WebhookApiTests.cs'],
-    ['notification-email-dispatcher', 'NotificationEmailDispatcherHostedService', 'Backend/src/Zumbo.Api/NotificationAdapters.cs', 'Backend/tests/Zumbo.PersistenceIntegrationTests/MailpitNotificationDeliveryTests.cs']
+    ['notification-email-dispatcher', 'NotificationEmailDispatcherHostedService', 'Backend/src/Zumbo.Api/NotificationAdapters.cs', 'Backend/tests/Zumbo.PersistenceIntegrationTests/MailpitNotificationDeliveryTests.cs'],
+    ['development-webhook-receipt-retention', 'DevelopmentWebhookReceiptRetentionHostedService', 'Backend/src/Zumbo.Api/DevelopmentWebhookReceiptRetentionHostedService.cs', 'Backend/tests/Zumbo.UnitTests/DevelopmentIntegrationServiceTests.cs']
   ].map(([id, service, source, test]) => ({ id, service, consumer: 'background', status: 'intentional', source, test, documentation: 'readme.md' }));
   for (const item of items) {
     assert.ok(exists(item.source) && read(item.source).includes(item.service), `Background source missing for ${item.service}.`);
@@ -370,12 +388,12 @@ function buildInformationArchitecture() {
   return {
     desktop: {
       shell: 'Frontend/desktop-bulma/index.html',
-      routes: ['/board', '/projects', '/teams', '/reports', '/audit', '/archive', '/settings'],
-      projectViews: ['overview', 'board', 'list', 'backlog', 'sprint', 'calendar', 'timeline', 'roadmap', 'catalog', 'automation', 'jobs', 'workload', 'reports']
+      routes: ['/board', '/projects', '/portfolios', '/goals', '/capacity', '/knowledge', '/teams', '/reports', '/audit', '/archive', '/settings'],
+      projectViews: ['overview', 'board', 'list', 'backlog', 'sprint', 'calendar', 'timeline', 'roadmap', 'catalog', 'intake', 'automation', 'jobs', 'workload', 'reports', 'dashboards']
     },
     mobile: {
       router: 'Frontend/mobile-ionic/app.js',
-      routes: ['/login', '/forgot-password', '/reset-password', '/projects/:projectId', '/projects/:projectId/catalog', '/projects/:projectId/automation', '/projects/:projectId/jobs', '/profile/integrations', '/teams/:teamId', '/tasks/:taskId', '/app/dashboard', '/app/projects', '/app/tasks', '/app/notifications', '/app/profile'],
+      routes: ['/login', '/forgot-password', '/reset-password', '/intake/:publicId', '/projects/:projectId', '/projects/:projectId/catalog', '/projects/:projectId/intake', '/projects/:projectId/automation', '/projects/:projectId/jobs', '/profile/integrations', '/portfolios', '/goals', '/capacity', '/knowledge', '/teams/:teamId', '/tasks/:taskId', '/app/dashboard', '/app/projects', '/app/tasks', '/app/notifications', '/app/profile'],
       taskViews: ['my', 'backlog', 'sprint', 'board', 'list']
     },
     planned: {
@@ -447,7 +465,10 @@ function listJavaScript(root) {
 }
 
 function normalizePath(path) {
-  const withoutQuery = path.split('?')[0];
+  const withoutQuery = path.split('?')[0].replace(
+    /\{([^}:]+):[^}]+\}/g,
+    '{$1}'
+  );
   return withoutQuery.length > 1 ? withoutQuery.replace(/\/$/, '') : withoutQuery;
 }
 

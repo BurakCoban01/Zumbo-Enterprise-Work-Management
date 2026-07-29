@@ -73,7 +73,7 @@ function recurrence(overrides = {}) {
 test('shared automation core preserves template fields, limits, roles and lifecycle states', () => {
   assert.equal(core.canEdit('ProjectOwner', {}), true);
   assert.equal(core.canEdit('ProjectAdmin', {}), true);
-  assert.equal(core.canEdit('Developer', {}), true);
+  assert.equal(core.canEdit('Developer', {}), false);
   assert.equal(core.canEdit('Viewer', {}), false);
   assert.equal(core.roleOf(project('Viewer'), 'user-1'), 'Viewer');
 
@@ -128,6 +128,8 @@ test('desktop automation uses authoritative pages, previews and versioned lifecy
       calls.push(['get', url]);
       if (url.includes('/templates?')) return Promise.resolve({ items: [currentTemplate] });
       if (url.includes('/recurrences?')) return Promise.resolve({ items: [currentRecurrence] });
+      if (url.includes('/api/automations/runs?')) return Promise.resolve({ items: [], total: 0 });
+      if (url.includes('/api/automations?')) return Promise.resolve({ items: [], total: 0 });
       if (url.includes('/occurrences?')) return Promise.resolve({ items: [{ id: 'occ-1', status: 'Generated', scheduledForUtc: '2026-08-01T07:00:00Z', createdWorkItemId: 'work-1' }] });
       if (url.includes('/api/audit/entity/')) return Promise.resolve([{ id: 'audit-1', action: 'WorkItemRecurrenceCreated', createdAt: '2026-08-01T07:00:00Z' }]);
       throw new Error(`Unexpected GET ${url}`);

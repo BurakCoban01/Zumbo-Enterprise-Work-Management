@@ -74,6 +74,11 @@
   border-bottom: 1px solid var(--line);
 }
 
+.mobile-intake-section > header > .button {
+  min-width: 44px;
+  min-height: 44px;
+}
+
 .mobile-intake-section > header h3 { margin: 0; color: var(--ink); font-size: 14px; }
 .mobile-intake-section > header small { color: var(--muted); font-size: 10px; }
 
@@ -117,6 +122,10 @@
   margin: 0;
   padding: 14px 16px;
   background: var(--surface-subtle);
+}
+
+.mobile-intake-form .mobile-intake-honeypot {
+  display: none !important;
 }
 
 .mobile-intake-form label {

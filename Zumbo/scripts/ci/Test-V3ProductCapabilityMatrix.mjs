@@ -15,14 +15,14 @@ const matrix = json('docs/product/api-ui-capability-matrix.json');
 assert.equal(matrix.schemaVersion, 1);
 assert.equal(matrix.task, 'V3-PRODUCT-001');
 assert.deepEqual(matrix.summary, {
-  operations: 238,
-  openApiOperations: 234,
-  frontendCalls: 372,
-  desktopCalls: 220,
-  mobileCalls: 152,
-  backgroundCapabilities: 8,
+  operations: 324,
+  openApiOperations: 320,
+  frontendCalls: 548,
+  desktopCalls: 309,
+  mobileCalls: 239,
+  backgroundCapabilities: 9,
   gapCapabilities: 3,
-  byStatus: { surfaced: 149, partial: 46, absent: 34, intentional: 9 },
+  byStatus: { surfaced: 232, partial: 46, absent: 36, intentional: 10 },
   duplicateOperations: 0,
   unmatchedFrontendCalls: 0,
   unownedOperations: 0
@@ -49,13 +49,21 @@ assert.equal(operation('GET /').status, 'intentional');
 assert.equal(operation('POST /api/auth/login').consumers.integration.length, 1);
 assert.equal(operation('* /hubs/work-items').consumers.background.length, 1);
 
-assert.equal(matrix.backgroundCapabilities.length, 8);
-assert.deepEqual(matrix.informationArchitecture.desktop.routes, ['/board', '/projects', '/teams', '/reports', '/audit', '/archive', '/settings']);
+assert.equal(matrix.backgroundCapabilities.length, 9);
+assert.ok(matrix.backgroundCapabilities.some(item =>
+  item.id === 'development-webhook-receipt-retention'));
+assert.deepEqual(matrix.informationArchitecture.desktop.routes, ['/board', '/projects', '/portfolios', '/goals', '/capacity', '/knowledge', '/teams', '/reports', '/audit', '/archive', '/settings']);
 assert.deepEqual(matrix.informationArchitecture.desktop.projectViews, [
-  'overview', 'board', 'list', 'backlog', 'sprint', 'calendar', 'timeline', 'roadmap', 'catalog', 'automation', 'jobs', 'workload', 'reports'
+  'overview', 'board', 'list', 'backlog', 'sprint', 'calendar', 'timeline', 'roadmap', 'catalog', 'intake', 'automation', 'jobs', 'workload', 'reports', 'dashboards'
 ]);
-assert.equal(matrix.informationArchitecture.mobile.routes.length, 15);
+assert.equal(matrix.informationArchitecture.mobile.routes.length, 21);
+assert.ok(matrix.informationArchitecture.mobile.routes.includes('/portfolios'));
+assert.ok(matrix.informationArchitecture.mobile.routes.includes('/goals'));
+assert.ok(matrix.informationArchitecture.mobile.routes.includes('/capacity'));
+assert.ok(matrix.informationArchitecture.mobile.routes.includes('/knowledge'));
+assert.ok(matrix.informationArchitecture.mobile.routes.includes('/intake/:publicId'));
 assert.ok(matrix.informationArchitecture.mobile.routes.includes('/projects/:projectId/catalog'));
+assert.ok(matrix.informationArchitecture.mobile.routes.includes('/projects/:projectId/intake'));
 assert.ok(matrix.informationArchitecture.mobile.routes.includes('/projects/:projectId/automation'));
 assert.ok(matrix.informationArchitecture.mobile.routes.includes('/projects/:projectId/jobs'));
 assert.ok(matrix.informationArchitecture.mobile.routes.includes('/profile/integrations'));
@@ -67,6 +75,36 @@ assert.deepEqual(matrix.capabilityGaps.map(gap => gap.id), [
 ]);
 assert.equal(matrix.capabilityGaps[0].score.total, 28);
 assert.ok(matrix.capabilityGaps.every(gap => gap.operationIds.length > 0));
+assert.ok(matrix.operations.filter(item => item.path.startsWith('/api/goals')).every(item =>
+  item.status === 'surfaced'
+  && item.consumers.desktop.some(consumer => consumer.route === '/goals')
+  && item.consumers.mobile.some(consumer => consumer.route === '/goals')));
+assert.ok(matrix.operations.filter(item => item.path.startsWith('/api/capacity-plans')).every(item =>
+  item.status === 'surfaced'
+  && item.consumers.desktop.some(consumer => consumer.route === '/capacity')
+  && item.consumers.mobile.some(consumer => consumer.route === '/capacity')));
+assert.ok(matrix.operations.filter(item => item.path.startsWith('/api/knowledge-documents')).every(item =>
+  item.status === 'surfaced'
+  && item.consumers.desktop.some(consumer => consumer.route === '/knowledge')
+  && item.consumers.mobile.some(consumer => consumer.route === '/knowledge')));
+assert.ok(matrix.operations.filter(item =>
+  item.path.startsWith('/api/integrations/development')
+  && !item.path.endsWith('/webhook')).every(item =>
+  item.status === 'surfaced'
+  && item.consumers.desktop.some(consumer => consumer.route === '/settings')
+  && item.consumers.mobile.some(consumer => consumer.route === '/profile/integrations')));
+const developmentIngress = operation(
+  'POST /api/integrations/development/{connectionId}/webhook'
+);
+assert.equal(developmentIngress.status, 'intentional');
+assert.equal(developmentIngress.consumers.integration.length, 1);
+assert.ok(matrix.operations.filter(item =>
+  item.path.includes('/development-links')).every(item =>
+  item.status === 'surfaced'
+  && item.consumers.desktop.some(consumer =>
+    consumer.route === '/board?panel=work-item')
+  && item.consumers.mobile.some(consumer =>
+    consumer.route === '/tasks/:taskId')));
 
 const evidence = json('artifacts/v3/V3-PRODUCT-001.json');
 assert.equal(evidence.schemaVersion, 1);
@@ -82,7 +120,7 @@ assert.equal(evidence.validation.summary.unmatchedFrontendCalls, 0);
 assert.equal(evidence.validation.summary.unownedOperations, 0);
 assert.equal(evidence.validation.scoredCapabilityGaps.length, 8);
 
-console.log('V3 product matrix passed: 238 operations, 372 frontend calls, 8 background consumers, 3 scored gaps and zero unowned operations.');
+console.log('V3 product matrix passed: 324 operations, 548 frontend calls, 9 background consumers, 3 scored gaps and zero unowned operations.');
 
 function json(path) {
   return JSON.parse(readFileSync(resolve(applicationRoot, path), 'utf8'));

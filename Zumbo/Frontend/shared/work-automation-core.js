@@ -16,7 +16,13 @@
     labelLength: 50,
     recurrenceInterval: 365,
     recurrenceOccurrences: 1000,
-    previewCount: 5
+    previewCount: 5,
+    ruleName: 120,
+    ruleDescription: 1000,
+    ruleConditions: 20,
+    ruleActions: 10,
+    ruleHourlyLimit: 1000,
+    ruleChainDepth: 10
   });
 
   function roleOf(project, userId) {
@@ -29,7 +35,7 @@
   function canEdit(role, currentUser) {
     var globalRoles = currentUser && currentUser.roles || [];
     return globalRoles.indexOf('SystemAdmin') >= 0
-      || ['ProjectOwner', 'ProjectAdmin', 'Developer'].indexOf(role) >= 0;
+      || ['ProjectOwner', 'ProjectAdmin'].indexOf(role) >= 0;
   }
 
   function normalizeLabels(value) {
@@ -172,6 +178,202 @@
     });
   }
 
+  function ruleDraft(rule) {
+    var definition = rule && rule.definition || {};
+    var trigger = definition.trigger || {};
+    var condition = definition.condition || null;
+    var conditions = condition
+      ? (condition.kind === 'Field' ? [condition] : condition.children || [])
+      : [];
+    return {
+      id: rule && rule.id || null,
+      version: rule && rule.version || 0,
+      publishedVersion: rule && rule.publishedVersion || 0,
+      active: !!(rule && rule.active),
+      archived: !!(rule && rule.archived),
+      name: definition.name || '',
+      description: definition.description || '',
+      triggerType: trigger.type || 'Event',
+      eventType: trigger.eventType || 'WorkItemCreated',
+      intervalMinutes: trigger.intervalMinutes || 60,
+      startAtLocal: trigger.startAtUtc ? new Date(trigger.startAtUtc) : null,
+      conditionMode: condition && condition.kind !== 'Field' ? condition.kind : 'All',
+      conditions: conditions.map(function(item) {
+        return {
+          field: item.field || 'Status',
+          operator: item.operator || 'Equals',
+          value: item.value == null ? '' : item.value
+        };
+      }),
+      actions: (definition.actions || []).map(function(action) {
+        return { type: action.type, value: action.value == null ? '' : action.value };
+      }),
+      maximumExecutionsPerHour: definition.maximumExecutionsPerHour || 100,
+      maximumChainDepth: definition.maximumChainDepth || 3
+    };
+  }
+
+  function newRuleDraft() {
+    return {
+      id: null,
+      version: 0,
+      publishedVersion: 0,
+      active: false,
+      archived: false,
+      name: '',
+      description: '',
+      triggerType: 'Event',
+      eventType: 'WorkItemCreated',
+      intervalMinutes: 60,
+      startAtLocal: null,
+      conditionMode: 'All',
+      conditions: [],
+      actions: [{ type: 'AddLabel', value: '' }],
+      maximumExecutionsPerHour: 100,
+      maximumChainDepth: 3
+    };
+  }
+
+  function actionNeedsValue(type) {
+    return ['AssignUser', 'AddLabel', 'RemoveLabel', 'SetPriority', 'AddComment']
+      .indexOf(type) >= 0;
+  }
+
+  function conditionNeedsValue(operator) {
+    return ['IsEmpty', 'IsNotEmpty'].indexOf(operator) < 0;
+  }
+
+  function conditionFieldLabel(field) {
+    return {
+      Status: 'Durum',
+      PreviousStatus: 'Önceki durum',
+      Priority: 'Öncelik',
+      Type: 'İş türü',
+      AssigneeUserId: 'Atanan kullanıcı',
+      Labels: 'Etiketler'
+    }[field] || field;
+  }
+
+  function conditionOperatorLabel(operator) {
+    return {
+      Equals: 'Eşittir',
+      NotEquals: 'Eşit değildir',
+      Contains: 'İçerir',
+      NotContains: 'İçermez',
+      IsEmpty: 'Boş',
+      IsNotEmpty: 'Boş değil'
+    }[operator] || operator;
+  }
+
+  function actionTypeLabel(type) {
+    return {
+      AssignToActor: 'Tetikleyen kullanıcıya ata',
+      AssignUser: 'Kullanıcıya ata',
+      ClearAssignee: 'Atamayı kaldır',
+      AddLabel: 'Etiket ekle',
+      RemoveLabel: 'Etiketi kaldır',
+      SetPriority: 'Öncelik ayarla',
+      AddComment: 'Yorum ekle'
+    }[type] || type;
+  }
+
+  function ruleRequest(projectId, draft) {
+    var conditions = (draft.conditions || []).map(function(condition) {
+      return {
+        kind: 'Field',
+        field: condition.field,
+        operator: condition.operator,
+        value: conditionNeedsValue(condition.operator) ? String(condition.value || '').trim() : null,
+        children: []
+      };
+    });
+    var condition = conditions.length === 0
+      ? null
+      : conditions.length === 1
+        ? conditions[0]
+        : {
+            kind: draft.conditionMode,
+            field: null,
+            operator: null,
+            value: null,
+            children: conditions
+          };
+    return {
+      projectId: projectId,
+      name: String(draft.name || '').trim(),
+      description: String(draft.description || '').trim() || null,
+      trigger: draft.triggerType === 'Schedule'
+        ? {
+            type: 'Schedule',
+            eventType: null,
+            intervalMinutes: Number(draft.intervalMinutes),
+            startAtUtc: toUtcIso(draft.startAtLocal)
+          }
+        : {
+            type: 'Event',
+            eventType: draft.eventType,
+            intervalMinutes: null,
+            startAtUtc: null
+          },
+      condition: condition,
+      actions: (draft.actions || []).map(function(action) {
+        return {
+          type: action.type,
+          value: actionNeedsValue(action.type) ? String(action.value || '').trim() : null
+        };
+      }),
+      maximumExecutionsPerHour: Number(draft.maximumExecutionsPerHour),
+      maximumChainDepth: Number(draft.maximumChainDepth)
+    };
+  }
+
+  function validRule(draft) {
+    if (!draft || !String(draft.name || '').trim() || !draft.actions || !draft.actions.length) return false;
+    if (draft.actions.length > limits.ruleActions || draft.conditions.length > limits.ruleConditions) return false;
+    if (draft.triggerType === 'Schedule'
+        && (Number(draft.intervalMinutes) < 5 || Number(draft.intervalMinutes) > 525600)) return false;
+    if (Number(draft.maximumExecutionsPerHour) < 1
+        || Number(draft.maximumExecutionsPerHour) > limits.ruleHourlyLimit) return false;
+    if (Number(draft.maximumChainDepth) < 1
+        || Number(draft.maximumChainDepth) > limits.ruleChainDepth) return false;
+    return draft.conditions.every(function(condition) {
+      return !conditionNeedsValue(condition.operator) || !!String(condition.value || '').trim();
+    }) && draft.actions.every(function(action) {
+      return !actionNeedsValue(action.type) || !!String(action.value || '').trim();
+    });
+  }
+
+  function ruleState(rule) {
+    if (rule.archived) return { id: 'archived', label: 'Arşiv', tone: 'neutral' };
+    if (!rule.publishedVersion) return { id: 'draft', label: 'Taslak', tone: 'warning' };
+    if (rule.active) return { id: 'active', label: 'Etkin', tone: 'success' };
+    return { id: 'paused', label: 'Duraklatıldı', tone: 'warning' };
+  }
+
+  function runState(run) {
+    var states = {
+      Succeeded: { label: 'Başarılı', tone: 'success' },
+      Skipped: { label: 'Atlandı', tone: 'neutral' },
+      Running: { label: 'Çalışıyor', tone: 'warning' },
+      Pending: { label: 'Sırada', tone: 'warning' },
+      RetryScheduled: { label: 'Yeniden denenecek', tone: 'warning' },
+      DeadLetter: { label: 'Müdahale gerekli', tone: 'danger' }
+    };
+    var state = states[run && run.status] || { label: 'Bilinmiyor', tone: 'neutral' };
+    return { id: run && run.status || 'Unknown', label: state.label, tone: state.tone };
+  }
+
+  function triggerLabel(rule) {
+    if (rule.triggerType === 'Schedule') {
+      return 'Her ' + rule.intervalMinutes + ' dakika';
+    }
+    return {
+      WorkItemCreated: 'İş oluşturulduğunda',
+      WorkItemUpdated: 'İş güncellendiğinde',
+      WorkItemTransitioned: 'İş durum değiştirdiğinde'
+    }[rule.eventType] || rule.eventType;
+  }
+
   function errorMessage(error, fallback) {
     if (error && error.message) return error.message;
     if (error && error.data && error.data.error && error.data.error.message) {
@@ -201,6 +403,18 @@
     recurrenceState: recurrenceState,
     occurrenceState: occurrenceState,
     auditEntries: auditEntries,
+    ruleDraft: ruleDraft,
+    newRuleDraft: newRuleDraft,
+    ruleRequest: ruleRequest,
+    validRule: validRule,
+    actionNeedsValue: actionNeedsValue,
+    conditionNeedsValue: conditionNeedsValue,
+    conditionFieldLabel: conditionFieldLabel,
+    conditionOperatorLabel: conditionOperatorLabel,
+    actionTypeLabel: actionTypeLabel,
+    ruleState: ruleState,
+    runState: runState,
+    triggerLabel: triggerLabel,
     errorMessage: errorMessage
   });
 });

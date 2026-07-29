@@ -5,7 +5,7 @@ import test from 'node:test';
 
 const root = resolve(import.meta.dirname, '..');
 const html = await readFile(resolve(root, 'desktop-bulma/index.html'), 'utf8');
-const desktopScripts = ['app.js', 'realtime.js', 'task-board.js', 'settings.js', 'privacy-center.js', 'audit-center.js', 'integration-center.js', 'planning.js', 'planning-views.js', 'reporting-views.js', 'board-view.js', 'board-excellence.js', 'work-items.js', 'management.js', 'directives.js', 'shell.js', 'work-automation.js', 'bulk-job-center.js', 'intake-center.js'];
+const desktopScripts = ['app.js', 'realtime.js', 'task-board.js', 'settings.js', 'privacy-center.js', 'audit-center.js', 'integration-center.js', 'planning.js', 'planning-views.js', 'reporting-views.js', 'portfolio-center.js', 'goal-center.js', 'capacity-center.js', 'knowledge-center.js', 'board-view.js', 'board-excellence.js', 'work-items.js', 'management.js', 'directives.js', 'shell.js', 'work-automation.js', 'bulk-job-center.js', 'intake-center.js'];
 const scriptSources = await Promise.all(desktopScripts.map(file =>
   readFile(resolve(root, 'desktop-bulma', file), 'utf8').catch(() => '')));
 const sourceByName = Object.fromEntries(desktopScripts.map((file, index) => [file, scriptSources[index]]));
@@ -59,13 +59,17 @@ test('realtime ve DOM adapterlari monolit controller disinda explicit modullerdi
   assert.match(sourceByName['shell.js'], /factory\('desktopShellFeature'/);
   assert.match(sourceByName['planning-views.js'], /factory\('desktopPlanningViewsFeature'/);
   assert.match(sourceByName['reporting-views.js'], /factory\('desktopReportingViewsFeature'/);
+  assert.match(sourceByName['portfolio-center.js'], /factory\('desktopPortfolioFeature'/);
+  assert.match(sourceByName['goal-center.js'], /factory\('desktopGoalFeature'/);
+  assert.match(sourceByName['capacity-center.js'], /factory\('desktopCapacityFeature'/);
+  assert.match(sourceByName['knowledge-center.js'], /factory\('desktopKnowledgeFeature'/);
   assert.match(sourceByName['work-automation.js'], /factory\('desktopWorkAutomationFeature'/);
   assert.match(sourceByName['bulk-job-center.js'], /factory\('desktopBulkJobFeature'/);
   assert.match(sourceByName['intake-center.js'], /factory\('desktopIntakeFeature'/);
   assert.match(sourceByName['privacy-center.js'], /factory\('desktopPrivacyFeature'/);
   assert.match(sourceByName['audit-center.js'], /factory\('desktopAuditFeature'/);
   assert.match(sourceByName['integration-center.js'], /factory\('desktopIntegrationFeature'/);
-  assert.match(html, /<script src="\.\/app\.js"><\/script>\s*<script src="\.\/realtime\.js"><\/script>\s*<script src="\.\/task-board\.js"><\/script>\s*<script src="\.\/settings\.js"><\/script>\s*<script src="\.\/planning\.js"><\/script>\s*<script src="\.\/planning-views\.js"><\/script>\s*<script src="\.\/reporting-views\.js"><\/script>\s*<script src="\.\/board-view\.js"><\/script>\s*<script src="\.\/board-excellence\.js"><\/script>\s*<script src="\.\/work-items\.js"><\/script>\s*<script src="\.\/management\.js"><\/script>\s*<script src="\.\/directives\.js"><\/script>/);
+  assert.match(html, /<script src="\.\/app\.js"><\/script>\s*<script src="\.\/realtime\.js"><\/script>\s*<script src="\.\/task-board\.js"><\/script>\s*<script src="\.\/settings\.js"><\/script>\s*<script src="\.\/planning\.js"><\/script>\s*<script src="\.\/planning-views\.js"><\/script>\s*<script src="\.\/reporting-views\.js"><\/script>\s*<script src="\.\/portfolio-center\.js"><\/script>\s*<script src="\.\/goal-center\.js"><\/script>\s*<script src="\.\/capacity-center\.js"><\/script>\s*<script src="\.\/knowledge-center\.js"><\/script>\s*<script src="\.\/board-view\.js"><\/script>\s*<script src="\.\/board-excellence\.js"><\/script>\s*<script src="\.\/work-items\.js"><\/script>\s*<script src="\.\/management\.js"><\/script>\s*<script src="\.\/directives\.js"><\/script>/);
   assert.ok(main.split(/\r?\n/).length <= 420, 'desktop app.js composition root exceeded its bounded budget');
 });
 

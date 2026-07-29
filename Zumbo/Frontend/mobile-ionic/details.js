@@ -226,6 +226,7 @@
   })
   .controller('TaskDetailController', function($scope, $stateParams, $window, $q, zumboApi, realtimeService, apiClient, mobileActionError, sessionStore, displayNameResolver, mobilePwaService) {
     var vm = this;
+    var developmentCore = $window.ZumboDevelopmentIntegrationCore;
     apiClient.transitionContext('task:' + $stateParams.taskId);
     vm.task = null;
     vm.project = null;
@@ -246,6 +247,14 @@
     vm.workLogDraft = { hours: null, note: '' };
     vm.taskDraft = { title: '', description: '', priority: 'Medium', dueDate: null };
     vm.relationDraft = { relatedWorkItemId: '', relationType: 'RelatesTo' };
+    vm.development = {
+      links: [],
+      mappings: [],
+      loading: false,
+      error: null,
+      editorOpen: false,
+      draft: developmentCore.emptyLinkDraft()
+    };
     vm.approvalNote = '';
     vm.schema = { customFields: [] };
     vm.users = [];
@@ -412,6 +421,36 @@
     };
     vm.activityEntries = function() { return vm.streams[vm.activityStreamName()].items; };
 
+    function loadDevelopment() {
+      vm.development.loading = true;
+      vm.development.error = null;
+      var mappings = vm.canLink()
+        ? zumboApi.taskDevelopmentMappings(vm.task.id).catch(function(error) {
+            vm.development.error = mobileActionError(
+              error,
+              'Repository eşlemeleri yüklenemedi.'
+            );
+            vm.partial = true;
+            return [];
+          })
+        : $q.when([]);
+      return $q.all([
+        zumboApi.taskDevelopmentLinks(vm.task.id),
+        mappings
+      ]).then(function(results) {
+        vm.development.links = results[0] || [];
+        vm.development.mappings = results[1] || [];
+      }).catch(function(error) {
+        vm.development.error = mobileActionError(
+          error,
+          'Geliştirme bağlantıları yüklenemedi.'
+        );
+        vm.partial = true;
+      }).finally(function() {
+        vm.development.loading = false;
+      });
+    }
+
     var unsubscribeRealtime = realtimeService.subscribe(function(change) {
       if (change.eventType === 'resyncRequired') {
         if (vm.task && change.projectId === vm.task.projectId) vm.load(vm.taskDraftHasChanges() ? angular.copy(vm.taskDraft) : null);
@@ -461,7 +500,7 @@
         vm.transitions = workflow.transitions.filter(function(transition) {
           return transition.fromStatus === vm.task.status;
         });
-        return loadStreams();
+        return $q.all([loadStreams(), loadDevelopment()]);
       }).catch(function(error) {
         vm.loadError = mobileActionError(error, 'Görev ayrıntıları yüklenemedi.');
       }).finally(function() { vm.loading = false; });
@@ -603,6 +642,62 @@
         return loadStream('activity', true);
       }), 'Görev ilişkisi kaldırılamadı.');
     };
+    vm.openDevelopmentEditor = function() {
+      vm.development.draft = developmentCore.emptyLinkDraft();
+      if (vm.development.mappings.length === 1) {
+        vm.development.draft.mappingId = vm.development.mappings[0].id;
+      }
+      vm.development.editorOpen = true;
+      vm.development.error = null;
+    };
+    vm.closeDevelopmentEditor = function() {
+      vm.development.editorOpen = false;
+      vm.development.draft = developmentCore.emptyLinkDraft();
+    };
+    vm.createDevelopmentLink = function() {
+      if (!vm.canLink() || vm.offline() || vm.actionBusy) return;
+      var request;
+      try {
+        request = developmentCore.validateLinkDraft(
+          vm.development.draft,
+          vm.development.mappings
+        );
+      } catch (error) {
+        vm.development.error = error.message;
+        return;
+      }
+      vm.actionBusy = 'development-link';
+      return zumboApi.createTaskDevelopmentLink(vm.task.id, request)
+        .then(function(link) {
+          if (!vm.development.links.some(function(item) { return item.id === link.id; })) {
+            vm.development.links.unshift(link);
+          }
+          vm.closeDevelopmentEditor();
+        }).catch(function(error) {
+          vm.development.error = mobileActionError(
+            error,
+            'Geliştirme bağlantısı eklenemedi.'
+          );
+        }).finally(function() { vm.actionBusy = null; });
+    };
+    vm.deleteDevelopmentLink = function(link) {
+      if (!link || !vm.canLink() || vm.offline() || vm.actionBusy) return;
+      if (!$window.confirm(link.title + ' bağlantısı kaldırılsın mı?')) return;
+      vm.actionBusy = link.id;
+      return zumboApi.deleteTaskDevelopmentLink(vm.task.id, link.id, link.version)
+        .then(function() {
+          vm.development.links = vm.development.links.filter(function(item) {
+            return item.id !== link.id;
+          });
+        }).catch(function(error) {
+          vm.development.error = mobileActionError(
+            error,
+            'Geliştirme bağlantısı kaldırılamadı.'
+          );
+        }).finally(function() { vm.actionBusy = null; });
+    };
+    vm.developmentState = developmentCore.linkState;
+    vm.developmentKind = developmentCore.kindLabel;
     vm.decideApproval = function(approval, approved) {
       if (!vm.canApprove() || vm.offline()) return;
       return mutation(zumboApi.decideTaskApproval(vm.task.id, approval.id, approved, vm.approvalNote).then(function() {

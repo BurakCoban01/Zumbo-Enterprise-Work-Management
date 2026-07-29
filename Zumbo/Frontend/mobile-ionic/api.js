@@ -50,6 +50,34 @@
       setWorkRecurrenceState: function(recurrenceId, active) { return apiClient.patch('/api/work-items/recurrences/' + recurrenceId + '/state', { active: active }); },
       archiveWorkRecurrence: function(recurrenceId) { return apiClient.delete('/api/work-items/recurrences/' + recurrenceId); },
       workRecurrenceOccurrences: function(recurrenceId) { return apiClient.get('/api/work-items/recurrences/' + recurrenceId + '/occurrences?page=1&pageSize=50'); },
+      automationRules: function(projectId, includeArchived) {
+        return apiClient.get('/api/automations?projectId=' + encodeURIComponent(projectId)
+          + '&page=1&pageSize=100&includeArchived=' + (includeArchived ? 'true' : 'false'));
+      },
+      automationRule: function(ruleId, draft) {
+        return apiClient.get('/api/automations/' + ruleId + (draft ? '?draft=true' : ''));
+      },
+      createAutomationRule: function(draft) { return apiClient.post('/api/automations', draft); },
+      updateAutomationRuleDraft: function(ruleId, draft) {
+        return apiClient.put('/api/automations/' + ruleId + '/draft', draft);
+      },
+      publishAutomationRule: function(ruleId) {
+        return apiClient.post('/api/automations/' + ruleId + '/publish', {});
+      },
+      setAutomationRuleState: function(ruleId, active) {
+        return apiClient.patch('/api/automations/' + ruleId + '/state', { active: active });
+      },
+      archiveAutomationRule: function(ruleId) { return apiClient.delete('/api/automations/' + ruleId); },
+      dryRunAutomationRule: function(ruleId, context) {
+        return apiClient.post('/api/automations/' + ruleId + '/dry-run', context);
+      },
+      automationRuns: function(projectId, status) {
+        return apiClient.get('/api/automations/runs?projectId=' + encodeURIComponent(projectId)
+          + '&page=1&pageSize=50' + (status ? '&status=' + encodeURIComponent(status) : ''));
+      },
+      replayAutomationRun: function(runId) {
+        return apiClient.post('/api/automations/runs/' + runId + '/replay', {});
+      },
       createProjectComponent: function(projectId, draft) { return apiClient.post('/api/projects/' + projectId + '/components', draft); },
       updateProjectComponent: function(projectId, componentId, draft) { return apiClient.put('/api/projects/' + projectId + '/components/' + componentId, draft); },
       archiveProjectComponent: function(projectId, componentId) { return apiClient.delete('/api/projects/' + projectId + '/components/' + componentId); },
@@ -175,6 +203,13 @@
       taskWorkLogs: function(taskId, page) { return apiClient.get('/api/work-items/' + taskId + '/worklogs?page=' + (page || 1) + '&pageSize=50'); },
       taskApprovals: function(taskId, page) { return apiClient.get('/api/work-items/' + taskId + '/approvals?page=' + (page || 1) + '&pageSize=50'); },
       taskTimeline: function(taskId, page) { return apiClient.get('/api/work-items/' + taskId + '/timeline?page=' + (page || 1) + '&pageSize=50'); },
+      taskDevelopmentLinks: function(taskId) { return apiClient.get('/api/work-items/' + taskId + '/development-links'); },
+      taskDevelopmentMappings: function(taskId) { return apiClient.get('/api/work-items/' + taskId + '/development-links/mappings'); },
+      createTaskDevelopmentLink: function(taskId, request) { return apiClient.post('/api/work-items/' + taskId + '/development-links', request); },
+      deleteTaskDevelopmentLink: function(taskId, linkId, version) {
+        return apiClient.delete('/api/work-items/' + taskId + '/development-links/' + linkId
+          + '?expectedVersion=' + encodeURIComponent(version));
+      },
       updateTask: function(taskId, draft) { return apiClient.put('/api/work-items/' + taskId, draft); },
       assignTask: function(taskId, assigneeUserId) { return apiClient.patch('/api/work-items/' + taskId + '/assignee', { assigneeUserId: assigneeUserId }); },
       setTaskTeam: function(taskId, teamId) { return apiClient.patch('/api/work-items/' + taskId + '/team', { teamId: teamId || null }); },
@@ -220,6 +255,37 @@
       webhookDeliveries: function(id, cursor) { return apiClient.get('/api/integrations/webhooks/' + id + '/deliveries?pageSize=30' + (cursor ? '&cursor=' + encodeURIComponent(cursor) : '')); },
       webhookDelivery: function(id) { return apiClient.get('/api/integrations/webhooks/deliveries/' + id); },
       replayWebhookDelivery: function(id) { return apiClient.post('/api/integrations/webhooks/deliveries/' + id + '/replay', {}); },
+      developmentConnections: function() { return apiClient.get('/api/integrations/development'); },
+      developmentConnection: function(id) { return apiClient.get('/api/integrations/development/' + id); },
+      createDevelopmentConnection: function(request) { return apiClient.post('/api/integrations/development', request); },
+      developmentMappings: function(id) { return apiClient.get('/api/integrations/development/' + id + '/mappings'); },
+      developmentRepositories: function(id) { return apiClient.get('/api/integrations/development/' + id + '/repositories'); },
+      createDevelopmentMapping: function(id, request) { return apiClient.post('/api/integrations/development/' + id + '/mappings', request); },
+      deleteDevelopmentMapping: function(id, version) {
+        return apiClient.delete('/api/integrations/development/mappings/' + id
+          + '?expectedVersion=' + encodeURIComponent(version));
+      },
+      checkDevelopmentHealth: function(id) { return apiClient.post('/api/integrations/development/' + id + '/health', {}); },
+      rotateDevelopmentCredential: function(id, accessToken, version) {
+        return apiClient.post('/api/integrations/development/' + id + '/rotate-credential', {
+          accessToken: accessToken,
+          expectedVersion: version
+        });
+      },
+      rotateDevelopmentSecret: function(id, version) {
+        return apiClient.post('/api/integrations/development/' + id + '/rotate-webhook-secret', {
+          expectedVersion: version
+        });
+      },
+      disconnectDevelopmentConnection: function(id, version) {
+        return apiClient.post('/api/integrations/development/' + id + '/disconnect', {
+          expectedVersion: version
+        });
+      },
+      deleteDevelopmentConnection: function(id, version) {
+        return apiClient.delete('/api/integrations/development/' + id
+          + '?expectedVersion=' + encodeURIComponent(version));
+      },
       read: function(id) { return apiClient.patch('/api/notifications/' + id + '/read', {}); },
       notificationPreferences: function() { return apiClient.get('/api/notifications/preferences/me'); },
       saveNotificationPreferences: function(draft) { return apiClient.put('/api/notifications/preferences/me', draft); },
