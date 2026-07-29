@@ -17,7 +17,8 @@
         view('automation', 'Otomasyon', 'repeat-2', 'board'),
         view('jobs', 'İş merkezi', 'database-zap', 'board'),
         view('workload', 'İş yükü', 'users', 'reports'),
-        view('reports', 'Raporlar', 'chart-no-axes-combined', 'reports')
+        view('reports', 'Raporlar', 'chart-no-axes-combined', 'reports'),
+        view('dashboards', 'Dashboardlar', 'panels-top-left', 'reports')
       ];
 
       function view(id, label, icon, section, requiresBoard) {

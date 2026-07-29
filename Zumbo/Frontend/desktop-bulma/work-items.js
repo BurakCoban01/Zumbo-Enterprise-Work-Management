@@ -8,6 +8,7 @@
           var updateLocation = helpers.updateLocation;
           var nextStatusFor = helpers.nextStatusFor;
           var apiActionError = helpers.apiActionError;
+    var developmentCore = $window.ZumboDevelopmentIntegrationCore;
     var detailRequestId = 0;
     var taskCatalogProject = null;
     var taskCatalogCache = [];
@@ -46,6 +47,14 @@
         actionError: null,
         draftPreserved: false,
         collaboration: { watcherCount: 0, voteCount: 0, watching: false, voted: false, version: 0 }
+      };
+      vm.taskDevelopment = {
+        links: [],
+        mappings: [],
+        loading: false,
+        error: null,
+        editorOpen: false,
+        draft: developmentCore.emptyLinkDraft()
       };
       vm.taskStreams = {
         comments: emptyStream(),
@@ -181,6 +190,39 @@
       });
     }
 
+    function loadTaskDevelopment(taskId) {
+      vm.taskDevelopment.loading = true;
+      vm.taskDevelopment.error = null;
+      var mappingRequest = vm.canLinkTask()
+        ? apiClient.get('/api/work-items/' + taskId + '/development-links/mappings')
+            .catch(function(error) {
+              vm.taskDevelopment.error = apiActionError(
+                error,
+                'Repository eşlemeleri yüklenemedi.'
+              );
+              vm.taskDetail.partial = true;
+              return [];
+            })
+        : $q.when([]);
+      return $q.all([
+        apiClient.get('/api/work-items/' + taskId + '/development-links'),
+        mappingRequest
+      ]).then(function(results) {
+        vm.taskDevelopment.links = results[0] || [];
+        vm.taskDevelopment.mappings = results[1] || [];
+        return vm.taskDevelopment;
+      }).catch(function(error) {
+        vm.taskDevelopment.error = apiActionError(
+          error,
+          'Geliştirme bağlantıları yüklenemedi.'
+        );
+        vm.taskDetail.partial = true;
+        return vm.taskDevelopment;
+      }).finally(function() {
+        vm.taskDevelopment.loading = false;
+      });
+    }
+
     vm.selectTask = function(task, skipLocation) {
       var preservedDraft = arguments.length > 2 ? arguments[2] : null;
       if (!task) return $q.when(null);
@@ -200,6 +242,7 @@
         return $q.all([
           loadCollaboration(detail.id),
           loadTaskStreams(),
+          loadTaskDevelopment(detail.id),
           apiClient.get('/api/audit/entity/WorkItem/' + detail.id).then(function(audit) {
             vm.audit = audit;
           }).catch(function() {
@@ -215,6 +258,82 @@
         if (requestId === detailRequestId) vm.taskDetail.loading = false;
       });
     };
+
+    vm.openTaskDevelopmentEditor = function() {
+      vm.taskDevelopment.draft = developmentCore.emptyLinkDraft();
+      if (vm.taskDevelopment.mappings.length === 1) {
+        vm.taskDevelopment.draft.mappingId = vm.taskDevelopment.mappings[0].id;
+      }
+      vm.taskDevelopment.editorOpen = true;
+      vm.taskDevelopment.error = null;
+    };
+
+    vm.closeTaskDevelopmentEditor = function() {
+      vm.taskDevelopment.editorOpen = false;
+      vm.taskDevelopment.draft = developmentCore.emptyLinkDraft();
+    };
+
+    vm.createTaskDevelopmentLink = function() {
+      if (!vm.selectedTask || !vm.canLinkTask() || mutationsUnavailable()
+          || vm.taskDetail.actionBusy) return;
+      var request;
+      try {
+        request = developmentCore.validateLinkDraft(
+          vm.taskDevelopment.draft,
+          vm.taskDevelopment.mappings
+        );
+      } catch (error) {
+        vm.taskDevelopment.error = error.message;
+        return;
+      }
+      vm.taskDetail.actionBusy = 'development-link';
+      vm.taskDevelopment.error = null;
+      return apiClient.post(
+        '/api/work-items/' + vm.selectedTask.id + '/development-links',
+        request
+      ).then(function(link) {
+        var found = vm.taskDevelopment.links.some(function(item) {
+          return item.id === link.id;
+        });
+        if (!found) vm.taskDevelopment.links.unshift(link);
+        vm.closeTaskDevelopmentEditor();
+        vm.notify('success', 'Geliştirme bağlantısı eklendi.');
+      }).catch(function(error) {
+        vm.taskDevelopment.error = apiActionError(
+          error,
+          'Geliştirme bağlantısı eklenemedi.'
+        );
+      }).finally(function() {
+        vm.taskDetail.actionBusy = null;
+      });
+    };
+
+    vm.deleteTaskDevelopmentLink = function(link) {
+      if (!vm.selectedTask || !link || !vm.canLinkTask()
+          || mutationsUnavailable() || vm.taskDetail.actionBusy) return;
+      if (!$window.confirm(link.title + ' bağlantısı kaldırılsın mı?')) return;
+      vm.taskDetail.actionBusy = link.id;
+      return apiClient.delete(
+        '/api/work-items/' + vm.selectedTask.id + '/development-links/'
+          + link.id + '?expectedVersion=' + link.version
+      ).then(function() {
+        vm.taskDevelopment.links = vm.taskDevelopment.links.filter(function(item) {
+          return item.id !== link.id;
+        });
+        vm.notify('success', 'Geliştirme bağlantısı kaldırıldı.');
+      }).catch(function(error) {
+        vm.taskDevelopment.error = apiActionError(
+          error,
+          'Geliştirme bağlantısı kaldırılamadı.'
+        );
+      }).finally(function() {
+        vm.taskDetail.actionBusy = null;
+      });
+    };
+
+    vm.taskDevelopmentState = developmentCore.linkState;
+    vm.taskDevelopmentKind = developmentCore.kindLabel;
+    vm.taskDevelopmentUrl = developmentCore.safeUrlLabel;
 
     vm.retryTaskDetail = function() {
       if (!vm.selectedTask) return $q.when(null);

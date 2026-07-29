@@ -11,6 +11,9 @@
           var deliveryRefreshTimer;
           vm.integrationRoles = [];
           vm.webhookScopes = core.scopes;
+          vm.developmentCore = $window.ZumboDevelopmentIntegrationCore;
+          vm.developmentProviders = vm.developmentCore.providers;
+          vm.integrationSurface = 'webhooks';
           vm.integrationCenter = {
             permissionResolved: false,
             loading: false,
@@ -25,6 +28,23 @@
             editorOpen: false,
             editorMode: 'create',
             draft: core.emptyDraft(),
+            secretReceipt: null
+          };
+          vm.developmentCenter = {
+            loading: false,
+            saving: false,
+            action: '',
+            error: '',
+            connections: [],
+            selected: null,
+            mappings: [],
+            repositories: [],
+            repositoryStatus: '',
+            editorOpen: false,
+            credentialOpen: false,
+            draft: vm.developmentCore.emptyConnectionDraft(),
+            credentialDraft: '',
+            mappingDraft: { projectId: '', repositoryId: '' },
             secretReceipt: null
           };
 
@@ -52,10 +72,24 @@
           };
 
           vm.openSettingsTab = function(tab) {
-            if (tab !== 'integrations') clearSensitiveState();
+            if (tab !== 'integrations') {
+              clearSensitiveState();
+              clearDevelopmentSensitiveState();
+            }
             if (tab === 'integrations' && !vm.canManageIntegrations()) return;
             vm.settingsTab = tab;
             if (tab === 'integrations') return vm.loadIntegrationCenter(true);
+          };
+
+          vm.openIntegrationSurface = function(surface) {
+            if (surface !== 'development' && surface !== 'webhooks') return;
+            vm.integrationSurface = surface;
+            if (surface === 'development') {
+              clearSensitiveState();
+              return vm.loadDevelopmentCenter(false);
+            }
+            clearDevelopmentSensitiveState();
+            return vm.loadIntegrationCenter(false);
           };
 
           vm.loadIntegrationCenter = function(resetSelection) {
@@ -284,6 +318,318 @@
           vm.webhookCanReplay = core.canReplay;
           vm.webhookShortHash = core.shortHash;
 
+          vm.loadDevelopmentCenter = function(resetSelection) {
+            if (!vm.canManageIntegrations()) return $q.when([]);
+            vm.developmentCenter.loading = true;
+            vm.developmentCenter.error = '';
+            return $q.all([
+              apiClient.get('/api/integrations/development', {
+                scope: 'desktop-development-integrations',
+                replace: true
+              }),
+              apiClient.get('/api/projects?organizationId=' + encodeURIComponent(
+                vm.session.currentUser.organizationId
+              ), {
+                scope: 'desktop-development-projects',
+                replace: true
+              }).catch(function() { return vm.projects || []; })
+            ]).then(function(results) {
+              vm.developmentCenter.connections = results[0] || [];
+              vm.projects = results[1] || vm.projects || [];
+              var selectedId = !resetSelection && vm.developmentCenter.selected
+                ? vm.developmentCenter.selected.id
+                : null;
+              var selected = vm.developmentCenter.connections.find(function(item) {
+                return item.id === selectedId;
+              }) || vm.developmentCenter.connections[0] || null;
+              if (selected) return vm.selectDevelopmentConnection(selected);
+              vm.developmentCenter.selected = null;
+              vm.developmentCenter.mappings = [];
+              vm.developmentCenter.repositories = [];
+              return [];
+            }).catch(function(error) {
+              vm.developmentCenter.error = apiActionError(
+                error,
+                'Geliştirme entegrasyonları yüklenemedi.'
+              );
+              return [];
+            }).finally(function() {
+              vm.developmentCenter.loading = false;
+            });
+          };
+
+          vm.selectDevelopmentConnection = function(connection) {
+            clearDevelopmentSensitiveState();
+            vm.developmentCenter.selected = connection || null;
+            vm.developmentCenter.editorOpen = false;
+            vm.developmentCenter.credentialOpen = false;
+            vm.developmentCenter.repositories = [];
+            vm.developmentCenter.repositoryStatus = '';
+            vm.developmentCenter.error = '';
+            return loadDevelopmentMappings();
+          };
+
+          vm.newDevelopmentConnection = function() {
+            clearDevelopmentSensitiveState();
+            vm.developmentCenter.selected = null;
+            vm.developmentCenter.draft = vm.developmentCore.emptyConnectionDraft();
+            vm.developmentCenter.editorOpen = true;
+            vm.developmentCenter.credentialOpen = false;
+            vm.developmentCenter.error = '';
+          };
+
+          vm.selectDevelopmentProvider = function(provider) {
+            vm.developmentCore.selectProvider(vm.developmentCenter.draft, provider);
+          };
+
+          vm.closeDevelopmentEditor = function() {
+            vm.developmentCenter.editorOpen = false;
+            vm.developmentCenter.draft = vm.developmentCore.emptyConnectionDraft();
+            vm.developmentCenter.selected = vm.developmentCenter.connections[0] || null;
+            if (vm.developmentCenter.selected) return loadDevelopmentMappings();
+          };
+
+          vm.saveDevelopmentConnection = function() {
+            if (vm.developmentCenter.saving || vm.pwa.offline) return;
+            var request;
+            try {
+              request = vm.developmentCore.validateConnectionDraft(
+                vm.developmentCenter.draft
+              );
+            } catch (error) {
+              vm.developmentCenter.error = error.message;
+              return;
+            }
+            vm.developmentCenter.saving = true;
+            vm.developmentCenter.error = '';
+            return apiClient.post('/api/integrations/development', request)
+              .then(function(receipt) {
+                replaceDevelopmentConnection(receipt.connection);
+                vm.developmentCenter.selected = receipt.connection;
+                vm.developmentCenter.editorOpen = false;
+                vm.developmentCenter.secretReceipt = {
+                  secret: receipt.webhookSecret,
+                  fingerprint: receipt.connection.webhookSecretFingerprint,
+                  version: receipt.connection.webhookSecretVersion
+                };
+                vm.notify('success', 'Sağlayıcı bağlantısı oluşturuldu.');
+                return loadDevelopmentMappings();
+              }).catch(handleDevelopmentMutationError).finally(function() {
+                vm.developmentCenter.saving = false;
+                vm.developmentCenter.draft.accessToken = '';
+              });
+          };
+
+          vm.openDevelopmentCredential = function() {
+            vm.developmentCenter.credentialDraft = '';
+            vm.developmentCenter.credentialOpen = true;
+            vm.developmentCenter.error = '';
+          };
+
+          vm.closeDevelopmentCredential = function() {
+            vm.developmentCenter.credentialOpen = false;
+            vm.developmentCenter.credentialDraft = '';
+          };
+
+          vm.rotateDevelopmentCredential = function() {
+            var selected = vm.developmentCenter.selected;
+            var credential = String(vm.developmentCenter.credentialDraft || '').trim();
+            if (!selected || vm.developmentCenter.action || vm.pwa.offline) return;
+            if (credential.length < 16 || credential.length > 512 || /\s/.test(credential)) {
+              vm.developmentCenter.error =
+                'Erişim anahtarı 16 ile 512 arasında boşluksuz karakter içermelidir.';
+              return;
+            }
+            vm.developmentCenter.action = 'credential';
+            return apiClient.post(
+              '/api/integrations/development/' + selected.id + '/rotate-credential',
+              { accessToken: credential, expectedVersion: selected.version }
+            ).then(function(connection) {
+              replaceDevelopmentConnection(connection);
+              vm.developmentCenter.selected = connection;
+              vm.closeDevelopmentCredential();
+              vm.notify('success', 'Sağlayıcı erişim anahtarı döndürüldü.');
+            }).catch(handleDevelopmentMutationError).finally(function() {
+              vm.developmentCenter.action = '';
+              vm.developmentCenter.credentialDraft = '';
+            });
+          };
+
+          vm.rotateDevelopmentWebhookSecret = function() {
+            var selected = vm.developmentCenter.selected;
+            if (!selected || vm.developmentCenter.action || vm.pwa.offline) return;
+            if (!$window.confirm(
+              'Mevcut imza sırrı 15 dakika sonra geçersiz olacak. Yeni sır oluşturulsun mu?'
+            )) return;
+            vm.developmentCenter.action = 'secret';
+            clearDevelopmentSensitiveState();
+            return apiClient.post(
+              '/api/integrations/development/' + selected.id + '/rotate-webhook-secret',
+              { expectedVersion: selected.version }
+            ).then(function(receipt) {
+              replaceDevelopmentConnection(receipt.connection);
+              vm.developmentCenter.selected = receipt.connection;
+              vm.developmentCenter.secretReceipt = {
+                secret: receipt.webhookSecret,
+                fingerprint: receipt.connection.webhookSecretFingerprint,
+                version: receipt.connection.webhookSecretVersion
+              };
+              vm.notify('success', 'Webhook imza sırrı döndürüldü.');
+            }).catch(handleDevelopmentMutationError).finally(function() {
+              vm.developmentCenter.action = '';
+            });
+          };
+
+          vm.checkDevelopmentHealth = function() {
+            var selected = vm.developmentCenter.selected;
+            if (!selected || !selected.isConnected || vm.developmentCenter.action) return;
+            vm.developmentCenter.action = 'health';
+            vm.developmentCenter.error = '';
+            return apiClient.post(
+              '/api/integrations/development/' + selected.id + '/health',
+              {}
+            ).then(function(health) {
+              vm.notify(
+                health.status === 'Healthy' ? 'success' : 'warning',
+                health.status === 'Healthy'
+                  ? 'Sağlayıcı bağlantısı sağlıklı.'
+                  : 'Sağlayıcı bağlantısı müdahale gerektiriyor.'
+              );
+              return apiClient.get(
+                '/api/integrations/development/' + selected.id
+              );
+            }).then(function(connection) {
+              replaceDevelopmentConnection(connection);
+              vm.developmentCenter.selected = connection;
+            }).catch(handleDevelopmentMutationError).finally(function() {
+              vm.developmentCenter.action = '';
+            });
+          };
+
+          vm.discoverDevelopmentRepositories = function() {
+            var selected = vm.developmentCenter.selected;
+            if (!selected || !selected.isConnected || vm.developmentCenter.action) return;
+            vm.developmentCenter.action = 'repositories';
+            vm.developmentCenter.error = '';
+            return apiClient.get(
+              '/api/integrations/development/' + selected.id + '/repositories',
+              { scope: 'desktop-development-repositories', replace: true }
+            ).then(function(page) {
+              vm.developmentCenter.repositories = page.items || [];
+              vm.developmentCenter.repositoryStatus = page.sourceStatus || 'Complete';
+            }).catch(handleDevelopmentMutationError).finally(function() {
+              vm.developmentCenter.action = '';
+            });
+          };
+
+          vm.createDevelopmentMapping = function() {
+            var selected = vm.developmentCenter.selected;
+            if (!selected || vm.developmentCenter.action || vm.pwa.offline) return;
+            var repository = vm.developmentCenter.repositories.find(function(item) {
+              return item.externalRepositoryId
+                === vm.developmentCenter.mappingDraft.repositoryId;
+            });
+            var request;
+            try {
+              request = vm.developmentCore.mappingRequest(
+                vm.developmentCenter.mappingDraft.projectId,
+                repository
+              );
+            } catch (error) {
+              vm.developmentCenter.error = error.message;
+              return;
+            }
+            vm.developmentCenter.action = 'mapping';
+            return apiClient.post(
+              '/api/integrations/development/' + selected.id + '/mappings',
+              request
+            ).then(function(mapping) {
+              vm.developmentCenter.mappings.push(mapping);
+              vm.developmentCenter.mappingDraft = { projectId: '', repositoryId: '' };
+              vm.notify('success', 'Repository projeye bağlandı.');
+            }).catch(handleDevelopmentMutationError).finally(function() {
+              vm.developmentCenter.action = '';
+            });
+          };
+
+          vm.deleteDevelopmentMapping = function(mapping) {
+            if (!mapping || vm.developmentCenter.action || vm.pwa.offline) return;
+            if (!$window.confirm(
+              mapping.repositoryFullName
+                + ' eşlemesi ve ona bağlı geliştirme bağlantıları kaldırılsın mı?'
+            )) return;
+            vm.developmentCenter.action = mapping.id;
+            return apiClient.delete(
+              '/api/integrations/development/mappings/' + mapping.id
+                + '?expectedVersion=' + mapping.version
+            ).then(function() {
+              vm.developmentCenter.mappings =
+                vm.developmentCenter.mappings.filter(function(item) {
+                  return item.id !== mapping.id;
+                });
+              vm.notify('success', 'Repository eşlemesi kaldırıldı.');
+            }).catch(handleDevelopmentMutationError).finally(function() {
+              vm.developmentCenter.action = '';
+            });
+          };
+
+          vm.disconnectDevelopmentConnection = function() {
+            var selected = vm.developmentCenter.selected;
+            if (!selected || !selected.isConnected || vm.developmentCenter.action
+                || vm.pwa.offline) return;
+            if (!$window.confirm(
+              'Erişim anahtarı ve webhook sırları kalıcı olarak silinsin mi?'
+            )) return;
+            vm.developmentCenter.action = 'disconnect';
+            clearDevelopmentSensitiveState();
+            return apiClient.post(
+              '/api/integrations/development/' + selected.id + '/disconnect',
+              { expectedVersion: selected.version }
+            ).then(function(connection) {
+              replaceDevelopmentConnection(connection);
+              vm.developmentCenter.selected = connection;
+              vm.developmentCenter.repositories = [];
+              return loadDevelopmentMappings().then(function() {
+                vm.notify('success', 'Sağlayıcı bağlantısı güvenli biçimde kesildi.');
+              });
+            }).catch(handleDevelopmentMutationError).finally(function() {
+              vm.developmentCenter.action = '';
+            });
+          };
+
+          vm.deleteDevelopmentConnection = function() {
+            var selected = vm.developmentCenter.selected;
+            if (!selected || vm.developmentCenter.action || vm.pwa.offline) return;
+            if (!$window.confirm(
+              selected.name + ' ve tüm eşleme/bağlantı kayıtları kalıcı olarak silinsin mi?'
+            )) return;
+            vm.developmentCenter.action = 'delete';
+            clearDevelopmentSensitiveState();
+            return apiClient.delete(
+              '/api/integrations/development/' + selected.id
+                + '?expectedVersion=' + selected.version
+            ).then(function() {
+              vm.developmentCenter.connections =
+                vm.developmentCenter.connections.filter(function(item) {
+                  return item.id !== selected.id;
+                });
+              vm.developmentCenter.selected =
+                vm.developmentCenter.connections[0] || null;
+              vm.developmentCenter.mappings = [];
+              if (vm.developmentCenter.selected) return loadDevelopmentMappings();
+            }).then(function() {
+              vm.notify('success', 'Sağlayıcı bağlantısı silindi.');
+            }).catch(handleDevelopmentMutationError).finally(function() {
+              vm.developmentCenter.action = '';
+            });
+          };
+
+          vm.dismissDevelopmentSecret = clearDevelopmentSensitiveState;
+          vm.developmentHealthState = vm.developmentCore.healthState;
+          vm.developmentSafeHealthError = vm.developmentCore.safeHealthError;
+          vm.developmentSafeUrl = vm.developmentCore.safeUrlLabel;
+          vm.developmentShortFingerprint = vm.developmentCore.shortFingerprint;
+
           function replaceSubscription(subscription) {
             var found = false;
             vm.integrationCenter.subscriptions = vm.integrationCenter.subscriptions.map(function(item) {
@@ -292,6 +638,35 @@
               return subscription;
             });
             if (!found) vm.integrationCenter.subscriptions.unshift(subscription);
+          }
+
+          function replaceDevelopmentConnection(connection) {
+            var found = false;
+            vm.developmentCenter.connections =
+              vm.developmentCenter.connections.map(function(item) {
+                if (item.id !== connection.id) return item;
+                found = true;
+                return connection;
+              });
+            if (!found) vm.developmentCenter.connections.unshift(connection);
+          }
+
+          function loadDevelopmentMappings() {
+            var selected = vm.developmentCenter.selected;
+            if (!selected) return $q.when([]);
+            return apiClient.get(
+              '/api/integrations/development/' + selected.id + '/mappings',
+              { scope: 'desktop-development-mappings', replace: true }
+            ).then(function(mappings) {
+              vm.developmentCenter.mappings = mappings || [];
+              return vm.developmentCenter.mappings;
+            }).catch(function(error) {
+              vm.developmentCenter.error = apiActionError(
+                error,
+                'Repository eşlemeleri yüklenemedi.'
+              );
+              return [];
+            });
           }
 
           function replaceDelivery(delivery) {
@@ -326,10 +701,29 @@
             }
           }
 
+          function clearDevelopmentSensitiveState() {
+            vm.developmentCenter.secretReceipt = null;
+            vm.developmentCenter.credentialDraft = '';
+            vm.developmentCenter.credentialOpen = false;
+          }
+
           function handleMutationError(error) {
             vm.integrationCenter.error = apiActionError(error, 'Webhook işlemi tamamlanamadı.');
             if (error && (error.status === 409 || error.code === 'WEBHOOK_SUBSCRIPTION_CONFLICT')) {
               return vm.loadIntegrationCenter(false);
+            }
+          }
+
+          function handleDevelopmentMutationError(error) {
+            vm.developmentCenter.error = apiActionError(
+              error,
+              'Geliştirme entegrasyonu işlemi tamamlanamadı.'
+            );
+            var code = error && error.data && error.data.error
+              && error.data.error.code;
+            if (error && (error.status === 409
+                || /_CONFLICT$/.test(String(code || '')))) {
+              return vm.loadDevelopmentCenter(false);
             }
           }
         }

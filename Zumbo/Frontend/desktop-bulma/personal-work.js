@@ -47,7 +47,7 @@
           vm.sectionLabel = function(section) {
             return {
               home: 'Ana sayfa', mywork: 'İşlerim', inbox: 'Gelen kutusu', board: 'Pano', projects: 'Projeler',
-              teams: 'Ekipler', reports: 'Raporlar', audit: 'Denetim', archive: 'Arşiv', settings: 'Ayarlar'
+              portfolios: 'Portföyler', goals: 'Hedefler', capacity: 'Kapasite', knowledge: 'Bilgi', teams: 'Ekipler', reports: 'Raporlar', audit: 'Denetim', archive: 'Arşiv', settings: 'Ayarlar'
             }[section] || section;
           };
 

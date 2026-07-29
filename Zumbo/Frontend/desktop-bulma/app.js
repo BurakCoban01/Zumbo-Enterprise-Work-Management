@@ -1,5 +1,5 @@
 angular.module('zumboDesktop', ['zumbo.shared.api', 'zumbo.shared.displayNames', 'zumbo.desktop.pwa'])
-  .controller('WorkspaceController', function($scope, $window, $document, $timeout, $q, apiClient, sessionStore, realtimeService, displayNameResolver, desktopPwaService, desktopShellFeature, desktopPersonalWorkFeature, desktopProjectOverviewFeature, desktopProjectCatalogFeature, desktopIntakeFeature, desktopWorkAutomationFeature, desktopBulkJobFeature, desktopSettingsFeature, desktopPrivacyFeature, desktopAuditFeature, desktopIntegrationFeature, desktopOperationsFeature, desktopPlanningFeature, desktopPlanningViewsFeature, desktopReportingViewsFeature, desktopWorkItemFeature, desktopManagementFeature, desktopBoardViewFeature, desktopTaskBoardFeature, desktopBoardExcellenceFeature) {
+  .controller('WorkspaceController', function($scope, $window, $document, $timeout, $q, apiClient, sessionStore, realtimeService, displayNameResolver, desktopPwaService, desktopShellFeature, desktopPersonalWorkFeature, desktopProjectOverviewFeature, desktopProjectCatalogFeature, desktopIntakeFeature, desktopWorkAutomationFeature, desktopBulkJobFeature, desktopSettingsFeature, desktopPrivacyFeature, desktopAuditFeature, desktopIntegrationFeature, desktopOperationsFeature, desktopPlanningFeature, desktopPlanningViewsFeature, desktopReportingViewsFeature, desktopPortfolioFeature, desktopGoalFeature, desktopCapacityFeature, desktopKnowledgeFeature, desktopWorkItemFeature, desktopManagementFeature, desktopBoardViewFeature, desktopTaskBoardFeature, desktopBoardExcellenceFeature) {
     var vm = this;
     vm.session = sessionStore;
     vm.pwa = desktopPwaService.state;
@@ -104,7 +104,7 @@ angular.module('zumboDesktop', ['zumbo.shared.api', 'zumbo.shared.displayNames',
       { label: 'Gelen kutusunu aç', group: 'Navigasyon', icon: 'inbox', action: 'section', value: 'inbox' },
       { label: 'Proje genel bakışını aç', group: 'Navigasyon', icon: 'layout-dashboard', action: 'projectView', value: 'overview' },
       { label: 'Panoyu aç', group: 'Navigasyon', icon: 'kanban', action: 'projectView', value: 'board' }, { label: 'Intake merkezini aç', group: 'Navigasyon', icon: 'clipboard-list', action: 'projectView', value: 'intake' },
-      { label: 'Projeleri aç', group: 'Navigasyon', icon: 'folder-kanban', action: 'section', value: 'projects' },
+      { label: 'Projeleri aç', group: 'Navigasyon', icon: 'folder-kanban', action: 'section', value: 'projects' }, { label: 'Portföyleri aç', group: 'Navigasyon', icon: 'milestone', action: 'section', value: 'portfolios' }, { label: 'Hedefleri aç', group: 'Navigasyon', icon: 'target', action: 'section', value: 'goals' }, { label: 'Kapasite planlarını aç', group: 'Navigasyon', icon: 'gauge', action: 'section', value: 'capacity' }, { label: 'Bilgi dokümanlarını aç', group: 'Navigasyon', icon: 'book-open-text', action: 'section', value: 'knowledge' },
       { label: 'Ekipleri aç', group: 'Navigasyon', icon: 'users-round', action: 'section', value: 'teams' },
       { label: 'Raporları aç', group: 'Navigasyon', icon: 'chart-no-axes-combined', action: 'projectView', value: 'reports' },
       { label: 'Denetim merkezini aç', group: 'Navigasyon', icon: 'scroll-text', action: 'section', value: 'audit', requires: 'audit' },
@@ -145,6 +145,7 @@ angular.module('zumboDesktop', ['zumbo.shared.api', 'zumbo.shared.displayNames',
         vm.loadTeams();
       } else if (target.kind === 'projects') {
         if (vm.reloadProjectAfterConflict) vm.reloadProjectAfterConflict(); else vm.reloadProjects();
+      } else if (target.kind === 'portfolios') { vm.loadPortfolios(); } else if (target.kind === 'goals') { vm.loadGoals(); } else if (target.kind === 'capacity-plans') { vm.loadCapacityPlans(); } else if (target.kind === 'knowledge-documents') { vm.loadKnowledge();
       } else if (target.kind === 'work-item-templates' || target.kind === 'work-item-recurrences') {
         if (vm.reloadWorkAutomationAfterConflict) vm.reloadWorkAutomationAfterConflict();
       } else if (target.kind === 'boards') {
@@ -199,7 +200,7 @@ angular.module('zumboDesktop', ['zumbo.shared.api', 'zumbo.shared.displayNames',
       if (section === 'home' || section === 'mywork' || section === 'inbox') vm.loadPersonalWork();
       if (section === 'inbox') vm.loadNotifications();
       if (section === 'teams') vm.loadTeams();
-      if (section === 'projects') vm.loadUsers();
+      if (section === 'projects') vm.loadUsers(); if (section === 'portfolios') vm.loadPortfolios(); if (section === 'goals') { vm.loadUsers(); vm.loadGoals(); } if (section === 'capacity') { vm.loadUsers(); vm.loadTeams(); vm.loadCapacityPlans(); } if (section === 'knowledge') { vm.loadUsers(); vm.loadKnowledge(); }
       if (section === 'settings') vm.loadSettings(); else if (section === 'audit') vm.loadAuditCenter(true);
     }
     function updateLocation(section, taskId, push) {
@@ -234,8 +235,7 @@ angular.module('zumboDesktop', ['zumbo.shared.api', 'zumbo.shared.displayNames',
     function applyLocation() {
       var params = new URLSearchParams($window.location.hash.slice(1)); if (vm.applyPublicIntakeLocation(params)) return;
       var section = params.get('section');
-      var sectionChanged = ['home', 'mywork', 'inbox', 'board', 'projects', 'teams', 'reports', 'audit', 'archive', 'settings'].indexOf(section) >= 0
-        && vm.activeSection !== section;
+      var sectionChanged = ['home', 'mywork', 'inbox', 'board', 'projects', 'portfolios', 'goals', 'capacity', 'knowledge', 'teams', 'reports', 'audit', 'archive', 'settings'].indexOf(section) >= 0 && vm.activeSection !== section;
       if (sectionChanged) {
         vm.activeSection = section;
         loadSectionData(section);
@@ -361,7 +361,7 @@ angular.module('zumboDesktop', ['zumbo.shared.api', 'zumbo.shared.displayNames',
       updateLocation: updateLocation,
       apiActionError: desktopTasks.apiActionError
     });
-    desktopProjectOverviewFeature.install(vm, { updateLocation: updateLocation });
+    desktopPortfolioFeature.install(vm, { apiActionError: desktopTasks.apiActionError }); desktopGoalFeature.install(vm, { apiActionError: desktopTasks.apiActionError }); desktopCapacityFeature.install(vm, { apiActionError: desktopTasks.apiActionError }); desktopKnowledgeFeature.install(vm, { apiActionError: desktopTasks.apiActionError }); desktopProjectOverviewFeature.install(vm, { updateLocation: updateLocation });
     function membershipFor(project) { return desktopManagement.membershipFor(project); }
     function firstAccessibleProject(projects) { return desktopManagement.firstAccessibleProject(projects); }
     function setBoardState(board) { return desktopManagement.setBoardState(board); }

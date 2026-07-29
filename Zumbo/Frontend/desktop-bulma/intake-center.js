@@ -32,6 +32,7 @@
           vm.intakeLimits = core.limits;
           vm.intakeForms = [];
           vm.intakeSubmissions = [];
+          vm.intakeLoadRequestId = 0;
           vm.intakeQueueState = '';
           vm.intakeTriageDrafts = {};
           vm.intakePublic = { loading: false, form: null, model: null, confirmation: null, error: null };
@@ -80,20 +81,27 @@
 
           vm.loadIntake = function() {
             if (!vm.project || !vm.projectMembership) return $q.when([]);
+            var requestId = ++vm.intakeLoadRequestId;
             vm.intakeLoading = true;
             vm.intakeError = null;
             return apiClient.get('/api/intake/forms?projectId=' + encodeURIComponent(vm.project.id), {
               scope: 'desktop-intake-forms',
               replace: true
             }).then(function(forms) {
+              if (requestId !== vm.intakeLoadRequestId) return forms;
               vm.intakeForms = forms;
-              var currentId = vm.intakeSelectedForm && vm.intakeSelectedForm.id;
-              var selected = forms.find(function(form) { return form.id === currentId; })
-                || forms.find(function(form) { return form.state !== 'Archived'; })
-                || forms[0]
-                || null;
-              if (selected) vm.selectIntakeForm(selected, true);
-              else resetEditor();
+              var preserveNewDraft = vm.intakeEditorOpen && vm.intakeDraft
+                && !vm.intakeDraft.id && !vm.intakeSelectedForm;
+              var selected = null;
+              if (!preserveNewDraft) {
+                var currentId = vm.intakeSelectedForm && vm.intakeSelectedForm.id;
+                selected = forms.find(function(form) { return form.id === currentId; })
+                  || forms.find(function(form) { return form.state !== 'Archived'; })
+                  || forms[0]
+                  || null;
+                if (selected) vm.selectIntakeForm(selected, true);
+                else resetEditor();
+              }
               if (vm.intakeTab === 'submit') {
                 var internal = vm.intakePublishedInternalForms()[0];
                 if (internal) return vm.selectIntakeSubmissionForm(internal);
@@ -101,14 +109,16 @@
               if (vm.intakeTab === 'triage' && selected) return vm.loadIntakeQueue();
               return forms;
             }).catch(function(error) {
+              if (requestId !== vm.intakeLoadRequestId) return [];
               vm.intakeError = core.errorMessage(error, 'Intake merkezi yüklenemedi.');
               return [];
             }).finally(function() {
-              vm.intakeLoading = false;
+              if (requestId === vm.intakeLoadRequestId) vm.intakeLoading = false;
             });
           };
 
           vm.newIntakeForm = function() {
+            if (vm.intakeLoading || vm.intakeBusy || !vm.boards.length) return;
             vm.intakeSelectedForm = null;
             vm.intakeDraft = core.newDraft(vm.project, vm.boards);
             vm.intakeEditorOpen = true;
@@ -380,6 +390,7 @@
             var changed = !project || vm.intakeProjectId !== project.id;
             vm.intakeProjectId = project && project.id || null;
             if (!changed) return;
+            vm.intakeLoadRequestId += 1;
             vm.intakeForms = [];
             vm.intakeSubmissions = [];
             resetEditor();
