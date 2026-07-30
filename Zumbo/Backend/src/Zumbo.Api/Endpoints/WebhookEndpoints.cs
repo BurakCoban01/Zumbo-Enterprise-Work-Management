@@ -17,7 +17,7 @@ internal static class WebhookEndpoints
             WorkItemWebhookService service,
             HttpContext http,
             CancellationToken ct) =>
-            Created(await service.CreateAsync(request, ct), http));
+            Created(await service.CreateAsync(request, ct, http.TraceIdentifier), http));
 
         group.MapGet("/", async (
             WorkItemWebhookService service,
@@ -44,7 +44,7 @@ internal static class WebhookEndpoints
             WorkItemWebhookService service,
             HttpContext http,
             CancellationToken ct) =>
-            Ok(await service.UpdateAsync(id, request, ct), http));
+            Ok(await service.UpdateAsync(id, request, ct, http.TraceIdentifier), http));
 
         group.MapPost("/{id}/rotate-secret", async (
             string id,
@@ -52,7 +52,7 @@ internal static class WebhookEndpoints
             WorkItemWebhookService service,
             HttpContext http,
             CancellationToken ct) =>
-            Ok(await service.RotateSecretAsync(id, request, ct), http))
+            Ok(await service.RotateSecretAsync(id, request, ct, http.TraceIdentifier), http))
             .RequireRateLimiting("bulk");
 
         group.MapPost("/{id}/enable", async (
@@ -61,7 +61,7 @@ internal static class WebhookEndpoints
             WorkItemWebhookService service,
             HttpContext http,
             CancellationToken ct) =>
-            Ok(await service.SetActiveAsync(id, true, request, ct), http));
+            Ok(await service.SetActiveAsync(id, true, request, ct, http.TraceIdentifier), http));
 
         group.MapPost("/{id}/disable", async (
             string id,
@@ -69,7 +69,15 @@ internal static class WebhookEndpoints
             WorkItemWebhookService service,
             HttpContext http,
             CancellationToken ct) =>
-            Ok(await service.SetActiveAsync(id, false, request, ct), http));
+            Ok(await service.SetActiveAsync(id, false, request, ct, http.TraceIdentifier), http));
+
+        group.MapPost("/{id}/test-delivery", async (
+            string id,
+            WorkItemWebhookService service,
+            HttpContext http,
+            CancellationToken ct) =>
+            Created(await service.QueueTestDeliveryAsync(id, ct, http.TraceIdentifier), http))
+            .RequireRateLimiting("bulk");
 
         group.MapGet("/{id}/deliveries", async (
             string id,
@@ -92,7 +100,7 @@ internal static class WebhookEndpoints
             WorkItemWebhookService service,
             HttpContext http,
             CancellationToken ct) =>
-            Ok(await service.ReplayAsync(deliveryId, ct), http))
+            Ok(await service.ReplayAsync(deliveryId, ct, http.TraceIdentifier), http))
             .RequireRateLimiting("bulk");
     }
 }

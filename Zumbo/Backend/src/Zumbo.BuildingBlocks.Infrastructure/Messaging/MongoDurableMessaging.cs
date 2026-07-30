@@ -181,6 +181,30 @@ public sealed class MongoDurableEventOutbox(
         return (await _messages.UpdateOneAsync(filter, update, cancellationToken: cancellationToken)).ModifiedCount == 1;
     }
 
+    public async Task<IReadOnlyList<DurableDeadLetterSummary>> ListDeadLettersAsync(
+        int pageSize,
+        CancellationToken cancellationToken = default)
+    {
+        if (pageSize is < 1 or > 50)
+        {
+            throw new ArgumentOutOfRangeException(nameof(pageSize));
+        }
+
+        var filter = Builders<MongoOutboxDocument>.Filter.Eq(
+            x => x.Status,
+            DurableMessageStates.DeadLetter);
+        var documents = await _messages.Find(filter)
+            .SortByDescending(x => x.DeadLetteredAtUtc)
+            .ThenBy(x => x.Id)
+            .Limit(pageSize)
+            .ToListAsync(cancellationToken);
+        return documents.Select(x => new DurableDeadLetterSummary(
+            x.Id,
+            x.EventType,
+            x.AttemptCount,
+            Offset(x.DeadLetteredAtUtc ?? x.OccurredAtUtc))).ToList();
+    }
+
     public async Task<DurableOutboxMetrics> GetMetricsAsync(
         DateTimeOffset nowUtc,
         CancellationToken cancellationToken = default)

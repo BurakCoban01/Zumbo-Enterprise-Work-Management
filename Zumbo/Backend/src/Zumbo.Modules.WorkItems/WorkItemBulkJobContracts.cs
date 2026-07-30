@@ -7,6 +7,7 @@ public sealed class WorkItemBulkJobOptions
     public int MaxInputBytes { get; init; } = 5 * 1024 * 1024;
     public int MaxExportItems { get; init; } = 10_000;
     public long MaxArtifactBytes { get; init; } = 25 * 1024 * 1024;
+    public int ArtifactRetentionDays { get; init; } = 7;
 }
 
 public sealed record WorkItemImportRow(
@@ -74,6 +75,7 @@ public sealed record WorkItemBulkJobResponse(
     DateTimeOffset CreatedAt,
     DateTimeOffset? StartedAt,
     DateTimeOffset? CompletedAt,
+    DateTimeOffset? ArtifactsExpireAt,
     long Version);
 
 public sealed record WorkItemBulkJobPage(

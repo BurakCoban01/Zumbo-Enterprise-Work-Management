@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using Npgsql;
 using NpgsqlTypes;
 using Zumbo.BuildingBlocks.Application.Messaging;
@@ -6,7 +7,8 @@ namespace Zumbo.Persistence.PostgreSql;
 
 public sealed class PostgreSqlDurableEventOutbox(
     PostgreSqlSession session,
-    PostgreSqlPersistenceOptions options) : IDurableEventOutbox
+    PostgreSqlPersistenceOptions options,
+    ILogger<PostgreSqlDurableEventOutbox>? logger = null) : IDurableEventOutbox
 {
     public async Task EnqueueAsync(
         DurableEventEnvelope message,
@@ -97,7 +99,10 @@ public sealed class PostgreSqlDurableEventOutbox(
         }
         catch
         {
-            await transaction.RollbackAsync(CancellationToken.None);
+            await PostgreSqlCompensation.RunAsync(
+                "postgres.outbox_claim.rollback",
+                token => transaction.RollbackAsync(token),
+                logger);
             throw;
         }
     }
@@ -181,6 +186,39 @@ public sealed class PostgreSqlDurableEventOutbox(
             leaseToken: null,
             nowUtc,
             cancellationToken);
+
+    public async Task<IReadOnlyList<DurableDeadLetterSummary>> ListDeadLettersAsync(
+        int pageSize,
+        CancellationToken cancellationToken = default)
+    {
+        if (pageSize is < 1 or > 50)
+        {
+            throw new ArgumentOutOfRangeException(nameof(pageSize));
+        }
+
+        const string sql = """
+            SELECT id, event_type, attempt_count, dead_lettered_at_utc
+            FROM messaging.outbox_messages
+            WHERE status='DeadLetter'
+            ORDER BY dead_lettered_at_utc DESC, id
+            LIMIT @pageSize;
+            """;
+        await using var lease = await session.LeaseAsync(cancellationToken);
+        await using var command = lease.CreateCommand(sql, options.CommandTimeoutSeconds);
+        command.Parameters.AddWithValue("pageSize", pageSize);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        var items = new List<DurableDeadLetterSummary>();
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            items.Add(new DurableDeadLetterSummary(
+                reader.GetString(0),
+                reader.GetString(1),
+                reader.GetInt32(2),
+                reader.GetFieldValue<DateTimeOffset>(3)));
+        }
+
+        return items;
+    }
 
     public async Task<DurableOutboxMetrics> GetMetricsAsync(
         DateTimeOffset nowUtc,

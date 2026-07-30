@@ -167,9 +167,35 @@
   ]);
   var tenantSessionKeys = Object.freeze(['zumbo.csrfToken']);
 
+  function readCookie(cookieHeader, name) {
+    if (typeof cookieHeader !== 'string' || !name) return null;
+    var prefix = encodeURIComponent(name) + '=';
+    var entry = cookieHeader.split(';').map(function(value) {
+      return value.trim();
+    }).find(function(value) {
+      return value.indexOf(prefix) === 0;
+    });
+    if (!entry) return null;
+    try {
+      return decodeURIComponent(entry.slice(prefix.length)) || null;
+    } catch (_) {
+      return null;
+    }
+  }
+
   function clearTenantStorage(local, session) {
     tenantLocalKeys.forEach(function(key) { local.removeItem(key); });
     tenantSessionKeys.forEach(function(key) { session.removeItem(key); });
+  }
+
+  function unwrapResponseBody(body) {
+    if (body
+        && typeof body === 'object'
+        && typeof body.success === 'boolean'
+        && Object.prototype.hasOwnProperty.call(body, 'data')) {
+      return body.data;
+    }
+    return body;
   }
 
   var core = Object.freeze({
@@ -182,6 +208,8 @@
     normalizeError: normalizeError,
     createSingleFlight: createSingleFlight,
     createRequestRegistry: createRequestRegistry,
+    unwrapResponseBody: unwrapResponseBody,
+    readCookie: readCookie,
     clearTenantStorage: clearTenantStorage,
     tenantLocalKeys: tenantLocalKeys,
     tenantSessionKeys: tenantSessionKeys
@@ -207,7 +235,10 @@
         if (user) root.localStorage.setItem('zumbo.currentUser', JSON.stringify(user));
         else root.localStorage.removeItem('zumbo.currentUser');
       },
-      getCsrf: function() { return root.sessionStorage.getItem('zumbo.csrfToken'); },
+      getCsrf: function() {
+        return root.sessionStorage.getItem('zumbo.csrfToken')
+          || readCookie(root.document && root.document.cookie, 'zumbo-csrf');
+      },
       setCsrf: function(token) {
         if (token) root.sessionStorage.setItem('zumbo.csrfToken', token);
         else root.sessionStorage.removeItem('zumbo.csrfToken');
@@ -242,7 +273,25 @@
     var resourceVersions = Object.create(null);
 
     function resource(url) {
-      var match = url.match(/^\/api\/(teams|projects|boards|work-items|workflows)(?:\/([^/?]+))?/);
+      var sprintItem = url.match(/^\/api\/sprints\/[^/?]+\/items\/([^/?]+)/);
+      if (sprintItem) return { kind: 'work-items', id: sprintItem[1] };
+      var template = url.match(/^\/api\/work-items\/templates\/([^/?]+)/);
+      if (template) return { kind: 'work-item-templates', id: template[1] };
+      var recurrence = url.match(/^\/api\/work-items\/recurrences\/([^/?]+)/);
+      if (recurrence && ['preview', 'process-due'].indexOf(recurrence[1]) < 0) {
+        return { kind: 'work-item-recurrences', id: recurrence[1] };
+      }
+      var automationRun = url.match(/^\/api\/automations\/runs\/([^/?]+)/);
+      if (automationRun) return { kind: 'automation-runs', id: automationRun[1] };
+      var automation = url.match(/^\/api\/automations\/([^/?]+)/);
+      if (automation && automation[1] !== 'runs') {
+        return { kind: 'automations', id: automation[1] };
+      }
+      var collaboration = url.match(/^\/api\/work-items\/([^/?]+)\/(?:collaboration|watch|vote|activity)(?:[/?]|$)/);
+      if (collaboration) return { kind: 'work-item-collaboration', id: collaboration[1] };
+      var intake = url.match(/^\/api\/intake\/forms(?:\/([^/?]+))?/);
+      if (intake) return { kind: 'intake-forms', id: intake[1] || null };
+      var match = url.match(/^\/api\/(teams|projects|boards|work-items|workflows|automations|dashboards|portfolios|goals|capacity-plans|knowledge-documents)(?:\/([^/?]+))?/);
       return match ? { kind: match[1], id: match[2] || null } : null;
     }
     function resourceKey(kind, id) { return kind + ':' + id; }
@@ -264,6 +313,7 @@
       return [
         '/api/browser-auth/login',
         '/api/browser-auth/register',
+        '/api/browser-auth/session',
         '/api/browser-auth/refresh',
         '/api/browser-auth/logout',
         '/api/auth/forgot-password',
@@ -279,6 +329,9 @@
         if (csrf) headers['X-CSRF-Token'] = csrf;
       }
       if (operation.idempotencyKey) headers['Idempotency-Key'] = operation.idempotencyKey;
+      if (operation.options.privacyStatusToken) {
+        headers['X-Privacy-Status-Token'] = String(operation.options.privacyStatusToken);
+      }
       var target = resource(operation.url);
       if (!isSafeMethod(operation.method) && target && target.id) {
         var version = resourceVersions[resourceKey(target.kind, target.id)];
@@ -382,7 +435,7 @@
           return $q.reject({ zumboCode: 'STALE_RESPONSE', zumboMessage: 'The response belongs to an inactive workspace.' });
         }
         if (options.rawResponse) return response;
-        return remember(url, response.data.data);
+        return remember(url, unwrapResponseBody(response.data));
       }).catch(function(error) {
         var target = resource(url);
         var apiError = error && error.data && error.data.error;
@@ -424,6 +477,7 @@
       },
       remember: remember,
       cancelScope: function(scope) { requests.cancelScope(scope, 'scope-canceled'); },
+      cancelPending: function(reason) { requests.cancelAll(reason || 'pending-canceled'); },
       transitionContext: function(context) {
         resourceVersions = Object.create(null);
         return requests.transition(context);

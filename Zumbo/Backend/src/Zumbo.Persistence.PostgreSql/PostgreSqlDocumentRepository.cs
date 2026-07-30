@@ -257,21 +257,6 @@ public sealed class PostgreSqlDocumentRepository<TDocument>(
         }
     }
 
-    internal async Task EnsureStorageAsync(CancellationToken cancellationToken = default)
-    {
-        var schema = SqlIdentifier.Quote(storage.Schema);
-        var sql = $"CREATE SCHEMA IF NOT EXISTS {schema}; " +
-                  $"CREATE TABLE IF NOT EXISTS {Qualified} (" +
-                  "id text PRIMARY KEY, version bigint NOT NULL DEFAULT 0 CHECK(version>=0), " +
-                  "document jsonb NOT NULL CHECK(jsonb_typeof(document)='object'), " +
-                  "created_at timestamptz NOT NULL DEFAULT transaction_timestamp(), " +
-                  "updated_at timestamptz NOT NULL DEFAULT transaction_timestamp(), " +
-                  "CHECK(document->>'Id'=id), CHECK(COALESCE((document->>'Version')::bigint,0)=version));";
-        await using var lease = await session.LeaseAsync(cancellationToken);
-        await using var command = lease.CreateCommand(sql, options.CommandTimeoutSeconds);
-        await command.ExecuteNonQueryAsync(cancellationToken);
-    }
-
     private string Qualified => $"{SqlIdentifier.Quote(storage.Schema)}.{SqlIdentifier.Quote(storage.Table)}";
 
     private async Task<PostgreSqlOwnedCommand> CreateCommandAsync(

@@ -190,6 +190,41 @@ public sealed class WorkflowAggregateTests
     }
 
     [Fact]
+    public async Task Service_PublishedHistoryRetainsTheMostRecentTwentyFiveVersions()
+    {
+        var service = new WorkflowService(
+            new InMemoryDocumentRepository<WorkflowDefinitionDocument>(),
+            new AllowAccess(),
+            new InMemoryDistributedLockProvider(),
+            Options.Create(new DistributedLockOptions()),
+            new FixedClock(OccurredAt),
+            new NoopAudit());
+        _ = await service.GetOrCreateDefaultAsync("project-retention", CancellationToken.None);
+
+        for (var version = 2; version <= 27; version++)
+        {
+            _ = await service.SaveDraftAsync(
+                new CreateWorkflowRequest(
+                    "project-retention",
+                    [new WorkflowTransitionRequest("Open", "Done", false, false)],
+                    [new WorkflowStatusRequest("Open", "Todo"), new WorkflowStatusRequest("Done", "Done")]),
+                "test",
+                CancellationToken.None);
+            _ = await service.PublishAsync("project-retention", "test", CancellationToken.None);
+        }
+
+        var versions = await service.ListVersionsAsync("project-retention", CancellationToken.None);
+
+        Assert.Equal(25, versions.Count);
+        Assert.Equal(27, versions.First().Number);
+        Assert.Equal(3, versions.Last().Number);
+        var current = await service.GetOrCreateDefaultAsync("project-retention", CancellationToken.None);
+        Assert.Equal(WorkflowRetentionPolicy.MaximumPublishedVersions, current.PublishedVersionRetentionLimit);
+        Assert.Equal(25, current.RetainedPublishedVersionCount);
+        Assert.Equal(3, current.OldestRetainedPublishedVersion);
+    }
+
+    [Fact]
     public async Task Service_IssueSchemeWithoutTodoDefault_IsRejected()
     {
         var service = new WorkflowService(

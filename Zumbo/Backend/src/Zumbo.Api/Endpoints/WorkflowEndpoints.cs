@@ -5,7 +5,9 @@ using static ApiEndpointResults;
 
 internal static class WorkflowEndpoints
 {
-    internal static IServiceCollection AddWorkflowsModule(this IServiceCollection services)
+    internal static IServiceCollection AddWorkflowsModule(
+        this IServiceCollection services,
+        IConfiguration? configuration = null)
     {
         services.AddScoped<IWorkflowProjectAccessChecker, WorkflowProjectAccessCheckerAdapter>();
         services.AddScoped<IWorkflowAuditWriter, WorkflowAuditWriterAdapter>();
@@ -15,7 +17,7 @@ internal static class WorkflowEndpoints
         services.AddScoped<SaveWorkflowDraftHandler>();
         services.AddScoped<PublishWorkflowHandler>();
         services.AddScoped<GetWorkflowHandler>();
-        return services;
+        return services.AddAutomationEngine(configuration);
     }
 
     internal static void MapWorkflowEndpoints(this RouteGroupBuilder api)

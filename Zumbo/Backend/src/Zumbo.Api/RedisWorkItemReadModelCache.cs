@@ -52,7 +52,7 @@ public sealed class RedisWorkItemReadModelCache : IWorkItemReadModelCache
         for (var attempt = 0; attempt < 2; attempt++)
         {
             ct.ThrowIfCancellationRequested();
-            var (version, versionAvailable) = await ReadVersionAsync(projectId);
+            var (version, versionAvailable) = await ReadVersionAsync(projectId, ct);
             var cacheKey = DataKey(projectId, version, modelName);
 
             if (versionAvailable)
@@ -83,7 +83,7 @@ public sealed class RedisWorkItemReadModelCache : IWorkItemReadModelCache
 
             var created = await factory(ct);
             var generatedAt = DateTimeOffset.UtcNow;
-            var (currentVersion, currentVersionAvailable) = await ReadVersionAsync(projectId);
+            var (currentVersion, currentVersionAvailable) = await ReadVersionAsync(projectId, ct);
             var versionChanged = versionAvailable && currentVersionAvailable && currentVersion != version;
             if (versionChanged && attempt == 0)
             {
@@ -142,7 +142,9 @@ public sealed class RedisWorkItemReadModelCache : IWorkItemReadModelCache
         }
     }
 
-    private async Task<(long Version, bool Available)> ReadVersionAsync(string projectId)
+    private async Task<(long Version, bool Available)> ReadVersionAsync(
+        string projectId,
+        CancellationToken ct)
     {
         try
         {
@@ -150,7 +152,7 @@ public sealed class RedisWorkItemReadModelCache : IWorkItemReadModelCache
                 "cache-version-read",
                 ExternalDependencyOperationKind.Read,
                 _ => _database.StringGetAsync(VersionKey(projectId)),
-                CancellationToken.None);
+                ct);
             return (value.TryParse(out long version) ? version : 0, true);
         }
         catch (Exception exception) when (IsDependencyFailure(exception))

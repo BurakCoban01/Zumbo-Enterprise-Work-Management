@@ -5,12 +5,15 @@ import test from 'node:test';
 
 const root = resolve(import.meta.dirname, '..');
 const html = await readFile(resolve(root, 'mobile-ionic/index.html'), 'utf8');
+const styles = await readFile(resolve(root, 'mobile-ionic/styles.css'), 'utf8');
 const serviceWorker = await readFile(resolve(root, 'mobile-ionic/service-worker.js'), 'utf8');
 const buildScript = await readFile(resolve(root, 'tests/build-frontend.mjs'), 'utf8');
 const parity = JSON.parse(await readFile(resolve(root, '../docs/frontend-parity.json'), 'utf8'));
 const mobileScripts = [
   'app.js', 'realtime.js', 'api.js', 'auth.js', 'workspace.js', 'tasks.js',
-  'details.js', 'pwa.js', 'directives.js'
+  'details.js', 'project-catalog.js', 'intake-center.js', 'work-automation.js', 'bulk-job-center.js', 'planning-views.js',
+  'reporting-views.js', 'portfolio-center.js', 'goal-center.js', 'capacity-center.js', 'knowledge-center.js', 'profile-security.js', 'privacy-center.js', 'integration-center.js',
+  'operations-center.js', 'mobile-shell.js', 'directives.js', 'pwa.js'
 ];
 const scriptSources = await Promise.all(mobileScripts.map(file =>
   readFile(resolve(root, 'mobile-ionic', file), 'utf8').catch(() => '')));
@@ -25,9 +28,11 @@ test('mobile auth, session ve route sozlesmesi karakterize edilir', () => {
   }
   for (const route of [
     "state('login'", "state('forgot-password'", "state('reset-password'",
-    "state('project-detail'", "state('team-detail'", "state('task-detail'",
+    "state('project-detail'", "state('project-jobs'", "state('team-detail'", "state('task-detail'",
+    "state('integration-center'", "state('operations-center'", "state('capacity-center'", "state('knowledge-center'",
     "state('app.dashboard'", "state('app.projects'", "state('app.tasks'",
-    "state('app.notifications'", "state('app.profile'"
+    "state('app.create'", "state('app.notifications'", "state('app.more'",
+    "state('app.search'", "state('app.profile'"
   ]) {
     assert.ok(app.includes(route), `${route} route is missing`);
   }
@@ -54,7 +59,9 @@ test('mobile controller komutlari ve Ionic yasam dongusu karakterize edilir', ()
     'ShellController', 'LoginController', 'ForgotPasswordController',
     'ResetPasswordController', 'DashboardController', 'ProjectsController',
     'TasksController', 'NotificationsController', 'ProjectDetailController',
-    'TeamDetailController', 'TaskDetailController'
+    'TeamDetailController', 'TaskDetailController', 'BulkJobCenterController', 'ProfileSecurityController',
+    'IntegrationCenterController', 'MobileCreateController', 'MobileSearchController',
+    'MobileMoreController', 'CapacityController', 'KnowledgeController'
   ]) {
     assert.match(app, new RegExp(`controller\\('${controller}'`), `${controller} is missing`);
   }
@@ -69,6 +76,47 @@ test('mobile controller komutlari ve Ionic yasam dongusu karakterize edilir', ()
   }
   assert.match(app, /\$ionicView\.beforeEnter/);
   assert.match(app, /scroll\.infiniteScrollComplete/);
+});
+
+test('mobile portfolio ilk yuklemeyi tekillestirir ve beklenen iptali kullanici hatasi yapmaz', () => {
+  const portfolio = scriptSources[13];
+  assert.match(portfolio, /var loadPromise = null;/);
+  assert.match(portfolio, /if \(loadPromise\) return loadPromise;/);
+  assert.match(portfolio, /loadPromise = \$q\.all\(/);
+  assert.match(portfolio, /if \(error && error\.canceled\) return;/);
+  assert.match(portfolio, /loadPromise = null;/);
+});
+
+test('mobile navigation labels and task titles remain readable in both themes', () => {
+  assert.match(app, /\$ionicConfigProvider\.backButton\.text\('Geri'\)/);
+  assert.match(styles, /\.zumbo-primary-tabs \.tab-item \.tab-title\s*\{[^}]*font-size:\s*12px;/s);
+  assert.match(styles, /\.task-row h2\s*\{[^}]*color:\s*var\(--ink\);[^}]*font-size:\s*15px;/s);
+});
+
+test('mobile team activity maps backend actions to user-facing labels', () => {
+  const details = scriptSources[6];
+  assert.match(details, /vm\.teamActivityLabel = function\(action\)/);
+  assert.match(details, /vm\.teamMemberRoleLabel = function\(role\)/);
+  assert.match(details, /vm\.teamMemberStatusLabel = function\(status\)/);
+  for (const action of [
+    'TeamCreated', 'TeamUpdated', 'TeamMemberInvited', 'TeamInviteAccepted',
+    'TeamInviteDeclined', 'TeamInviteExpired', 'TeamInviteRevoked',
+    'TeamMemberRoleChanged', 'TeamOwnershipTransferred', 'TeamMemberRemoved',
+    'TeamArchived', 'TeamRestored'
+  ]) {
+    assert.match(details, new RegExp(`${action}:\\s*'[^']+'`), `${action} display label is missing`);
+  }
+  assert.match(html, /\{\{vm\.teamActivityLabel\(entry\.action\)\}\}/);
+  assert.match(html, /\{\{vm\.teamMemberRoleLabel\(member\.role\)\}\}/);
+  assert.match(html, /\{\{vm\.teamMemberStatusLabel\(member\.status\)\}\}/);
+  assert.match(html, /<option value="Member">Üye<\/option>/);
+  assert.match(html, /<option value="Admin">Yönetici<\/option>/);
+});
+
+test('mobile canceled requests use the surface fallback instead of raw transport copy', () => {
+  const api = scriptSources[2];
+  assert.match(api, /if \(error && error\.canceled\) return fallback;/);
+  assert.doesNotMatch(api, /The request was canceled/);
 });
 
 test('mobile realtime, stale context ve concurrency davranisi korunur', () => {
@@ -107,7 +155,7 @@ test('mobile PWA yalniz shell assetlerini cacheler ve API hub isteklerini dislar
   assert.doesNotMatch(serviceWorker, /Authorization|X-CSRF-Token/);
 });
 
-test('mobile composition dokuz explicit modul ve ince route root kullanir', () => {
+test('mobile composition on explicit modul ve ince route root kullanir', () => {
   const main = scriptSources[0];
   assert.ok(main.split(/\r?\n/).length < 80, 'mobile app.js composition root is too large');
   assert.match(scriptSources[1], /factory\('realtimeService'/);
@@ -116,9 +164,25 @@ test('mobile composition dokuz explicit modul ve ince route root kullanir', () =
   assert.match(scriptSources[4], /controller\('ProjectsController'/);
   assert.match(scriptSources[5], /controller\('TasksController'/);
   assert.match(scriptSources[6], /controller\('TaskDetailController'/);
-  assert.match(scriptSources[7], /factory\('mobilePwaService'/);
-  assert.match(scriptSources[8], /directive\('fileChange'/);
-  assert.match(html, /<script src="\.\/app\.js"><\/script>\s*<script src="\.\/realtime\.js"><\/script>\s*<script src="\.\/api\.js"><\/script>\s*<script src="\.\/auth\.js"><\/script>\s*<script src="\.\/workspace\.js"><\/script>\s*<script src="\.\/tasks\.js"><\/script>\s*<script src="\.\/details\.js"><\/script>\s*<script src="\.\/directives\.js"><\/script>\s*<script src="\.\/pwa\.js"><\/script>/);
+  assert.match(scriptSources[7], /controller\('ProjectCatalogController'/);
+  assert.match(scriptSources[8], /controller\('MobileIntakeController'/);
+  assert.match(scriptSources[8], /controller\('PublicIntakeController'/);
+  assert.match(scriptSources[9], /controller\('WorkAutomationController'/);
+  assert.match(scriptSources[10], /controller\('BulkJobCenterController'/);
+  assert.match(scriptSources[11], /controller\('ProjectPlanningController'/);
+  assert.match(scriptSources[12], /controller\('ProjectReportingController'/);
+  assert.match(scriptSources[13], /controller\('PortfolioController'/);
+  assert.match(scriptSources[14], /controller\('GoalController'/);
+  assert.match(scriptSources[15], /controller\('CapacityController'/);
+  assert.match(scriptSources[16], /controller\('KnowledgeController'/);
+  assert.match(scriptSources[17], /controller\('ProfileSecurityController'/);
+  assert.match(scriptSources[18], /factory\('mobilePrivacyFeature'/);
+  assert.match(scriptSources[19], /controller\('IntegrationCenterController'/);
+  assert.match(scriptSources[20], /controller\('OperationsCenterController'/);
+  assert.match(scriptSources[21], /controller\('MobileCreateController'/);
+  assert.match(scriptSources[22], /directive\('fileChange'/);
+  assert.match(scriptSources[23], /factory\('mobilePwaService'/);
+  assert.match(html, /<script src="\.\/app\.js"><\/script>\s*<script src="\.\/realtime\.js"><\/script>\s*<script src="\.\/api\.js"><\/script>\s*<script src="\.\/auth\.js"><\/script>\s*<script src="\.\/workspace\.js"><\/script>\s*<script src="\.\/tasks\.js"><\/script>\s*<script src="\.\/details\.js"><\/script>\s*<script src="\.\/project-catalog\.js"><\/script>\s*<script src="\.\/intake-center\.js"><\/script>\s*<script src="\.\/work-automation\.js"><\/script>\s*<script src="\.\/bulk-job-center\.js"><\/script>\s*<script src="\.\/planning-views\.js"><\/script>\s*<script src="\.\/reporting-views\.js"><\/script>\s*<script src="\.\/portfolio-center\.js"><\/script>\s*<script src="\.\/goal-center\.js"><\/script>\s*<script src="\.\/capacity-center\.js"><\/script>\s*<script src="\.\/knowledge-center\.js"><\/script>\s*<script src="\.\/profile-security\.js"><\/script>\s*<script src="\.\/privacy-center\.js"><\/script>\s*<script src="\.\/integration-center\.js"><\/script>\s*<script src="\.\/operations-center\.js"><\/script>\s*<script src="\.\/mobile-shell\.js"><\/script>\s*<script src="\.\/directives\.js"><\/script>\s*<script src="\.\/pwa\.js"><\/script>/);
 });
 
 test('mobile essential backlog sprint board list ve work-item komutlari aciktir', () => {
@@ -138,9 +202,9 @@ test('mobile essential backlog sprint board list ve work-item komutlari aciktir'
 });
 
 test('mobile offline ve update state explicit kullanici geri bildirimi verir', () => {
-  assert.match(scriptSources[7], /offline: !\$window\.navigator\.onLine/);
-  assert.match(scriptSources[7], /updateReady: false/);
-  assert.match(scriptSources[7], /waiting\.postMessage\(\{ type: 'SKIP_WAITING' \}\)/);
+  assert.match(scriptSources[23], /offline: !\$window\.navigator\.onLine/);
+  assert.match(scriptSources[23], /updateReady: false/);
+  assert.match(scriptSources[23], /waiting\.postMessage\(\{ type: 'SKIP_WAITING' \}\)/);
   assert.match(serviceWorker, /event\.data\.type === 'SKIP_WAITING'/);
   assert.match(buildScript, /path\.startsWith\(`\$\{surface\.directory\}\/`\)/);
   assert.match(buildScript, /manifestPath: 'mobile-ionic\/pwa-manifest\.json'/);

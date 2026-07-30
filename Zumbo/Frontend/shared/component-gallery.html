@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#15363d">
+  <title>Zumbo Bileşen Galerisi</title>
+  <link rel="icon" href="./zumbo-mark.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="../vendor/bulma/bulma.min.css">
+  <link rel="stylesheet" href="./design-system.css">
+  <link rel="stylesheet" href="./component-gallery.css">
+</head>
+<body>
+  <a class="skip-link" href="#gallery-main">Ana içeriğe geç</a>
+  <header class="gallery-header">
+    <div class="gallery-brand">
+      <img src="./zumbo-mark.svg" alt="">
+      <div><strong>Zumbo</strong><span>Ürün bileşenleri</span></div>
+    </div>
+    <span class="zumbo-status success">Onaylı temel</span>
+  </header>
+
+  <main id="gallery-main" class="gallery-main" tabindex="-1">
+    <section class="gallery-intro" aria-labelledby="gallery-title">
+      <div>
+        <p class="zumbo-kicker">İç ürün aracı</p>
+        <h1 id="gallery-title">Bileşen galerisi</h1>
+        <p>Masaüstü ve mobil yüzeylerde kullanılan semantik roller, durumlar ve çalışma yoğunluğu.</p>
+      </div>
+      <dl class="gallery-contract">
+        <div><dt>Geometri</dt><dd>4–8 px</dd></div>
+        <div><dt>Kontrol</dt><dd>40 / 44 px</dd></div>
+        <div><dt>Hareket</dt><dd>90–240 ms</dd></div>
+      </dl>
+    </section>
+
+    <section class="gallery-section" aria-labelledby="color-title">
+      <div class="section-title"><p class="zumbo-kicker">Temel</p><h2 id="color-title">Semantik renkler</h2></div>
+      <div class="swatch-grid">
+        <div class="swatch"><span class="swatch-action"></span><strong>Eylem</strong><small>Seçim ve ana komut</small></div>
+        <div class="swatch"><span class="swatch-signal"></span><strong>Zumbo sinyali</strong><small>Marka vurgusu</small></div>
+        <div class="swatch"><span class="swatch-success"></span><strong>Başarılı</strong><small>Tamamlanan işlem</small></div>
+        <div class="swatch"><span class="swatch-warning"></span><strong>Dikkat</strong><small>İnceleme gereken durum</small></div>
+        <div class="swatch"><span class="swatch-danger"></span><strong>Kritik</strong><small>Hata ve yıkıcı işlem</small></div>
+        <div class="swatch"><span class="swatch-info"></span><strong>Bilgi</strong><small>Bağlam ve ilerleme</small></div>
+      </div>
+    </section>
+
+    <section class="gallery-section gallery-two-column" aria-labelledby="type-title">
+      <div>
+        <div class="section-title"><p class="zumbo-kicker">Hiyerarşi</p><h2 id="type-title">Tipografi</h2></div>
+        <div class="type-specimens">
+          <p class="type-title">Proje görünümü</p>
+          <p class="type-heading">Sprint planlaması</p>
+          <p class="type-body">Ekip işlerini taramak, karşılaştırmak ve güvenle güncellemek için okunaklı gövde metni.</p>
+          <p class="type-label">DURUM · ATANAN · BİTİŞ</p>
+          <p class="type-numeric" data-numeric>1.248 görev · %73 tamamlandı</p>
+        </div>
+      </div>
+      <div>
+        <div class="section-title"><p class="zumbo-kicker">Yoğunluk</p><h2>Ritim</h2></div>
+        <div class="density-sample">
+          <div><strong>Rahat satır</strong><span>48 px · dokunma ve tarama</span></div>
+          <div class="density-compact"><strong>Sıkı satır</strong><span>40 px · yoğun masaüstü</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="gallery-section" aria-labelledby="control-title">
+      <div class="section-title"><p class="zumbo-kicker">Komutlar</p><h2 id="control-title">Kontroller ve durumları</h2></div>
+      <div class="control-grid">
+        <div class="control-group"><span>Ana</span><button class="button is-primary" type="button">Görev oluştur</button></div>
+        <div class="control-group"><span>İkincil</span><button class="button" type="button">Filtreleri aç</button></div>
+        <div class="control-group"><span>Yıkıcı</span><button class="button is-danger" type="button">Arşivle</button></div>
+        <div class="control-group"><span>Yükleniyor</span><button class="button is-primary is-loading" type="button" aria-busy="true">Kaydediliyor</button></div>
+        <div class="control-group"><span>Devre dışı</span><button class="button" type="button" disabled>Yayınla</button></div>
+      </div>
+      <div class="field-grid">
+        <label><span>Başlık</span><input class="input" value="Mobil oturum akışını gözden geçir"></label>
+        <label><span>Sorumlu</span><select><option>Deniz Yılmaz</option></select></label>
+        <label><span>Hatalı değer</span><input class="input" aria-invalid="true" aria-describedby="field-error" value="32.13.2026"><small id="field-error">Geçerli bir tarih girin.</small></label>
+        <label><span>Kilitli</span><input class="input" value="PROJ-184" disabled></label>
+      </div>
+    </section>
+
+    <section class="gallery-section" aria-labelledby="status-title">
+      <div class="section-title"><p class="zumbo-kicker">Geri bildirim</p><h2 id="status-title">Durum dili</h2></div>
+      <div class="status-row" aria-label="Durum rozetleri">
+        <span class="zumbo-status info">Planlandı</span>
+        <span class="zumbo-status warning">Riskli</span>
+        <span class="zumbo-status success">Tamamlandı</span>
+        <span class="zumbo-status danger">Engellendi</span>
+      </div>
+      <div class="message-stack">
+        <div class="zumbo-message success" role="status"><span>Değişiklikler kaydedildi.</span><button class="button is-small" type="button">Görüntüle</button></div>
+        <div class="zumbo-message warning" role="status"><span>Bağlantı zayıf; veriler son başarılı eşitlemeden gösteriliyor.</span><button class="button is-small" type="button">Yenile</button></div>
+        <div class="zumbo-message danger" role="alert"><span>Görev güncellenemedi. Girdiğiniz bilgiler korundu.</span><button class="button is-small" type="button">Tekrar dene</button></div>
+      </div>
+    </section>
+
+    <section class="gallery-section" aria-labelledby="work-title">
+      <div class="section-title"><p class="zumbo-kicker">Çalışma grafiği</p><h2 id="work-title">Liste ve görev anatomisi</h2></div>
+      <div class="work-sample">
+        <div class="work-list" role="table" aria-label="Örnek görev listesi">
+          <div class="work-list-row work-list-head" role="row"><span role="columnheader">Görev</span><span role="columnheader">Durum</span><span role="columnheader">Sorumlu</span><span role="columnheader">Bitiş</span></div>
+          <div class="work-list-row" role="row"><strong role="cell">PROJ-184 · Oturum yenileme geri bildirimini tamamla</strong><span role="cell"><span class="zumbo-status info">İşleniyor</span></span><span role="cell">Deniz Yılmaz</span><time role="cell" datetime="2026-07-24">24 Tem</time></div>
+          <div class="work-list-row" role="row"><strong role="cell">PROJ-191 · Mobil boş durumunu doğrula</strong><span role="cell"><span class="zumbo-status warning">İnceleme</span></span><span role="cell">Mert Kaya</span><time role="cell" datetime="2026-07-25">25 Tem</time></div>
+        </div>
+        <article class="task-sample">
+          <div><span class="zumbo-status danger">Engellendi</span><span data-numeric>PROJ-197</span></div>
+          <h3>Webhook teslimat geçmişini görünür yap</h3>
+          <p>Yönetici yüzeyi için hata, yeniden deneme ve boş durumlarını bağla.</p>
+          <footer><span>Ayşe Demir</span><time datetime="2026-07-26">26 Tem</time></footer>
+        </article>
+      </div>
+    </section>
+
+    <section class="gallery-section state-section" aria-labelledby="state-title">
+      <div class="section-title"><p class="zumbo-kicker">Dayanıklı deneyim</p><h2 id="state-title">Yükleme, boş, yetki ve hata</h2></div>
+      <div class="state-grid">
+        <div class="state-sample"><strong>Yükleniyor</strong><div class="zumbo-skeleton"></div><div class="zumbo-skeleton short"></div><div class="zumbo-skeleton"></div></div>
+        <div class="state-sample"><strong>Görev yok</strong><p>Bu filtreyle eşleşen görev bulunamadı.</p><button class="button is-small" type="button">Filtreleri temizle</button></div>
+        <div class="state-sample"><strong>Salt okunur</strong><p>Bu projeyi görüntüleyebilirsiniz; düzenleme yetkiniz yok.</p><button class="button is-small" type="button">Yetkileri görüntüle</button></div>
+        <div class="state-sample"><strong>Yüklenemedi</strong><p>Sunucuya ulaşılamadı. Mevcut seçimleriniz korundu.</p><button class="button is-small" type="button">Tekrar dene</button></div>
+      </div>
+    </section>
+
+    <section class="gallery-section theme-preview theme-dark" aria-labelledby="dark-title">
+      <div class="section-title"><p class="zumbo-kicker">Koyu tema</p><h2 id="dark-title">Aynı semantik roller, ayrı kontrast bütçesi</h2></div>
+      <div class="dark-preview-row">
+        <button class="button is-primary" type="button">Değişiklikleri kaydet</button>
+        <span class="zumbo-status success">Eşitlendi</span>
+        <span class="zumbo-status warning">Çevrimdışı</span>
+        <input class="input" aria-label="Koyu tema arama örneği" value="PROJ-184">
+      </div>
+    </section>
+  </main>
+</body>
+</html>

@@ -61,6 +61,12 @@ public sealed record DurableOutboxMetrics(
     DateTimeOffset? OldestPendingAtUtc,
     DateTimeOffset CapturedAtUtc);
 
+public sealed record DurableDeadLetterSummary(
+    string Id,
+    string EventType,
+    int Attempts,
+    DateTimeOffset DeadLetteredAtUtc);
+
 public sealed record DurableMessageFailure(
     bool Updated,
     bool DeadLettered,
@@ -96,6 +102,10 @@ public interface IDurableEventOutbox
     Task<bool> ReplayDeadLetterAsync(
         string messageId,
         DateTimeOffset nowUtc,
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<DurableDeadLetterSummary>> ListDeadLettersAsync(
+        int pageSize,
         CancellationToken cancellationToken = default);
 
     Task<DurableOutboxMetrics> GetMetricsAsync(

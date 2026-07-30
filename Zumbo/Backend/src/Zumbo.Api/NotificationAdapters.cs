@@ -3,6 +3,7 @@ using System.Net.Mail;
 using System.Net.Sockets;
 using Microsoft.Extensions.Options;
 using Zumbo.BuildingBlocks.Application.Runtime;
+using Zumbo.Modules.Audit;
 using Zumbo.Modules.Identity;
 using Zumbo.Modules.Notifications;
 
@@ -13,6 +14,25 @@ public sealed class NotificationUserDirectoryAdapter(IUserRepository users) : IN
         var user = await users.GetByIdAsync(userId, ct);
         return user is null ? null : new NotificationUser(user.Id, user.OrganizationId, user.Email, user.IsActive);
     }
+}
+
+public sealed class NotificationAuditWriterAdapter(AuditService audit) : INotificationAuditWriter
+{
+    public Task WriteAsync(
+        string action,
+        string entityId,
+        string? oldValue,
+        string? newValue,
+        string correlationId,
+        CancellationToken ct) =>
+        audit.WriteAsync(
+            action,
+            "Notification",
+            entityId,
+            oldValue,
+            newValue,
+            correlationId,
+            ct);
 }
 
 public sealed class SmtpEmailNotificationSender : IEmailNotificationSender

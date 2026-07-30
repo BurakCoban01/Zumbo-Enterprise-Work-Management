@@ -30,6 +30,14 @@
           vm.roadmapSprints = vm.roadmapSprints || [];
           vm.selectedPlanningSprintId = vm.selectedPlanningSprintId || '';
           vm.sprintDraft = vm.sprintDraft || initialSprintDraft();
+          vm.sprintItems = vm.sprintItems || [];
+          vm.burndown = vm.burndown || [];
+          vm.planningError = null;
+          vm.planningLoading = false;
+          vm.burndownLoading = false;
+          vm.burndownError = null;
+          vm.backlogNextCursor = null;
+          vm.sprintNextCursor = null;
 
           vm.canPlanSprint = function() {
             return !!vm.projectMembership && vm.projectMembership.role !== 'Viewer';
@@ -77,23 +85,82 @@
             });
             if (!vm.selectedPlanningSprint) {
               vm.burndown = [];
+              vm.burndownError = null;
               return;
             }
+            var sprintId = vm.selectedPlanningSprint.id;
+            vm.burndownLoading = true;
+            vm.burndownError = null;
             return apiClient.get('/api/sprints/' + vm.selectedPlanningSprint.id + '/burndown')
-              .then(function(points) { vm.burndown = points; return points; })
-              .catch(function() { vm.burndown = []; return []; });
+              .then(function(points) {
+                if (!vm.selectedPlanningSprint || vm.selectedPlanningSprint.id !== sprintId) return [];
+                vm.burndown = points || [];
+                vm.burndownRefreshedAt = new Date();
+                return vm.burndown;
+              })
+              .catch(function() {
+                if (!vm.selectedPlanningSprint || vm.selectedPlanningSprint.id !== sprintId) return [];
+                vm.burndown = [];
+                vm.burndownError = 'Burndown verisi yuklenemedi.';
+                return [];
+              }).finally(function() {
+                if (vm.selectedPlanningSprint && vm.selectedPlanningSprint.id === sprintId) vm.burndownLoading = false;
+              });
+          };
+
+          vm.planningPoints = function() {
+            return (vm.sprintItems || []).reduce(function(total, item) {
+              return total + Number(item.estimatePoints || 0);
+            }, 0);
+          };
+
+          vm.capacityBaseline = function() {
+            var completed = (vm.velocity || []).map(function(item) { return Number(item.completedPoints || 0); });
+            if (!completed.length) return null;
+            return completed.reduce(function(total, points) { return total + points; }, 0) / completed.length;
+          };
+
+          vm.capacityPercent = function() {
+            var baseline = vm.capacityBaseline();
+            return baseline ? Math.round(vm.planningPoints() / baseline * 100) : null;
+          };
+
+          vm.capacityState = function() {
+            var percent = vm.capacityPercent();
+            if (percent === null) return 'unknown';
+            if (percent > 115) return 'over';
+            if (percent > 90) return 'near';
+            return 'available';
+          };
+
+          vm.burndownWidth = function(point) {
+            var max = Math.max.apply(null, (vm.burndown || []).map(function(item) {
+              return Number(item.remainingPoints || 0);
+            }).concat([0]));
+            return max ? Math.round(Number(point.remainingPoints || 0) / max * 100) : 0;
+          };
+
+          vm.carryoverTargets = function() {
+            return (vm.sprints || []).filter(function(sprint) {
+              return sprint.status === 'Planned' && (!vm.selectedPlanningSprint || sprint.id !== vm.selectedPlanningSprint.id);
+            });
           };
 
           vm.loadTimeline = function() {
             if (!vm.project || !vm.projectMembership) return $q.when([]);
+            if (vm.timelineLoading) return $q.when(vm.timelineEntries || []);
             var projectId = vm.project.id;
+            vm.timelineLoading = true;
+            vm.timelineError = null;
             function entityAudit(type, id) {
               return id ? apiClient.get('/api/audit/entity/' + type + '/' + id).catch(function() { return []; }) : $q.when([]);
             }
             var requests = [entityAudit('Project', projectId)];
             if (vm.board) requests.push(entityAudit('Board', vm.board.id));
-            (vm.sprints || []).forEach(function(sprint) { requests.push(entityAudit('Sprint', sprint.id)); });
-            if (vm.selectedTask) requests.push(entityAudit('WorkItem', vm.selectedTask.id));
+            if (vm.workMode === 'timeline') {
+              (vm.sprints || []).forEach(function(sprint) { requests.push(entityAudit('Sprint', sprint.id)); });
+              if (vm.selectedTask) requests.push(entityAudit('WorkItem', vm.selectedTask.id));
+            }
             return $q.all(requests)
               .then(function(groups) {
                 if (!vm.project || vm.project.id !== projectId) return [];
@@ -106,12 +173,20 @@
                   return new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime();
                 });
                 return vm.timelineEntries;
-              }).catch(function() { vm.timelineEntries = []; return []; });
+              }).catch(function() {
+                vm.timelineEntries = [];
+                vm.timelineError = 'Proje etkinliği yüklenemedi.';
+                return [];
+              }).finally(function() {
+                if (vm.project && vm.project.id === projectId) vm.timelineLoading = false;
+              });
           };
 
           vm.loadReports = function(projectId) {
             if (!vm.project) return $q.when();
             projectId = projectId || vm.project.id;
+            vm.planningLoading = true;
+            vm.planningError = null;
             function assignIfCurrent(assign) {
               return function(data) {
                 if (vm.project && vm.project.id === projectId) assign(data);
@@ -127,31 +202,120 @@
               apiClient.get('/api/work-items/reports/sprint-velocity/' + projectId + '?sprintCount=3')
                 .then(assignIfCurrent(function(data) { vm.velocity = data; })),
               apiClient.get('/api/sprints/projects/' + projectId + '?pageSize=50')
-                .then(assignIfCurrent(function(data) { vm.sprints = data.items || data; })),
+                .then(assignIfCurrent(function(data) {
+                  vm.sprints = data.items || data;
+                  vm.sprintNextCursor = data.nextCursor || null;
+                })),
               apiClient.get('/api/sprints/projects/' + projectId + '/backlog?pageSize=100')
-                .then(assignIfCurrent(function(data) { vm.backlogItems = data.items || data; }))
+                .then(assignIfCurrent(function(data) {
+                  vm.backlogItems = data.items || data;
+                  vm.backlogNextCursor = data.nextCursor || null;
+                  vm.backlogItems.forEach(function(item) { apiClient.remember('/api/work-items/' + item.id, item); });
+                }))
             ]).then(function() {
               if (!vm.project || vm.project.id !== projectId) return;
               vm.rebuildAdvancedViews();
-              return vm.workMode === 'timeline' ? vm.loadTimeline() : null;
+              return vm.workMode === 'timeline' || vm.workMode === 'overview' ? vm.loadTimeline() : null;
+            }).catch(function(error) {
+              if (vm.project && vm.project.id === projectId) {
+                vm.planningError = apiActionError(error, 'Planlama verileri yüklenemedi.');
+              }
+              return false;
+            }).finally(function() {
+              if (vm.project && vm.project.id === projectId) vm.planningLoading = false;
             });
           };
 
-          function planningMutation(request, successMessage) {
+          function appendUnique(target, items) {
+            (items || []).forEach(function(item) {
+              if (!target.some(function(existing) { return existing.id === item.id; })) target.push(item);
+            });
+          }
+
+          vm.loadMoreBacklog = function() {
+            if (!vm.project || !vm.backlogNextCursor || vm.planningLoading) return $q.when();
+            var projectId = vm.project.id;
+            vm.planningLoading = true;
+            return apiClient.get('/api/sprints/projects/' + projectId + '/backlog?pageSize=100&after=' + encodeURIComponent(vm.backlogNextCursor))
+              .then(function(data) {
+                if (!vm.project || vm.project.id !== projectId) return;
+                appendUnique(vm.backlogItems, data.items || []);
+                (data.items || []).forEach(function(item) { apiClient.remember('/api/work-items/' + item.id, item); });
+                vm.backlogNextCursor = data.nextCursor || null;
+              }).catch(function(error) {
+                vm.planningError = apiActionError(error, 'Backlog devam kayıtları yüklenemedi.');
+              }).finally(function() { vm.planningLoading = false; });
+          };
+
+          vm.loadMoreSprints = function() {
+            if (!vm.project || !vm.sprintNextCursor || vm.planningLoading) return $q.when();
+            var projectId = vm.project.id;
+            vm.planningLoading = true;
+            return apiClient.get('/api/sprints/projects/' + projectId + '?pageSize=50&after=' + encodeURIComponent(vm.sprintNextCursor))
+              .then(function(data) {
+                if (!vm.project || vm.project.id !== projectId) return;
+                appendUnique(vm.sprints, data.items || []);
+                vm.sprintNextCursor = data.nextCursor || null;
+                vm.rebuildAdvancedViews();
+              }).catch(function(error) {
+                vm.planningError = apiActionError(error, 'Sprint devam kayıtları yüklenemedi.');
+              }).finally(function() { vm.planningLoading = false; });
+          };
+
+          vm.loadRemainingPlanningTasks = function() {
+            if (vm.loading || !vm.hasMoreTasks) return $q.when();
+            function next() {
+              if (!vm.hasMoreTasks) {
+                vm.rebuildAdvancedViews();
+                return true;
+              }
+              return vm.loadMoreTasks().then(next);
+            }
+            return next();
+          };
+
+          function planningErrorMessage(error) {
+            var code = error && error.data && error.data.error && error.data.error.code;
+            if (code === 'CONCURRENCY_CONFLICT') return 'Çakışma algılandı. Güncel plan yeniden yüklendi; işlemi tekrar deneyin.';
+            if (code === 'SPRINT_ACTIVE_EXISTS') return 'Bu projede zaten aktif bir sprint var.';
+            if (code === 'SPRINT_PLANNING_CLOSED') return 'Sprint başladığı için kapsamı artık değiştirilemez.';
+            return apiActionError(error, 'Sprint işlemi tamamlanamadı.');
+          }
+
+          function planningMutation(request, successMessage, rollback) {
             if (vm.sprintBusy) return;
             vm.sprintBusy = true;
-            return request.then(function() {
+            vm.planningError = null;
+            return request.then(function(result) {
+              if (result && result.id) {
+                var sprint = (vm.sprints || []).find(function(item) { return item.id === result.id; });
+                if (sprint) angular.extend(sprint, result);
+                else vm.sprints.push(result);
+                vm.selectedPlanningSprintId = result.id;
+                vm.selectPlanningSprint();
+              }
               vm.notify('success', successMessage);
               return vm.loadTasks().then(function() { return true; });
             }).catch(function(error) {
-              vm.notify('error', apiActionError(error, 'Sprint işlemi tamamlanamadı.'));
-              return false;
+              if (rollback) rollback();
+              var message = planningErrorMessage(error);
+              vm.planningError = message;
+              vm.notify('error', message);
+              return vm.loadTasks().then(function() {
+                vm.planningError = message;
+                return false;
+              });
             }).finally(function() { vm.sprintBusy = false; });
           }
 
           vm.createSprint = function() {
             if (!vm.project || !vm.canPlanSprint() || !vm.sprintDraft.name || vm.sprintBusy) return;
             var draft = vm.sprintDraft;
+            vm.sprintDraftError = null;
+            if (!dateKey(draft.startDate) || !dateKey(draft.endDate) || dateKey(draft.endDate) < dateKey(draft.startDate)) {
+              vm.sprintDraftError = 'Bitiş tarihi başlangıç tarihinden önce olamaz.';
+              return $q.when(false);
+            }
             return planningMutation(apiClient.post('/api/sprints', {
               projectId: vm.project.id,
               name: draft.name,
@@ -165,17 +329,49 @@
 
           vm.planBacklogItem = function(item) {
             if (!item || !vm.canPlanSprint() || !vm.selectedPlanningSprint || vm.selectedPlanningSprint.status !== 'Planned') return;
+            var sprintId = vm.selectedPlanningSprint.id;
+            var backlogIndex = vm.backlogItems.indexOf(item);
+            var task = (vm.tasks || []).find(function(candidate) { return candidate.id === item.id; });
+            var previousSprintId = task && task.sprintId;
+            apiClient.remember('/api/work-items/' + item.id, item);
+            if (backlogIndex >= 0) vm.backlogItems.splice(backlogIndex, 1);
+            if (task) task.sprintId = sprintId;
+            vm.selectPlanningSprint();
             return planningMutation(apiClient.put(
-              '/api/sprints/' + vm.selectedPlanningSprint.id + '/items/' + item.id,
+              '/api/sprints/' + sprintId + '/items/' + item.id,
               { estimatePoints: item.estimatePoints || 0 }
-            ), 'İş sprint kapsamına alındı.');
+            ), 'İş sprint kapsamına alındı.', function() {
+              if (backlogIndex >= 0 && vm.backlogItems.indexOf(item) < 0) vm.backlogItems.splice(backlogIndex, 0, item);
+              if (task) task.sprintId = previousSprintId;
+              vm.selectPlanningSprint();
+            });
           };
 
           vm.unplanSprintItem = function(item) {
             if (!item || !vm.canPlanSprint() || !vm.selectedPlanningSprint || vm.selectedPlanningSprint.status !== 'Planned') return;
+            var sprintId = vm.selectedPlanningSprint.id;
+            var backlogCopy = vm.backlogItems.slice();
+            apiClient.remember('/api/work-items/' + item.id, item);
+            item.sprintId = null;
+            if (!vm.backlogItems.some(function(candidate) { return candidate.id === item.id; })) vm.backlogItems.unshift(item);
+            vm.selectPlanningSprint();
             return planningMutation(apiClient.delete(
-              '/api/sprints/' + vm.selectedPlanningSprint.id + '/items/' + item.id
-            ), 'İş backlog alanına taşındı.');
+              '/api/sprints/' + sprintId + '/items/' + item.id
+            ), 'İş backlog alanına taşındı.', function() {
+              vm.backlogItems = backlogCopy;
+              item.sprintId = sprintId;
+              vm.selectPlanningSprint();
+            });
+          };
+
+          vm.handlePlanningItemKey = function(event, item, direction) {
+            if (!event.altKey || (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight')) return;
+            var wantsPlan = direction === 'plan' && event.key === 'ArrowRight';
+            var wantsBacklog = direction === 'unplan' && event.key === 'ArrowLeft';
+            if (!wantsPlan && !wantsBacklog) return;
+            event.preventDefault();
+            if (wantsPlan) vm.planBacklogItem(item);
+            else vm.unplanSprintItem(item);
           };
 
           vm.startSelectedSprint = function() {

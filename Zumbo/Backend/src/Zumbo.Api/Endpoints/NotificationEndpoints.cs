@@ -26,6 +26,7 @@ internal static class NotificationEndpoints
                 "Notification email delivery configuration is invalid.")
             .ValidateOnStart();
         services.AddScoped<INotificationUserDirectory, NotificationUserDirectoryAdapter>();
+        services.AddScoped<INotificationAuditWriter, NotificationAuditWriterAdapter>();
         services.AddScoped<IEmailNotificationSender, SmtpEmailNotificationSender>();
         services.AddScoped<NotificationService>();
         services.AddScoped<ListNotificationsHandler>();
@@ -92,14 +93,40 @@ internal static class NotificationEndpoints
             .WithZumboPermission(PermissionCatalog.OperationsManage, isGlobal: true)
             .RequireRateLimiting("report");
 
+        group.MapGet("/delivery/dead-letters", async (
+            string organizationId,
+            int? pageSize,
+            NotificationService service,
+            CancellationToken ct) =>
+            Results.Ok(await service.ListDeadLettersAsync(
+                organizationId,
+                Math.Clamp(pageSize ?? 20, 1, 50),
+                ct)))
+            .WithZumboPermission(PermissionCatalog.OperationsManage, isGlobal: true)
+            .RequireRateLimiting("report");
+
         group.MapPost("/delivery/{notificationId}/replay", async (
             string notificationId,
             string organizationId,
             NotificationService service,
+            INotificationAuditWriter audit,
+            HttpContext http,
             CancellationToken ct) =>
-            await service.ReplayDeadLetterAsync(organizationId, notificationId, ct)
-                ? Results.Ok()
-                : Results.NotFound())
+        {
+            if (!await service.ReplayDeadLetterAsync(organizationId, notificationId, ct))
+            {
+                return Results.NotFound();
+            }
+
+            await audit.WriteAsync(
+                "NotificationDeliveryReplayed",
+                notificationId,
+                "DeadLetter",
+                "Pending",
+                CorrelationId(http),
+                ct);
+            return Results.Ok();
+        })
             .WithZumboPermission(PermissionCatalog.OperationsManage, isGlobal: true)
             .RequireRateLimiting("bulk");
     }

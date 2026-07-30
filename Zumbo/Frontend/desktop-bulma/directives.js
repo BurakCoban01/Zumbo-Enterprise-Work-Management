@@ -51,8 +51,14 @@
       return {
         restrict: 'A',
         link: function(scope, element, attrs) {
-          element.attr('draggable', 'true');
+          attrs.$observe('draggableTask', function(taskId) {
+            element.attr('draggable', taskId ? 'true' : 'false');
+          });
           element.on('dragstart', function(event) {
+            if (!attrs.draggableTask) {
+              event.preventDefault();
+              return;
+            }
             var nativeEvent = event.originalEvent || event;
             nativeEvent.dataTransfer.effectAllowed = 'move';
             nativeEvent.dataTransfer.setData('text/plain', attrs.draggableTask);

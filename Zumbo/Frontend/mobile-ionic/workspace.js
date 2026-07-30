@@ -6,7 +6,33 @@
     var vm = this;
     vm.summary = {};
     vm.tasks = [];
+    vm.visibleTaskItems = [];
+    vm.mode = 'assigned';
     vm.searchDegraded = false;
+    function isDone(task) {
+      return task.completedAt || ['done', 'completed', 'tamamlandı'].indexOf(String(task.status || '').toLocaleLowerCase('tr-TR')) >= 0;
+    }
+    function isBlocked(task) {
+      if (String(task.status || '').toLowerCase().indexOf('block') >= 0) return true;
+      return (task.relations || []).some(function(relation) {
+        return ['blockedby', 'dependson'].indexOf(String(relation.relationType || '').toLowerCase()) >= 0;
+      });
+    }
+    vm.setMode = function(mode) {
+      vm.mode = mode;
+      rebuildVisibleTasks();
+    };
+    vm.visibleTasks = function() {
+      return vm.visibleTaskItems;
+    };
+    function rebuildVisibleTasks() {
+      var open = vm.tasks.filter(function(task) { return !isDone(task); });
+      if (vm.mode === 'due') vm.visibleTaskItems = open.filter(function(task) { return task.dueDate; }).sort(function(left, right) { return new Date(left.dueDate) - new Date(right.dueDate); });
+      else if (vm.mode === 'blocked') vm.visibleTaskItems = open.filter(isBlocked);
+      else if (vm.mode === 'recent') vm.visibleTaskItems = vm.tasks.slice().reverse();
+      else vm.visibleTaskItems = open;
+      return vm.visibleTaskItems;
+    }
     var unsubscribeRealtime = realtimeService.subscribe(function(change) {
       if (change.eventType === 'resyncRequired') {
         if (sessionStore.state.project && change.projectId === sessionStore.state.project.id) vm.refresh();
@@ -20,6 +46,7 @@
       else if (visible && index >= 0) { vm.tasks[index] = change.workItem; }
       else if (visible) { vm.tasks.unshift(change.workItem); }
       vm.tasks.sort(function(left, right) { return (left.rank || 0) - (right.rank || 0); });
+      rebuildVisibleTasks();
     });
     $scope.$on('$destroy', unsubscribeRealtime);
     vm.refresh = function() {
@@ -46,6 +73,7 @@
           vm.tasks = result[1].items || [];
           vm.searchDegraded = result[1].degraded === true;
           realtimeService.synchronize(vm.tasks);
+          rebuildVisibleTasks();
         }
       }).finally(function() {
         $ionicScrollDelegate.$getByHandle('dashboardScroll').resize();
@@ -117,11 +145,43 @@
     $scope.$on('$ionicView.beforeEnter', vm.load);
     vm.load();
   })
-  .controller('NotificationsController', function(zumboApi) {
+  .controller('NotificationsController', function($scope, zumboApi, mobileActionError) {
     var vm = this;
+    vm.mode = 'unread';
     vm.notifications = [];
-    vm.load = function() { return zumboApi.notifications().then(function(data) { vm.notifications = data; }); };
-    vm.read = function(notification) { zumboApi.read(notification.id).then(vm.load); };
+    vm.loading = false;
+    vm.error = '';
+    vm.load = function() {
+      vm.loading = true;
+      vm.error = '';
+      return zumboApi.notifications().then(function(data) {
+        vm.notifications = data;
+      }).catch(function(error) {
+        vm.error = mobileActionError(error, 'Gelen kutusu yüklenemedi.');
+      }).finally(function() {
+        vm.loading = false;
+      });
+    };
+    vm.refresh = function() {
+      return vm.load().finally(function() {
+        $scope.$broadcast('scroll.refreshComplete');
+      });
+    };
+    vm.read = function(notification) {
+      if (notification.reading) return;
+      notification.reading = true;
+      vm.error = '';
+      return zumboApi.read(notification.id).then(vm.load).catch(function(error) {
+        notification.reading = false;
+        vm.error = mobileActionError(error, 'Bildirim güncellenemedi.');
+      });
+    };
+    vm.setMode = function(mode) { vm.mode = mode; };
+    vm.visibleNotifications = function() {
+      if (vm.mode === 'all') return vm.notifications;
+      if (vm.mode === 'actions') return vm.notifications.filter(function(item) { return /approval|mention|onay|bahset/i.test(item.type + ' ' + item.message); });
+      return vm.notifications.filter(function(item) { return !item.read; });
+    };
     vm.load();
   });
 })();

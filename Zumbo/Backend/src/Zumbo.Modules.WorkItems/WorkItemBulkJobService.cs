@@ -195,6 +195,13 @@ public sealed class WorkItemBulkJobService(
         string jobId, bool errors, CancellationToken ct)
     {
         var job = await GetOwnedAsync(jobId, PermissionCatalog.WorkItemView, ct);
+        if (ArtifactsExpired(job))
+        {
+            await ExpireArtifactsAsync(job, ct);
+            throw new NotFoundException(
+                "WORK_ITEM_BULK_ARTIFACT_EXPIRED",
+                "The requested job artifact has expired.");
+        }
         var path = errors ? job.ErrorStoragePath : job.ResultStoragePath;
         var name = errors ? job.ErrorFileName : job.ResultFileName;
         var type = errors ? job.ErrorContentType : job.ResultContentType;
@@ -326,11 +333,50 @@ public sealed class WorkItemBulkJobService(
         Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(value))).ToLowerInvariant();
     internal static WorkItemBulkJobDueEvent ToEvent(WorkItemBulkJobDocument job) =>
         new(job.OrganizationId, job.ProjectId, job.Id, job.RequestedByUserId, job.DispatchSequence);
-    internal static WorkItemBulkJobResponse ToResponse(WorkItemBulkJobDocument job) =>
+    internal WorkItemBulkJobResponse ToResponse(WorkItemBulkJobDocument job) =>
         new(job.Id, job.ProjectId, job.Type, job.Operation, job.DryRun, job.State,
             job.TotalItems, job.ProcessedItems, job.SucceededItems, job.FailedItems,
             job.CancelRequested, job.ResultStoragePath is not null, job.ErrorStoragePath is not null,
-            job.LastErrorCode, job.LastErrorMessage, job.CreatedAt, job.StartedAt, job.CompletedAt, job.Version);
+            job.LastErrorCode, job.LastErrorMessage, job.CreatedAt, job.StartedAt, job.CompletedAt,
+            job.CompletedAt?.AddDays(Options.ArtifactRetentionDays), job.Version);
+
+    private bool ArtifactsExpired(WorkItemBulkJobDocument job) =>
+        job.CompletedAt?.AddDays(Options.ArtifactRetentionDays) <= clock.UtcNow;
+
+    private async Task ExpireArtifactsAsync(WorkItemBulkJobDocument job, CancellationToken ct)
+    {
+        var paths = new[] { job.ResultStoragePath, job.ErrorStoragePath }
+            .Where(path => !string.IsNullOrWhiteSpace(path))
+            .Distinct(StringComparer.Ordinal)
+            .Select(path => path!)
+            .ToArray();
+        if (paths.Length == 0) return;
+
+        job.ResultStoragePath = null;
+        job.ResultFileName = null;
+        job.ResultContentType = null;
+        job.ResultChecksumSha256 = null;
+        job.ResultSizeBytes = null;
+        job.ErrorStoragePath = null;
+        job.ErrorFileName = null;
+        job.ErrorContentType = null;
+        job.ErrorChecksumSha256 = null;
+        job.ErrorSizeBytes = null;
+        job.UpdatedAt = clock.UtcNow;
+        await ReplaceAsync(job, ct);
+        foreach (var path in paths)
+        {
+            await artifacts.DeleteAsync(path, ct);
+        }
+        await audit.WriteAsync(
+            "WorkItemBulkJobArtifactsExpired",
+            "WorkItemBulkJob",
+            job.Id,
+            null,
+            job.CompletedAt?.AddDays(Options.ArtifactRetentionDays).ToString("O"),
+            $"bulk-job:{job.Id}",
+            ct);
+    }
     private async Task ReplaceAsync(WorkItemBulkJobDocument job, CancellationToken ct)
     {
         var result = await jobs.ReplaceByVersionAsync(x => x.Id == job.Id, job, job.Version, ct);

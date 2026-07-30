@@ -1,0 +1,274 @@
+.mobile-knowledge {
+  background: var(--surface-canvas);
+}
+
+.mobile-knowledge-head,
+.mobile-knowledge-search,
+.mobile-knowledge-meta,
+.mobile-knowledge-comment header,
+.mobile-knowledge-version {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.mobile-knowledge-head {
+  justify-content: space-between;
+  padding: 16px 16px 10px;
+}
+
+.mobile-knowledge-head h2,
+.mobile-knowledge-head small {
+  display: block;
+  margin: 0;
+}
+
+.mobile-knowledge-head small,
+.mobile-knowledge-register small,
+.mobile-knowledge-meta span,
+.mobile-knowledge-form label > span,
+.mobile-knowledge-comment small,
+.mobile-knowledge-version small {
+  color: var(--text-muted);
+}
+
+.mobile-knowledge-head button {
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--accent);
+}
+
+.mobile-knowledge-search {
+  margin: 0 16px 10px;
+}
+
+.mobile-knowledge-search input {
+  min-width: 0;
+  flex: 1 1 auto;
+  min-height: 44px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--surface);
+  color: var(--text);
+}
+
+.mobile-knowledge-search button {
+  width: 44px;
+  min-width: 44px;
+  min-height: 44px;
+}
+
+.mobile-knowledge-register {
+  display: flex;
+  gap: 8px;
+  padding: 0 16px 12px;
+  overflow-x: auto;
+}
+
+.mobile-knowledge-register button {
+  flex: 0 0 210px;
+  min-height: 62px;
+  padding: 9px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+  text-align: left;
+}
+
+.mobile-knowledge-register button.active {
+  border-color: var(--accent);
+}
+
+.mobile-knowledge-register strong,
+.mobile-knowledge-register small {
+  display: block;
+}
+
+.mobile-knowledge-tabs {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin: 0 16px 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.mobile-knowledge-tabs button {
+  min-height: 44px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.mobile-knowledge-tabs button.active {
+  border-bottom-color: var(--accent);
+  color: var(--text);
+}
+
+.mobile-knowledge-content,
+.mobile-knowledge-form,
+.mobile-knowledge-history,
+.mobile-knowledge-comments,
+.mobile-knowledge-links {
+  margin: 0 16px 16px;
+}
+
+.mobile-knowledge-content,
+.mobile-knowledge-form {
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+}
+
+.mobile-knowledge-content h2 {
+  margin: 0;
+  font-size: 1.15rem;
+}
+
+.mobile-knowledge-meta {
+  flex-wrap: wrap;
+  margin: 8px 0 12px;
+}
+
+.mobile-knowledge-meta > div {
+  padding-right: 10px;
+  border-right: 1px solid var(--border);
+}
+
+.mobile-knowledge-preview,
+.mobile-knowledge-readonly,
+.mobile-knowledge-partial {
+  margin: 8px 0;
+  padding: 8px 10px;
+  border-left: 3px solid var(--warning);
+  background: var(--surface-muted);
+}
+
+.mobile-knowledge-readonly {
+  border-left-color: var(--accent);
+}
+
+.mobile-knowledge-render {
+  line-height: 1.6;
+}
+
+.mobile-knowledge-render h2,
+.mobile-knowledge-render h3,
+.mobile-knowledge-render h4 {
+  margin: 18px 0 7px;
+  letter-spacing: 0;
+}
+
+.mobile-knowledge-render p,
+.mobile-knowledge-render ul,
+.mobile-knowledge-render ol,
+.mobile-knowledge-render blockquote {
+  margin: 0 0 10px;
+}
+
+.mobile-knowledge-render blockquote,
+.mobile-knowledge-render pre {
+  padding: 9px;
+  border-left: 3px solid var(--accent);
+  background: var(--surface-muted);
+}
+
+.mobile-knowledge-render pre {
+  max-width: 100%;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+
+.mobile-knowledge-form {
+  display: grid;
+  gap: 12px;
+}
+
+.mobile-knowledge-form label {
+  display: grid;
+  gap: 6px;
+}
+
+.mobile-knowledge-form input,
+.mobile-knowledge-form select,
+.mobile-knowledge-form textarea {
+  width: 100%;
+  min-height: 44px;
+  padding: 9px 10px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--surface);
+  color: var(--text);
+}
+
+.mobile-knowledge-form textarea.content {
+  min-height: 220px;
+  font-family: var(--font-mono);
+}
+
+.mobile-knowledge-form select[multiple] {
+  min-height: 112px;
+}
+
+.mobile-knowledge-version {
+  width: 100%;
+  min-height: 54px;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  padding: 9px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+  text-align: left;
+}
+
+.mobile-knowledge-version strong,
+.mobile-knowledge-version small {
+  display: block;
+}
+
+.mobile-knowledge-comment {
+  margin-bottom: 8px;
+  padding: 10px;
+  border-left: 3px solid var(--border-strong);
+  background: var(--surface);
+}
+
+.mobile-knowledge-comment.resolved {
+  opacity: .7;
+}
+
+.mobile-knowledge-comment header {
+  justify-content: space-between;
+}
+
+.mobile-knowledge-comment p {
+  margin: 7px 0 0;
+}
+
+.mobile-knowledge-links h3,
+.mobile-knowledge-history h3,
+.mobile-knowledge-comments h3 {
+  font-size: .95rem;
+}
+
+.mobile-knowledge-link {
+  display: block;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+@media (max-width: 350px) {
+  .mobile-knowledge-tabs button {
+    font-size: 11px;
+  }
+}

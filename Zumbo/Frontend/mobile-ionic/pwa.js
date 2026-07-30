@@ -13,11 +13,14 @@
       var refreshing = false;
       var controlled = Boolean($window.navigator.serviceWorker && $window.navigator.serviceWorker.controller);
 
-      function updateConnectivity() {
+      function updateConnectivity(event) {
+        var offline = event && event.type
+          ? event.type === 'offline'
+          : !$window.navigator.onLine;
         $rootScope.$evalAsync(function() {
-          state.offline = !$window.navigator.onLine;
+          state.offline = offline;
         });
-        if ($window.navigator.onLine && state.registration) {
+        if (!offline && state.registration) {
           state.registration.update().catch(angular.noop);
         }
       }

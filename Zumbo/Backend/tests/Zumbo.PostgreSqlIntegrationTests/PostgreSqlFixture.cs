@@ -7,7 +7,9 @@ using Zumbo.RepositoryContracts;
 using Zumbo.Modules.Audit;
 using Zumbo.Modules.Identity;
 using Zumbo.Modules.Notifications;
+using Zumbo.Modules.Projects;
 using Zumbo.Modules.WorkItems;
+using Zumbo.Modules.Workflows;
 
 namespace Zumbo.PostgreSqlIntegrationTests;
 
@@ -36,14 +38,19 @@ public sealed class PostgreSqlFixture : IAsyncLifetime
 
         Api = PostgreSqlApi.Create(connectionString);
         await Api.ResetAndMigrateAsync(CancellationToken.None);
-        await using (var bootstrap = new PostgreSqlProvider(connectionString))
-        {
-            _ = bootstrap.CreateRepository<RepositoryContractDocument>(TestSchema, RepositoryTable);
-        }
 
         await using var connection = await Api.OpenConnectionAsync(CancellationToken.None);
         await ExecuteAsync(connection, $"""
             CREATE SCHEMA IF NOT EXISTS {TestSchema};
+            CREATE TABLE IF NOT EXISTS {TestSchema}.{RepositoryTable} (
+                id text PRIMARY KEY,
+                version bigint NOT NULL DEFAULT 0 CHECK(version >= 0),
+                document jsonb NOT NULL CHECK(jsonb_typeof(document) = 'object'),
+                created_at timestamptz NOT NULL DEFAULT transaction_timestamp(),
+                updated_at timestamptz NOT NULL DEFAULT transaction_timestamp(),
+                CHECK(document ->> 'Id' = id),
+                CHECK(COALESCE((document ->> 'Version')::bigint, 0) = version)
+            );
             CREATE TABLE IF NOT EXISTS {TestSchema}.{TransactionTable} (
                 id uuid PRIMARY KEY,
                 value text NOT NULL,
@@ -154,8 +161,22 @@ public sealed class PostgreSqlApi : IAsyncDisposable
         options.MapDocument<WorkItemRecurrenceOccurrenceDocument>("work_items", "work_item_recurrence_occurrences");
         options.MapDocument<WorkItemBulkJobDocument>("work_items", "work_item_bulk_jobs");
         options.MapDocument<WorkItemBulkJobItemDocument>("work_items", "work_item_bulk_job_items");
+        options.MapDocument<IntakeFormDocument>("work_items", "intake_forms");
+        options.MapDocument<IntakeFormVersionDocument>("work_items", "intake_form_versions");
+        options.MapDocument<IntakeSubmissionDocument>("work_items", "intake_submissions");
+        options.MapDocument<DashboardDocument>("work_items", "dashboards");
+        options.MapDocument<CapacityPlanDocument>("work_items", "capacity_plans");
+        options.MapDocument<DevelopmentConnectionDocument>("work_items", "development_connections");
+        options.MapDocument<DevelopmentRepositoryMappingDocument>("work_items", "development_repository_mappings");
+        options.MapDocument<WorkItemDevelopmentLinkDocument>("work_items", "work_item_development_links");
+        options.MapDocument<DevelopmentWebhookReceiptDocument>("work_items", "development_webhook_receipts");
+        options.MapDocument<PortfolioDocument>("projects", "portfolios");
+        options.MapDocument<GoalDocument>("projects", "goals");
+        options.MapDocument<KnowledgeDocument>("projects", "knowledge_documents");
         options.MapDocument<WebhookSubscriptionDocument>("work_items", "webhook_subscriptions");
         options.MapDocument<WebhookDeliveryDocument>("work_items", "webhook_deliveries");
+        options.MapDocument<AutomationRuleDocument>("workflows", "automation_rules");
+        options.MapDocument<AutomationRunDocument>("workflows", "automation_runs");
         var dataSource = new NpgsqlDataSourceBuilder(connectionString).Build();
         return new PostgreSqlApi(dataSource, options, new PostgreSqlSession(dataSource));
     }

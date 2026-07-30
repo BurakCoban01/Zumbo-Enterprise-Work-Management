@@ -94,11 +94,17 @@ public sealed class RouteInventoryCharacterizationTests : IClassFixture<WebAppli
             typeof(OrganizationService), typeof(CreateOrganizationHandler), typeof(ListOrganizationsHandler),
             typeof(TeamService), typeof(CreateTeamHandler), typeof(ListTeamsHandler),
             typeof(ProjectService), typeof(CreateProjectHandler), typeof(ListProjectsHandler),
+            typeof(PortfolioService), typeof(GoalService), typeof(KnowledgeService),
             typeof(BoardService), typeof(CreateBoardHandler), typeof(ListBoardsByProjectHandler),
             typeof(NotificationService), typeof(ListNotificationsHandler), typeof(MarkNotificationAsReadHandler),
             typeof(AuditService), typeof(WriteAuditLogHandler), typeof(QueryAuditLogHandler),
             typeof(WorkflowService), typeof(UpsertWorkflowHandler), typeof(GetWorkflowHandler),
-            typeof(WorkItemService), typeof(CreateWorkItemHandler), typeof(SearchWorkItemsHandler)
+            typeof(AutomationRuleService),
+            typeof(IntakeFormService), typeof(IntakeSubmissionService),
+            typeof(WorkItemService), typeof(CreateWorkItemHandler), typeof(SearchWorkItemsHandler),
+            typeof(DashboardService), typeof(DashboardRenderer),
+            typeof(DevelopmentIntegrationService),
+            typeof(DevelopmentWebhookReceiptRetentionService)
         };
 
         foreach (var serviceType in scopedTypes)

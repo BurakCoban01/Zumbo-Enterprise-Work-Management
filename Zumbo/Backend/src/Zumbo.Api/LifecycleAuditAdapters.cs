@@ -3,6 +3,7 @@ using Zumbo.Modules.Boards;
 using Zumbo.Modules.Organizations;
 using Zumbo.Modules.Projects;
 using Zumbo.Modules.Teams;
+using Zumbo.Modules.WorkItems;
 using Zumbo.Modules.Workflows;
 
 public sealed class TeamAuditWriterAdapter(AuditService audit) : ITeamAuditWriter
@@ -56,6 +57,19 @@ public sealed class WorkflowAuditWriterAdapter(AuditService audit) : IWorkflowAu
         audit.WriteAsync("WorkflowUpdated", "Project", projectId, oldValue, newValue, correlationId, ct);
 }
 
+public sealed class AutomationAuditWriterAdapter(AuditService audit) : IAutomationAuditWriter
+{
+    public Task WriteAsync(
+        string action,
+        string ruleId,
+        string projectId,
+        string? oldValue,
+        string? newValue,
+        string correlationId,
+        CancellationToken ct) =>
+        audit.WriteAsync(action, "AutomationRule", ruleId, oldValue, newValue, correlationId, ct);
+}
+
 public sealed class OrganizationAuditWriterAdapter(AuditService audit) : IOrganizationAuditWriter
 {
     public Task WriteAsync(
@@ -66,4 +80,17 @@ public sealed class OrganizationAuditWriterAdapter(AuditService audit) : IOrgani
         string correlationId,
         CancellationToken ct) =>
         audit.WriteAsync(action, "Organization", organizationId, oldValue, newValue, correlationId, ct);
+}
+
+public sealed class WorkItemOperationsAuditWriterAdapter(AuditService audit) : IWorkItemOperationsAuditWriter
+{
+    public Task WriteAsync(
+        string action,
+        string entityType,
+        string entityId,
+        string? oldValue,
+        string? newValue,
+        string correlationId,
+        CancellationToken ct) =>
+        audit.WriteAsync(action, entityType, entityId, oldValue, newValue, correlationId, ct);
 }

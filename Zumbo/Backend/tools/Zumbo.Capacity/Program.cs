@@ -25,7 +25,7 @@ try
     object result = command switch
     {
         "seed" => await CreateSeedRunner(password).RunAsync(profile, cancellation.Token),
-        "clean" => await CreateSeedRunner(password).CleanAsync(profile, CancellationToken.None),
+        "clean" => await CreateSeedRunner(password).CleanAsync(profile, cancellation.Token),
         "benchmark" => await new BenchmarkRunner(
                 RequireEnvironment("ZUMBO_MONGO_URL"),
                 RequireEnvironment("ZUMBO_API_URL"),

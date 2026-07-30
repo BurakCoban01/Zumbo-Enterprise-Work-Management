@@ -119,6 +119,27 @@ public sealed class AttachmentSecurityTests
     }
 
     [Fact]
+    public async Task RejectedUpload_CleanupFailureDoesNotHidePrimaryResultAndUsesBoundedToken()
+    {
+        var storage = new FailingDeleteStorage();
+        var adapter = new AttachmentStorageAdapter(
+            storage,
+            new MutableScanner(AttachmentMalwareScanStatuses.Infected),
+            Microsoft.Extensions.Options.Options.Create(new AttachmentSecurityOptions()),
+            new FixedClock(DateTimeOffset.UtcNow));
+
+        var exception = await Assert.ThrowsAsync<ValidationException>(() => adapter.SaveAsync(
+            new MemoryStream("infected test fixture"u8.ToArray()),
+            "fixture.txt",
+            "text/plain",
+            1024,
+            default));
+
+        Assert.Equal("Attachment was rejected by malware scanning.", exception.Message);
+        Assert.True(storage.DeleteToken.CanBeCanceled);
+    }
+
+    [Fact]
     public async Task Maintenance_RetriesQuarantineAndPersistsCleanState()
     {
         await using var fixture = new AttachmentFixture(AttachmentMalwareScanStatuses.Unavailable);
@@ -218,6 +239,42 @@ public sealed class AttachmentSecurityTests
     }
 
     [Fact]
+    public async Task StatusAndScopedMaintenance_DoNotCrossOrganizationBoundary()
+    {
+        await using var fixture = new AttachmentFixture(AttachmentMalwareScanStatuses.Unavailable);
+        var repository = new InMemoryDocumentRepository<WorkItemAttachmentActivityDocument>();
+        var first = await fixture.Adapter.SaveAsync(
+            new MemoryStream("first tenant"u8.ToArray()),
+            "first.txt",
+            "text/plain",
+            1024,
+            default);
+        var second = await fixture.Adapter.SaveAsync(
+            new MemoryStream("second tenant"u8.ToArray()),
+            "second.txt",
+            "text/plain",
+            1024,
+            default);
+        await repository.CreateAsync(WithOrganization(ToDocument(first, fixture.Clock.UtcNow), "org-a"));
+        var foreign = await repository.CreateAsync(
+            WithOrganization(ToDocument(second, fixture.Clock.UtcNow), "org-b"));
+        var maintenance = new AttachmentSecurityMaintenanceService(
+            repository,
+            fixture.Adapter,
+            fixture.Options,
+            fixture.Clock);
+
+        var status = await maintenance.GetStatusAsync("org-a", default);
+        var result = await maintenance.RunBatchAsync("org-a", default);
+        var untouched = await repository.SelectAsync(x => x.Id == foreign.Id);
+
+        Assert.Equal(1, status.Quarantined);
+        Assert.Equal(1, result.Retried);
+        Assert.Equal(AttachmentSecurityStates.Quarantined, untouched!.SecurityState);
+        Assert.Equal(foreign.Version, untouched.Version);
+    }
+
+    [Fact]
     public async Task ClamAvScanner_UnavailableEndpointReturnsFailClosedState()
     {
         var scanner = new ClamAvAttachmentMalwareScanner(Options.Create(new AttachmentSecurityOptions
@@ -256,6 +313,14 @@ public sealed class AttachmentSecurityTests
             ScannedAt = stored.ScannedAt,
             CreatedAt = createdAt
         };
+
+    private static WorkItemAttachmentActivityDocument WithOrganization(
+        WorkItemAttachmentActivityDocument document,
+        string organizationId)
+    {
+        document.OrganizationId = organizationId;
+        return document;
+    }
 
     private static byte[] CreateZip(params (string Name, byte[] Content)[] entries)
     {
@@ -316,6 +381,67 @@ public sealed class AttachmentSecurityTests
             ct.ThrowIfCancellationRequested();
             return Task.FromResult(new AttachmentMalwareScanResult(Status, "TestScanner", "test outcome"));
         }
+    }
+
+    private sealed class FailingDeleteStorage : IFileStorage
+    {
+        public CancellationToken DeleteToken { get; private set; }
+
+        public Task<StoredFile> SaveAsync(
+            Stream content,
+            string fileName,
+            string contentType,
+            long maxSizeBytes,
+            CancellationToken cancellationToken = default) =>
+            SaveQuarantinedAsync(content, fileName, contentType, maxSizeBytes, cancellationToken);
+
+        public Task<StoredFile> SaveQuarantinedAsync(
+            Stream content,
+            string fileName,
+            string contentType,
+            long maxSizeBytes,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(new StoredFile(
+                fileName,
+                contentType,
+                content.Length,
+                "quarantine/fixture",
+                "synthetic-checksum"));
+
+        public Task<StoredFile> SaveArtifactAsync(
+            Stream content,
+            string fileName,
+            string contentType,
+            long maxSizeBytes,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<StoredFile> PromoteAsync(
+            StoredFile quarantinedFile,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<StoredFileContent> OpenReadAsync(
+            string storagePath,
+            string contentType,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task DeleteAsync(
+            string storagePath,
+            CancellationToken cancellationToken = default)
+        {
+            DeleteToken = cancellationToken;
+            throw new InvalidOperationException("Synthetic cleanup failure.");
+        }
+
+        public Task<IReadOnlyList<StoredFileObject>> ListAttachmentObjectsAsync(
+            int maxCount,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<StoredFileObject>>([]);
+
+        public Task CheckHealthAsync(CancellationToken cancellationToken = default) =>
+            Task.CompletedTask;
     }
 
     private sealed class FixedClock(DateTimeOffset now) : IClock

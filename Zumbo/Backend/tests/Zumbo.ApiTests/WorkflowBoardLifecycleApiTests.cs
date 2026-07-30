@@ -48,6 +48,9 @@ public sealed class WorkflowBoardLifecycleApiTests : IClassFixture<WebApplicatio
         var published = await GetAsync<WorkflowResponse>($"/api/workflows/{project.Id}");
         Assert.Equal(1, published.PublishedVersion);
         Assert.False(published.HasDraft);
+        Assert.Equal(WorkflowRetentionPolicy.MaximumPublishedVersions, published.PublishedVersionRetentionLimit);
+        Assert.Equal(1, published.RetainedPublishedVersionCount);
+        Assert.Equal(1, published.OldestRetainedPublishedVersion);
         Assert.Contains(published.IssueTypeSchemes!, x => x.IssueType == "*");
         Assert.Contains(
             board.Columns.Single(x => x.Category == "InProgress").StatusNames!,

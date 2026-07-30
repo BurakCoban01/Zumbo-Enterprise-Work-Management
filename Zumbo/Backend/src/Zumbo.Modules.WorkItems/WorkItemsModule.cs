@@ -1,7 +1,9 @@
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using System.Linq.Expressions;
 using Zumbo.BuildingBlocks.Application.Concurrency;
 using Zumbo.BuildingBlocks.Application.Persistence;
+using Zumbo.BuildingBlocks.Application.Runtime;
 using Zumbo.BuildingBlocks.Application.Search;
 using Zumbo.BuildingBlocks.Application.Security;
 using Zumbo.SharedKernel;
@@ -17,7 +19,10 @@ public sealed record SetWorkItemCustomFieldsRequest(IReadOnlyCollection<WorkItem
 public sealed record AddChecklistItemRequest(string Text);
 public sealed record CompleteChecklistItemRequest(bool Completed);
 public sealed record AddLabelRequest(string Label);
-public sealed record AddCommentRequest(string Body, IReadOnlyCollection<string>? Mentions);
+public sealed record AddCommentRequest(
+    string Body,
+    IReadOnlyCollection<string>? Mentions,
+    string? IdempotencyKey = null);
 public sealed record EditCommentRequest(string Body);
 public sealed record AddWorkLogRequest(string UserId, decimal Hours, string? Note);
 public sealed record LinkWorkItemRequest(string RelatedWorkItemId, string RelationType);
@@ -153,8 +158,12 @@ public sealed partial class WorkItemService(
     IWorkItemSprintPolicy? sprintPolicy = null,
     IWorkItemTypeSchemaPolicy? typeSchemaPolicy = null,
     WorkItemCollaborationService? collaborationService = null,
-    IOptions<SearchOptions>? searchOptions = null)
+    IOptions<SearchOptions>? searchOptions = null,
+    IWorkItemAutomationEventPublisher? automationEvents = null,
+    IWorkItemAutomationChainContextAccessor? automationChain = null,
+    ILogger<WorkItemService>? logger = null) : IIntakeWorkItemCreator
 {
+    private readonly ILogger<WorkItemService>? compensationLogger = logger;
     private readonly ExpectedVersionState expectedVersion = new(expectedVersions);
     private readonly Dictionary<string, string> authorizedOrganizationIds = new(StringComparer.Ordinal);
     private readonly WorkItemRankService ranks = rankService ?? new(workItems, clock, Options.Create(new WorkItemRankOptions()));
@@ -167,7 +176,67 @@ public sealed partial class WorkItemService(
         string? requestedId = null)
     {
         var authorization = await EnsurePermissionAsync(request.ProjectId, "WorkItemCreate", ct);
+        return await CreateCoreAsync(
+            request,
+            authorization.OrganizationId,
+            correlationId,
+            ct,
+            requestedId,
+            currentUser.UserId ?? "system",
+            null,
+            []);
+    }
 
+    async Task<WorkItemResponse> IIntakeWorkItemCreator.CreateAsync(
+        IntakeWorkItemCreation creation,
+        CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(creation.OrganizationId)
+            || string.IsNullOrWhiteSpace(creation.SubmissionId))
+        {
+            throw new ValidationException("Intake work creation requires organization and submission scope.");
+        }
+
+        authorizedOrganizationIds[creation.Request.ProjectId] = creation.OrganizationId;
+        var requestedId = IntakeStableIds.WorkItemId(creation.SubmissionId);
+        var existing = await workItems.SelectAsync(x => x.Id == requestedId, ct);
+        if (existing is not null)
+        {
+            if (existing.ProjectId != creation.Request.ProjectId
+                || existing.SourceIntakeSubmissionId != creation.SubmissionId)
+            {
+                throw new ConflictException(
+                    "INTAKE_WORK_ITEM_ID_CONFLICT",
+                    "The intake submission work item id is already in use.");
+            }
+
+            await activityStore.HydrateAsync(existing, creation.OrganizationId, ct);
+            return ToResponse(existing);
+        }
+
+        return await CreateCoreAsync(
+            creation.Request,
+            creation.OrganizationId,
+            creation.CorrelationId,
+            ct,
+            requestedId,
+            currentUser.UserId ?? "intake",
+            creation.SubmissionId,
+            creation.Attachments,
+            creation.Description);
+    }
+
+    private async Task<WorkItemResponse> CreateCoreAsync(
+        CreateWorkItemRequest request,
+        string organizationId,
+        string correlationId,
+        CancellationToken ct,
+        string? requestedId,
+        string actorUserId,
+        string? intakeSubmissionId,
+        IReadOnlyCollection<StoredAttachment> initialAttachments,
+        string description = "")
+    {
         CreateWorkItemValidator.Validate(request);
 
         var shape = await typeSchemas.ValidateAsync(request.ProjectId, request.Type, request.CustomFields, ct);
@@ -182,7 +251,6 @@ public sealed partial class WorkItemService(
         var placement = await boardPlacementPolicy.ResolveInitialAsync(request.ProjectId, request.BoardId, ct);
         var rank = await ranks.NextRankAsync(request.BoardId, placement.ColumnId, null, ct);
         var now = clock.UtcNow;
-        var organizationId = authorization.OrganizationId;
         var workItem = new WorkItemDocument
         {
             Id = string.IsNullOrWhiteSpace(requestedId) ? Guid.NewGuid().ToString("N") : requestedId,
@@ -192,6 +260,7 @@ public sealed partial class WorkItemService(
             TeamId = teamId,
             ColumnId = placement.ColumnId,
             Title = request.Title.Trim(),
+            Description = description.Trim(),
             Type = type,
             IssueTypeSchemaVersion = shape.SchemaVersion,
             CustomFields = shape.CustomFields.ToList(),
@@ -200,6 +269,7 @@ public sealed partial class WorkItemService(
             Rank = rank,
             AssigneeUserId = request.AssigneeUserId,
             DueDate = request.DueDate,
+            SourceIntakeSubmissionId = intakeSubmissionId,
             CreatedAt = now,
             UpdatedAt = now,
             ActivityStorageVersion = 1,
@@ -208,10 +278,23 @@ public sealed partial class WorkItemService(
                 new WorkItemStatusHistoryDocument
                 {
                     ToStatus = placement.Status,
-                    ChangedByUserId = currentUser.UserId ?? "system",
+                    ChangedByUserId = actorUserId,
                     ChangedAt = now
                 }
-            ]
+            ],
+            Attachments = initialAttachments.Select(stored => new AttachmentDocument
+            {
+                FileName = stored.FileName,
+                ContentType = stored.ContentType,
+                SizeBytes = stored.SizeBytes,
+                StoragePath = stored.StoragePath,
+                ChecksumSha256 = stored.ChecksumSha256,
+                SecurityState = stored.SecurityState,
+                ScanProvider = stored.ScanProvider,
+                ScanDetail = stored.ScanDetail,
+                ScannedAt = stored.ScannedAt,
+                CreatedAt = now
+            }).ToList()
         };
 
         await using (await AcquirePlacementLockAsync(request.BoardId, placement, ct))
@@ -225,7 +308,9 @@ public sealed partial class WorkItemService(
                 await wipProjection.ReserveCreateAsync(request.ProjectId, request.BoardId, placement, ct);
             }
             var initialTimeline = workItem.StatusHistory;
+            var separatedAttachments = workItem.Attachments;
             workItem.StatusHistory = [];
+            workItem.Attachments = [];
             try
             {
                 await workItems.CreateAsync(workItem, ct);
@@ -233,10 +318,17 @@ public sealed partial class WorkItemService(
             finally
             {
                 workItem.StatusHistory = initialTimeline;
+                workItem.Attachments = separatedAttachments;
             }
             await activityStore.CreateTimelineAsync(
                 WorkItemActivityStore.ToActivity(workItem, organizationId, workItem.StatusHistory[0], 0),
                 ct);
+            foreach (var attachment in workItem.Attachments)
+            {
+                await activityStore.CreateAttachmentAsync(
+                    WorkItemActivityStore.ToActivity(workItem, organizationId, attachment),
+                    ct);
+            }
         }
         await searchPublisher.IndexAsync(ToScopedSearchRecord(workItem), ct);
         await audit.WriteAsync("WorkItemCreated", "WorkItem", workItem.Id, null, workItem.Title, correlationId, ct);
@@ -253,6 +345,13 @@ public sealed partial class WorkItemService(
         }
 
         await cacheInvalidationPublisher.InvalidateProjectAsync(workItem.ProjectId, ct);
+        await PublishAutomationAsync(
+            "WorkItemCreated",
+            workItem,
+            previousStatus: null,
+            correlationId,
+            $"created:{workItem.Version}",
+            ct);
         return ToResponse(workItem);
     }
 
@@ -395,6 +494,13 @@ public sealed partial class WorkItemService(
         }
         await PublishRealtimeAsync("updated", workItem, correlationId, ct);
         await cacheInvalidationPublisher.InvalidateProjectAsync(workItem.ProjectId, ct);
+        await PublishAutomationAsync(
+            "WorkItemUpdated",
+            workItem,
+            workItem.Status,
+            correlationId,
+            $"updated:{workItem.Version}",
+            ct);
         return ToResponse(workItem);
     }
 
@@ -426,6 +532,54 @@ public sealed partial class WorkItemService(
             workItem, "WorkItemCustomFieldsUpdated", "Custom fields updated", correlationId, ct);
         await PublishRealtimeAsync("updated", workItem, correlationId, ct);
         await cacheInvalidationPublisher.InvalidateProjectAsync(workItem.ProjectId, ct);
+        await PublishAutomationAsync(
+            "WorkItemUpdated",
+            workItem,
+            workItem.Status,
+            correlationId,
+            $"assigned:{workItem.Version}",
+            ct);
+        return ToResponse(workItem);
+    }
+
+    public async Task<WorkItemResponse> ClearAssigneeAsync(
+        string id,
+        string correlationId,
+        CancellationToken ct)
+    {
+        var workItem = await GetWorkItem(id, ct);
+        await EnsurePermissionAsync(workItem.ProjectId, PermissionCatalog.WorkItemAssign, ct);
+        if (workItem.AssigneeUserId is null)
+            return ToResponse(workItem);
+
+        var oldAssignee = workItem.AssigneeUserId;
+        workItem.AssigneeUserId = null;
+        workItem.UpdatedAt = clock.UtcNow;
+        await SaveAsync(workItem, ct);
+        await searchPublisher.IndexAsync(ToScopedSearchRecord(workItem), ct);
+        await audit.WriteAsync(
+            "WorkItemAssigneeCleared",
+            "WorkItem",
+            workItem.Id,
+            oldAssignee,
+            null,
+            correlationId,
+            ct);
+        await RecordActivityAndNotifyWatchersAsync(
+            workItem,
+            "WorkItemAssigneeCleared",
+            "Assignee cleared",
+            correlationId,
+            ct);
+        await PublishRealtimeAsync("updated", workItem, correlationId, ct);
+        await cacheInvalidationPublisher.InvalidateProjectAsync(workItem.ProjectId, ct);
+        await PublishAutomationAsync(
+            "WorkItemUpdated",
+            workItem,
+            workItem.Status,
+            correlationId,
+            $"assignee-cleared:{workItem.Version}",
+            ct);
         return ToResponse(workItem);
     }
 
@@ -699,6 +853,13 @@ public sealed partial class WorkItemService(
         }
         await PublishRealtimeAsync("moved", workItem, correlationId, ct);
         await cacheInvalidationPublisher.InvalidateProjectAsync(workItem.ProjectId, ct);
+        await PublishAutomationAsync(
+            "WorkItemTransitioned",
+            workItem,
+            oldStatus,
+            correlationId,
+            $"transitioned:{workItem.Version}",
+            ct);
         return ToResponse(workItem);
     }
 
@@ -807,6 +968,13 @@ public sealed partial class WorkItemService(
         await searchPublisher.IndexAsync(ToScopedSearchRecord(workItem), ct);
         await RecordActivityAndNotifyWatchersAsync(
             workItem, "WorkItemLabelAdded", "Label added", MutationEventId(workItem, "label:add:" + label), ct);
+        await PublishAutomationAsync(
+            "WorkItemUpdated",
+            workItem,
+            workItem.Status,
+            MutationEventId(workItem, "label:add:" + label),
+            $"label-added:{workItem.Version}:{label}",
+            ct);
         return ToResponse(workItem);
     }
 
@@ -825,13 +993,21 @@ public sealed partial class WorkItemService(
         await searchPublisher.IndexAsync(ToScopedSearchRecord(workItem), ct);
         await RecordActivityAndNotifyWatchersAsync(
             workItem, "WorkItemLabelRemoved", "Label removed", MutationEventId(workItem, "label:remove:" + label), ct);
+        await PublishAutomationAsync(
+            "WorkItemUpdated",
+            workItem,
+            workItem.Status,
+            MutationEventId(workItem, "label:remove:" + label),
+            $"label-removed:{workItem.Version}:{label}",
+            ct);
         return ToResponse(workItem);
     }
 
     public async Task<WorkItemResponse> AddCommentAsync(string id, AddCommentRequest request, string correlationId, CancellationToken ct)
     {
-        var body = NormalizeCommentBody(request.Body);
-        var mentions = NormalizeMentions(request.Mentions);
+        var body = WorkItemCommentRules.NormalizeBody(request.Body);
+        var mentions = WorkItemCommentRules.NormalizeMentions(request.Mentions);
+        var idempotencyKey = WorkItemCommentRules.NormalizeIdempotencyKey(request.IdempotencyKey);
         var workItem = await GetWorkItem(id, ct);
         await EnsurePermissionAsync(workItem.ProjectId, "CommentCreate", ct);
         var organizationId = CurrentOrganizationId(workItem.ProjectId);
@@ -844,6 +1020,25 @@ public sealed partial class WorkItemService(
                 ct);
         }
         await EnsureSeparatedAsync(workItem, ct);
+        var authorUserId = currentUser.UserId ?? "system";
+        var stableCommentId = idempotencyKey is null
+            ? null
+            : IntakeStableIds.Hash(
+                $"comment\u001f{workItem.Id}\u001f{authorUserId}\u001f{idempotencyKey}")[..32];
+        if (stableCommentId is not null
+            && workItem.Comments.SingleOrDefault(comment => comment.Id == stableCommentId) is { } existing)
+        {
+            if (existing.Body != body
+                || !existing.Mentions.Order(StringComparer.Ordinal)
+                    .SequenceEqual(mentions.Order(StringComparer.Ordinal)))
+            {
+                throw new ConflictException(
+                    "COMMENT_IDEMPOTENCY_KEY_REUSED",
+                    "Idempotency key was already used for a different comment.");
+            }
+
+            return ToResponse(workItem);
+        }
         if (workItem.Comments.Count >= 500)
         {
             throw new ConflictException("WORK_ITEM_COMMENT_LIMIT", "A work item cannot contain more than 500 comments.");
@@ -851,8 +1046,9 @@ public sealed partial class WorkItemService(
 
         var comment = new CommentDocument
         {
+            Id = stableCommentId ?? Guid.NewGuid().ToString("N"),
             Body = body,
-            AuthorUserId = currentUser.UserId ?? "system",
+            AuthorUserId = authorUserId,
             Mentions = mentions,
             CreatedAt = clock.UtcNow
         };
@@ -894,12 +1090,19 @@ public sealed partial class WorkItemService(
                 ct);
         }
 
+        await PublishAutomationAsync(
+            "WorkItemUpdated",
+            workItem,
+            workItem.Status,
+            correlationId,
+            $"comment-added:{comment.Id}",
+            ct);
         return ToResponse(workItem);
     }
 
     public async Task<WorkItemResponse> EditCommentAsync(string id, string commentId, EditCommentRequest request, string correlationId, CancellationToken ct)
     {
-        var body = NormalizeCommentBody(request.Body);
+        var body = WorkItemCommentRules.NormalizeBody(request.Body);
         var workItem = await GetWorkItem(id, ct);
         await EnsurePermissionAsync(workItem.ProjectId, "CommentCreate", ct);
         await EnsureSeparatedAsync(workItem, ct);
@@ -1031,7 +1234,10 @@ public sealed partial class WorkItemService(
         }
         catch
         {
-            await attachmentStorage.DeleteAsync(stored.StoragePath, CancellationToken.None);
+            var cleanup = await CompensationExecution.RunAsync(
+                "work_item.attachment.delete",
+                token => attachmentStorage.DeleteAsync(stored.StoragePath, token));
+            ObserveCompensation(cleanup);
             throw;
         }
 
@@ -1092,7 +1298,10 @@ public sealed partial class WorkItemService(
         }
         catch
         {
-            await activityStore.CreateAttachmentAsync(attachment, CancellationToken.None);
+            var restore = await CompensationExecution.RunAsync(
+                "work_item.attachment.restore",
+                token => activityStore.CreateAttachmentAsync(attachment, token));
+            ObserveCompensation(restore);
             workItem.Attachments.Add(new AttachmentDocument
             {
                 Id = attachment.Id,
@@ -1746,42 +1955,6 @@ public sealed partial class WorkItemService(
 
     private static string? NormalizeOptionalId(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();
-
-    private static string NormalizeCommentBody(string? body)
-    {
-        if (string.IsNullOrWhiteSpace(body))
-        {
-            throw new ValidationException("Comment body is required.");
-        }
-
-        var normalized = body.Trim();
-        if (normalized.Length > 10_000)
-        {
-            throw new ValidationException("Comment body cannot exceed 10000 characters.");
-        }
-
-        return normalized;
-    }
-
-    private static List<string> NormalizeMentions(IReadOnlyCollection<string>? mentions)
-    {
-        var normalized = mentions?
-            .Where(x => !string.IsNullOrWhiteSpace(x))
-            .Select(x => x.Trim())
-            .Distinct(StringComparer.Ordinal)
-            .ToList() ?? [];
-        if (normalized.Count > 50)
-        {
-            throw new ValidationException("A comment cannot mention more than 50 users.");
-        }
-
-        if (normalized.Any(x => x.Length > 128))
-        {
-            throw new ValidationException("Mentioned user ids cannot exceed 128 characters.");
-        }
-
-        return normalized;
-    }
 
     private async Task<WorkItemDocument> GetWorkItem(string id, CancellationToken ct)
     {

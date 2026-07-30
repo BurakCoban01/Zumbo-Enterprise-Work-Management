@@ -1044,6 +1044,24 @@ public sealed class DomainRuleTests
             new AddCommentRequest(new string('x', 10_001), []),
             "test-correlation",
             CancellationToken.None));
+
+        var idempotent = await service.AddCommentAsync(
+            item.Id,
+            new AddCommentRequest("Automated note", [], "automation:run-1:0"),
+            "automation-correlation",
+            CancellationToken.None);
+        idempotent = await service.AddCommentAsync(
+            item.Id,
+            new AddCommentRequest("Automated note", [], "automation:run-1:0"),
+            "automation-correlation",
+            CancellationToken.None);
+        Assert.Equal(2, idempotent.Comments.Count);
+        var reused = await Assert.ThrowsAsync<ConflictException>(() => service.AddCommentAsync(
+            item.Id,
+            new AddCommentRequest("Different note", [], "automation:run-1:0"),
+            "automation-correlation",
+            CancellationToken.None));
+        Assert.Equal("COMMENT_IDEMPOTENCY_KEY_REUSED", reused.Code);
     }
 
     [Fact]
@@ -1696,6 +1714,16 @@ public sealed class DomainRuleTests
         Assert.Equal(4, (await service.ExportAsync(
             new AuditLogQuery(null, null, "WorkItem", "item-1", null, null),
             CancellationToken.None)).Count);
+        var exportRecords = await service.ExportAsync(
+            new AuditLogQuery(null, null, "WorkItem", "item-1", null, null),
+            CancellationToken.None);
+        await using var exportStream = new MemoryStream();
+        await AuditService.WriteNdjsonAsync(exportRecords, exportStream, CancellationToken.None);
+        var exportLines = System.Text.Encoding.UTF8.GetString(exportStream.ToArray())
+            .Split('\n', StringSplitOptions.RemoveEmptyEntries);
+        Assert.Equal(exportRecords.Count, exportLines.Length);
+        Assert.DoesNotContain("old-secret", string.Join('\n', exportLines), StringComparison.Ordinal);
+        Assert.DoesNotContain("new-secret", string.Join('\n', exportLines), StringComparison.Ordinal);
 
         var integrity = await service.VerifyIntegrityAsync("org-1", CancellationToken.None);
         Assert.True(integrity.Valid);

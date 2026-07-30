@@ -1,5 +1,7 @@
+using Microsoft.Extensions.Logging;
 using MongoDB.Driver;
 using Zumbo.BuildingBlocks.Application.Messaging;
+using Zumbo.BuildingBlocks.Application.Runtime;
 
 namespace Zumbo.BuildingBlocks.Infrastructure.Persistence;
 
@@ -43,7 +45,8 @@ public sealed class MongoTransactionContext : IAsyncDisposable
 
 public sealed class MongoDurableTransactionRunner(
     IMongoDbService mongo,
-    MongoTransactionContext context) : IDurableTransactionRunner
+    MongoTransactionContext context,
+    ILogger<MongoDurableTransactionRunner>? logger = null) : IDurableTransactionRunner
 {
     private const int MaximumAttempts = 3;
     private const string TransientTransactionError = "TransientTransactionError";
@@ -139,11 +142,23 @@ public sealed class MongoDurableTransactionRunner(
         }
     }
 
-    private static async Task AbortIfActiveAsync(IClientSessionHandle session)
+    private async Task AbortIfActiveAsync(IClientSessionHandle session)
     {
-        if (session.IsInTransaction)
+        if (!session.IsInTransaction)
         {
-            await session.AbortTransactionAsync(CancellationToken.None);
+            return;
+        }
+
+        var result = await CompensationExecution.RunAsync(
+            "mongo.transaction.abort",
+            token => session.AbortTransactionAsync(token));
+        if (!result.Succeeded)
+        {
+            logger?.LogWarning(
+                "Compensation operation {Operation} ended with {Outcome}; failure type {FailureType}.",
+                result.Operation,
+                result.Outcome,
+                result.Exception?.GetType().Name ?? "none");
         }
     }
 }

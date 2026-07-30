@@ -9,6 +9,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Zumbo.BuildingBlocks.Application.Persistence;
 using Zumbo.Modules.Identity;
+using Zumbo.Modules.Audit;
 using Zumbo.Modules.Organizations;
 using Zumbo.Modules.WorkItems;
 using Zumbo.SharedKernel;
@@ -18,6 +19,45 @@ namespace Zumbo.ApiTests;
 public sealed class WebhookApiTests(WebApplicationFactory<Program> baseFactory)
     : IClassFixture<WebApplicationFactory<Program>>
 {
+    [Fact]
+    public async Task Audit_tenant_resolution_uses_webhook_resource_ownership_without_request_context()
+    {
+        using var scope = baseFactory.Services.CreateScope();
+        var subscriptions = scope.ServiceProvider
+            .GetRequiredService<IDocumentRepository<WebhookSubscriptionDocument>>();
+        var deliveries = scope.ServiceProvider
+            .GetRequiredService<IDocumentRepository<WebhookDeliveryDocument>>();
+        var subscription = await subscriptions.CreateAsync(new WebhookSubscriptionDocument
+        {
+            OrganizationId = "audit-webhook-tenant",
+            Name = "Audit ownership",
+            TargetUrl = "https://receiver.example.test/events",
+            EventScopes = ["work-item.created"],
+            CurrentSecretProtected = "protected",
+            CurrentSecretFingerprint = "fingerprint",
+            CreatedByUserId = "actor-1"
+        });
+        var delivery = await deliveries.CreateAsync(new WebhookDeliveryDocument
+        {
+            OrganizationId = "audit-webhook-tenant",
+            SubscriptionId = subscription.Id,
+            SourceEventId = "audit-source",
+            EventScope = "webhook.test",
+            TargetUrl = subscription.TargetUrl,
+            Payload = "{}",
+            PayloadSha256 = "hash"
+        });
+        var resolver = scope.ServiceProvider.GetRequiredService<IAuditTenantResolver>();
+
+        var subscriptionTenant = await resolver.ResolveAsync(
+            "WebhookSubscription", subscription.Id, "actor-1", default);
+        var deliveryTenant = await resolver.ResolveAsync(
+            "WebhookDelivery", delivery.Id, "actor-1", default);
+
+        Assert.Equal("audit-webhook-tenant", subscriptionTenant.OrganizationId);
+        Assert.Equal("audit-webhook-tenant", deliveryTenant.OrganizationId);
+    }
+
     [Fact]
     public async Task Management_routes_require_permission_return_secret_once_and_hide_foreign_tenant()
     {
@@ -60,6 +100,49 @@ public sealed class WebhookApiTests(WebApplicationFactory<Program> baseFactory)
         Assert.DoesNotContain(receipt.Secret, getBody, StringComparison.Ordinal);
         Assert.DoesNotContain("currentSecretProtected", getBody, StringComparison.OrdinalIgnoreCase);
 
+        var updated = await ReadAsync<WebhookSubscriptionResponse>(await client.PutAsJsonAsync(
+            $"/api/integrations/webhooks/{subscription.Id}",
+            new UpdateWebhookSubscriptionRequest(
+                "Delivery receiver",
+                "http://127.0.0.1:65530/delivery-events",
+                ["work-item.created", "work-item.updated"],
+                subscription.Version)));
+        Assert.Equal("Delivery receiver", updated.Name);
+        Assert.Equal(2, updated.Version);
+
+        var testDeliveryResponse = await client.PostAsync(
+            $"/api/integrations/webhooks/{subscription.Id}/test-delivery",
+            content: null);
+        Assert.Equal(HttpStatusCode.Created, testDeliveryResponse.StatusCode);
+        var testDelivery = (await testDeliveryResponse.Content
+            .ReadFromJsonAsync<ApiResponse<WebhookDeliveryResponse>>())!.Data!;
+        Assert.Equal("webhook.test", testDelivery.EventScope);
+        Assert.Equal(WebhookDeliveryStatuses.Pending, testDelivery.Status);
+
+        var metrics = await ReadAsync<WebhookDeliveryMetrics>(
+            await client.GetAsync("/api/integrations/webhooks/metrics"));
+        Assert.True(metrics.Pending >= 1);
+        var deliveries = await ReadAsync<WebhookDeliveryPage>(
+            await client.GetAsync($"/api/integrations/webhooks/{subscription.Id}/deliveries?pageSize=20"));
+        Assert.Contains(deliveries.Items, x => x.Id == testDelivery.Id);
+        var delivery = await ReadAsync<WebhookDeliveryResponse>(
+            await client.GetAsync($"/api/integrations/webhooks/deliveries/{testDelivery.Id}"));
+        Assert.Equal(testDelivery.PayloadSha256, delivery.PayloadSha256);
+
+        var disabled = await ReadAsync<WebhookSubscriptionResponse>(await client.PostAsJsonAsync(
+            $"/api/integrations/webhooks/{subscription.Id}/disable",
+            new SetWebhookSubscriptionStateRequest(updated.Version)));
+        Assert.False(disabled.IsActive);
+        var disabledTest = await client.PostAsync(
+            $"/api/integrations/webhooks/{subscription.Id}/test-delivery",
+            content: null);
+        Assert.Equal(HttpStatusCode.Conflict, disabledTest.StatusCode);
+        Assert.Contains("WEBHOOK_SUBSCRIPTION_DISABLED", await disabledTest.Content.ReadAsStringAsync());
+        var enabled = await ReadAsync<WebhookSubscriptionResponse>(await client.PostAsJsonAsync(
+            $"/api/integrations/webhooks/{subscription.Id}/enable",
+            new SetWebhookSubscriptionStateRequest(disabled.Version)));
+        Assert.True(enabled.IsActive);
+
         using (var scope = factory.Services.CreateScope())
         {
             var repository = scope.ServiceProvider
@@ -71,7 +154,7 @@ public sealed class WebhookApiTests(WebApplicationFactory<Program> baseFactory)
 
         var rotatedResponse = await client.PostAsJsonAsync(
             $"/api/integrations/webhooks/{subscription.Id}/rotate-secret",
-            new RotateWebhookSecretRequest(subscription.Version));
+            new RotateWebhookSecretRequest(enabled.Version));
         Assert.True(
             rotatedResponse.IsSuccessStatusCode,
             $"Rotation failed with {(int)rotatedResponse.StatusCode}: {await rotatedResponse.Content.ReadAsStringAsync()}");
@@ -81,7 +164,7 @@ public sealed class WebhookApiTests(WebApplicationFactory<Program> baseFactory)
         Assert.Equal(2, rotated.Subscription.SecretVersion);
         var stale = await client.PostAsJsonAsync(
             $"/api/integrations/webhooks/{subscription.Id}/disable",
-            new SetWebhookSubscriptionStateRequest(subscription.Version));
+            new SetWebhookSubscriptionStateRequest(updated.Version));
         Assert.Equal(HttpStatusCode.Conflict, stale.StatusCode);
 
         var member = await RegisterAsync(client, "member-" + stamp, "tenant-a-" + stamp);

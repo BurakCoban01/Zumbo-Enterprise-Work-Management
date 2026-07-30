@@ -123,6 +123,10 @@ public sealed class PostgreSqlDurableMessagingTests(PostgreSqlFixture fixture)
         var metrics = await fixture.Api.Outbox.GetMetricsAsync(nextAttempt);
         Assert.Equal(1, metrics.DeadLetter);
         Assert.Equal(1, metrics.Retried);
+        var listed = Assert.Single(await fixture.Api.Outbox.ListDeadLettersAsync(1));
+        Assert.Equal(second.Event.Id, listed.Id);
+        Assert.Equal(second.Event.EventType, listed.EventType);
+        Assert.Equal(2, listed.Attempts);
 
         Assert.True(await fixture.Api.Outbox.ReplayDeadLetterAsync(second.Event.Id, nextAttempt.AddMinutes(3)));
         var replay = Assert.Single(await fixture.Api.Outbox.ClaimAsync(

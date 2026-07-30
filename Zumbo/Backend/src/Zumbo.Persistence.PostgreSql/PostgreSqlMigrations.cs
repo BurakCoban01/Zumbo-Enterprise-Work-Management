@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using Microsoft.Extensions.Logging;
 using Npgsql;
 
 namespace Zumbo.Persistence.PostgreSql;
@@ -26,7 +27,8 @@ public interface IPostgreSqlMigrationRunner
 
 public sealed class PostgreSqlMigrationRunner(
     NpgsqlDataSource dataSource,
-    PostgreSqlPersistenceOptions options) : IPostgreSqlMigrationRunner
+    PostgreSqlPersistenceOptions options,
+    ILogger<PostgreSqlMigrationRunner>? logger = null) : IPostgreSqlMigrationRunner
 {
     private const string Ledger = "public.zumbo_schema_migrations";
     private const string LockName = "zumbo-postgresql-schema-migrations-v1";
@@ -73,7 +75,10 @@ public sealed class PostgreSqlMigrationRunner(
             }
             catch
             {
-                await transaction.RollbackAsync(CancellationToken.None);
+                await PostgreSqlCompensation.RunAsync(
+                    "postgres.migration_apply.rollback",
+                    token => transaction.RollbackAsync(token),
+                    logger);
                 throw;
             }
         }
@@ -123,7 +128,10 @@ public sealed class PostgreSqlMigrationRunner(
             }
             catch
             {
-                await transaction.RollbackAsync(CancellationToken.None);
+                await PostgreSqlCompensation.RunAsync(
+                    "postgres.migration_rollback.rollback",
+                    token => transaction.RollbackAsync(token),
+                    logger);
                 throw;
             }
         }
@@ -1553,6 +1561,368 @@ public sealed class PostgreSqlMigrationRunner(
             DROP TABLE IF EXISTS work_items.webhook_deliveries;
             DROP TABLE IF EXISTS work_items.webhook_subscriptions;
             """;
+        const string intakeForms = """
+            CREATE TABLE IF NOT EXISTS work_items.intake_forms (
+                id text PRIMARY KEY,
+                version bigint NOT NULL DEFAULT 0 CHECK (version >= 0),
+                document jsonb NOT NULL CHECK (jsonb_typeof(document) = 'object'),
+                created_at timestamptz NOT NULL DEFAULT transaction_timestamp(),
+                updated_at timestamptz NOT NULL DEFAULT transaction_timestamp(),
+                CHECK (document ->> 'Id' = id),
+                CHECK (COALESCE((document ->> 'Version')::bigint, 0) = version)
+            );
+            CREATE UNIQUE INDEX IF NOT EXISTS ux_intake_forms_public_id
+                ON work_items.intake_forms ((document ->> 'PublicId'));
+            CREATE INDEX IF NOT EXISTS ix_intake_forms_tenant_project_state
+                ON work_items.intake_forms (
+                    (document ->> 'OrganizationId'),
+                    (document ->> 'ProjectId'),
+                    (document ->> 'State'),
+                    public.zumbo_parse_timestamptz(document ->> 'UpdatedAt') DESC,
+                    id);
+
+            CREATE TABLE IF NOT EXISTS work_items.intake_form_versions (
+                id text PRIMARY KEY,
+                version bigint NOT NULL DEFAULT 0 CHECK (version >= 0),
+                document jsonb NOT NULL CHECK (jsonb_typeof(document) = 'object'),
+                created_at timestamptz NOT NULL DEFAULT transaction_timestamp(),
+                updated_at timestamptz NOT NULL DEFAULT transaction_timestamp(),
+                CHECK (document ->> 'Id' = id),
+                CHECK (COALESCE((document ->> 'Version')::bigint, 0) = version)
+            );
+            CREATE UNIQUE INDEX IF NOT EXISTS ux_intake_form_versions_number
+                ON work_items.intake_form_versions (
+                    (document ->> 'FormId'),
+                    ((document ->> 'DefinitionVersion')::integer));
+
+            CREATE TABLE IF NOT EXISTS work_items.intake_submissions (
+                id text PRIMARY KEY,
+                version bigint NOT NULL DEFAULT 0 CHECK (version >= 0),
+                document jsonb NOT NULL CHECK (jsonb_typeof(document) = 'object'),
+                created_at timestamptz NOT NULL DEFAULT transaction_timestamp(),
+                updated_at timestamptz NOT NULL DEFAULT transaction_timestamp(),
+                CHECK (document ->> 'Id' = id),
+                CHECK (COALESCE((document ->> 'Version')::bigint, 0) = version)
+            );
+            CREATE UNIQUE INDEX IF NOT EXISTS ux_intake_submissions_idempotency
+                ON work_items.intake_submissions (
+                    (document ->> 'OrganizationId'),
+                    (document ->> 'FormId'),
+                    (document ->> 'SubmittedByUserId'),
+                    (document ->> 'IdempotencyKeyHash'));
+            CREATE INDEX IF NOT EXISTS ix_intake_submissions_triage
+                ON work_items.intake_submissions (
+                    (document ->> 'OrganizationId'),
+                    (document ->> 'FormId'),
+                    (document ->> 'State'),
+                    public.zumbo_parse_timestamptz(document ->> 'CreatedAt') DESC,
+                    id);
+            CREATE UNIQUE INDEX IF NOT EXISTS ux_intake_submissions_work_item
+                ON work_items.intake_submissions ((document ->> 'WorkItemId'));
+            """;
+        const string dropIntakeForms = """
+            DROP TABLE IF EXISTS work_items.intake_submissions;
+            DROP TABLE IF EXISTS work_items.intake_form_versions;
+            DROP TABLE IF EXISTS work_items.intake_forms;
+            """;
+        const string automationRules = """
+            CREATE TABLE IF NOT EXISTS workflows.automation_rules (
+                id text PRIMARY KEY,
+                version bigint NOT NULL DEFAULT 0 CHECK (version >= 0),
+                document jsonb NOT NULL CHECK (jsonb_typeof(document) = 'object'),
+                created_at timestamptz NOT NULL DEFAULT transaction_timestamp(),
+                updated_at timestamptz NOT NULL DEFAULT transaction_timestamp(),
+                CHECK (document ->> 'Id' = id),
+                CHECK (COALESCE((document ->> 'Version')::bigint, 0) = version)
+            );
+            CREATE INDEX IF NOT EXISTS ix_automation_rules_tenant_project_state
+                ON workflows.automation_rules (
+                    (document ->> 'OrganizationId'),
+                    (document ->> 'ProjectId'),
+                    ((document ->> 'Archived')::boolean),
+                    public.zumbo_parse_timestamptz(document ->> 'UpdatedAt') DESC,
+                    id);
+            CREATE INDEX IF NOT EXISTS ix_automation_rules_schedule
+                ON workflows.automation_rules (
+                    ((document ->> 'Active')::boolean),
+                    ((document ->> 'Archived')::boolean),
+                    public.zumbo_parse_timestamptz(document ->> 'NextRunAtUtc'),
+                    id);
+            """;
+        const string dropAutomationRules = """
+            DROP TABLE IF EXISTS workflows.automation_rules;
+            """;
+        const string automationRuns = """
+            CREATE TABLE IF NOT EXISTS workflows.automation_runs (
+                id text PRIMARY KEY,
+                version bigint NOT NULL DEFAULT 0 CHECK (version >= 0),
+                document jsonb NOT NULL CHECK (jsonb_typeof(document) = 'object'),
+                created_at timestamptz NOT NULL DEFAULT transaction_timestamp(),
+                updated_at timestamptz NOT NULL DEFAULT transaction_timestamp(),
+                CHECK (document ->> 'Id' = id),
+                CHECK (COALESCE((document ->> 'Version')::bigint, 0) = version)
+            );
+            CREATE INDEX IF NOT EXISTS ix_automation_runs_tenant_project_created
+                ON workflows.automation_runs (
+                    (document ->> 'OrganizationId'),
+                    (document ->> 'ProjectId'),
+                    public.zumbo_parse_timestamptz(document ->> 'CreatedAtUtc') DESC,
+                    id);
+            CREATE INDEX IF NOT EXISTS ix_automation_runs_rule_created
+                ON workflows.automation_runs (
+                    (document ->> 'OrganizationId'),
+                    (document ->> 'RuleId'),
+                    public.zumbo_parse_timestamptz(document ->> 'CreatedAtUtc') DESC,
+                    id);
+            CREATE INDEX IF NOT EXISTS ix_automation_runs_retry
+                ON workflows.automation_runs (
+                    (document ->> 'Status'),
+                    public.zumbo_parse_timestamptz(document ->> 'NextAttemptAtUtc'),
+                    id);
+            """;
+        const string dropAutomationRuns = """
+            DROP TABLE IF EXISTS workflows.automation_runs;
+            """;
+        const string dashboards = """
+            CREATE TABLE IF NOT EXISTS work_items.dashboards (
+                id text PRIMARY KEY,
+                version bigint NOT NULL DEFAULT 0 CHECK (version >= 0),
+                document jsonb NOT NULL CHECK (jsonb_typeof(document) = 'object'),
+                created_at timestamptz NOT NULL DEFAULT transaction_timestamp(),
+                updated_at timestamptz NOT NULL DEFAULT transaction_timestamp(),
+                CHECK (document ->> 'Id' = id),
+                CHECK (COALESCE((document ->> 'Version')::bigint, 0) = version)
+            );
+            CREATE INDEX IF NOT EXISTS ix_dashboards_tenant_owner_state
+                ON work_items.dashboards (
+                    (document ->> 'OrganizationId'),
+                    (document ->> 'OwnerUserId'),
+                    ((document ->> 'Archived')::boolean),
+                    public.zumbo_parse_timestamptz(document ->> 'UpdatedAt') DESC,
+                    id);
+            CREATE INDEX IF NOT EXISTS ix_dashboards_tenant_viewers
+                ON work_items.dashboards
+                USING gin ((document -> 'ViewerUserIds'));
+            CREATE INDEX IF NOT EXISTS ix_dashboards_tenant_projects
+                ON work_items.dashboards
+                USING gin ((document -> 'ProjectIds'));
+            """;
+        const string dropDashboards = """
+            DROP TABLE IF EXISTS work_items.dashboards;
+            """;
+        const string portfolios = """
+            CREATE TABLE IF NOT EXISTS projects.portfolios (
+                id text PRIMARY KEY,
+                version bigint NOT NULL DEFAULT 0 CHECK (version >= 0),
+                document jsonb NOT NULL CHECK (jsonb_typeof(document) = 'object'),
+                created_at timestamptz NOT NULL DEFAULT transaction_timestamp(),
+                updated_at timestamptz NOT NULL DEFAULT transaction_timestamp(),
+                CHECK (document ->> 'Id' = id),
+                CHECK (COALESCE((document ->> 'Version')::bigint, 0) = version)
+            );
+            CREATE INDEX IF NOT EXISTS ix_portfolios_tenant_owner_state
+                ON projects.portfolios (
+                    (document ->> 'OrganizationId'),
+                    (document ->> 'OwnerUserId'),
+                    ((document ->> 'Archived')::boolean),
+                    public.zumbo_parse_timestamptz(document ->> 'UpdatedAt') DESC,
+                    id);
+            CREATE INDEX IF NOT EXISTS ix_portfolios_tenant_viewers
+                ON projects.portfolios
+                USING gin ((document -> 'ViewerUserIds'));
+            CREATE INDEX IF NOT EXISTS ix_portfolios_tenant_initiatives
+                ON projects.portfolios
+                USING gin ((document -> 'Initiatives'));
+            """;
+        const string dropPortfolios = """
+            DROP TABLE IF EXISTS projects.portfolios;
+            """;
+        const string goals = """
+            CREATE TABLE IF NOT EXISTS projects.goals (
+                id text PRIMARY KEY,
+                version bigint NOT NULL DEFAULT 0 CHECK (version >= 0),
+                document jsonb NOT NULL CHECK (jsonb_typeof(document) = 'object'),
+                created_at timestamptz NOT NULL DEFAULT transaction_timestamp(),
+                updated_at timestamptz NOT NULL DEFAULT transaction_timestamp(),
+                CHECK (document ->> 'Id' = id),
+                CHECK (COALESCE((document ->> 'Version')::bigint, 0) = version)
+            );
+            CREATE INDEX IF NOT EXISTS ix_goals_tenant_owner_state
+                ON projects.goals (
+                    (document ->> 'OrganizationId'),
+                    (document ->> 'OwnerUserId'),
+                    ((document ->> 'Archived')::boolean),
+                    public.zumbo_parse_timestamptz(document ->> 'UpdatedAt') DESC,
+                    id);
+            CREATE INDEX IF NOT EXISTS ix_goals_tenant_viewers
+                ON projects.goals
+                USING gin ((document -> 'ViewerUserIds'));
+            CREATE INDEX IF NOT EXISTS ix_goals_tenant_key_results
+                ON projects.goals
+                USING gin ((document -> 'KeyResults'));
+            """;
+        const string dropGoals = """
+            DROP TABLE IF EXISTS projects.goals;
+            """;
+        const string capacityPlans = """
+            CREATE TABLE IF NOT EXISTS work_items.capacity_plans (
+                id text PRIMARY KEY,
+                version bigint NOT NULL DEFAULT 0 CHECK (version >= 0),
+                document jsonb NOT NULL CHECK (jsonb_typeof(document) = 'object'),
+                created_at timestamptz NOT NULL DEFAULT transaction_timestamp(),
+                updated_at timestamptz NOT NULL DEFAULT transaction_timestamp(),
+                CHECK (document ->> 'Id' = id),
+                CHECK (COALESCE((document ->> 'Version')::bigint, 0) = version)
+            );
+            CREATE INDEX IF NOT EXISTS ix_capacity_plans_tenant_owner_state
+                ON work_items.capacity_plans (
+                    (document ->> 'OrganizationId'),
+                    (document ->> 'OwnerUserId'),
+                    ((document ->> 'Archived')::boolean),
+                    public.zumbo_parse_timestamptz(document ->> 'UpdatedAt') DESC,
+                    id);
+            CREATE INDEX IF NOT EXISTS ix_capacity_plans_tenant_viewers
+                ON work_items.capacity_plans
+                USING gin ((document -> 'ViewerUserIds'));
+            CREATE INDEX IF NOT EXISTS ix_capacity_plans_tenant_projects
+                ON work_items.capacity_plans
+                USING gin ((document -> 'ProjectIds'));
+            """;
+        const string dropCapacityPlans = """
+            DROP TABLE IF EXISTS work_items.capacity_plans;
+            """;
+        const string knowledgeDocuments = """
+            CREATE TABLE IF NOT EXISTS projects.knowledge_documents (
+                id text PRIMARY KEY,
+                version bigint NOT NULL DEFAULT 0 CHECK (version >= 0),
+                document jsonb NOT NULL CHECK (jsonb_typeof(document) = 'object'),
+                created_at timestamptz NOT NULL DEFAULT transaction_timestamp(),
+                updated_at timestamptz NOT NULL DEFAULT transaction_timestamp(),
+                CHECK (document ->> 'Id' = id),
+                CHECK (COALESCE((document ->> 'Version')::bigint, 0) = version)
+            );
+            CREATE INDEX IF NOT EXISTS ix_knowledge_tenant_scope_state
+                ON projects.knowledge_documents (
+                    (document ->> 'OrganizationId'),
+                    (document ->> 'ScopeType'),
+                    (document ->> 'ScopeId'),
+                    ((document ->> 'Archived')::boolean),
+                    public.zumbo_parse_timestamptz(document ->> 'UpdatedAt') DESC,
+                    id);
+            CREATE INDEX IF NOT EXISTS ix_knowledge_tenant_owner_state
+                ON projects.knowledge_documents (
+                    (document ->> 'OrganizationId'),
+                    (document ->> 'OwnerUserId'),
+                    ((document ->> 'Archived')::boolean),
+                    id);
+            CREATE INDEX IF NOT EXISTS ix_knowledge_tenant_tags
+                ON projects.knowledge_documents
+                USING gin ((document -> 'Tags'));
+            """;
+        const string dropKnowledgeDocuments = """
+            DROP TABLE IF EXISTS projects.knowledge_documents;
+            """;
+        const string developmentIntegrations = """
+            CREATE TABLE IF NOT EXISTS work_items.development_connections (
+                id text PRIMARY KEY,
+                version bigint NOT NULL DEFAULT 0 CHECK (version >= 0),
+                document jsonb NOT NULL CHECK (jsonb_typeof(document) = 'object'),
+                created_at timestamptz NOT NULL DEFAULT transaction_timestamp(),
+                updated_at timestamptz NOT NULL DEFAULT transaction_timestamp(),
+                CHECK (document ->> 'Id' = id),
+                CHECK (COALESCE((document ->> 'Version')::bigint, 0) = version)
+            );
+            CREATE INDEX IF NOT EXISTS ix_development_connections_tenant_updated
+                ON work_items.development_connections (
+                    (document ->> 'OrganizationId'),
+                    public.zumbo_parse_timestamptz(document ->> 'UpdatedAtUtc') DESC,
+                    id);
+
+            CREATE TABLE IF NOT EXISTS work_items.development_repository_mappings (
+                id text PRIMARY KEY,
+                version bigint NOT NULL DEFAULT 0 CHECK (version >= 0),
+                document jsonb NOT NULL CHECK (jsonb_typeof(document) = 'object'),
+                created_at timestamptz NOT NULL DEFAULT transaction_timestamp(),
+                updated_at timestamptz NOT NULL DEFAULT transaction_timestamp(),
+                CHECK (document ->> 'Id' = id),
+                CHECK (COALESCE((document ->> 'Version')::bigint, 0) = version)
+            );
+            CREATE UNIQUE INDEX IF NOT EXISTS ux_development_mappings_tenant_connection_repository
+                ON work_items.development_repository_mappings (
+                    (document ->> 'OrganizationId'),
+                    (document ->> 'ConnectionId'),
+                    (document ->> 'ExternalRepositoryId'));
+            CREATE INDEX IF NOT EXISTS ix_development_mappings_tenant_project_active
+                ON work_items.development_repository_mappings (
+                    (document ->> 'OrganizationId'),
+                    (document ->> 'ProjectId'),
+                    ((document ->> 'IsActive')::boolean),
+                    id);
+
+            CREATE TABLE IF NOT EXISTS work_items.work_item_development_links (
+                id text PRIMARY KEY,
+                version bigint NOT NULL DEFAULT 0 CHECK (version >= 0),
+                document jsonb NOT NULL CHECK (jsonb_typeof(document) = 'object'),
+                created_at timestamptz NOT NULL DEFAULT transaction_timestamp(),
+                updated_at timestamptz NOT NULL DEFAULT transaction_timestamp(),
+                CHECK (document ->> 'Id' = id),
+                CHECK (COALESCE((document ->> 'Version')::bigint, 0) = version)
+            );
+            CREATE INDEX IF NOT EXISTS ix_development_links_tenant_work_item_updated
+                ON work_items.work_item_development_links (
+                    (document ->> 'OrganizationId'),
+                    (document ->> 'ProjectId'),
+                    (document ->> 'WorkItemId'),
+                    public.zumbo_parse_timestamptz(document ->> 'UpdatedAtUtc') DESC,
+                    id);
+            CREATE INDEX IF NOT EXISTS ix_development_links_tenant_mapping_commit
+                ON work_items.work_item_development_links (
+                    (document ->> 'OrganizationId'),
+                    (document ->> 'MappingId'),
+                    (document ->> 'CommitSha'),
+                    (document ->> 'ExternalId'),
+                    id);
+
+            CREATE TABLE IF NOT EXISTS work_items.development_webhook_receipts (
+                id text PRIMARY KEY,
+                version bigint NOT NULL DEFAULT 0 CHECK (version >= 0),
+                document jsonb NOT NULL CHECK (jsonb_typeof(document) = 'object'),
+                created_at timestamptz NOT NULL DEFAULT transaction_timestamp(),
+                updated_at timestamptz NOT NULL DEFAULT transaction_timestamp(),
+                CHECK (document ->> 'Id' = id),
+                CHECK (COALESCE((document ->> 'Version')::bigint, 0) = version)
+            );
+            CREATE INDEX IF NOT EXISTS ix_development_receipts_connection_expiry
+                ON work_items.development_webhook_receipts (
+                    (document ->> 'ConnectionId'),
+                    public.zumbo_parse_timestamptz(document ->> 'ExpiresAtUtc'),
+                    id);
+            """;
+        const string dropDevelopmentIntegrations = """
+            DROP TABLE IF EXISTS work_items.development_webhook_receipts;
+            DROP TABLE IF EXISTS work_items.work_item_development_links;
+            DROP TABLE IF EXISTS work_items.development_repository_mappings;
+            DROP TABLE IF EXISTS work_items.development_connections;
+            """;
+        const string highCardinalityIndexes = """
+            CREATE INDEX IF NOT EXISTS ix_projects_organization_archived_key_cursor
+                ON projects.projects (
+                    (document #>> ARRAY['OrganizationId']),
+                    ((document #>> ARRAY['Archived'])::boolean),
+                    (document #>> ARRAY['Key']),
+                    id COLLATE "C");
+            CREATE INDEX IF NOT EXISTS ix_refresh_sessions_owner_last_seen
+                ON identity.refresh_sessions (
+                    (document #>> ARRAY['OrganizationId']),
+                    (document #>> ARRAY['UserId']),
+                    public.zumbo_parse_timestamptz(
+                        document #>> ARRAY['LastSeenAt']) DESC NULLS LAST,
+                    id COLLATE "C");
+            """;
+        const string dropHighCardinalityIndexes = """
+            DROP INDEX IF EXISTS identity.ix_refresh_sessions_owner_last_seen;
+            DROP INDEX IF EXISTS projects.ix_projects_organization_archived_key_cursor;
+            """;
 
         return
         [
@@ -1582,7 +1952,17 @@ public sealed class PostgreSqlMigrationRunner(
             Migration.Create(24, "work_item_report_activity_indexes", workItemReportActivityIndexes, dropWorkItemReportActivityIndexes),
             Migration.Create(25, "privacy_workflows", privacyWorkflows, dropPrivacyWorkflows),
             Migration.Create(26, "privacy_workflow_utc_index", privacyWorkflowUtcIndex, dropPrivacyWorkflowUtcIndex),
-            Migration.Create(27, "webhook_subscriptions_and_deliveries", webhooks, dropWebhooks)
+            Migration.Create(27, "webhook_subscriptions_and_deliveries", webhooks, dropWebhooks),
+            Migration.Create(28, "intake_forms_and_submissions", intakeForms, dropIntakeForms),
+            Migration.Create(29, "automation_rules", automationRules, dropAutomationRules),
+            Migration.Create(30, "automation_runs", automationRuns, dropAutomationRuns),
+            Migration.Create(31, "dashboards", dashboards, dropDashboards),
+            Migration.Create(32, "portfolios", portfolios, dropPortfolios),
+            Migration.Create(33, "goals", goals, dropGoals),
+            Migration.Create(34, "capacity_plans", capacityPlans, dropCapacityPlans),
+            Migration.Create(35, "knowledge_documents", knowledgeDocuments, dropKnowledgeDocuments),
+            Migration.Create(36, "development_integrations", developmentIntegrations, dropDevelopmentIntegrations),
+            Migration.Create(37, "high_cardinality_indexes", highCardinalityIndexes, dropHighCardinalityIndexes)
         ];
     }
 

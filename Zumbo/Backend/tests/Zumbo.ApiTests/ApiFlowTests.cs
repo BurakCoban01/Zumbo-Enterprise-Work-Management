@@ -265,12 +265,21 @@ public sealed class ApiFlowTests : IClassFixture<WebApplicationFactory<Program>>
         var auditExportResponse = await _client.GetAsync(
             $"/api/audit/export?entityType=WorkItem&entityId={workItem.Id}&from={auditFrom}&to={auditTo}");
         auditExportResponse.EnsureSuccessStatusCode();
+        Assert.Equal("application/x-ndjson", auditExportResponse.Content.Headers.ContentType?.MediaType);
+        Assert.Equal("attachment", auditExportResponse.Content.Headers.ContentDisposition?.DispositionType);
+        Assert.Equal("zumbo-audit-export.ndjson", auditExportResponse.Content.Headers.ContentDisposition?.FileName);
+        Assert.Equal("no-store", auditExportResponse.Headers.CacheControl?.ToString());
+        Assert.Equal("nosniff", auditExportResponse.Headers.GetValues("X-Content-Type-Options").Single());
+        Assert.Equal("audit-ndjson-v1", auditExportResponse.Headers.GetValues("X-Zumbo-Export-Format").Single());
         var exportedAudit = (await auditExportResponse.Content.ReadAsStringAsync())
             .Split('\n', StringSplitOptions.RemoveEmptyEntries)
             .Select(line => JsonSerializer.Deserialize<AuditLogResponse>(
                 line,
                 new JsonSerializerOptions(JsonSerializerDefaults.Web))!)
             .ToList();
+        Assert.Equal(
+            exportedAudit.Count.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            auditExportResponse.Headers.GetValues("X-Zumbo-Export-Records").Single());
         var invalidCursorResponse = await _client.GetAsync(
             $"/api/audit?entityType=WorkItem&entityId={workItem.Id}&cursor=invalid-base64");
         var ownAudit = await EventuallyAsync(
@@ -943,6 +952,7 @@ public sealed class ApiFlowTests : IClassFixture<WebApplicationFactory<Program>>
         var sessions = await GetAsync<IReadOnlyList<SessionResponse>>("/api/auth/sessions");
         var current = Assert.Single(sessions);
         Assert.Equal("Security test laptop", current.DeviceName);
+        Assert.True(current.IsCurrent);
         Assert.Equal(64, current.ClientFingerprint.Length);
         Assert.DoesNotContain("Zumbo-Sec004-Tests", current.ClientFingerprint, StringComparison.Ordinal);
 
@@ -1301,6 +1311,13 @@ public sealed class ApiFlowTests : IClassFixture<WebApplicationFactory<Program>>
             organizationId,
             "development-bootstrap-token"));
         _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", admin.AccessToken);
+        var auditIntegrityResponse = await _client.GetAsync(
+            $"/api/audit/integrity/{organizationId}");
+        auditIntegrityResponse.EnsureSuccessStatusCode();
+        var auditIntegrity = await auditIntegrityResponse.Content
+            .ReadFromJsonAsync<ApiResponse<AuditIntegrityResult>>();
+        Assert.NotNull(auditIntegrity?.Data);
+        Assert.True(auditIntegrity.Data.Valid);
         var availableRoles = await GetAsync<IReadOnlyList<RoleResponse>>("/api/auth/roles");
         Assert.Contains(availableRoles, x => x.Name == "SystemAdmin" && x.IsSystem);
         var role = await PostAsync<RoleResponse>("/api/auth/roles", new CreateRoleRequest(

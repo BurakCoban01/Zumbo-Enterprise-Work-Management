@@ -13,6 +13,8 @@ public static class WorkItemDurableEventTypes
     public const string Webhook = "work-item.webhook.v1";
     public const string RecurrenceOccurrence = "work-item.recurrence-occurrence.v1";
     public const string BulkJob = "work-item.bulk-job.v1";
+    public const string Automation = "work-item.automation.v1";
+    public const string DevelopmentWebhook = "work-item.development-webhook.v1";
 }
 
 public sealed record WorkItemAuditEvent(
@@ -54,12 +56,81 @@ public sealed record WorkItemRecurrenceDueEvent(
     string OccurrenceId,
     DateTimeOffset ScheduledForUtc);
 
+public sealed record WorkItemAutomationEvent(
+    string OrganizationId,
+    string ProjectId,
+    string EventType,
+    string TriggerId,
+    string WorkItemId,
+    string ActorUserId,
+    string CorrelationId,
+    DateTimeOffset OccurredAtUtc,
+    IReadOnlyDictionary<string, string?> Fields,
+    string? RootRunId,
+    int ChainDepth,
+    IReadOnlyCollection<string> VisitedRuleIds);
+
+public sealed record WorkItemAutomationChainContext(
+    string RootRunId,
+    int ChainDepth,
+    IReadOnlyCollection<string> VisitedRuleIds);
+
+public interface IWorkItemAutomationChainContextAccessor
+{
+    WorkItemAutomationChainContext? Current { get; }
+    IDisposable Push(WorkItemAutomationChainContext context);
+}
+
+public sealed class WorkItemAutomationChainContextAccessor : IWorkItemAutomationChainContextAccessor
+{
+    private WorkItemAutomationChainContext? current;
+
+    public WorkItemAutomationChainContext? Current => current;
+
+    public IDisposable Push(WorkItemAutomationChainContext context)
+    {
+        var previous = current;
+        current = context;
+        return new RestoreScope(() => current = previous);
+    }
+
+    private sealed class RestoreScope(Action restore) : IDisposable
+    {
+        private bool disposed;
+
+        public void Dispose()
+        {
+            if (disposed)
+                return;
+            disposed = true;
+            restore();
+        }
+    }
+}
+
 public interface IWorkItemRecurrenceEventPublisher
 {
     Task PublishAsync(WorkItemRecurrenceDueEvent message, CancellationToken ct);
 }
 
+public interface IWorkItemAutomationEventPublisher
+{
+    Task PublishAsync(WorkItemAutomationEvent message, CancellationToken ct);
+}
+
 public interface IWorkItemAuditPublisher
+{
+    Task WriteAsync(
+        string action,
+        string entityType,
+        string entityId,
+        string? oldValue,
+        string? newValue,
+        string correlationId,
+        CancellationToken ct);
+}
+
+public interface IWorkItemOperationsAuditWriter
 {
     Task WriteAsync(
         string action,

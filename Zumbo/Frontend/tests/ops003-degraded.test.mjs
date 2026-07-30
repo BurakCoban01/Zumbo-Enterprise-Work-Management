@@ -17,17 +17,19 @@ test('desktop search uses bounded fallback contract and exposes degraded state',
   assert.match(html, /güvenli yedek görünümden gösteriliyor/);
 });
 
-test('mobile search preserves paging and exposes degraded state on both task surfaces', async () => {
-  const [api, tasks, workspace, html] = await Promise.all([
+test('mobile search preserves paging and exposes degraded state on all search surfaces', async () => {
+  const [api, tasks, workspace, shell, html] = await Promise.all([
     read('mobile-ionic/api.js'),
     read('mobile-ionic/tasks.js'),
     read('mobile-ionic/workspace.js'),
+    read('mobile-ionic/mobile-shell.js'),
     read('mobile-ionic/index.html')
   ]);
-  assert.equal((api.match(/apiClient\.post\(['"]\/api\/work-items\/search['"]/g) || []).length, 2);
+  assert.equal((api.match(/apiClient\.post\(['"]\/api\/work-items\/search['"]/g) || []).length, 3);
   assert.match(tasks, /vm\.searchDegraded = data\.degraded === true/);
   assert.match(workspace, /vm\.searchDegraded = result\[1\]\.degraded === true/);
-  assert.equal((html.match(/mobile-degraded-state/g) || []).length, 2);
+  assert.match(shell, /vm\.degraded = result\.degraded === true/);
+  assert.equal((html.match(/mobile-degraded-state/g) || []).length, 3);
 });
 
 test('backend fallback is bounded and returns an explicit degraded API response', async () => {

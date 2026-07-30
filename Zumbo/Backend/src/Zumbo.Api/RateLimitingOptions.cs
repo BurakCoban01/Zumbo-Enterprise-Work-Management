@@ -6,6 +6,7 @@ public sealed class RateLimitingOptions
     public int ApiPermitLimit { get; init; } = 300;
     public int SearchPermitLimit { get; init; } = 60;
     public int UploadPermitLimit { get; init; } = 10;
+    public int IntakePublicPermitLimit { get; init; } = 5;
     public int ReportPermitLimit { get; init; } = 30;
     public int BulkPermitLimit { get; init; } = 10;
     public int RealtimeConnectPermitLimit { get; init; } = 500;
@@ -20,6 +21,7 @@ public sealed class RateLimitingOptions
         "api" => new(name, ApiPermitLimit, StandardWindowSeconds, false),
         "search" => new(name, SearchPermitLimit, StandardWindowSeconds, false),
         "upload" => new(name, UploadPermitLimit, StandardWindowSeconds, true),
+        "intake-public" => new(name, IntakePublicPermitLimit, StandardWindowSeconds, true),
         "report" => new(name, ReportPermitLimit, StandardWindowSeconds, false),
         "bulk" => new(name, BulkPermitLimit, StandardWindowSeconds, true),
         "realtime-connect" => new(name, RealtimeConnectPermitLimit, StandardWindowSeconds, true),

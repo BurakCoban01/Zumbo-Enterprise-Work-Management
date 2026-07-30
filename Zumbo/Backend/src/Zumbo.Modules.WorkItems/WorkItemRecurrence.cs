@@ -167,7 +167,25 @@ public sealed record CreateWorkItemRecurrenceRequest(
     DateTimeOffset? EndAtUtc,
     int MaxOccurrences);
 
+public sealed record PreviewWorkItemRecurrenceRequest(
+    string ProjectId,
+    string TemplateId,
+    string Frequency,
+    int Interval,
+    DateTimeOffset StartAtUtc,
+    DateTimeOffset? EndAtUtc,
+    int MaxOccurrences,
+    int PreviewCount = 5);
+
 public sealed record SetWorkItemRecurrenceStateRequest(bool Active);
+
+public sealed record WorkItemRecurrencePreviewResponse(
+    string Frequency,
+    int Interval,
+    DateTimeOffset StartAtUtc,
+    DateTimeOffset? EndAtUtc,
+    int MaxOccurrences,
+    IReadOnlyCollection<DateTimeOffset> OccurrencesUtc);
 
 public sealed record WorkItemRecurrenceResponse(
     string Id,
@@ -412,6 +430,40 @@ public sealed class WorkItemTemplateRecurrenceService(
             "WorkItemRecurrenceCreated", "WorkItemRecurrence", recurrence.Id, null,
             $"{recurrence.Frequency}:{recurrence.Interval}", correlationId, ct);
         return await ToResponseAsync(recurrence, ct);
+    }
+
+    public async Task<WorkItemRecurrencePreviewResponse> PreviewRecurrenceAsync(
+        PreviewWorkItemRecurrenceRequest request,
+        CancellationToken ct)
+    {
+        var authorization = await EnsurePermissionAsync(request.ProjectId, PermissionCatalog.WorkItemCreate, ct);
+        var template = await GetTemplateAsync(request.TemplateId, includeArchived: false, ct);
+        EnsureOwnership(template.OrganizationId, template.ProjectId, authorization.OrganizationId, request.ProjectId);
+        var schedule = ValidateSchedule(new CreateWorkItemRecurrenceRequest(
+            request.ProjectId,
+            request.TemplateId,
+            request.Frequency,
+            request.Interval,
+            request.StartAtUtc,
+            request.EndAtUtc,
+            request.MaxOccurrences));
+        var previewCount = Math.Clamp(request.PreviewCount, 1, 10);
+        var limit = Math.Min(previewCount, schedule.MaxOccurrences);
+        var values = new List<DateTimeOffset>(limit);
+        var next = schedule.StartAtUtc;
+        while (values.Count < limit && (schedule.EndAtUtc is null || next <= schedule.EndAtUtc))
+        {
+            values.Add(next);
+            next = Next(next, schedule.Frequency, schedule.Interval);
+        }
+
+        return new WorkItemRecurrencePreviewResponse(
+            schedule.Frequency,
+            schedule.Interval,
+            schedule.StartAtUtc,
+            schedule.EndAtUtc,
+            schedule.MaxOccurrences,
+            values);
     }
 
     public async Task<WorkItemRecurrenceResponse> SetRecurrenceStateAsync(

@@ -3,7 +3,9 @@ using System.IO.Compression;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Zumbo.BuildingBlocks.Application.Runtime;
 using Zumbo.BuildingBlocks.Infrastructure.Storage;
 using Zumbo.Modules.WorkItems;
 using Zumbo.SharedKernel;
@@ -12,7 +14,8 @@ public sealed class AttachmentStorageAdapter(
     IFileStorage storage,
     IAttachmentMalwareScanner malwareScanner,
     IOptions<AttachmentSecurityOptions> options,
-    IClock clock) : IAttachmentStorage
+    IClock clock,
+    ILogger<AttachmentStorageAdapter>? logger = null) : IAttachmentStorage
 {
     private const long MaximumAttachmentBytes = 25 * 1024 * 1024;
 
@@ -49,7 +52,7 @@ public sealed class AttachmentStorageAdapter(
         {
             if (quarantined is not null)
             {
-                await storage.DeleteAsync(quarantined.StoragePath, CancellationToken.None);
+                await TryDeleteQuarantineAsync(quarantined.StoragePath);
             }
             throw new ValidationException("Attachment size cannot exceed 25 MB.");
         }
@@ -57,7 +60,7 @@ public sealed class AttachmentStorageAdapter(
         {
             if (quarantined is not null)
             {
-                await storage.DeleteAsync(quarantined.StoragePath, CancellationToken.None);
+                await TryDeleteQuarantineAsync(quarantined.StoragePath);
             }
             throw;
         }
@@ -151,7 +154,6 @@ public sealed class AttachmentStorageAdapter(
     {
         if (scan.Status == AttachmentMalwareScanStatuses.Infected)
         {
-            await storage.DeleteAsync(quarantined.StoragePath, CancellationToken.None);
             throw new ValidationException("Attachment was rejected by malware scanning.");
         }
 
@@ -172,6 +174,21 @@ public sealed class AttachmentStorageAdapter(
             scan.Provider,
             null,
             clock.UtcNow);
+    }
+
+    private async Task TryDeleteQuarantineAsync(string storagePath)
+    {
+        var result = await CompensationExecution.RunAsync(
+            "attachment.quarantine.delete",
+            token => storage.DeleteAsync(storagePath, token));
+        if (!result.Succeeded)
+        {
+            logger?.LogWarning(
+                "Compensation operation {Operation} ended with {Outcome}; failure type {FailureType}.",
+                result.Operation,
+                result.Outcome,
+                result.Exception?.GetType().Name ?? "none");
+        }
     }
 
     private async Task<AttachmentMalwareScanResult> ScanFailClosedAsync(

@@ -10,6 +10,7 @@
 **/dist/
 **/coverage/
 **/.playwright/
+**/.playwright-mcp/
 artifacts/ui/playwright/
 artifacts/security/generated/
 artifacts/contracts/generated/
@@ -50,3 +51,6 @@ artifacts/migrations/ci/
 *.log
 *.out
 *.err
+
+# Windows reserved device names
+nul

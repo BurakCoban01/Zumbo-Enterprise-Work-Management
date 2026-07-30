@@ -6,6 +6,7 @@ using MongoDB.Bson.Serialization;
 using MongoDB.Driver;
 using Npgsql;
 using NpgsqlTypes;
+using Zumbo.BuildingBlocks.Application.Runtime;
 
 namespace Zumbo.DataTransfer;
 
@@ -239,7 +240,13 @@ internal static class TransferEngine
         }
         catch
         {
-            if (session.IsInTransaction) await session.AbortTransactionAsync(CancellationToken.None);
+            if (session.IsInTransaction)
+            {
+                var cleanup = await CompensationExecution.RunAsync(
+                    "data_transfer.mongo_import.abort",
+                    token => session.AbortTransactionAsync(token));
+                ObserveCompensation(cleanup);
+            }
             throw;
         }
     }
@@ -279,8 +286,21 @@ internal static class TransferEngine
         }
         catch
         {
-            await transaction.RollbackAsync(CancellationToken.None);
+            var cleanup = await CompensationExecution.RunAsync(
+                "data_transfer.postgres_import.rollback",
+                token => transaction.RollbackAsync(token));
+            ObserveCompensation(cleanup);
             throw;
+        }
+    }
+
+    private static void ObserveCompensation(CompensationResult result)
+    {
+        if (!result.Succeeded)
+        {
+            Console.Error.WriteLine(
+                $"Compensation operation {result.Operation} ended with {result.Outcome}; "
+                + $"failure type {result.Exception?.GetType().Name ?? "none"}.");
         }
     }
 

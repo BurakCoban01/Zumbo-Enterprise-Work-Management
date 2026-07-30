@@ -70,7 +70,11 @@ internal static class ObservabilityRegistration
                     .AddAspNetCoreInstrumentation()
                     .AddHttpClientInstrumentation()
                     .AddRuntimeInstrumentation()
-                    .AddMeter("Zumbo.ExternalDependencies", "Zumbo.DurableMessaging", "Zumbo.Realtime");
+                    .AddMeter(
+                        "Zumbo.ExternalDependencies",
+                        "Zumbo.DurableMessaging",
+                        "Zumbo.Realtime",
+                        "Zumbo.Audit");
                 if (options.OtlpEnabled)
                     metrics.AddOtlpExporter(exporter => ConfigureExporter(exporter, endpoint, options));
             });

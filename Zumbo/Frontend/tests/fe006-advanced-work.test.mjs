@@ -5,9 +5,13 @@ import test from 'node:test';
 
 const root = resolve(import.meta.dirname, '..');
 const planning = await readFile(resolve(root, 'desktop-bulma/planning.js'), 'utf8');
+const planningViews = await readFile(resolve(root, 'desktop-bulma/planning-views.js'), 'utf8');
+const planningCore = await readFile(resolve(root, 'shared/planning-core.js'), 'utf8');
+const projectOverview = await readFile(resolve(root, 'desktop-bulma/project-overview.js'), 'utf8');
 const desktopApp = await readFile(resolve(root, 'desktop-bulma/app.js'), 'utf8');
 const taskBoard = await readFile(resolve(root, 'desktop-bulma/task-board.js'), 'utf8');
 const boardView = await readFile(resolve(root, 'desktop-bulma/board-view.js'), 'utf8');
+const boardExcellence = await readFile(resolve(root, 'desktop-bulma/board-excellence.js'), 'utf8');
 const desktopHtml = await readFile(resolve(root, 'desktop-bulma/index.html'), 'utf8');
 const desktopCss = await readFile(resolve(root, 'desktop-bulma/styles.css'), 'utf8');
 const mobile = await readFile(resolve(root, 'mobile-ionic/tasks.js'), 'utf8');
@@ -40,19 +44,21 @@ test('sprint komutlari viewer icin istemci tarafinda gizlenir ve API yetkisi esa
 });
 
 test('pano liste backlog sprint takvim timeline ve roadmap tek erisilebilir tablist icindedir', () => {
-  assert.match(desktopHtml, /class="work-mode-tabs"[^>]+role="tablist"/);
+  assert.match(desktopHtml, /class="project-view-switcher"[^>]+role="tablist"/);
   for (const mode of ['board', 'list', 'backlog', 'sprint', 'calendar', 'timeline', 'roadmap']) {
-    assert.ok(desktopHtml.includes(`vm.setWorkMode('${mode}')`), `${mode} tab is missing`);
+    assert.ok(projectOverview.includes(`view('${mode}'`), `${mode} tab is missing`);
     assert.ok(desktopHtml.includes(`vm.workMode === '${mode}'`), `${mode} surface is missing`);
   }
 });
 
 test('liste ve bulk yuzeyleri ayni authoritative task koleksiyonunu kullanir', () => {
-  assert.match(desktopHtml, /class="work-table-row"[^>]+ng-repeat="task in vm\.tasks/);
+  assert.match(desktopHtml, /ng-repeat="task in vm\.listTasks track by task\.id"/);
+  assert.match(boardExcellence, /vm\.listTasks = \(vm\.tasks \|\| \[\]\)\.filter/);
   assert.match(desktopHtml, /vm\.toggleTaskSelection\(task\.id\)/);
-  assert.match(taskBoard, /\/api\/work-items\/bulk\/move/);
-  assert.match(taskBoard, /\/api\/work-items\/bulk\/assign/);
-  assert.match(taskBoard, /\/api\/work-items\/bulk\/archive/);
+  assert.match(boardExcellence, /\/api\/work-items\/bulk\/move/);
+  assert.match(boardExcellence, /\/api\/work-items\/bulk\/assign/);
+  assert.match(boardExcellence, /\/api\/work-items\/bulk\/archive/);
+  assert.match(boardExcellence, /vm\.saveListEdit\s*=\s*function/);
 });
 
 test('filter ve kayitli gorunum backend board view kontratini korur', () => {
@@ -69,23 +75,28 @@ test('conflict ve optimistic rollback ileri gorunumlerde korunur', () => {
   assert.match(taskBoard, /return vm\.loadTasks\(\)/);
 });
 
-test('timeline yalniz yetkili ve bounded entity audit kaynaklarini birlestirir', () => {
+test('overview audit ve planning timeline yetkili bounded kaynaklari ayri sunar', () => {
   assert.match(planning, /\/api\/audit\/entity\/' \+ type \+ '\/' \+ id/);
   assert.match(planning, /entityAudit\('Project', projectId\)/);
   assert.match(planning, /entityAudit\('Board', vm\.board\.id\)/);
   assert.match(planning, /entityAudit\('Sprint', sprint\.id\)/);
   assert.match(planning, /entityAudit\('WorkItem', vm\.selectedTask\.id\)/);
   assert.doesNotMatch(planning, /\/api\/audit\/\?organizationId=/);
-  assert.match(desktopHtml, /class="project-timeline"/);
+  assert.match(desktopHtml, /class="overview-activity"/);
+  assert.match(desktopHtml, /class="planning-gantt-row"/);
+  assert.match(planningCore, /dependencies: edges/);
+  assert.match(desktopHtml, /vm\.planningModel\.dependencies\.length/);
 });
 
-test('takvim due date ve roadmap sprint tarihlerini gercek modellerden turetir', () => {
-  assert.match(planning, /task\.dueDate/);
-  assert.match(planning, /vm\.calendarGroups = Object\.keys\(byDate\)/);
-  assert.match(planning, /vm\.roadmapSprints = \(vm\.sprints \|\| \[\]\)/);
+test('takvim timeline ve roadmap gercek gorev sprint milestone ve release tarihlerini turetir', () => {
+  assert.match(planningCore, /task\.dueDate/);
+  assert.match(planningCore, /sprint\.startDate/);
+  assert.match(planningCore, /sprint\.endDate/);
+  assert.match(planningCore, /project\.milestones/);
+  assert.match(planningCore, /project\.releases/);
   assert.match(desktopHtml, /datetime="\{\{day\.key\}\}"/);
-  assert.match(desktopHtml, /sprint\.startDate/);
-  assert.match(desktopHtml, /sprint\.endDate/);
+  assert.match(desktopHtml, /vm\.planningDateLabel\(row\.startKey\)/);
+  assert.match(desktopHtml, /vm\.planningDateLabel\(row\.endKey\)/);
 });
 
 test('desktop responsive reflow ve mobile essential modlari birlikte korunur', () => {

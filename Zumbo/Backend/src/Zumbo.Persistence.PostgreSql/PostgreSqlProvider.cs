@@ -1,4 +1,5 @@
 using System.Data.Common;
+using Microsoft.Extensions.Logging;
 using Npgsql;
 using Zumbo.BuildingBlocks.Application.Persistence;
 
@@ -10,9 +11,13 @@ public sealed class PostgreSqlProvider : IAsyncDisposable
     private readonly NpgsqlDataSource dataSource;
     private readonly PostgreSqlSession session;
     private readonly PostgreSqlMigrationRunner migrations;
+    private readonly ILogger<PostgreSqlProvider>? logger;
 
-    public PostgreSqlProvider(string connectionString)
+    public PostgreSqlProvider(
+        string connectionString,
+        ILogger<PostgreSqlProvider>? logger = null)
     {
+        this.logger = logger;
         options = new PostgreSqlPersistenceOptions { ConnectionString = connectionString };
         options.Validate();
         dataSource = new NpgsqlDataSourceBuilder(connectionString).Build();
@@ -24,9 +29,7 @@ public sealed class PostgreSqlProvider : IAsyncDisposable
         where TDocument : class, IDocument
     {
         options.MapDocument<TDocument>(schema, table);
-        var repository = new PostgreSqlDocumentRepository<TDocument>(session, options);
-        repository.EnsureStorageAsync().GetAwaiter().GetResult();
-        return repository;
+        return new PostgreSqlDocumentRepository<TDocument>(session, options);
     }
 
     public async Task<DbConnection> OpenConnectionAsync(CancellationToken cancellationToken) =>
@@ -61,7 +64,10 @@ public sealed class PostgreSqlProvider : IAsyncDisposable
         }
         catch
         {
-            await transaction.RollbackAsync(CancellationToken.None);
+            await PostgreSqlCompensation.RunAsync(
+                "postgres.provider.rollback",
+                token => transaction.RollbackAsync(token),
+                logger);
             throw;
         }
     }

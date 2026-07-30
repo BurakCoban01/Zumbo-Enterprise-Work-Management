@@ -346,6 +346,422 @@ public static class MongoWorkItemBulkJobIndexes
     ];
 }
 
+public static class MongoIntakeIndexes
+{
+    public static IReadOnlyList<MongoIndexSpecification> All { get; } =
+    [
+        new(
+            "WorkItems",
+            "intakeforms",
+            "ux_intake_forms_public_id",
+            new BsonDocument { ["PublicId"] = 1 },
+            Unique: true),
+        new(
+            "WorkItems",
+            "intakeforms",
+            "ix_intake_forms_tenant_project_state",
+            new BsonDocument
+            {
+                ["OrganizationId"] = 1,
+                ["ProjectId"] = 1,
+                ["State"] = 1,
+                ["UpdatedAt"] = -1,
+                ["_id"] = 1
+            }),
+        new(
+            "WorkItems",
+            "intakeformversions",
+            "ux_intake_form_versions_number",
+            new BsonDocument { ["FormId"] = 1, ["DefinitionVersion"] = 1 },
+            Unique: true),
+        new(
+            "WorkItems",
+            "intakesubmissions",
+            "ux_intake_submissions_idempotency",
+            new BsonDocument
+            {
+                ["OrganizationId"] = 1,
+                ["FormId"] = 1,
+                ["SubmittedByUserId"] = 1,
+                ["IdempotencyKeyHash"] = 1
+            },
+            Unique: true),
+        new(
+            "WorkItems",
+            "intakesubmissions",
+            "ix_intake_submissions_triage",
+            new BsonDocument
+            {
+                ["OrganizationId"] = 1,
+                ["FormId"] = 1,
+                ["State"] = 1,
+                ["CreatedAt"] = -1,
+                ["_id"] = 1
+            }),
+        new(
+            "WorkItems",
+            "intakesubmissions",
+            "ux_intake_submissions_work_item",
+            new BsonDocument { ["WorkItemId"] = 1 },
+            Unique: true)
+    ];
+}
+
+public static class MongoAutomationIndexes
+{
+    public static IReadOnlyList<MongoIndexSpecification> All { get; } =
+    [
+        new(
+            "Workflows",
+            "automationrules",
+            "ix_automation_rules_tenant_project_state",
+            new BsonDocument
+            {
+                ["OrganizationId"] = 1,
+                ["ProjectId"] = 1,
+                ["Archived"] = 1,
+                ["UpdatedAt"] = -1,
+                ["_id"] = 1
+            }),
+        new(
+            "Workflows",
+            "automationrules",
+            "ix_automation_rules_schedule",
+            new BsonDocument
+            {
+                ["Active"] = 1,
+                ["Archived"] = 1,
+                ["NextRunAtUtc"] = 1,
+                ["_id"] = 1
+            })
+    ];
+}
+
+public static class MongoDashboardIndexes
+{
+    public static IReadOnlyList<MongoIndexSpecification> All { get; } =
+    [
+        new(
+            "WorkItems",
+            "dashboards",
+            "ix_dashboards_tenant_owner_state",
+            new BsonDocument
+            {
+                ["OrganizationId"] = 1,
+                ["OwnerUserId"] = 1,
+                ["Archived"] = 1,
+                ["UpdatedAt"] = -1,
+                ["_id"] = 1
+            }),
+        new(
+            "WorkItems",
+            "dashboards",
+            "ix_dashboards_tenant_viewers",
+            new BsonDocument
+            {
+                ["OrganizationId"] = 1,
+                ["ViewerUserIds"] = 1,
+                ["Archived"] = 1,
+                ["_id"] = 1
+            }),
+        new(
+            "WorkItems",
+            "dashboards",
+            "ix_dashboards_tenant_projects",
+            new BsonDocument
+            {
+                ["OrganizationId"] = 1,
+                ["ProjectIds"] = 1,
+                ["Archived"] = 1,
+                ["_id"] = 1
+            })
+    ];
+}
+
+public static class MongoCapacityPlanIndexes
+{
+    public static IReadOnlyList<MongoIndexSpecification> All { get; } =
+    [
+        new(
+            "WorkItems",
+            "capacity_plans",
+            "ix_capacity_plans_tenant_owner_state",
+            new BsonDocument
+            {
+                ["OrganizationId"] = 1,
+                ["OwnerUserId"] = 1,
+                ["Archived"] = 1,
+                ["UpdatedAt"] = -1,
+                ["_id"] = 1
+            }),
+        new(
+            "WorkItems",
+            "capacity_plans",
+            "ix_capacity_plans_tenant_viewers",
+            new BsonDocument
+            {
+                ["OrganizationId"] = 1,
+                ["ViewerUserIds"] = 1,
+                ["Archived"] = 1,
+                ["_id"] = 1
+            }),
+        new(
+            "WorkItems",
+            "capacity_plans",
+            "ix_capacity_plans_tenant_projects",
+            new BsonDocument
+            {
+                ["OrganizationId"] = 1,
+                ["ProjectIds"] = 1,
+                ["Archived"] = 1,
+                ["_id"] = 1
+            })
+    ];
+}
+
+public static class MongoPortfolioIndexes
+{
+    public static IReadOnlyList<MongoIndexSpecification> All { get; } =
+    [
+        new(
+            "Projects",
+            "portfolios",
+            "ix_portfolios_tenant_owner_state",
+            new BsonDocument
+            {
+                ["OrganizationId"] = 1,
+                ["OwnerUserId"] = 1,
+                ["Archived"] = 1,
+                ["UpdatedAt"] = -1,
+                ["_id"] = 1
+            }),
+        new(
+            "Projects",
+            "portfolios",
+            "ix_portfolios_tenant_viewers",
+            new BsonDocument
+            {
+                ["OrganizationId"] = 1,
+                ["ViewerUserIds"] = 1,
+                ["Archived"] = 1,
+                ["_id"] = 1
+            }),
+        new(
+            "Projects",
+            "portfolios",
+            "ix_portfolios_tenant_projects",
+            new BsonDocument
+            {
+                ["OrganizationId"] = 1,
+                ["Initiatives.ProjectIds"] = 1,
+                ["Archived"] = 1,
+                ["_id"] = 1
+            })
+    ];
+}
+
+public static class MongoGoalIndexes
+{
+    public static IReadOnlyList<MongoIndexSpecification> All { get; } =
+    [
+        new(
+            "Projects",
+            "goals",
+            "ix_goals_tenant_owner_state",
+            new BsonDocument
+            {
+                ["OrganizationId"] = 1,
+                ["OwnerUserId"] = 1,
+                ["Archived"] = 1,
+                ["UpdatedAt"] = -1,
+                ["_id"] = 1
+            }),
+        new(
+            "Projects",
+            "goals",
+            "ix_goals_tenant_viewers",
+            new BsonDocument
+            {
+                ["OrganizationId"] = 1,
+                ["ViewerUserIds"] = 1,
+                ["Archived"] = 1,
+                ["_id"] = 1
+            }),
+        new(
+            "Projects",
+            "goals",
+            "ix_goals_tenant_key_result_owners",
+            new BsonDocument
+            {
+                ["OrganizationId"] = 1,
+                ["KeyResults.OwnerUserId"] = 1,
+                ["Archived"] = 1,
+                ["_id"] = 1
+            })
+    ];
+}
+
+public static class MongoKnowledgeIndexes
+{
+    public static IReadOnlyList<MongoIndexSpecification> All { get; } =
+    [
+        new(
+            "Projects",
+            "knowledge_documents",
+            "ix_knowledge_tenant_scope_state",
+            new BsonDocument
+            {
+                ["OrganizationId"] = 1,
+                ["ScopeType"] = 1,
+                ["ScopeId"] = 1,
+                ["Archived"] = 1,
+                ["UpdatedAt"] = -1,
+                ["_id"] = 1
+            }),
+        new(
+            "Projects",
+            "knowledge_documents",
+            "ix_knowledge_tenant_owner_state",
+            new BsonDocument
+            {
+                ["OrganizationId"] = 1,
+                ["OwnerUserId"] = 1,
+                ["Archived"] = 1,
+                ["UpdatedAt"] = -1,
+                ["_id"] = 1
+            }),
+        new(
+            "Projects",
+            "knowledge_documents",
+            "ix_knowledge_tenant_tags",
+            new BsonDocument
+            {
+                ["OrganizationId"] = 1,
+                ["Tags"] = 1,
+                ["Archived"] = 1,
+                ["_id"] = 1
+            })
+    ];
+}
+
+public static class MongoDevelopmentIntegrationIndexes
+{
+    public static IReadOnlyList<MongoIndexSpecification> All { get; } =
+    [
+        new(
+            "WorkItems",
+            "developmentconnections",
+            "ix_development_connections_tenant_updated",
+            new BsonDocument
+            {
+                ["OrganizationId"] = 1,
+                ["UpdatedAtUtc"] = -1,
+                ["_id"] = 1
+            }),
+        new(
+            "WorkItems",
+            "developmentrepositorymappings",
+            "ux_development_mappings_tenant_connection_repository",
+            new BsonDocument
+            {
+                ["OrganizationId"] = 1,
+                ["ConnectionId"] = 1,
+                ["ExternalRepositoryId"] = 1
+            },
+            Unique: true),
+        new(
+            "WorkItems",
+            "developmentrepositorymappings",
+            "ix_development_mappings_tenant_project_active",
+            new BsonDocument
+            {
+                ["OrganizationId"] = 1,
+                ["ProjectId"] = 1,
+                ["IsActive"] = 1,
+                ["_id"] = 1
+            }),
+        new(
+            "WorkItems",
+            "workitemdevelopmentlinks",
+            "ix_development_links_tenant_work_item_updated",
+            new BsonDocument
+            {
+                ["OrganizationId"] = 1,
+                ["ProjectId"] = 1,
+                ["WorkItemId"] = 1,
+                ["UpdatedAtUtc"] = -1,
+                ["_id"] = 1
+            }),
+        new(
+            "WorkItems",
+            "workitemdevelopmentlinks",
+            "ix_development_links_tenant_mapping_commit",
+            new BsonDocument
+            {
+                ["OrganizationId"] = 1,
+                ["MappingId"] = 1,
+                ["CommitSha"] = 1,
+                ["ExternalId"] = 1,
+                ["_id"] = 1
+            }),
+        new(
+            "WorkItems",
+            "developmentwebhookreceipts",
+            "ix_development_receipts_connection_expiry",
+            new BsonDocument
+            {
+                ["ConnectionId"] = 1,
+                ["ExpiresAtUtc"] = 1,
+                ["_id"] = 1
+            }),
+        new(
+            "WorkItems",
+            "developmentwebhookreceipts",
+            "ttl_development_receipts_expiry",
+            new BsonDocument("ExpiresAtUtc", 1),
+            ExpireAfter: TimeSpan.Zero)
+    ];
+}
+
+public static class MongoAutomationRunIndexes
+{
+    public static IReadOnlyList<MongoIndexSpecification> All { get; } =
+    [
+        new(
+            "Workflows",
+            "automationruns",
+            "ix_automation_runs_tenant_project_created",
+            new BsonDocument
+            {
+                ["OrganizationId"] = 1,
+                ["ProjectId"] = 1,
+                ["CreatedAtUtc"] = -1,
+                ["_id"] = 1
+            }),
+        new(
+            "Workflows",
+            "automationruns",
+            "ix_automation_runs_rule_created",
+            new BsonDocument
+            {
+                ["OrganizationId"] = 1,
+                ["RuleId"] = 1,
+                ["CreatedAtUtc"] = -1,
+                ["_id"] = 1
+            }),
+        new(
+            "Workflows",
+            "automationruns",
+            "ix_automation_runs_retry",
+            new BsonDocument
+            {
+                ["Status"] = 1,
+                ["NextAttemptAtUtc"] = 1,
+                ["_id"] = 1
+            })
+    ];
+}
+
 public static class MongoAuditTenantIndexes
 {
     public static IReadOnlyList<MongoIndexSpecification> All { get; } =
@@ -561,6 +977,24 @@ public static class MongoIdentityCredentialIndexes
     ];
 }
 
+public static class MongoHighCardinalityIndexes
+{
+    public static IReadOnlyList<MongoIndexSpecification> All { get; } =
+    [
+        new(
+            "Identity",
+            "refreshsessions",
+            "ix_refreshsessions_owner_last_seen",
+            new BsonDocument
+            {
+                ["OrganizationId"] = 1,
+                ["UserId"] = 1,
+                ["LastSeenAt"] = -1,
+                ["_id"] = 1
+            })
+    ];
+}
+
 internal static class MongoLegacyIdentityCredentialIndexes
 {
     public static IReadOnlyList<MongoIndexSpecification> All { get; } =
@@ -685,6 +1119,26 @@ public sealed class MongoMigrationRunner(
         "20260720_025_privacy_workflow_utc_index";
     public const string WebhookIndexMigrationId =
         "20260720_026_webhook_indexes";
+    public const string IntakeIndexMigrationId =
+        "20260724_027_intake_indexes";
+    public const string AutomationIndexMigrationId =
+        "20260728_028_automation_indexes";
+    public const string AutomationRunIndexMigrationId =
+        "20260728_029_automation_run_indexes";
+    public const string DashboardIndexMigrationId =
+        "20260728_030_dashboard_indexes";
+    public const string PortfolioIndexMigrationId =
+        "20260728_031_portfolio_indexes";
+    public const string GoalIndexMigrationId =
+        "20260729_032_goal_indexes";
+    public const string CapacityPlanIndexMigrationId =
+        "20260729_033_capacity_plan_indexes";
+    public const string KnowledgeIndexMigrationId =
+        "20260729_034_knowledge_indexes";
+    public const string DevelopmentIntegrationIndexMigrationId =
+        "20260729_035_development_integration_indexes";
+    public const string HighCardinalityIndexMigrationId =
+        "20260729_036_high_cardinality_indexes";
 
     private const string LedgerCollection = "__zumbo_migrations";
     private const string BackupCollection = "__zumbo_migration_rank_backups";
@@ -731,6 +1185,46 @@ public sealed class MongoMigrationRunner(
             await ApplyIndexesAsync(
                 WorkItemBulkJobIndexMigrationId,
                 MongoWorkItemBulkJobIndexes.All,
+                cancellationToken),
+            await ApplyIndexesAsync(
+                IntakeIndexMigrationId,
+                MongoIntakeIndexes.All,
+                cancellationToken),
+            await ApplyIndexesAsync(
+                AutomationIndexMigrationId,
+                MongoAutomationIndexes.All,
+                cancellationToken),
+            await ApplyIndexesAsync(
+                AutomationRunIndexMigrationId,
+                MongoAutomationRunIndexes.All,
+                cancellationToken),
+            await ApplyIndexesAsync(
+                DashboardIndexMigrationId,
+                MongoDashboardIndexes.All,
+                cancellationToken),
+            await ApplyIndexesAsync(
+                PortfolioIndexMigrationId,
+                MongoPortfolioIndexes.All,
+                cancellationToken),
+            await ApplyIndexesAsync(
+                GoalIndexMigrationId,
+                MongoGoalIndexes.All,
+                cancellationToken),
+            await ApplyIndexesAsync(
+                CapacityPlanIndexMigrationId,
+                MongoCapacityPlanIndexes.All,
+                cancellationToken),
+            await ApplyIndexesAsync(
+                KnowledgeIndexMigrationId,
+                MongoKnowledgeIndexes.All,
+                cancellationToken),
+            await ApplyIndexesAsync(
+                DevelopmentIntegrationIndexMigrationId,
+                MongoDevelopmentIntegrationIndexes.All,
+                cancellationToken),
+            await ApplyIndexesAsync(
+                HighCardinalityIndexMigrationId,
+                MongoHighCardinalityIndexes.All,
                 cancellationToken),
             await ApplyIndexesAsync(
                 AuditTenantIndexMigrationId,

@@ -16,7 +16,7 @@ public sealed class WebhookServiceTests
         var receipt = await context.Service.CreateAsync(new(
             "Delivery hook",
             "https://receiver.example.test/events",
-            ["work-item.created", "work-item.updated"]), default);
+            ["work-item.created", "work-item.updated"]), default, "create-correlation");
 
         var stored = await context.Subscriptions.SelectAsync(x => x.Id == receipt.Subscription.Id);
         Assert.NotNull(stored);
@@ -24,6 +24,10 @@ public sealed class WebhookServiceTests
         Assert.DoesNotContain(receipt.Secret, JsonSerializer.Serialize(stored), StringComparison.Ordinal);
         Assert.NotEqual(receipt.Secret, stored.CurrentSecretProtected);
         Assert.Equal(receipt.Secret, context.Protector.Unprotect(stored.CurrentSecretProtected));
+        var createdAudit = Assert.Single(context.Audit.Entries);
+        Assert.Equal("WebhookSubscriptionCreated", createdAudit.Action);
+        Assert.Equal("create-correlation", createdAudit.CorrelationId);
+        Assert.DoesNotContain(receipt.Secret, createdAudit.NewValue, StringComparison.Ordinal);
 
         context.User.OrganizationId = "another-tenant";
         var exception = await Assert.ThrowsAsync<NotFoundException>(
@@ -93,6 +97,63 @@ public sealed class WebhookServiceTests
         Assert.Equal(
             WorkItemWebhookService.Sign(original.Secret, send.TimestampUnixSeconds, send.Payload),
             send.PreviousSignature);
+        Assert.Contains(context.Audit.Entries, x =>
+            x.Action == "WebhookSecretRotated"
+            && x.OldValue == original.Subscription.SecretFingerprint
+            && x.NewValue == rotated.Subscription.SecretFingerprint);
+        Assert.DoesNotContain(
+            context.Audit.Entries,
+            x => string.Equals(x.NewValue, rotated.Secret, StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task Test_delivery_is_safe_signed_and_requires_an_active_subscription()
+    {
+        var context = CreateContext();
+        var receipt = await context.Service.CreateAsync(new(
+            "Health check",
+            "https://receiver.example.test/events?private=ignored",
+            ["work-item.created"]), default, "create-test");
+
+        var queued = await context.Service.QueueTestDeliveryAsync(
+            receipt.Subscription.Id,
+            default,
+            "test-correlation");
+
+        Assert.Equal(WebhookDeliveryStatuses.Pending, queued.Status);
+        Assert.Equal("webhook.test", queued.EventScope);
+        var stored = await context.Deliveries.SelectAsync(x => x.Id == queued.Id);
+        Assert.NotNull(stored);
+        using (var payload = JsonDocument.Parse(stored.Payload))
+        {
+            Assert.Equal("webhook.test", payload.RootElement.GetProperty("type").GetString());
+            Assert.True(payload.RootElement.GetProperty("data").GetProperty("test").GetBoolean());
+            Assert.False(payload.RootElement.TryGetProperty("workItem", out _));
+        }
+
+        Assert.Equal(1, await context.Service.DispatchAsync(10, "test-worker", default));
+        var send = Assert.Single(context.Sender.Requests);
+        Assert.Equal(
+            WorkItemWebhookService.Sign(receipt.Secret, send.TimestampUnixSeconds, send.Payload),
+            send.Signature);
+        var queuedAudit = Assert.Single(context.Audit.Entries, x => x.Action == "WebhookTestDeliveryQueued");
+        Assert.Equal("test-correlation", queuedAudit.CorrelationId);
+        Assert.DoesNotContain("private=ignored", JsonSerializer.Serialize(context.Audit.Entries));
+
+        var disabled = await context.Service.SetActiveAsync(
+            receipt.Subscription.Id,
+            false,
+            new(receipt.Subscription.Version),
+            default,
+            "disable-correlation");
+        var exception = await Assert.ThrowsAsync<ConflictException>(
+            () => context.Service.QueueTestDeliveryAsync(receipt.Subscription.Id, default));
+        Assert.Equal("WEBHOOK_SUBSCRIPTION_DISABLED", exception.Code);
+        Assert.Contains(context.Audit.Entries, x =>
+            x.Action == "WebhookSubscriptionDisabled"
+            && x.OldValue == bool.TrueString
+            && x.NewValue == bool.FalseString);
+        Assert.False(disabled.IsActive);
     }
 
     [Fact]
@@ -155,6 +216,7 @@ public sealed class WebhookServiceTests
         var deliveries = new InMemoryDocumentRepository<WebhookDeliveryDocument>();
         var protector = new TestProtector();
         var sender = new TestSender();
+        var audit = new TestAuditPublisher();
         var clock = new MutableClock(new DateTimeOffset(2026, 7, 20, 10, 0, 0, TimeSpan.Zero));
         var user = new MutableCurrentUser { UserId = "user-1", OrganizationId = "tenant-1" };
         var service = new WorkItemWebhookService(
@@ -164,6 +226,7 @@ public sealed class WebhookServiceTests
             new AllowTargetPolicy(),
             sender,
             new AllowAuthorization(),
+            audit,
             Options.Create(new WebhookOptions
             {
                 MaximumAttempts = maximumAttempts,
@@ -174,7 +237,7 @@ public sealed class WebhookServiceTests
             }),
             clock,
             user);
-        return new TestContext(service, subscriptions, deliveries, protector, sender, clock, user);
+        return new TestContext(service, subscriptions, deliveries, protector, sender, audit, clock, user);
     }
 
     private sealed record TestContext(
@@ -183,6 +246,7 @@ public sealed class WebhookServiceTests
         InMemoryDocumentRepository<WebhookDeliveryDocument> Deliveries,
         TestProtector Protector,
         TestSender Sender,
+        TestAuditPublisher Audit,
         MutableClock Clock,
         MutableCurrentUser User);
 
@@ -201,6 +265,32 @@ public sealed class WebhookServiceTests
     {
         public Task EnsureCanManageAsync(string organizationId, CancellationToken ct) => Task.CompletedTask;
     }
+
+    private sealed class TestAuditPublisher : IWorkItemAuditPublisher
+    {
+        public List<AuditEntry> Entries { get; } = [];
+
+        public Task WriteAsync(
+            string action,
+            string entityType,
+            string entityId,
+            string? oldValue,
+            string? newValue,
+            string correlationId,
+            CancellationToken ct)
+        {
+            Entries.Add(new(action, entityType, entityId, oldValue, newValue, correlationId));
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed record AuditEntry(
+        string Action,
+        string EntityType,
+        string EntityId,
+        string? OldValue,
+        string? NewValue,
+        string CorrelationId);
 
     private sealed class TestSender : IWebhookSender
     {

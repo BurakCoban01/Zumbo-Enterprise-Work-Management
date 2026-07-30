@@ -30,6 +30,31 @@ public sealed class ApiExceptionMiddlewareTests
             StatusCodes.Status409Conflict,
             "CONCURRENCY_CONFLICT");
 
+    [Fact]
+    public async Task ClientCanceledRequest_IsNotMappedToServerError()
+    {
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        var middleware = new ApiExceptionMiddleware(
+            _ => Task.FromCanceled(cancellation.Token),
+            NullLogger<ApiExceptionMiddleware>.Instance,
+            new TestHostEnvironment());
+        var context = new DefaultHttpContext
+        {
+            TraceIdentifier = "canceled-correlation",
+            RequestAborted = cancellation.Token
+        };
+        context.Response.Body = new MemoryStream();
+
+        await middleware.InvokeAsync(context);
+
+        Assert.Equal(StatusCodes.Status200OK, context.Response.StatusCode);
+        Assert.Equal(0, context.Response.Body.Length);
+        Assert.Equal(
+            "canceled-correlation",
+            context.Response.Headers["X-Correlation-Id"]);
+    }
+
     private static async Task AssertMappingAsync(Exception exception, int statusCode, string code)
     {
         var middleware = new ApiExceptionMiddleware(

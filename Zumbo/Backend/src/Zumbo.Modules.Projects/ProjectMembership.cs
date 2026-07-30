@@ -149,6 +149,11 @@ public sealed partial class ProjectService
             throw new ConflictException("PROJECT_TEAM_EXISTS", "Team is already linked to the project.");
         }
 
+        ProjectCardinalityLimits.EnsureCanGrow(
+            project.TeamIds.Count,
+            ProjectCardinalityLimits.MaximumTeams,
+            "PROJECT_TEAM_LIMIT_REACHED",
+            "teams");
         var team = await teamDirectory.FindAsync(teamId, ct)
             ?? throw new NotFoundException("TEAM_NOT_FOUND", "Team was not found.");
         if (!team.IsActive || !string.Equals(team.OrganizationId, project.OrganizationId, StringComparison.Ordinal))

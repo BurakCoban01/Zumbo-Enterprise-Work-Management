@@ -973,6 +973,39 @@ public sealed class MongoMigrationRunnerTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task IntakeIndexes_AreTenantScopedUniqueAndIdempotent()
+    {
+        var catalog = MongoIntakeIndexes.All;
+        Assert.Equal(6, catalog.Count);
+        Assert.Equal(
+            catalog.Count,
+            catalog.Select(x => (x.Module, x.Collection, x.Name)).Distinct().Count());
+        var runner = CreateRunner(new MongoMigrationOptions
+        {
+            BatchSize = 10,
+            MaxBatchesPerRun = 20
+        });
+        var first = Outcome(
+            await runner.RunAsync(),
+            MongoMigrationRunner.IntakeIndexMigrationId);
+        var second = Outcome(
+            await runner.RunAsync(),
+            MongoMigrationRunner.IntakeIndexMigrationId);
+        Assert.Equal(MongoMigrationStates.Completed, first.Status);
+        Assert.Equal(catalog.Count, first.Examined);
+        Assert.Equal(MongoMigrationStates.Skipped, second.Status);
+        foreach (var specification in catalog)
+        {
+            var collection = _database.GetCollection<BsonDocument>(specification.Collection);
+            using var cursor = await collection.Indexes.ListAsync();
+            var actual = Assert.Single(
+                await cursor.ToListAsync(),
+                index => index["name"] == specification.Name);
+            Assert.Equal(specification.Keys, actual["key"].AsBsonDocument);
+        }
+    }
+
+    [Fact]
     public async Task IdentityCredentialIndexes_AreExactAndCreatedIdempotently()
     {
         var catalog = MongoIdentityCredentialIndexes.All;

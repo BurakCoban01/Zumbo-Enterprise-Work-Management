@@ -95,7 +95,7 @@ internal static class IdentityEndpoints
             .WithZumboPermission(PermissionCatalog.ProfileRead);
 
         group.MapGet("/sessions", async (IdentityService service, HttpContext http, CancellationToken ct) =>
-            Ok(await service.ListSessionsAsync(ct), http))
+            Ok(await service.ListSessionsAsync(http.User.FindFirst("sessionId")?.Value, ct), http))
             .RequireAuthorization()
             .WithZumboPermission(PermissionCatalog.ProfileRead);
 

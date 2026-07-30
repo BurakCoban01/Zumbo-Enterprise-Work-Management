@@ -60,14 +60,22 @@ internal static class AuditEndpoints
             DateTimeOffset? to,
             string? organizationId,
             AuditService service,
+            HttpContext http,
             CancellationToken ct) =>
         {
             var records = await service.ExportAsync(
                 new AuditLogQuery(actorUserId, action, entityType, entityId, from, to, OrganizationId: organizationId),
                 ct);
-            var lines = string.Join('\n', records.Select(record =>
-                System.Text.Json.JsonSerializer.Serialize(record))) + '\n';
-            return Results.Text(lines, "application/x-ndjson", System.Text.Encoding.UTF8);
+            http.Response.StatusCode = StatusCodes.Status200OK;
+            http.Response.ContentType = "application/x-ndjson";
+            http.Response.Headers.ContentDisposition =
+                "attachment; filename=zumbo-audit-export.ndjson";
+            http.Response.Headers.CacheControl = "no-store";
+            http.Response.Headers["X-Content-Type-Options"] = "nosniff";
+            http.Response.Headers["X-Zumbo-Export-Format"] = "audit-ndjson-v1";
+            http.Response.Headers["X-Zumbo-Export-Records"] =
+                records.Count.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            await AuditService.WriteNdjsonAsync(records, http.Response.Body, ct);
         }).RequireRateLimiting("report");
 
         group.MapPost("/retention/purge", async (
@@ -82,8 +90,9 @@ internal static class AuditEndpoints
         group.MapGet("/integrity/{organizationId}", async (
             string organizationId,
             AuditService service,
+            HttpContext http,
             CancellationToken ct) =>
-            Results.Ok(await service.VerifyIntegrityAsync(organizationId, ct)))
+            Ok(await service.VerifyIntegrityAsync(organizationId, ct), http))
             .WithZumboPermission(PermissionCatalog.AuditReadAll, isGlobal: true)
             .RequireRateLimiting("report");
 

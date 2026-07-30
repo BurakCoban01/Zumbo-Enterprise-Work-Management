@@ -145,6 +145,7 @@ internal static class ApiConfigurationValidation
             [nameof(options.ApiPermitLimit)] = options.ApiPermitLimit,
             [nameof(options.SearchPermitLimit)] = options.SearchPermitLimit,
             [nameof(options.UploadPermitLimit)] = options.UploadPermitLimit,
+            [nameof(options.IntakePublicPermitLimit)] = options.IntakePublicPermitLimit,
             [nameof(options.ReportPermitLimit)] = options.ReportPermitLimit,
             [nameof(options.BulkPermitLimit)] = options.BulkPermitLimit,
             [nameof(options.RealtimeConnectPermitLimit)] = options.RealtimeConnectPermitLimit

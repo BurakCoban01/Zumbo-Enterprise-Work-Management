@@ -19,6 +19,19 @@ test('runtime config tek ve normalize edilmis API base URL uretir', () => {
   assert.equal(core.resolveBaseUrl({}, 'https://app.zumbo.test/'), 'https://app.zumbo.test');
 });
 
+test('API istemcisi standart zarfi acar, dogrudan operasyon govdesini korur', () => {
+  const data = { dependencies: [{ dependency: 'mongodb' }] };
+  assert.deepEqual(
+    core.unwrapResponseBody({ success: true, data, error: null, correlationId: 'corr-1' }),
+    data
+  );
+  assert.deepEqual(core.unwrapResponseBody(data), data);
+  assert.deepEqual(core.unwrapResponseBody({ data: 'domain-value', status: 'available' }), {
+    data: 'domain-value',
+    status: 'available'
+  });
+});
+
 test('refresh sonrasi replay yalniz safe method veya explicit idempotency key icin acilir', () => {
   assert.equal(core.canReplay('GET', null), true);
   assert.equal(core.canReplay('HEAD', null), true);
@@ -95,7 +108,17 @@ test('logout tenant state temizler, cihaz gorunum tercihlerini korur', () => {
   assert.equal(core.tenantSessionKeys.some(key => sessionValues.has(key)), false);
 });
 
+test('CSRF tokeni yeni sekmede guvenli double-submit cookie degerinden kurtarilir', () => {
+  assert.equal(
+    core.readCookie('theme=dark; zumbo-csrf=token%2Bwith%2Fsymbols%3D; locale=tr', 'zumbo-csrf'),
+    'token+with/symbols='
+  );
+  assert.equal(core.readCookie('zumbo-csrf-malicious=wrong', 'zumbo-csrf'), null);
+  assert.equal(core.readCookie('zumbo-csrf=%E0%A4%A', 'zumbo-csrf'), null);
+});
+
 test('desktop ve mobile ayni shared AngularJS istemci modulunu yukler', async () => {
+  assert.match(source, /cancelPending: function\(reason\) \{ requests\.cancelAll/);
   for (const surface of ['desktop-bulma', 'mobile-ionic']) {
     const [html, app] = await Promise.all([
       readFile(resolve(root, surface, 'index.html'), 'utf8'),
