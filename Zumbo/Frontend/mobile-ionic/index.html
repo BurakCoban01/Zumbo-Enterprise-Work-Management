@@ -479,10 +479,10 @@
         <form class="mobile-manage-form" ng-if="vm.team && vm.canManage" ng-submit="vm.save()"><label><span>Ekip adı</span><input type="text" ng-model="vm.teamDraft.name" aria-label="Mobil ekip adı" required></label><div class="mobile-form-actions"><button class="button button-small button-positive" type="submit" ng-disabled="vm.saving">Ekibi kaydet</button><button class="button button-small button-assertive button-outline" type="button" ng-if="vm.canArchive" ng-click="vm.archive()" ng-disabled="vm.saving">Arşivle</button></div></form>
         <div class="mobile-permission" ng-if="vm.team && !vm.canManage"><i class="ion-locked"></i> Bu ekipte yönetim yetkiniz yok.</div>
         <div class="item item-divider">Üyeler ve davetler</div>
-        <div class="mobile-member-row" ng-repeat="member in vm.team.members track by member.id"><span><strong>{{member.email}}</strong><small>{{member.role}} · {{member.status}}</small></span><button class="button button-small button-assertive button-clear ion-trash-a" ng-if="vm.canManage && member.role !== 'Owner'" ng-click="vm.removeMember(member)" aria-label="Mobil ekip üyesini kaldır"></button></div>
-        <form class="mobile-manage-form compact" ng-if="vm.canManage" ng-submit="vm.invite()"><label><span>E-posta</span><input type="email" ng-model="vm.inviteDraft.email" aria-label="Mobil ekip davet e-postası" required></label><label><span>Rol</span><select ng-model="vm.inviteDraft.role" aria-label="Mobil ekip davet rolü"><option>Member</option><option>Admin</option></select></label><button class="button button-small button-positive" type="submit" ng-disabled="vm.saving">Davet et</button></form>
+        <div class="mobile-member-row" ng-repeat="member in vm.team.members track by member.id"><span><strong>{{member.email}}</strong><small>{{vm.teamMemberRoleLabel(member.role)}} · {{vm.teamMemberStatusLabel(member.status)}}</small></span><button class="button button-small button-assertive button-clear ion-trash-a" ng-if="vm.canManage && member.role !== 'Owner'" ng-click="vm.removeMember(member)" aria-label="Mobil ekip üyesini kaldır"></button></div>
+        <form class="mobile-manage-form compact" ng-if="vm.canManage" ng-submit="vm.invite()"><label><span>E-posta</span><input type="email" ng-model="vm.inviteDraft.email" aria-label="Mobil ekip davet e-postası" required></label><label><span>Rol</span><select ng-model="vm.inviteDraft.role" aria-label="Mobil ekip davet rolü"><option value="Member">Üye</option><option value="Admin">Yönetici</option></select></label><button class="button button-small button-positive" type="submit" ng-disabled="vm.saving">Davet et</button></form>
         <div class="item item-divider">Ekip etkinliği</div>
-        <div class="mobile-timeline"><p ng-repeat="entry in vm.audit | limitTo:8"><strong>{{entry.action}}</strong><span>{{entry.createdAt | date:'dd.MM HH:mm'}}</span></p><p ng-if="!vm.audit.length">Henüz etkinlik yok.</p></div>
+        <div class="mobile-timeline"><p ng-repeat="entry in vm.audit | limitTo:8"><strong>{{vm.teamActivityLabel(entry.action)}}</strong><span>{{entry.createdAt | date:'dd.MM HH:mm'}}</span></p><p ng-if="!vm.audit.length">Henüz etkinlik yok.</p></div>
       </ion-content>
     </ion-view>
   </script>
@@ -532,7 +532,7 @@
             </section>
 
             <form class="mobile-task-section mobile-task-form" ng-if="vm.canEditTask()" ng-submit="vm.saveTask()">
-              <div class="mobile-task-section-title"><h2>Özellikler</h2><span>{{vm.membership.role}}</span></div>
+              <div class="mobile-task-section-title"><h2>Özellikler</h2><span>{{vm.projectRoleLabel(vm.membership.role)}}</span></div>
               <label><span>Başlık</span><input type="text" ng-model="vm.taskDraft.title" maxlength="200" required></label>
               <label><span>Açıklama</span><textarea ng-model="vm.taskDraft.description" rows="4"></textarea></label>
               <div class="mobile-task-form-grid">
@@ -631,7 +631,7 @@
             </section>
 
             <section class="mobile-task-section mobile-activity-stream" aria-live="polite">
-              <div class="mobile-activity-entry" ng-repeat="entry in vm.activityEntries() track by entry.id"><i class="ion-ios-pulse" aria-hidden="true"></i><div><strong>{{vm.activityLabel(entry.type || entry.action || entry.eventType)}}</strong><p ng-bind="entry.body || entry.note || entry.detail || entry.message || entry.description || 'Görev güncellendi.'"></p><small>{{vm.userName(entry.actorUserId || entry.userId || entry.authorUserId)}} · {{entry.createdAt || entry.occurredAt | date:'dd MMM HH:mm'}}</small></div></div>
+              <div class="mobile-activity-entry" ng-repeat="entry in vm.activityEntries() track by entry.id"><i class="ion-ios-pulse" aria-hidden="true"></i><div><strong>{{vm.activityLabel(entry.type || entry.action || entry.eventType)}}</strong><p ng-if="vm.activityDetail(entry)" ng-bind="vm.activityDetail(entry)"></p><small>{{vm.userName(entry.actorUserId || entry.userId || entry.authorUserId)}} · {{entry.createdAt || entry.occurredAt | date:'dd MMM HH:mm'}}</small></div></div>
               <p class="mobile-task-empty" ng-if="!vm.activityEntries().length">Bu filtrede etkinlik yok.</p>
               <button class="mobile-task-more" type="button" ng-if="vm.streamHasMore(vm.activityStreamName())" ng-click="vm.loadMoreStream(vm.activityStreamName())">Daha fazla etkinlik</button>
             </section>

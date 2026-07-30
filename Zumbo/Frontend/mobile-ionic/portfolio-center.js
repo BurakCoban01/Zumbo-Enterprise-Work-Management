@@ -5,6 +5,7 @@
     .controller('PortfolioController', function($scope, $q, $window, apiClient, zumboApi, sessionStore, mobileActionError) {
       var vm = this;
       var core = $window.ZumboPortfolioCore;
+      var loadPromise = null;
       vm.portfolios = [];
       vm.projects = [];
       vm.users = [];
@@ -18,9 +19,10 @@
       vm.dependencyDraft = core.dependency();
 
       vm.load = function() {
+        if (loadPromise) return loadPromise;
         vm.loading = true;
         vm.error = null;
-        return $q.all([
+        loadPromise = $q.all([
           apiClient.get('/api/portfolios?page=1&pageSize=100', {
             scope: 'mobile-portfolios',
             replace: true
@@ -37,11 +39,14 @@
           }
           return vm.portfolios.length ? vm.select(vm.portfolios[0]) : vm.newPortfolio();
         }).catch(function(error) {
+          if (error && error.canceled) return;
           vm.error = mobileActionError(error, 'Portföyler yüklenemedi.');
         }).finally(function() {
+          loadPromise = null;
           vm.loading = false;
           $scope.$broadcast('scroll.refreshComplete');
         });
+        return loadPromise;
       };
 
       vm.select = function(item) {
@@ -64,6 +69,7 @@
           vm.newInitiative();
           vm.newDependency();
         }).catch(function(error) {
+          if (error && error.canceled) return;
           vm.error = mobileActionError(error, 'Portföy ayrıntısı yüklenemedi.');
         }).finally(function() {
           vm.loading = false;

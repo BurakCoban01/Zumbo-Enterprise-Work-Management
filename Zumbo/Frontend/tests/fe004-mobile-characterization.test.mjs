@@ -5,6 +5,7 @@ import test from 'node:test';
 
 const root = resolve(import.meta.dirname, '..');
 const html = await readFile(resolve(root, 'mobile-ionic/index.html'), 'utf8');
+const styles = await readFile(resolve(root, 'mobile-ionic/styles.css'), 'utf8');
 const serviceWorker = await readFile(resolve(root, 'mobile-ionic/service-worker.js'), 'utf8');
 const buildScript = await readFile(resolve(root, 'tests/build-frontend.mjs'), 'utf8');
 const parity = JSON.parse(await readFile(resolve(root, '../docs/frontend-parity.json'), 'utf8'));
@@ -75,6 +76,47 @@ test('mobile controller komutlari ve Ionic yasam dongusu karakterize edilir', ()
   }
   assert.match(app, /\$ionicView\.beforeEnter/);
   assert.match(app, /scroll\.infiniteScrollComplete/);
+});
+
+test('mobile portfolio ilk yuklemeyi tekillestirir ve beklenen iptali kullanici hatasi yapmaz', () => {
+  const portfolio = scriptSources[13];
+  assert.match(portfolio, /var loadPromise = null;/);
+  assert.match(portfolio, /if \(loadPromise\) return loadPromise;/);
+  assert.match(portfolio, /loadPromise = \$q\.all\(/);
+  assert.match(portfolio, /if \(error && error\.canceled\) return;/);
+  assert.match(portfolio, /loadPromise = null;/);
+});
+
+test('mobile navigation labels and task titles remain readable in both themes', () => {
+  assert.match(app, /\$ionicConfigProvider\.backButton\.text\('Geri'\)/);
+  assert.match(styles, /\.zumbo-primary-tabs \.tab-item \.tab-title\s*\{[^}]*font-size:\s*12px;/s);
+  assert.match(styles, /\.task-row h2\s*\{[^}]*color:\s*var\(--ink\);[^}]*font-size:\s*15px;/s);
+});
+
+test('mobile team activity maps backend actions to user-facing labels', () => {
+  const details = scriptSources[6];
+  assert.match(details, /vm\.teamActivityLabel = function\(action\)/);
+  assert.match(details, /vm\.teamMemberRoleLabel = function\(role\)/);
+  assert.match(details, /vm\.teamMemberStatusLabel = function\(status\)/);
+  for (const action of [
+    'TeamCreated', 'TeamUpdated', 'TeamMemberInvited', 'TeamInviteAccepted',
+    'TeamInviteDeclined', 'TeamInviteExpired', 'TeamInviteRevoked',
+    'TeamMemberRoleChanged', 'TeamOwnershipTransferred', 'TeamMemberRemoved',
+    'TeamArchived', 'TeamRestored'
+  ]) {
+    assert.match(details, new RegExp(`${action}:\\s*'[^']+'`), `${action} display label is missing`);
+  }
+  assert.match(html, /\{\{vm\.teamActivityLabel\(entry\.action\)\}\}/);
+  assert.match(html, /\{\{vm\.teamMemberRoleLabel\(member\.role\)\}\}/);
+  assert.match(html, /\{\{vm\.teamMemberStatusLabel\(member\.status\)\}\}/);
+  assert.match(html, /<option value="Member">Üye<\/option>/);
+  assert.match(html, /<option value="Admin">Yönetici<\/option>/);
+});
+
+test('mobile canceled requests use the surface fallback instead of raw transport copy', () => {
+  const api = scriptSources[2];
+  assert.match(api, /if \(error && error\.canceled\) return fallback;/);
+  assert.doesNotMatch(api, /The request was canceled/);
 });
 
 test('mobile realtime, stale context ve concurrency davranisi korunur', () => {

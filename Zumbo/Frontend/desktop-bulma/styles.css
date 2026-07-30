@@ -1117,7 +1117,7 @@ h1 {
 .context-selectors label,
 .nav-secondary > span {
   color: var(--muted);
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 700;
   text-transform: uppercase;
 }
@@ -1244,7 +1244,7 @@ kbd {
   color: var(--muted);
   padding: 2px 5px;
   font-family: inherit;
-  font-size: 10px;
+  font-size: 11px;
   text-align: center;
 }
 
@@ -1261,8 +1261,8 @@ kbd {
   border: 2px solid var(--surface);
   border-radius: 9px;
   background: var(--danger);
-  color: #fff;
-  font-size: 10px;
+  color: var(--color-text-inverse);
+  font-size: 12px;
   line-height: 14px;
   text-align: center;
 }
@@ -1316,7 +1316,7 @@ kbd {
 .notification-popover > p,
 .popover-heading span {
   color: var(--muted);
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .notification-popover > p {
@@ -1774,7 +1774,7 @@ kbd {
   gap: 7px;
   min-height: 20px;
   color: var(--muted);
-  font-size: 11px;
+  font-size: 12px;
   white-space: nowrap;
 }
 
@@ -2799,9 +2799,9 @@ kbd {
   border-radius: 10px;
   margin-left: auto;
   background: var(--accent);
-  color: #ffffff;
+  color: var(--color-text-inverse);
   padding: 1px 6px;
-  font-size: 10px;
+  font-size: 12px;
   font-variant-numeric: tabular-nums;
   text-align: center;
 }
@@ -2823,7 +2823,7 @@ kbd {
 }
 .personal-metrics button { display: grid; gap: 3px; border: 0; border-right: 1px solid var(--line); background: transparent; padding: 18px 14px; text-align: left; }
 .personal-metrics button:last-child { border-right: 0; }
-.personal-metrics span { color: var(--muted); font-size: 11px; }
+.personal-metrics span { color: var(--muted); font-size: 12px; }
 .personal-metrics strong { color: var(--ink); font-size: 24px; font-variant-numeric: tabular-nums; }
 .personal-metrics button:hover { background: var(--surface-subtle); }
 
@@ -2831,7 +2831,7 @@ kbd {
 .personal-columns > section + section { border-left: 1px solid var(--line); padding-left: 28px; }
 .personal-section-heading { min-height: 32px; margin-bottom: 8px; }
 .personal-section-heading h3 { color: var(--ink); font-size: 13px; }
-.personal-section-heading button { border: 0; background: transparent; color: var(--accent); font-size: 11px; }
+.personal-section-heading button { border: 0; background: transparent; color: var(--accent); font-size: 14px; }
 .personal-section-heading > span { color: var(--muted); font-variant-numeric: tabular-nums; }
 
 .personal-task, .inbox-row {
@@ -2848,9 +2848,9 @@ kbd {
 }
 .personal-task { grid-template-columns: auto minmax(0, 1fr) auto auto; gap: 10px; }
 .personal-task > span:not(.priority-mark), .inbox-row > span:nth-child(2) { display: grid; min-width: 0; gap: 2px; }
-.personal-task strong, .inbox-row strong { overflow: hidden; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
-.personal-task small, .inbox-row small { overflow: hidden; color: var(--muted); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
-.personal-task time, .inbox-row time { color: var(--muted); font-size: 10px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.personal-task strong, .inbox-row strong { overflow: hidden; color: var(--ink); font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }
+.personal-task small, .inbox-row small { overflow: hidden; color: var(--muted); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.personal-task time, .inbox-row time { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .personal-task svg { width: 15px; height: 15px; color: var(--muted); }
 .personal-task:hover, .inbox-row:hover { background: var(--surface-subtle); }
 .priority-mark { width: 3px; height: 30px; border-radius: 2px; background: var(--line-strong); }
@@ -2863,7 +2863,7 @@ kbd {
 .personal-tabs button { min-height: 34px; border: 1px solid transparent; border-radius: 4px; background: transparent; color: var(--muted); padding: 7px 11px; }
 .personal-tabs button.active { border-color: var(--line-strong); background: var(--panel); color: var(--accent); }
 .saved-personal-views { display: flex; align-items: center; flex-wrap: wrap; gap: 7px; border-bottom: 1px solid var(--line); padding-bottom: 14px; }
-.saved-personal-views > button { display: inline-flex; align-items: center; gap: 5px; border: 1px solid var(--line); border-radius: 4px; background: transparent; color: var(--muted); padding: 6px 8px; font-size: 11px; }
+.saved-personal-views > button { display: inline-flex; align-items: center; gap: 5px; border: 1px solid var(--line); border-radius: 4px; background: transparent; color: var(--muted); padding: 6px 8px; font-size: 14px; }
 .saved-personal-views svg { width: 13px; height: 13px; }
 .saved-personal-views form { display: flex; gap: 5px; margin-left: auto; }
 .saved-personal-views .input { width: 170px; }

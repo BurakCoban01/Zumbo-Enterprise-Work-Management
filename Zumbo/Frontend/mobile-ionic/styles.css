@@ -61,7 +61,7 @@ body, .pane, .view {
 
 .zumbo-primary-tabs .tab-item .tab-title {
   overflow: hidden;
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 650;
   line-height: 15px;
   text-overflow: ellipsis;
@@ -714,6 +714,7 @@ body, .pane, .view {
 }
 
 .task-row h2 {
+  color: var(--ink);
   font-size: 15px;
   font-weight: 700;
 }

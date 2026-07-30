@@ -8,6 +8,16 @@ const dockerCliImage = 'docker@sha256:402f150151fd6e68c8f9a0cb7c50d35ee3bf64268d
 const runbooks = Object.freeze({
   'docs/runbooks/first-run.md': ['## Windows', '## Linux', 'prepare-env.mjs', 'preflight.mjs', '--wait'],
   'docs/runbooks/daily-use.md': ['## Başlatma', '## Güvenli Durdurma', '## Resume', 'down --remove-orphans'],
+  'docs/runbooks/local-demo-walkthrough.md': [
+    '## İlk Başlatma',
+    '## Tekrar Başlatma',
+    '## Kapsamı Sınırlı Güvenli Reset',
+    '## Kısa Ürün Walkthrough',
+    '## Veriyi Koruyan Güvenli Durdurma',
+    'demo-start.mjs',
+    'demo-stop.mjs',
+    'demo-prepare.mjs'
+  ],
   'docs/runbooks/troubleshooting.md': ['Get-NetTCPConnection', 'ss -ltnp', 'docker compose', 'health/ready'],
   'docs/runbooks/backup-restore.md': ['Backup-Zumbo.ps1', 'Restore-Zumbo.ps1', 'ConfirmIsolatedTarget'],
   'docs/runbooks/security-operations.md': ['Invoke-SecurityGate.ps1', 'secret', 'rotation']
@@ -22,7 +32,10 @@ const requiredTargets = [
   'docs/security/security-gates.md',
   'scripts/operations/prepare-env.mjs',
   'scripts/operations/preflight.mjs',
-  'scripts/operations/bootstrap-admin.mjs'
+  'scripts/operations/bootstrap-admin.mjs',
+  'scripts/operations/demo-start.mjs',
+  'scripts/operations/demo-stop.mjs',
+  'scripts/operations/demo-prepare.mjs'
 ];
 const checks = [];
 const temporaryEnvironment = resolve(repositoryRoot, `Backend/.env.qa002-contract-${process.pid}`);

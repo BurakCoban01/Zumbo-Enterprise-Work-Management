@@ -14,9 +14,10 @@
       if (code === 'FORBIDDEN') {
         return 'Bu işlem için yetkiniz yok.';
       }
-  return error && error.data && error.data.error && error.data.error.message
-    ? error.data.error.message
-    : fallback;
+      if (error && error.canceled) return fallback;
+      return error && error.data && error.data.error && error.data.error.message
+        ? error.data.error.message
+        : fallback;
     };
   })
   .factory('zumboApi', function(apiClient, sessionStore) {

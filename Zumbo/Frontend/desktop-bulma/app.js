@@ -129,7 +129,6 @@ angular.module('zumboDesktop', ['zumbo.shared.api', 'zumbo.shared.displayNames',
       updateLocation(section, null, true);
       loadSectionData(section);
     };
-
     vm.notify = function(kind, message) {
       vm.feedback = { kind: kind, message: message };
       $timeout.cancel(vm.feedbackTimer);
@@ -267,7 +266,6 @@ angular.module('zumboDesktop', ['zumbo.shared.api', 'zumbo.shared.displayNames',
     function onPopState() { $scope.$applyAsync(applyLocation); }
     $document.on('keydown', onGlobalKeydown);
     $window.addEventListener('popstate', onPopState);
-
     var unsubscribeRealtime = realtimeService.subscribe(function(change) {
       if (change.eventType === 'resyncRequired') {
         if (vm.project && change.projectId === vm.project.id) vm.loadTasks();

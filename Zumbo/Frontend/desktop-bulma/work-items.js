@@ -464,18 +464,45 @@
       var labels = {
         WorkItemCreated: 'Görev oluşturuldu',
         WorkItemUpdated: 'Ayrıntılar güncellendi',
+        WorkItemAssigned: 'Atanan kişi değiştirildi',
+        WorkItemAssigneeCleared: 'Atama kaldırıldı',
         WorkItemMoved: 'Durum değişti',
+        WorkItemReordered: 'Görev sırası değiştirildi',
+        WorkItemPlanningUpdated: 'Planlama güncellendi',
+        WorkItemChecklistItemAdded: 'Kontrol listesi maddesi eklendi',
+        WorkItemChecklistItemUpdated: 'Kontrol listesi maddesi güncellendi',
+        WorkItemLabelAdded: 'Etiket eklendi',
+        WorkItemLabelRemoved: 'Etiket kaldırıldı',
         WorkItemCommentAdded: 'Yorum eklendi',
         WorkItemCommentEdited: 'Yorum düzenlendi',
         WorkItemCommentDeleted: 'Yorum silindi',
         WorkItemAttachmentUploaded: 'Dosya yüklendi',
         WorkItemAttachmentDeleted: 'Dosya kaldırıldı',
+        WorkItemWorkLogAdded: 'Çalışma kaydı eklendi',
+        WorkItemParentChanged: 'Üst görev değiştirildi',
+        WorkItemLinked: 'Görev ilişkisi eklendi',
+        WorkItemUnlinked: 'Görev ilişkisi kaldırıldı',
+        WorkItemArchived: 'Görev arşivlendi',
+        WorkItemRestored: 'Görev geri yüklendi',
+        WorkItemApprovalRequested: 'Onay istendi',
+        WorkItemApprovalExpired: 'Onay süresi doldu',
+        WorkItemApprovalDecided: 'Onay kararı verildi',
+        WorkItemCustomFieldsUpdated: 'Özel alanlar güncellendi',
+        WorkItemTeamChanged: 'Ekip değiştirildi',
+        WorkItemAutomationApplied: 'Otomasyon uygulandı',
+        WorkItemTransitioned: 'İş akışı geçişi uygulandı',
         WorkItemWatched: 'Takip başladı',
         WorkItemUnwatched: 'Takip sona erdi',
         WorkItemVoted: 'Oy eklendi',
-        WorkItemVoteRemoved: 'Oy kaldırıldı'
+        WorkItemVoteRemoved: 'Oy kaldırıldı',
+        RecurringWorkItemGenerated: 'Yinelenen görev oluşturuldu'
       };
-      return labels[type] || String(type || 'Etkinlik').replace(/([a-z])([A-Z])/g, '$1 $2');
+      return labels[type] || 'Görev etkinliği';
+    };
+
+    vm.activityDetail = function(entry) {
+      if (!entry) return '';
+      return entry.body || entry.note || entry.message || entry.description || '';
     };
 
     vm.taskActivityEntries = function() {

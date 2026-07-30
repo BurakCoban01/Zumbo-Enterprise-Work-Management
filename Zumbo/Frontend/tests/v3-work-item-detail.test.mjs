@@ -162,6 +162,37 @@ test('collaboration resources do not overwrite the work-item aggregate version',
   assert.match(apiClientSource, /collaboration\|watch\|vote\|activity/);
 });
 
+test('desktop and mobile task activity use complete user-facing labels', () => {
+  const activityTypes = [
+    'WorkItemCreated', 'WorkItemUpdated', 'WorkItemAssigned', 'WorkItemAssigneeCleared',
+    'WorkItemMoved', 'WorkItemReordered', 'WorkItemPlanningUpdated',
+    'WorkItemChecklistItemAdded', 'WorkItemChecklistItemUpdated',
+    'WorkItemLabelAdded', 'WorkItemLabelRemoved', 'WorkItemCommentAdded',
+    'WorkItemCommentEdited', 'WorkItemCommentDeleted', 'WorkItemAttachmentUploaded',
+    'WorkItemAttachmentDeleted', 'WorkItemWorkLogAdded', 'WorkItemParentChanged',
+    'WorkItemLinked', 'WorkItemUnlinked', 'WorkItemArchived', 'WorkItemRestored',
+    'WorkItemApprovalRequested', 'WorkItemApprovalExpired', 'WorkItemApprovalDecided',
+    'WorkItemCustomFieldsUpdated', 'WorkItemTeamChanged', 'WorkItemAutomationApplied',
+    'WorkItemTransitioned', 'WorkItemWatched', 'WorkItemUnwatched', 'WorkItemVoted',
+    'WorkItemVoteRemoved', 'RecurringWorkItemGenerated'
+  ];
+  for (const source of [detailSource, mobileDetailSource]) {
+    for (const type of activityTypes) {
+      assert.match(source, new RegExp(`${type}:\\s*'[^']+'`), `${type} display label is missing`);
+    }
+    assert.match(source, /return labels\[type\] \|\| 'Görev etkinliği';/);
+    assert.doesNotMatch(source, /String\(type \|\| 'Etkinlik'\)\.replace/);
+  }
+  assert.match(detailSource, /vm\.activityDetail = function\(entry\)/);
+  assert.match(mobileDetailSource, /vm\.activityDetail = function\(entry\)/);
+  assert.match(mobileDetailSource, /vm\.projectRoleLabel = function\(value\)/);
+  assert.match(desktopHtml, /\{\{vm\.activityDetail\(entry\)\}\}/);
+  assert.match(mobileHtml, /ng-bind="vm\.activityDetail\(entry\)"/);
+  assert.match(mobileHtml, /\{\{vm\.projectRoleLabel\(vm\.membership\.role\)\}\}/);
+  assert.doesNotMatch(desktopHtml, /\{\{entry\.detail\}\}/);
+  assert.doesNotMatch(mobileHtml, /entry\.body \|\| entry\.note \|\| entry\.detail/);
+});
+
 test('desktop surface provides drawer/page, safe text, complete states and activity filters', () => {
   for (const binding of [
     'vm.openTaskPage()', 'vm.collapseTaskDetail()', 'vm.toggleTaskWatch()', 'vm.toggleTaskVote()',

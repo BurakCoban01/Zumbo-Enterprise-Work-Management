@@ -132,7 +132,7 @@
     </div>
     <div class="nav-secondary nav-label">
       <span>Son kullanılan</span>
-      <button ng-repeat="recent in vm.recentProjects | limitTo:3" ng-click="vm.selectProject(recent)">{{recent.name}}</button>
+      <button ng-repeat="recent in vm.recentProjects | limitTo:3 track by recent.id" ng-click="vm.selectProject(recent)">{{recent.name}}</button>
     </div>
     <div class="side-footer">
       <span class="nav-label">{{vm.session.currentUser.username || 'Oturum yok'}}</span>
@@ -2059,7 +2059,7 @@
             </article>
             <article ng-switch-when="history" class="task-event" ng-repeat="entry in vm.taskStreams.timeline.items track by $index"><span class="event-mark"></span><div><strong>{{entry.fromStatus || 'Başlangıç'}} → {{entry.toStatus}}</strong><small>{{vm.userName(entry.changedByUserId)}} · {{entry.changedAt | date:'dd MMM HH:mm'}}</small></div></article>
             <article ng-switch-when="worklogs" class="task-event" ng-repeat="log in vm.taskStreams.worklogs.items track by log.id"><span class="event-mark"></span><div><strong>{{log.hours}} saat · {{vm.userName(log.userId)}}</strong><small>{{log.note || 'Not eklenmedi'}} · {{log.createdAt | date:'dd MMM HH:mm'}}</small></div></article>
-            <article ng-switch-default class="task-event" ng-repeat="entry in vm.taskStreams.activity.items track by entry.id"><span class="event-mark"></span><div><strong>{{vm.activityLabel(entry.type)}}</strong><small>{{vm.userName(entry.actorUserId)}} · {{entry.detail}} · {{entry.createdAt | date:'dd MMM HH:mm'}}</small></div></article>
+            <article ng-switch-default class="task-event" ng-repeat="entry in vm.taskStreams.activity.items track by entry.id"><span class="event-mark"></span><div><strong>{{vm.activityLabel(entry.type)}}</strong><small>{{vm.userName(entry.actorUserId)}}<span ng-if="vm.activityDetail(entry)"> · {{vm.activityDetail(entry)}}</span> · {{entry.createdAt | date:'dd MMM HH:mm'}}</small></div></article>
           </div>
           <p class="detail-empty" ng-if="!vm.taskStreams[vm.taskActivityStreamName()].loading && !vm.taskActivityEntries().length">Bu filtrede etkinlik yok.</p>
           <p class="stream-error" ng-if="vm.taskStreams[vm.taskActivityStreamName()].error" role="alert">{{vm.taskStreams[vm.taskActivityStreamName()].error}}</p>

@@ -8,6 +8,7 @@ const root = resolve(import.meta.dirname, '..');
 const source = await readFile(resolve(root, 'desktop-bulma/personal-work.js'), 'utf8');
 const appSource = await readFile(resolve(root, 'desktop-bulma/app.js'), 'utf8');
 const desktopHtml = await readFile(resolve(root, 'desktop-bulma/index.html'), 'utf8');
+const desktopStyles = await readFile(resolve(root, 'desktop-bulma/styles.css'), 'utf8');
 const mobileHtml = await readFile(resolve(root, 'mobile-ionic/index.html'), 'utf8');
 const workspaceSource = await readFile(resolve(root, 'mobile-ionic/workspace.js'), 'utf8');
 
@@ -144,4 +145,13 @@ test('desktop and mobile templates expose personal navigation, triage filters an
   assert.match(mobileHtml, /vm\.visibleNotifications\(\)/);
   assert.match(mobileHtml, /Bu filtrede bildirim yok\./);
   assert.match(appSource, /\.then\(function\(\) \{\s*loadSectionData\(vm\.activeSection\);\s*return \$q\.all\(\[vm\.loadNotifications\(\), vm\.loadTeams\(\), vm\.loadUsers\(\), vm\.loadAuditCapabilities\(\)\]\);/);
+});
+
+test('desktop personal work typography keeps primary and supporting content readable', () => {
+  assert.match(desktopStyles, /\.personal-metrics span\s*\{[^}]*font-size:\s*12px;/s);
+  assert.match(desktopStyles, /\.personal-section-heading button\s*\{[^}]*font-size:\s*14px;/s);
+  assert.match(desktopStyles, /\.personal-task strong,\s*\.inbox-row strong\s*\{[^}]*color:\s*var\(--ink\);[^}]*font-size:\s*14px;/s);
+  assert.match(desktopStyles, /\.personal-task small,\s*\.inbox-row small\s*\{[^}]*font-size:\s*12px;/s);
+  assert.match(desktopStyles, /\.personal-task time,\s*\.inbox-row time\s*\{[^}]*font-size:\s*12px;/s);
+  assert.match(desktopStyles, /\.saved-personal-views > button\s*\{[^}]*font-size:\s*14px;/s);
 });

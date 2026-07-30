@@ -115,6 +115,30 @@
   --color-danger-soft: #432624;
   --elevation-panel: 0 14px 38px rgba(0, 0, 0, 0.34);
   --elevation-overlay: 0 28px 72px rgba(0, 0, 0, 0.5);
+  --ink: var(--color-text);
+  --muted: var(--color-text-muted);
+  --surface: var(--color-surface);
+  --surface-subtle: var(--color-surface-subtle);
+  --surface-muted: var(--color-surface-subtle);
+  --panel: var(--color-panel);
+  --line: var(--color-border);
+  --border: var(--color-border);
+  --line-soft: color-mix(in srgb, var(--color-border) 58%, transparent);
+  --line-strong: var(--color-border-strong);
+  --accent: var(--color-accent);
+  --accent-strong: var(--color-accent-strong);
+  --accent-soft: var(--color-accent-soft);
+  --focus: var(--color-focus);
+  --success: var(--color-success);
+  --success-soft: var(--color-success-soft);
+  --success-strong: var(--color-success);
+  --warning: var(--color-warning);
+  --warning-soft: var(--color-warning-soft);
+  --warning-strong: var(--color-warning);
+  --danger: var(--color-danger);
+  --danger-soft: var(--color-danger-soft);
+  --danger-strong: var(--color-danger);
+  --shadow: var(--elevation-panel);
 }
 
 .density-compact {

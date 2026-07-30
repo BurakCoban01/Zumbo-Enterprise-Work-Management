@@ -10,6 +10,7 @@ const appSource = await readFile(resolve(root, 'desktop-bulma/app.js'), 'utf8');
 const managementSource = await readFile(resolve(root, 'desktop-bulma/management.js'), 'utf8');
 const workItemsSource = await readFile(resolve(root, 'desktop-bulma/work-items.js'), 'utf8');
 const html = await readFile(resolve(root, 'desktop-bulma/index.html'), 'utf8');
+const styles = await readFile(resolve(root, 'desktop-bulma/styles.css'), 'utf8');
 
 function createShellFeature() {
   let provider;
@@ -102,4 +103,14 @@ test('command template exposes combobox, listbox, selected state and permission-
   assert.match(html, /class="command-results" role="listbox"/);
   assert.match(html, /role="option" aria-selected=/);
   assert.match(html, /Eşleşen komut veya görev yok\./);
+});
+
+test('desktop shell tracks recent projects by stable identity and keeps shell metadata legible', () => {
+  assert.match(html, /ng-repeat="recent in vm\.recentProjects \| limitTo:3 track by recent\.id"/);
+  assert.match(styles, /\.context-selectors label,\s*\.nav-secondary > span\s*\{[^}]*font-size:\s*12px;/s);
+  assert.match(styles, /kbd\s*\{[^}]*font-size:\s*11px;/s);
+  assert.match(styles, /\.notification-button > span\s*\{[^}]*color:\s*var\(--color-text-inverse\);[^}]*font-size:\s*12px;/s);
+  assert.match(styles, /\.notification-popover > button span,\s*\.notification-popover > p,\s*\.popover-heading span\s*\{[^}]*font-size:\s*12px;/s);
+  assert.match(styles, /\.breadcrumbs\s*\{[^}]*font-size:\s*12px;/s);
+  assert.match(styles, /\.nav-count\s*\{[^}]*color:\s*var\(--color-text-inverse\);[^}]*font-size:\s*12px;/s);
 });

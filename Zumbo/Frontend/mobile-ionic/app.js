@@ -2,7 +2,9 @@
   'use strict';
 
   angular.module('zumboMobile', ['ionic', 'zumbo.shared.api', 'zumbo.shared.displayNames'])
-  .config(function($stateProvider, $urlRouterProvider) {
+  .config(function($stateProvider, $urlRouterProvider, $ionicConfigProvider) {
+    $ionicConfigProvider.backButton.text('Geri');
+
     function protectedState(definition) {
       definition.resolve = {
         browserSession: function(authService) { return authService.restore(); }

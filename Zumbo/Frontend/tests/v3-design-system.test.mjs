@@ -32,6 +32,30 @@ test('light and dark state pairs retain WCAG AA text contrast', async () => {
   }
 });
 
+test('dark theme rebinds legacy aliases to its semantic palette', async () => {
+  const css = await read('shared/design-system.css');
+  const dark = css.match(/\.theme-dark\s*\{([\s\S]*?)\}/)[1];
+  for (const [alias, semantic] of [
+    ['ink', 'text'],
+    ['muted', 'text-muted'],
+    ['surface', 'surface'],
+    ['surface-subtle', 'surface-subtle'],
+    ['surface-muted', 'surface-subtle'],
+    ['panel', 'panel'],
+    ['line', 'border'],
+    ['line-strong', 'border-strong'],
+    ['accent', 'accent'],
+    ['accent-strong', 'accent-strong'],
+    ['accent-soft', 'accent-soft'],
+    ['focus', 'focus'],
+    ['success', 'success'],
+    ['warning', 'warning'],
+    ['danger', 'danger']
+  ]) {
+    assert.match(dark, new RegExp(`--${alias}:\\s*var\\(--color-${semantic}\\)`));
+  }
+});
+
 test('component gallery uses shipped primitives and renders required product states', async () => {
   const html = await read('shared/component-gallery.html');
   assert.match(html, /shared\/component-gallery\.html|<title>Zumbo Bileşen Galerisi<\/title>/);

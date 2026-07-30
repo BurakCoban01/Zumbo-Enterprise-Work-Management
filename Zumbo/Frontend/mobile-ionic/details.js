@@ -173,6 +173,38 @@
     apiClient.transitionContext('team:' + $stateParams.teamId);
     vm.team = sessionStore.state.team;
     vm.inviteDraft = { email: '', role: 'Member' };
+    vm.teamMemberRoleLabel = function(role) {
+      return {
+        Owner: 'Sahip',
+        Admin: 'Yönetici',
+        Member: 'Üye'
+      }[role] || 'Üye';
+    };
+    vm.teamMemberStatusLabel = function(status) {
+      return {
+        Active: 'Aktif',
+        Invited: 'Davet edildi',
+        Declined: 'Reddedildi',
+        Expired: 'Süresi doldu',
+        Revoked: 'İptal edildi'
+      }[status] || 'Durum bilinmiyor';
+    };
+    vm.teamActivityLabel = function(action) {
+      return {
+        TeamCreated: 'Ekip oluşturuldu',
+        TeamUpdated: 'Ekip güncellendi',
+        TeamMemberInvited: 'Üye davet edildi',
+        TeamInviteAccepted: 'Davet kabul edildi',
+        TeamInviteDeclined: 'Davet reddedildi',
+        TeamInviteExpired: 'Davet süresi doldu',
+        TeamInviteRevoked: 'Davet iptal edildi',
+        TeamMemberRoleChanged: 'Üye rolü değiştirildi',
+        TeamOwnershipTransferred: 'Ekip sahipliği devredildi',
+        TeamMemberRemoved: 'Üye kaldırıldı',
+        TeamArchived: 'Ekip arşivlendi',
+        TeamRestored: 'Ekip geri yüklendi'
+      }[action] || 'Ekip etkinliği';
+    };
     vm.load = function() {
       return zumboApi.teams().then(function(teams) {
         vm.team = teams.filter(function(team) { return team.id === $stateParams.teamId; })[0];
@@ -298,6 +330,14 @@
 
     vm.userName = function(userId) {
       return displayNameResolver.user(userId, vm.users, sessionStore.state.currentUser);
+    };
+    vm.projectRoleLabel = function(value) {
+      return {
+        ProjectOwner: 'Proje sahibi',
+        ProjectAdmin: 'Proje yöneticisi',
+        Developer: 'Geliştirici',
+        Viewer: 'Görüntüleyici'
+      }[value] || 'Proje üyesi';
     };
     vm.fieldDefinition = function(value) {
       return (vm.schema.customFields || []).find(function(field) { return field.key === value.fieldKey; })
@@ -721,18 +761,44 @@
       var labels = {
         WorkItemCreated: 'Görev oluşturuldu',
         WorkItemUpdated: 'Ayrıntılar güncellendi',
+        WorkItemAssigned: 'Atanan kişi değiştirildi',
+        WorkItemAssigneeCleared: 'Atama kaldırıldı',
         WorkItemMoved: 'Durum değişti',
+        WorkItemReordered: 'Görev sırası değiştirildi',
+        WorkItemPlanningUpdated: 'Planlama güncellendi',
+        WorkItemChecklistItemAdded: 'Kontrol listesi maddesi eklendi',
+        WorkItemChecklistItemUpdated: 'Kontrol listesi maddesi güncellendi',
+        WorkItemLabelAdded: 'Etiket eklendi',
+        WorkItemLabelRemoved: 'Etiket kaldırıldı',
         WorkItemCommentAdded: 'Yorum eklendi',
         WorkItemCommentEdited: 'Yorum düzenlendi',
         WorkItemCommentDeleted: 'Yorum silindi',
         WorkItemAttachmentUploaded: 'Dosya yüklendi',
         WorkItemAttachmentDeleted: 'Dosya kaldırıldı',
+        WorkItemWorkLogAdded: 'Çalışma kaydı eklendi',
+        WorkItemParentChanged: 'Üst görev değiştirildi',
+        WorkItemLinked: 'Görev ilişkisi eklendi',
+        WorkItemUnlinked: 'Görev ilişkisi kaldırıldı',
+        WorkItemArchived: 'Görev arşivlendi',
+        WorkItemRestored: 'Görev geri yüklendi',
+        WorkItemApprovalRequested: 'Onay istendi',
+        WorkItemApprovalExpired: 'Onay süresi doldu',
+        WorkItemApprovalDecided: 'Onay kararı verildi',
+        WorkItemCustomFieldsUpdated: 'Özel alanlar güncellendi',
+        WorkItemTeamChanged: 'Ekip değiştirildi',
+        WorkItemAutomationApplied: 'Otomasyon uygulandı',
+        WorkItemTransitioned: 'İş akışı geçişi uygulandı',
         WorkItemWatched: 'Takip başladı',
         WorkItemUnwatched: 'Takip sona erdi',
         WorkItemVoted: 'Oy eklendi',
-        WorkItemVoteRemoved: 'Oy kaldırıldı'
+        WorkItemVoteRemoved: 'Oy kaldırıldı',
+        RecurringWorkItemGenerated: 'Yinelenen görev oluşturuldu'
       };
-      return labels[type] || String(type || 'Etkinlik').replace(/([a-z])([A-Z])/g, '$1 $2');
+      return labels[type] || 'Görev etkinliği';
+    };
+    vm.activityDetail = function(entry) {
+      if (!entry) return '';
+      return entry.body || entry.note || entry.message || entry.description || '';
     };
     vm.load();
   });
