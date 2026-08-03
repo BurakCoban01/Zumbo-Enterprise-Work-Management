@@ -33,7 +33,9 @@ public sealed class RefactorRuntimeContractTests
         "services.AddScoped<UpsertWorkflowHandler>();",
         "services.AddScoped<GetWorkflowHandler>();",
         "services.AddScoped<CreateWorkItemHandler>();",
-        "services.AddScoped<SearchWorkItemsHandler>();"
+        "services.AddScoped<SearchWorkItemsHandler>();",
+        "services.AddScoped<ListNotificationsHandler>();",
+        "services.AddScoped<MarkNotificationAsReadHandler>();"
     ];
 
     private static readonly string[] PortFocusedVerticalSliceDiRegistrations =
@@ -144,7 +146,13 @@ public sealed class RefactorRuntimeContractTests
         + "provider.GetRequiredService<IWorkItemTypeSchemaPolicy>(),"
         + "provider.GetRequiredService<IWorkItemSearchIndex>(),"
         + "provider.GetRequiredService<IWorkItemActivityStore>(),"
-        + "provider.GetRequiredService<IOptions<SearchOptions>>()));"
+        + "provider.GetRequiredService<IOptions<SearchOptions>>()));",
+        "services.AddScoped<ListNotificationsHandler>(provider=>newListNotificationsHandler("
+        + "provider.GetRequiredService<IDocumentRepository<NotificationDocument>>(),"
+        + "provider.GetRequiredService<ICurrentUser>()));",
+        "services.AddScoped<MarkNotificationAsReadHandler>(provider=>newMarkNotificationAsReadHandler("
+        + "provider.GetRequiredService<IDocumentRepository<NotificationDocument>>(),"
+        + "provider.GetRequiredService<ICurrentUser>()));"
     ];
 
     private static string ProjectDirectory => Path.GetFullPath(
@@ -240,7 +248,8 @@ public sealed class RefactorRuntimeContractTests
                 "CreateProjectHandler and ListProjectsHandler remain scoped self-services; explicit factories select their port-focused constructors while compatibility constructors remain available.",
                 "CreateBoardHandler and ListBoardsByProjectHandler remain scoped self-services; explicit factories select their port-focused constructors while compatibility constructors remain available.",
                 "UpsertWorkflowHandler and GetWorkflowHandler remain scoped self-services; explicit factories select their port-focused constructors while compatibility constructors remain available.",
-                "CreateWorkItemHandler and SearchWorkItemsHandler remain scoped self-services; explicit factories select their port-focused constructors while compatibility constructors remain available."
+                "CreateWorkItemHandler and SearchWorkItemsHandler remain scoped self-services; explicit factories select their port-focused constructors while compatibility constructors remain available.",
+                "ListNotificationsHandler and MarkNotificationAsReadHandler remain scoped self-services; explicit factories select their port-focused constructors while compatibility constructors remain available."
             },
             intentionalConfigurationChanges = new[]
             {

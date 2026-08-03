@@ -96,7 +96,17 @@ public sealed class RefactorSemanticPreservationTests
             ["Zumbo.Modules.WorkItems|Zumbo.Modules.WorkItems.WorkItemService|method:CreateAsync:(CreateWorkItemRequestrequest,stringcorrelationId,CancellationTokenct,string?requestedId=null):Task<WorkItemResponse>"] =
                 "The compatibility facade delegates ordinary work-item creation to the port-focused slice while preserving the requested-id path used by legacy and intake-compatible callers.",
             ["Zumbo.Modules.WorkItems|Zumbo.Modules.WorkItems.WorkItemService|method:SearchAsync:(WorkItemSearchRequestrequest,CancellationTokenct):Task<IReadOnlyList<WorkItemResponse>>"] =
-                "The compatibility facade delegates work-item search to the port-focused query slice while preserving the original public signature and tenant-scoped behavior."
+                "The compatibility facade delegates work-item search to the port-focused query slice while preserving the original public signature and tenant-scoped behavior.",
+            ["Zumbo.Api|NotificationEndpoints|method:AddNotificationsModule:(thisIServiceCollectionservices,IConfigurationconfiguration):IServiceCollection"] =
+                "Notification list and mark-read handlers remain scoped while explicit factories select their port-focused constructors and preserve compatibility constructors.",
+            ["Zumbo.Modules.Notifications|Zumbo.Modules.Notifications.ListNotificationsHandler|method:HandleAsync:(ListNotificationsQueryquery,CancellationTokenct):Task<IReadOnlyList<NotificationResponse>>"] =
+                "The endpoint handler selects the independent notification-list slice when composed from ports and retains its original NotificationService constructor as a compatibility path.",
+            ["Zumbo.Modules.Notifications|Zumbo.Modules.Notifications.MarkNotificationAsReadHandler|method:HandleAsync:(MarkNotificationAsReadCommandcommand,CancellationTokenct):Task<MarkNotificationAsReadResponse>"] =
+                "The endpoint handler selects the independent mark-read slice when composed from ports and retains its original NotificationService constructor as a compatibility path.",
+            ["Zumbo.Modules.Notifications|Zumbo.Modules.Notifications.NotificationService|method:ListAsync:(stringuserId,CancellationTokenct,intpage=1,intpageSize=50,boolunreadOnly=false):Task<IReadOnlyList<NotificationResponse>>"] =
+                "The compatibility facade delegates notification listing to the port-focused query slice while preserving its public signature, paging, ordering, and user isolation.",
+            ["Zumbo.Modules.Notifications|Zumbo.Modules.Notifications.NotificationService|method:MarkAsReadAsync:(stringnotificationId,CancellationTokenct):Task"] =
+                "The compatibility facade delegates the idempotent mark-read mutation to its port-focused slice while preserving the original public signature and authorization behavior."
         };
 
     private static string ProjectDirectory => Path.GetFullPath(

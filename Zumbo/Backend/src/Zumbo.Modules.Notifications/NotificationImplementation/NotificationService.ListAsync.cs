@@ -14,17 +14,7 @@ public sealed partial class NotificationService{
         int page = 1,
         int pageSize = 50,
         bool unreadOnly = false)
-    {
-        EnsureCurrentUser(userId);
-        ListNotificationsValidator.Validate(new ListNotificationsQuery(userId, page, pageSize, unreadOnly));
-
-        var result = await notifications.ListByFilterAsync(
-            x => x.UserId == userId && (!unreadOnly || !x.Read),
-            x => x.CreatedAt,
-            orderDescending: true,
-            page: page,
-            pageSize: pageSize,
-            cancellationToken: ct);
-        return result.Select(ToResponse).ToList();
-    }
+        => await listNotificationsHandler.HandleAsync(
+            new ListNotificationsQuery(userId, page, pageSize, unreadOnly),
+            ct);
 }

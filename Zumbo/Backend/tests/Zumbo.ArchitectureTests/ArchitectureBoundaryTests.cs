@@ -823,6 +823,59 @@ public sealed class ArchitectureBoundaryTests
     }
 
     [Fact]
+    public void NotificationListAndMarkRead_ArePortFocusedVerticalSlicesWithCompatibilityFacades()
+    {
+        var moduleDirectory = Path.Combine(SourceDirectory, "Zumbo.Modules.Notifications");
+        var listDirectory = Path.Combine(moduleDirectory, "Features", "ListNotifications");
+        var markReadDirectory = Path.Combine(moduleDirectory, "Features", "MarkNotificationAsRead");
+        var representativeDirectory = Path.Combine(
+            moduleDirectory,
+            "Features",
+            "RepresentativeNotificationSlices");
+
+        Assert.True(File.Exists(Path.Combine(listDirectory, "ListNotificationsQuery.cs")));
+        Assert.True(File.Exists(Path.Combine(listDirectory, "ListNotificationsValidator.cs")));
+        Assert.True(File.Exists(Path.Combine(listDirectory, "ListNotificationsHandler.cs")));
+        Assert.True(File.Exists(Path.Combine(listDirectory, "ListNotificationsSlice.cs")));
+        Assert.True(File.Exists(Path.Combine(markReadDirectory, "MarkNotificationAsReadCommand.cs")));
+        Assert.True(File.Exists(Path.Combine(markReadDirectory, "MarkNotificationAsReadValidator.cs")));
+        Assert.True(File.Exists(Path.Combine(markReadDirectory, "MarkNotificationAsReadHandler.cs")));
+        Assert.True(File.Exists(Path.Combine(markReadDirectory, "MarkNotificationAsReadSlice.cs")));
+        Assert.Empty(
+            Directory.Exists(representativeDirectory)
+                ? Directory.GetFiles(representativeDirectory, "*.cs", SearchOption.AllDirectories)
+                : []);
+
+        var listSlice = File.ReadAllText(Path.Combine(listDirectory, "ListNotificationsSlice.cs"));
+        var markReadSlice = File.ReadAllText(Path.Combine(markReadDirectory, "MarkNotificationAsReadSlice.cs"));
+        Assert.DoesNotContain("NotificationService", listSlice, StringComparison.Ordinal);
+        Assert.DoesNotContain("NotificationService", markReadSlice, StringComparison.Ordinal);
+        Assert.Contains("IDocumentRepository<NotificationDocument>", listSlice, StringComparison.Ordinal);
+        Assert.Contains("ICurrentUser", listSlice, StringComparison.Ordinal);
+        Assert.Contains("IDocumentRepository<NotificationDocument>", markReadSlice, StringComparison.Ordinal);
+        Assert.Contains("ICurrentUser", markReadSlice, StringComparison.Ordinal);
+
+        var listFacade = File.ReadAllText(Path.Combine(
+            moduleDirectory,
+            "NotificationImplementation",
+            "NotificationService.ListAsync.cs"));
+        var markReadFacade = File.ReadAllText(Path.Combine(
+            moduleDirectory,
+            "NotificationImplementation",
+            "NotificationService.MarkAsReadAsync.cs"));
+        Assert.Contains("listNotificationsHandler.HandleAsync", listFacade, StringComparison.Ordinal);
+        Assert.Contains("markNotificationAsReadHandler.HandleAsync", markReadFacade, StringComparison.Ordinal);
+
+        var composition = File.ReadAllText(Path.Combine(
+            SourceDirectory,
+            "Zumbo.Api",
+            "Endpoints",
+            "NotificationEndpoints.cs"));
+        Assert.Contains("AddScoped<ListNotificationsHandler>(provider =>", composition, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<MarkNotificationAsReadHandler>(provider =>", composition, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void ProductionSourceFiles_StayWithinReadabilityLimit()
     {
         const int maximumLines = 500;

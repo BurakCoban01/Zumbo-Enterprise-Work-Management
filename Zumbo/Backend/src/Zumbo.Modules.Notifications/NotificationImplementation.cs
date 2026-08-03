@@ -18,4 +18,6 @@ public sealed partial class NotificationService(
     ICurrentUser currentUser,
     IDurableMessageJitter? retryJitter = null)
 {
+    private readonly ListNotificationsHandler listNotificationsHandler = new(notifications, currentUser);
+    private readonly MarkNotificationAsReadHandler markNotificationAsReadHandler = new(notifications, currentUser);
 }
