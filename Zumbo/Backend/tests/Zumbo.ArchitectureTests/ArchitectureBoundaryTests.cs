@@ -178,6 +178,36 @@ public sealed class ArchitectureBoundaryTests
     }
 
     [Fact]
+    public void GatewaySource_RemainsProviderAndModuleAgnostic()
+    {
+        var gatewayDirectory = Path.Combine(SourceDirectory, "Zumbo.Gateway");
+        var source = ReadSourceScope(gatewayDirectory);
+        var forbiddenMarkers = new[]
+        {
+            "Zumbo.Modules.", "Zumbo.Api", "Npgsql", "MongoDB.",
+            "StackExchange.Redis", "OpenSearch", "Minio"
+        };
+
+        Assert.All(forbiddenMarkers, marker =>
+            Assert.DoesNotContain(marker, source, StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void PostgreSqlPersistence_DependsOnlyOnApplicationPortsAndProviderPackage()
+    {
+        var persistenceDirectory = Path.Combine(SourceDirectory, "Zumbo.Persistence.PostgreSql");
+        var project = Path.Combine(persistenceDirectory, "Zumbo.Persistence.PostgreSql.csproj");
+        var source = ReadSourceScope(persistenceDirectory);
+
+        AssertExactSet(["Zumbo.BuildingBlocks.Application"], ProjectReferences(project));
+        AssertExactSet(["Npgsql"], PackageReferences(project));
+        Assert.DoesNotContain("Zumbo.Modules.", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("Zumbo.Api", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("MongoDB.", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("StackExchange.Redis", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void ApiPipeline_PreservesExactMiddlewareOrder()
     {
         var pipeline = Path.Combine(SourceDirectory, "Zumbo.Api", "Hosting", "ApiPipeline.cs");
@@ -964,6 +994,36 @@ public sealed class ArchitectureBoundaryTests
             "Production source files must contain at most one top-level type:"
                 + Environment.NewLine
                 + string.Join(Environment.NewLine, offenders.Select(file => $"{file.Path}: {file.Count}")));
+    }
+
+    [Fact]
+    public void EndpointRepositoryDependencies_AreRestrictedToCompositionMethods()
+    {
+        var endpointDirectory = Path.Combine(SourceDirectory, "Zumbo.Api", "Endpoints");
+        var violations = Directory.GetFiles(endpointDirectory, "*.cs", SearchOption.AllDirectories)
+            .SelectMany(path =>
+            {
+                var root = CSharpSyntaxTree.ParseText(File.ReadAllText(path)).GetCompilationUnitRoot();
+                return root.DescendantNodes()
+                    .OfType<GenericNameSyntax>()
+                    .Where(type => type.Identifier.ValueText == "IDocumentRepository")
+                    .Select(type => new
+                    {
+                        Path = Path.GetRelativePath(endpointDirectory, path),
+                        Method = type.FirstAncestorOrSelf<MethodDeclarationSyntax>()?.Identifier.ValueText
+                    });
+            })
+            .Where(reference => reference.Method is null
+                || !reference.Method.StartsWith("Add", StringComparison.Ordinal))
+            .OrderBy(reference => reference.Path, StringComparer.Ordinal)
+            .ToArray();
+
+        Assert.True(
+            violations.Length == 0,
+            "Endpoint mapping methods must use application handlers/services rather than repositories:"
+                + Environment.NewLine
+                + string.Join(Environment.NewLine, violations.Select(
+                    violation => $"{violation.Path}: {violation.Method ?? "type scope"}")));
     }
 
     [Fact]
