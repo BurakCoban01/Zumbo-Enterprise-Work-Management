@@ -1,5 +1,9 @@
+using Microsoft.Extensions.Options;
 using Zumbo.Modules.Boards;
+using Zumbo.BuildingBlocks.Application.Concurrency;
+using Zumbo.BuildingBlocks.Application.Persistence;
 using Zumbo.BuildingBlocks.Application.Security;
+using Zumbo.SharedKernel;
 
 using static ApiEndpointResults;
 
@@ -14,8 +18,18 @@ internal static class BoardsEndpoints
         services.AddScoped<IBoardColumnUsageChecker>(provider => provider.GetRequiredService<BoardPolicyAdapter>());
         services.AddScoped<BoardService>();
         services.AddScoped<BoardWorkflowMappingService>();
-        services.AddScoped<CreateBoardHandler>();
-        services.AddScoped<ListBoardsByProjectHandler>();
+        services.AddScoped<CreateBoardHandler>(provider => new CreateBoardHandler(
+            provider.GetRequiredService<IDocumentRepository<BoardDocument>>(),
+            provider.GetRequiredService<IBoardProjectAccessChecker>(),
+            provider.GetRequiredService<IDistributedLockProvider>(),
+            provider.GetRequiredService<IOptions<DistributedLockOptions>>(),
+            provider.GetRequiredService<IClock>(),
+            provider.GetRequiredService<ICurrentUser>(),
+            provider.GetRequiredService<IBoardAuditWriter>()));
+        services.AddScoped<ListBoardsByProjectHandler>(provider => new ListBoardsByProjectHandler(
+            provider.GetRequiredService<IDocumentRepository<BoardDocument>>(),
+            provider.GetRequiredService<IBoardProjectAccessChecker>(),
+            provider.GetRequiredService<ICurrentUser>()));
         return services;
     }
 

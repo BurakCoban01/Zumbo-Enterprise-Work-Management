@@ -62,7 +62,19 @@ public sealed class RefactorSemanticPreservationTests
             ["Zumbo.Modules.Projects|Zumbo.Modules.Projects.ListProjectsHandler|method:HandleAsync:(ListProjectsQueryquery,CancellationTokenct):Task<IReadOnlyList<ProjectResponse>>"] =
                 "The endpoint handler selects the independent project-list query slice when composed from ports and retains its original facade constructor.",
             ["Zumbo.Modules.Projects|Zumbo.Modules.Projects.ProjectService|ctor:(IDocumentRepository<ProjectDocument>projects,IProjectMemberDirectorymemberDirectory,IProjectTeamDirectoryteamDirectory,IProjectTeamUsageCheckerteamUsageChecker,IProjectAuditWriteraudit,IClockclock,ICurrentUsercurrentUser,IExpectedVersionAccessor?expectedVersions=null,IProjectOrganizationDirectory?organizationDirectory=null,IOptions<ProjectLifecycleOptions>?lifecycleOptions=null)"] =
-                "The unchanged compatibility facade constructor now wires the port-focused create and list handlers from its existing dependencies; its public signature and all previous assignments remain intact."
+                "The unchanged compatibility facade constructor now wires the port-focused create and list handlers from its existing dependencies; its public signature and all previous assignments remain intact.",
+            ["Zumbo.Api|BoardsEndpoints|method:AddBoardsModule:(thisIServiceCollectionservices):IServiceCollection"] =
+                "Board create and project-list handlers remain scoped while explicit factories select their port-focused constructors and preserve compatibility constructors.",
+            ["Zumbo.Modules.Boards|Zumbo.Modules.Boards.BoardService|method:CreateAsync:(CreateBoardRequestrequest,stringcorrelationId,CancellationTokenct):Task<BoardResponse>"] =
+                "The compatibility facade delegates board creation to the port-focused CreateBoard slice while preserving its public signature and behavior.",
+            ["Zumbo.Modules.Boards|Zumbo.Modules.Boards.BoardService|method:ListByProjectAsync:(stringprojectId,CancellationTokenct,boolarchived=false):Task<IReadOnlyList<BoardResponse>>"] =
+                "The compatibility facade delegates board listing to the project-scoped ListBoardsByProject query slice while preserving its public signature.",
+            ["Zumbo.Modules.Boards|Zumbo.Modules.Boards.CreateBoardHandler|method:HandleAsync:(CreateBoardRequestrequest,stringcorrelationId,CancellationTokenct):Task<BoardResponse>"] =
+                "The endpoint handler selects the independent board-creation slice when composed from ports and retains its original facade constructor.",
+            ["Zumbo.Modules.Boards|Zumbo.Modules.Boards.ListBoardsByProjectHandler|method:HandleAsync:(ListBoardsByProjectQueryquery,CancellationTokenct):Task<IReadOnlyList<BoardResponse>>"] =
+                "The endpoint handler selects the independent project-board-list slice when composed from ports and retains its original facade constructor.",
+            ["Zumbo.Modules.Boards|Zumbo.Modules.Boards.BoardService|ctor:(IDocumentRepository<BoardDocument>boards,IBoardProjectAccessCheckeraccessChecker,IBoardColumnUsageCheckerusageChecker,IDistributedLockProviderdistributedLockProvider,IOptions<DistributedLockOptions>distributedLockOptions,IClockclock,ICurrentUsercurrentUser,IBoardAuditWriteraudit,IExpectedVersionAccessor?expectedVersions=null,IBoardWorkflowCatalog?workflowCatalog=null)"] =
+                "The unchanged compatibility facade constructor now wires the port-focused create and list handlers from its existing dependencies; its public signature and previous expected-version assignment remain intact."
         };
 
     private static string ProjectDirectory => Path.GetFullPath(

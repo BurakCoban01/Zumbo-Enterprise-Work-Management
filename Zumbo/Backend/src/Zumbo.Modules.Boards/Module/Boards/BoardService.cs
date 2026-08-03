@@ -18,4 +18,16 @@ public sealed partial class BoardService(
     IBoardWorkflowCatalog? workflowCatalog = null)
 {
     private readonly ExpectedVersionState expectedVersion = new(expectedVersions);
+    private readonly CreateBoardHandler createBoardHandler = new(
+        boards,
+        accessChecker,
+        distributedLockProvider,
+        distributedLockOptions,
+        clock,
+        currentUser,
+        audit);
+    private readonly ListBoardsByProjectHandler listBoardsByProjectHandler = new(
+        boards,
+        accessChecker,
+        currentUser);
 }
