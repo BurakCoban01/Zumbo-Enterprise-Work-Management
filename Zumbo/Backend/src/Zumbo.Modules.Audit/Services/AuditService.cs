@@ -22,6 +22,8 @@ public sealed class AuditService
     private readonly AuditOptions options;
     private readonly IAuditTenantResolver? tenantResolver;
     private readonly IDistributedLockProvider? distributedLocks;
+    private readonly WriteAuditLogHandler writeAuditLogHandler;
+    private readonly QueryAuditLogHandler queryAuditLogHandler;
 
     public AuditService(
         IDocumentRepository<AuditLogDocument> auditLogs,
@@ -41,6 +43,15 @@ public sealed class AuditService
         this.options = options?.Value ?? new AuditOptions();
         this.tenantResolver = tenantResolver;
         this.distributedLocks = distributedLocks;
+        writeAuditLogHandler = new WriteAuditLogHandler(
+            auditLogs,
+            clock,
+            currentUser,
+            requestContext,
+            Microsoft.Extensions.Options.Options.Create(this.options),
+            tenantResolver,
+            distributedLocks);
+        queryAuditLogHandler = new QueryAuditLogHandler(auditLogs, accessChecker);
     }
 
     public Task WriteAsync(
@@ -51,17 +62,14 @@ public sealed class AuditService
         string? newValue,
         string correlationId,
         CancellationToken ct) =>
-        WriteAsAsync(
-            currentUser.UserId ?? "system",
-            action,
-            entityType,
-            entityId,
-            oldValue,
-            newValue,
-            correlationId,
-            requestContext.GetMetadata(),
-            clock.UtcNow,
-            null,
+        writeAuditLogHandler.HandleUncheckedAsync(
+            new WriteAuditLogCommand(
+                action,
+                entityType,
+                entityId,
+                oldValue,
+                newValue,
+                correlationId),
             ct);
 
     public async Task WriteAsAsync(
@@ -143,35 +151,7 @@ public sealed class AuditService
         (await QueryAsync(new AuditLogQuery(actorUserId, null, null, null, null, null, PageSize: 100), ct)).Items;
 
     public async Task<AuditLogPageResponse> QueryAsync(AuditLogQuery query, CancellationToken ct)
-    {
-        var normalized = QueryAuditLogValidator.ValidateAndNormalize(query);
-        var scope = await accessChecker.EnsureCanReadAsync(normalized, ct);
-        var cursor = DecodeCursor(normalized.Cursor);
-        var filter = BuildFilter(normalized, scope.OrganizationId, cursor);
-        var requested = normalized.Cursor is null ? normalized.PageSize : normalized.PageSize + 1;
-        var page = normalized.Cursor is null ? normalized.Page : 1;
-        var result = await auditLogs.ListByFilterAsync(
-            filter,
-            x => x.CreatedAt,
-            orderDescending: true,
-            page,
-            requested,
-            ct);
-        var hasNext = result.Count > normalized.PageSize;
-        var items = result.Take(normalized.PageSize).ToList();
-        if (normalized.Cursor is null && items.Count == normalized.PageSize)
-        {
-            hasNext = (await auditLogs.ListByFilterAsync(
-                filter, x => x.CreatedAt, true, normalized.Page + 1, normalized.PageSize, ct)).Count > 0;
-        }
-        var nextCursor = hasNext && items.Count > 0 ? EncodeCursor(items[^1]) : null;
-        return new AuditLogPageResponse(
-            items.Select(ToResponse).ToList(),
-            normalized.Page,
-            normalized.PageSize,
-            hasNext,
-            nextCursor);
-    }
+        => await queryAuditLogHandler.HandleAsync(query, ct);
 
     public async Task<IReadOnlyList<AuditLogResponse>> ExportAsync(AuditLogQuery query, CancellationToken ct)
     {

@@ -1,3 +1,6 @@
+using Microsoft.Extensions.Options;
+using Zumbo.BuildingBlocks.Application.Concurrency;
+using Zumbo.BuildingBlocks.Application.Persistence;
 using Zumbo.Modules.Audit;
 using Zumbo.BuildingBlocks.Application.Security;
 using Zumbo.SharedKernel;
@@ -22,8 +25,17 @@ internal static class AuditEndpoints
         services.AddScoped<IAuditTenantResolver>(provider => provider.GetRequiredService<AuditAccessCheckerAdapter>());
         services.AddScoped<IAuditRequestContext, HttpAuditRequestContext>();
         services.AddScoped<AuditService>();
-        services.AddScoped<WriteAuditLogHandler>();
-        services.AddScoped<QueryAuditLogHandler>();
+        services.AddScoped<WriteAuditLogHandler>(provider => new WriteAuditLogHandler(
+            provider.GetRequiredService<IDocumentRepository<AuditLogDocument>>(),
+            provider.GetRequiredService<IClock>(),
+            provider.GetRequiredService<ICurrentUser>(),
+            provider.GetRequiredService<IAuditRequestContext>(),
+            provider.GetRequiredService<IOptions<AuditOptions>>(),
+            provider.GetService<IAuditTenantResolver>(),
+            provider.GetService<IDistributedLockProvider>()));
+        services.AddScoped<QueryAuditLogHandler>(provider => new QueryAuditLogHandler(
+            provider.GetRequiredService<IDocumentRepository<AuditLogDocument>>(),
+            provider.GetRequiredService<IAuditAccessChecker>()));
         return services;
     }
 

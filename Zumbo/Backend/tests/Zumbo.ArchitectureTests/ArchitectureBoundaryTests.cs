@@ -876,6 +876,57 @@ public sealed class ArchitectureBoundaryTests
     }
 
     [Fact]
+    public void AuditWriteAndQuery_ArePortFocusedVerticalSlicesWithCompatibilityFacades()
+    {
+        var moduleDirectory = Path.Combine(SourceDirectory, "Zumbo.Modules.Audit");
+        var writeDirectory = Path.Combine(moduleDirectory, "Features", "WriteAuditLog");
+        var queryDirectory = Path.Combine(moduleDirectory, "Features", "QueryAuditLog");
+        var representativeDirectory = Path.Combine(
+            moduleDirectory,
+            "Features",
+            "RepresentativeAuditSlices");
+
+        Assert.True(File.Exists(Path.Combine(writeDirectory, "WriteAuditLogCommand.cs")));
+        Assert.True(File.Exists(Path.Combine(writeDirectory, "WriteAuditLogValidator.cs")));
+        Assert.True(File.Exists(Path.Combine(writeDirectory, "WriteAuditLogHandler.cs")));
+        Assert.True(File.Exists(Path.Combine(writeDirectory, "WriteAuditLogSlice.cs")));
+        Assert.True(File.Exists(Path.Combine(queryDirectory, "AuditLogQuery.cs")));
+        Assert.True(File.Exists(Path.Combine(queryDirectory, "QueryAuditLogValidator.cs")));
+        Assert.True(File.Exists(Path.Combine(queryDirectory, "QueryAuditLogHandler.cs")));
+        Assert.True(File.Exists(Path.Combine(queryDirectory, "QueryAuditLogSlice.cs")));
+        Assert.Empty(
+            Directory.Exists(representativeDirectory)
+                ? Directory.GetFiles(representativeDirectory, "*.cs", SearchOption.AllDirectories)
+                : []);
+
+        var writeSlice = File.ReadAllText(Path.Combine(writeDirectory, "WriteAuditLogSlice.cs"));
+        var querySlice = File.ReadAllText(Path.Combine(queryDirectory, "QueryAuditLogSlice.cs"));
+        Assert.DoesNotContain("AuditService", writeSlice, StringComparison.Ordinal);
+        Assert.DoesNotContain("AuditService", querySlice, StringComparison.Ordinal);
+        Assert.Contains("IDocumentRepository<AuditLogDocument>", writeSlice, StringComparison.Ordinal);
+        Assert.Contains("IAuditTenantResolver", writeSlice, StringComparison.Ordinal);
+        Assert.Contains("IAuditRequestContext", writeSlice, StringComparison.Ordinal);
+        Assert.Contains("IDistributedLockProvider", writeSlice, StringComparison.Ordinal);
+        Assert.Contains("IDocumentRepository<AuditLogDocument>", querySlice, StringComparison.Ordinal);
+        Assert.Contains("IAuditAccessChecker", querySlice, StringComparison.Ordinal);
+
+        var facade = File.ReadAllText(Path.Combine(
+            moduleDirectory,
+            "Services",
+            "AuditService.cs"));
+        Assert.Contains("writeAuditLogHandler.HandleUncheckedAsync", facade, StringComparison.Ordinal);
+        Assert.Contains("queryAuditLogHandler.HandleAsync", facade, StringComparison.Ordinal);
+
+        var composition = File.ReadAllText(Path.Combine(
+            SourceDirectory,
+            "Zumbo.Api",
+            "Endpoints",
+            "AuditEndpoints.cs"));
+        Assert.Contains("AddScoped<WriteAuditLogHandler>(provider =>", composition, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<QueryAuditLogHandler>(provider =>", composition, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void ProductionSourceFiles_StayWithinReadabilityLimit()
     {
         const int maximumLines = 500;

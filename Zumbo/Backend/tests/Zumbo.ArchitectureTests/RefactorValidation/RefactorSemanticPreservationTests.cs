@@ -106,7 +106,19 @@ public sealed class RefactorSemanticPreservationTests
             ["Zumbo.Modules.Notifications|Zumbo.Modules.Notifications.NotificationService|method:ListAsync:(stringuserId,CancellationTokenct,intpage=1,intpageSize=50,boolunreadOnly=false):Task<IReadOnlyList<NotificationResponse>>"] =
                 "The compatibility facade delegates notification listing to the port-focused query slice while preserving its public signature, paging, ordering, and user isolation.",
             ["Zumbo.Modules.Notifications|Zumbo.Modules.Notifications.NotificationService|method:MarkAsReadAsync:(stringnotificationId,CancellationTokenct):Task"] =
-                "The compatibility facade delegates the idempotent mark-read mutation to its port-focused slice while preserving the original public signature and authorization behavior."
+                "The compatibility facade delegates the idempotent mark-read mutation to its port-focused slice while preserving the original public signature and authorization behavior.",
+            ["Zumbo.Api|AuditEndpoints|method:AddAuditModule:(thisIServiceCollectionservices):IServiceCollection"] =
+                "Audit write and query handlers remain scoped while explicit factories select their port-focused constructors and preserve compatibility constructors.",
+            ["Zumbo.Modules.Audit|Zumbo.Modules.Audit.WriteAuditLogHandler|method:HandleAsync:(WriteAuditLogCommandcommand,CancellationTokenct):Task<WriteAuditLogResponse>"] =
+                "The endpoint handler validates the command and selects the independent audit-write slice when composed from ports while retaining its original AuditService constructor.",
+            ["Zumbo.Modules.Audit|Zumbo.Modules.Audit.QueryAuditLogHandler|method:HandleAsync:(AuditLogQueryquery,CancellationTokenct):Task<AuditLogPageResponse>"] =
+                "The endpoint handler selects the independent audit-query slice when composed from ports and retains its original AuditService constructor as a compatibility path.",
+            ["Zumbo.Modules.Audit|Zumbo.Modules.Audit.AuditService|ctor:(IDocumentRepository<AuditLogDocument>auditLogs,IClockclock,ICurrentUsercurrentUser,IAuditRequestContextrequestContext,IAuditAccessCheckeraccessChecker,IOptions<AuditOptions>?options=null,IAuditTenantResolver?tenantResolver=null,IDistributedLockProvider?distributedLocks=null)"] =
+                "The unchanged service constructor now wires port-focused write and query handlers from its existing dependencies while preserving every prior field assignment and optional dependency.",
+            ["Zumbo.Modules.Audit|Zumbo.Modules.Audit.AuditService|method:WriteAsync:(stringaction,stringentityType,stringentityId,string?oldValue,string?newValue,stringcorrelationId,CancellationTokenct):Task"] =
+                "The compatibility facade delegates ordinary audit writes through the unchecked handler path, preserving the original normalization behavior and public signature.",
+            ["Zumbo.Modules.Audit|Zumbo.Modules.Audit.AuditService|method:QueryAsync:(AuditLogQueryquery,CancellationTokenct):Task<AuditLogPageResponse>"] =
+                "The compatibility facade delegates audit paging to the port-focused query slice while preserving validation, authorization, filtering, ordering, and cursor behavior."
         };
 
     private static string ProjectDirectory => Path.GetFullPath(
