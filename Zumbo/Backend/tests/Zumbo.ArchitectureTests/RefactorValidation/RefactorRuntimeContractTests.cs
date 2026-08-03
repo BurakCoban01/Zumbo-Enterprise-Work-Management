@@ -18,13 +18,15 @@ public sealed class RefactorRuntimeContractTests
         "AddHostedService", "Configure", "PostConfigure", "AddOptions", "AddHttpClient"
     ];
 
-    private static readonly string[] ReplacedIdentityDiRegistrations =
+    private static readonly string[] ReplacedVerticalSliceDiRegistrations =
     [
         "services.AddScoped<RegisterUserHandler>();",
-        "services.AddScoped<SearchUsersHandler>();"
+        "services.AddScoped<SearchUsersHandler>();",
+        "services.AddScoped<CreateOrganizationHandler>();",
+        "services.AddScoped<ListOrganizationsHandler>();"
     ];
 
-    private static readonly string[] PortFocusedIdentityDiRegistrations =
+    private static readonly string[] PortFocusedVerticalSliceDiRegistrations =
     [
         "services.AddScoped<RegisterUserHandler>(provider=>newRegisterUserHandler("
         + "provider.GetRequiredService<IUserRepository>(),"
@@ -41,6 +43,16 @@ public sealed class RefactorRuntimeContractTests
         + "provider.GetRequiredService<ISessionClientContext>()));",
         "services.AddScoped<SearchUsersHandler>(provider=>newSearchUsersHandler("
         + "provider.GetRequiredService<IUserRepository>(),"
+        + "provider.GetRequiredService<ICurrentUser>()));",
+        "services.AddScoped<CreateOrganizationHandler>(provider=>newCreateOrganizationHandler("
+        + "provider.GetRequiredService<IDocumentRepository<OrganizationDocument>>(),"
+        + "provider.GetRequiredService<IDistributedLockProvider>(),"
+        + "provider.GetRequiredService<IOptions<DistributedLockOptions>>(),"
+        + "provider.GetRequiredService<IClock>(),"
+        + "provider.GetRequiredService<ICurrentUser>(),"
+        + "provider.GetRequiredService<IOrganizationAuditWriter>()));",
+        "services.AddScoped<ListOrganizationsHandler>(provider=>newListOrganizationsHandler("
+        + "provider.GetRequiredService<IDocumentRepository<OrganizationDocument>>(),"
         + "provider.GetRequiredService<ICurrentUser>()));"
     ];
 
@@ -75,8 +87,8 @@ public sealed class RefactorRuntimeContractTests
             "DI registrations",
             registrations,
             targetRegistrations,
-            ReplacedIdentityDiRegistrations,
-            PortFocusedIdentityDiRegistrations);
+            ReplacedVerticalSliceDiRegistrations,
+            PortFocusedVerticalSliceDiRegistrations);
         AssertExact("PostgreSQL migrations", migrations, targetMigrations);
         AssertExactWithAllowedAdditions(
             "Mongo contracts",
@@ -131,7 +143,8 @@ public sealed class RefactorRuntimeContractTests
             },
             intentionalRuntimeContractReplacements = new[]
             {
-                "RegisterUserHandler and SearchUsersHandler remain scoped self-services; explicit factories select their port-focused constructors while compatibility constructors remain available."
+                "RegisterUserHandler and SearchUsersHandler remain scoped self-services; explicit factories select their port-focused constructors while compatibility constructors remain available.",
+                "CreateOrganizationHandler and ListOrganizationsHandler remain scoped self-services; explicit factories select their port-focused constructors while compatibility constructors remain available."
             },
             intentionalConfigurationChanges = new[]
             {

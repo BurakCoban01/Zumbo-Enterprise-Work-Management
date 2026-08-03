@@ -26,7 +26,19 @@ public sealed class RefactorSemanticPreservationTests
             ["Zumbo.Modules.Identity|Zumbo.Modules.Identity.RegisterUserHandler|method:HandleAsync:(RegisterUserRequestrequest,CancellationTokenct):Task<AuthResponse>"] =
                 "The endpoint handler now selects the independent registration slice when composed from ports while retaining the original IdentityService constructor as a compatibility path.",
             ["Zumbo.Modules.Identity|Zumbo.Modules.Identity.SearchUsersHandler|method:HandleAsync:(SearchUsersQueryquery,CancellationTokenct):Task<IReadOnlyList<UserProfileResponse>>"] =
-                "The endpoint handler now selects the independent user-search slice when composed from ports while retaining the original IdentityService constructor as a compatibility path."
+                "The endpoint handler now selects the independent user-search slice when composed from ports while retaining the original IdentityService constructor as a compatibility path.",
+            ["Zumbo.Api|OrganizationsEndpoints|method:AddOrganizationsModule:(thisIServiceCollectionservices):IServiceCollection"] =
+                "Organization create and list handlers remain scoped while explicit factories select their port-focused constructors and preserve compatibility constructors.",
+            ["Zumbo.Modules.Organizations|Zumbo.Modules.Organizations.OrganizationService|method:CreateAsync:(CreateOrganizationRequestrequest,stringcorrelationId,CancellationTokenct):Task<OrganizationResponse>"] =
+                "The compatibility facade delegates organization creation to the port-focused CreateOrganization slice while preserving its public signature and behavior.",
+            ["Zumbo.Modules.Organizations|Zumbo.Modules.Organizations.OrganizationService|method:ListAsync:(CancellationTokenct):Task<IReadOnlyList<OrganizationResponse>>"] =
+                "The compatibility facade delegates organization listing to the tenant-scoped ListOrganizations query slice while preserving its public signature.",
+            ["Zumbo.Modules.Organizations|Zumbo.Modules.Organizations.CreateOrganizationHandler|method:HandleAsync:(CreateOrganizationRequestrequest,stringcorrelationId,CancellationTokenct):Task<OrganizationResponse>"] =
+                "The endpoint handler selects the independent organization-creation slice when composed from ports and retains its original facade constructor.",
+            ["Zumbo.Modules.Organizations|Zumbo.Modules.Organizations.ListOrganizationsHandler|method:HandleAsync:(ListOrganizationsQueryquery,CancellationTokenct):Task<IReadOnlyList<OrganizationResponse>>"] =
+                "The endpoint handler selects the independent organization-list query slice when composed from ports and retains its original facade constructor.",
+            ["Zumbo.Modules.Organizations|Zumbo.Modules.Organizations.OrganizationService|ctor:(IDocumentRepository<OrganizationDocument>organizations,IOrganizationMemberDirectorymemberDirectory,IDistributedLockProviderdistributedLockProvider,IOptions<DistributedLockOptions>distributedLockOptions,IClockclock,ICurrentUsercurrentUser,IOrganizationAuditWriteraudit,IExpectedVersionAccessor?expectedVersions=null,IOptions<OrganizationLifecycleOptions>?lifecycleOptions=null)"] =
+                "The unchanged compatibility facade constructor now wires the port-focused create and list handlers from its existing dependencies; its public signature and all previous assignments remain intact."
         };
 
     private static string ProjectDirectory => Path.GetFullPath(

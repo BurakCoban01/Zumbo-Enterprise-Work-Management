@@ -523,6 +523,52 @@ public sealed class ArchitectureBoundaryTests
     }
 
     [Fact]
+    public void OrganizationCreateAndList_ArePortFocusedVerticalSlicesWithCompatibilityFacades()
+    {
+        var moduleDirectory = Path.Combine(SourceDirectory, "Zumbo.Modules.Organizations");
+        var createDirectory = Path.Combine(moduleDirectory, "Features", "CreateOrganization");
+        var listDirectory = Path.Combine(moduleDirectory, "Features", "ListOrganizations");
+        var representativeDirectory = Path.Combine(
+            moduleDirectory,
+            "Features",
+            "RepresentativeOrganizationSlices");
+
+        Assert.True(File.Exists(Path.Combine(createDirectory, "CreateOrganizationRequest.cs")));
+        Assert.True(File.Exists(Path.Combine(createDirectory, "CreateOrganizationValidator.cs")));
+        Assert.True(File.Exists(Path.Combine(createDirectory, "CreateOrganizationHandler.cs")));
+        Assert.True(File.Exists(Path.Combine(createDirectory, "CreateOrganizationSlice.cs")));
+        Assert.True(File.Exists(Path.Combine(listDirectory, "ListOrganizationsQuery.cs")));
+        Assert.True(File.Exists(Path.Combine(listDirectory, "ListOrganizationsValidator.cs")));
+        Assert.True(File.Exists(Path.Combine(listDirectory, "ListOrganizationsHandler.cs")));
+        Assert.True(File.Exists(Path.Combine(listDirectory, "ListOrganizationsSlice.cs")));
+        Assert.Empty(
+            Directory.Exists(representativeDirectory)
+                ? Directory.GetFiles(representativeDirectory, "*.cs", SearchOption.AllDirectories)
+                : []);
+
+        var createSlice = File.ReadAllText(Path.Combine(createDirectory, "CreateOrganizationSlice.cs"));
+        var listSlice = File.ReadAllText(Path.Combine(listDirectory, "ListOrganizationsSlice.cs"));
+        Assert.DoesNotContain("OrganizationService", createSlice, StringComparison.Ordinal);
+        Assert.DoesNotContain("OrganizationService", listSlice, StringComparison.Ordinal);
+        Assert.Contains("IDocumentRepository<OrganizationDocument>", createSlice, StringComparison.Ordinal);
+        Assert.Contains("IDistributedLockProvider", createSlice, StringComparison.Ordinal);
+        Assert.Contains("IDocumentRepository<OrganizationDocument>", listSlice, StringComparison.Ordinal);
+        Assert.Contains("ICurrentUser", listSlice, StringComparison.Ordinal);
+
+        var facade = File.ReadAllText(Path.Combine(moduleDirectory, "OrganizationsModule.cs"));
+        Assert.Contains("createOrganizationHandler.HandleAsync", facade, StringComparison.Ordinal);
+        Assert.Contains("listOrganizationsHandler.HandleAsync", facade, StringComparison.Ordinal);
+
+        var composition = File.ReadAllText(Path.Combine(
+            SourceDirectory,
+            "Zumbo.Api",
+            "Endpoints",
+            "OrganizationsEndpoints.cs"));
+        Assert.Contains("AddScoped<CreateOrganizationHandler>(provider =>", composition, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<ListOrganizationsHandler>(provider =>", composition, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void ProductionSourceFiles_StayWithinReadabilityLimit()
     {
         const int maximumLines = 500;
