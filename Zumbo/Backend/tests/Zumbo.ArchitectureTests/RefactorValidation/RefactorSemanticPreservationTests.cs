@@ -86,7 +86,17 @@ public sealed class RefactorSemanticPreservationTests
             ["Zumbo.Modules.Workflows|Zumbo.Modules.Workflows.GetWorkflowHandler|method:HandleAsync:(GetWorkflowQueryquery,CancellationTokenct):Task<WorkflowResponse>"] =
                 "The endpoint handler selects the independent workflow-read slice when composed from ports and retains its original facade constructor.",
             ["Zumbo.Modules.Workflows|Zumbo.Modules.Workflows.WorkflowService|ctor:(IDocumentRepository<WorkflowDefinitionDocument>workflows,IWorkflowProjectAccessCheckeraccessChecker,IDistributedLockProviderdistributedLockProvider,IOptions<DistributedLockOptions>distributedLockOptions,IClockclock,IWorkflowAuditWriteraudit,IExpectedVersionAccessor?expectedVersions=null,IWorkflowPublicationGuard?publicationGuard=null)"] =
-                "The unchanged compatibility facade constructor now wires port-focused upsert and read handlers from its existing dependencies; its public signature and expected-version state remain intact."
+                "The unchanged compatibility facade constructor now wires port-focused upsert and read handlers from its existing dependencies; its public signature and expected-version state remain intact.",
+            ["Zumbo.Api|WorkItemEndpoints|method:AddWorkItemsModule:(thisIServiceCollectionservices,IConfiguration?configuration=null):IServiceCollection"] =
+                "Work-item create and search handlers remain scoped while explicit factories select their port-focused constructors and preserve compatibility constructors.",
+            ["Zumbo.Modules.WorkItems|Zumbo.Modules.WorkItems.CreateWorkItemHandler|method:HandleAsync:(CreateWorkItemRequestrequest,stringcorrelationId,CancellationTokenct):Task<WorkItemResponse>"] =
+                "The endpoint handler selects the independent work-item creation slice when composed from ports and retains its original WorkItemService constructor as a compatibility path.",
+            ["Zumbo.Modules.WorkItems|Zumbo.Modules.WorkItems.SearchWorkItemsHandler|method:HandleAsync:(WorkItemSearchRequestrequest,CancellationTokenct):Task<IReadOnlyList<WorkItemResponse>>"] =
+                "The endpoint handler selects the independent work-item search slice when composed from ports and retains its original WorkItemService constructor as a compatibility path.",
+            ["Zumbo.Modules.WorkItems|Zumbo.Modules.WorkItems.WorkItemService|method:CreateAsync:(CreateWorkItemRequestrequest,stringcorrelationId,CancellationTokenct,string?requestedId=null):Task<WorkItemResponse>"] =
+                "The compatibility facade delegates ordinary work-item creation to the port-focused slice while preserving the requested-id path used by legacy and intake-compatible callers.",
+            ["Zumbo.Modules.WorkItems|Zumbo.Modules.WorkItems.WorkItemService|method:SearchAsync:(WorkItemSearchRequestrequest,CancellationTokenct):Task<IReadOnlyList<WorkItemResponse>>"] =
+                "The compatibility facade delegates work-item search to the port-focused query slice while preserving the original public signature and tenant-scoped behavior."
         };
 
     private static string ProjectDirectory => Path.GetFullPath(

@@ -1,5 +1,9 @@
+using Microsoft.Extensions.Options;
+using Zumbo.BuildingBlocks.Application.Concurrency;
 using Zumbo.Modules.WorkItems;
 using Zumbo.BuildingBlocks.Application.Messaging;
+using Zumbo.BuildingBlocks.Application.Persistence;
+using Zumbo.BuildingBlocks.Application.Search;
 using Zumbo.BuildingBlocks.Application.Security;
 using Zumbo.SharedKernel;
 
@@ -162,8 +166,36 @@ internal static partial class WorkItemEndpoints
             .ValidateOnStart();
         services.AddScoped<IntakeFormService>();
         services.AddScoped<IntakeSubmissionService>();
-        services.AddScoped<CreateWorkItemHandler>();
-        services.AddScoped<SearchWorkItemsHandler>();
+        services.AddScoped<CreateWorkItemHandler>(provider => new CreateWorkItemHandler(
+            provider.GetRequiredService<IDocumentRepository<WorkItemDocument>>(),
+            provider.GetRequiredService<IWorkItemNotificationPublisher>(),
+            provider.GetRequiredService<IWorkItemAuditPublisher>(),
+            provider.GetRequiredService<IClock>(),
+            provider.GetRequiredService<ICurrentUser>(),
+            provider.GetRequiredService<IProjectPermissionChecker>(),
+            provider.GetRequiredService<IWorkItemTeamPolicy>(),
+            provider.GetRequiredService<IBoardPlacementPolicy>(),
+            provider.GetRequiredService<IDistributedLockProvider>(),
+            provider.GetRequiredService<IOptions<DistributedLockOptions>>(),
+            provider.GetRequiredService<IWorkItemSearchPublisher>(),
+            provider.GetRequiredService<IWorkItemRealtimePublisher>(),
+            provider.GetRequiredService<IWorkItemCacheInvalidationPublisher>(),
+            provider.GetRequiredService<IWorkItemActivityStore>(),
+            provider.GetRequiredService<WorkItemGraphService>(),
+            provider.GetService<WorkItemWipProjection>(),
+            provider.GetRequiredService<WorkItemRankService>(),
+            provider.GetRequiredService<IWorkItemTypeSchemaPolicy>(),
+            provider.GetService<WorkItemCollaborationService>(),
+            provider.GetService<IWorkItemAutomationEventPublisher>(),
+            provider.GetService<IWorkItemAutomationChainContextAccessor>()));
+        services.AddScoped<SearchWorkItemsHandler>(provider => new SearchWorkItemsHandler(
+            provider.GetRequiredService<IDocumentRepository<WorkItemDocument>>(),
+            provider.GetRequiredService<ICurrentUser>(),
+            provider.GetRequiredService<IProjectPermissionChecker>(),
+            provider.GetRequiredService<IWorkItemTypeSchemaPolicy>(),
+            provider.GetRequiredService<IWorkItemSearchIndex>(),
+            provider.GetRequiredService<IWorkItemActivityStore>(),
+            provider.GetRequiredService<IOptions<SearchOptions>>()));
         if (configuration?.GetValue("BackgroundJobs:Enabled", true) == true)
         {
             services.AddHostedService<DueDateReminderHostedService>();

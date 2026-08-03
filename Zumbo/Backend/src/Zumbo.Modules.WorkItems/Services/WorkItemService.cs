@@ -48,4 +48,34 @@ public sealed partial class WorkItemService(
     private readonly WorkItemRankService ranks = rankService ?? new(workItems, clock, Options.Create(new WorkItemRankOptions()));
     private readonly IWorkItemTypeSchemaPolicy typeSchemas = typeSchemaPolicy ?? new LegacyWorkItemTypeSchemaPolicy();
     private readonly SearchOptions searchRuntimeOptions = searchOptions?.Value ?? new SearchOptions();
+    private readonly SearchWorkItemsHandler searchWorkItemsHandler = new(
+        workItems,
+        currentUser,
+        permissionChecker,
+        typeSchemaPolicy ?? new LegacyWorkItemTypeSchemaPolicy(),
+        searchIndex,
+        activityStore,
+        searchOptions ?? Options.Create(new SearchOptions()));
+    private readonly CreateWorkItemHandler createWorkItemHandler = new(
+        workItems,
+        notifications,
+        audit,
+        clock,
+        currentUser,
+        permissionChecker,
+        teamPolicy,
+        boardPlacementPolicy,
+        distributedLockProvider,
+        distributedLockOptions,
+        searchPublisher,
+        realtimePublisher,
+        cacheInvalidationPublisher,
+        activityStore,
+        graph,
+        wipProjection,
+        rankService ?? new(workItems, clock, Options.Create(new WorkItemRankOptions())),
+        typeSchemaPolicy ?? new LegacyWorkItemTypeSchemaPolicy(),
+        collaborationService,
+        automationEvents,
+        automationChain);
 }

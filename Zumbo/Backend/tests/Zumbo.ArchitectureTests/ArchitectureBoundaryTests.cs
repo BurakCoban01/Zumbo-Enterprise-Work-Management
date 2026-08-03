@@ -763,6 +763,66 @@ public sealed class ArchitectureBoundaryTests
     }
 
     [Fact]
+    public void WorkItemCreateAndSearch_ArePortFocusedVerticalSlicesWithCompatibilityFacades()
+    {
+        var moduleDirectory = Path.Combine(SourceDirectory, "Zumbo.Modules.WorkItems");
+        var createDirectory = Path.Combine(moduleDirectory, "Features", "CreateWorkItem");
+        var searchDirectory = Path.Combine(moduleDirectory, "Features", "SearchWorkItems");
+        var representativeDirectory = Path.Combine(
+            moduleDirectory,
+            "Features",
+            "RepresentativeWorkItemSlices");
+
+        Assert.True(File.Exists(Path.Combine(createDirectory, "CreateWorkItemRequest.cs")));
+        Assert.True(File.Exists(Path.Combine(createDirectory, "CreateWorkItemValidator.cs")));
+        Assert.True(File.Exists(Path.Combine(createDirectory, "CreateWorkItemHandler.cs")));
+        Assert.True(File.Exists(Path.Combine(createDirectory, "CreateWorkItemSlice.cs")));
+        Assert.True(File.Exists(Path.Combine(searchDirectory, "WorkItemSearchRequest.cs")));
+        Assert.True(File.Exists(Path.Combine(searchDirectory, "SearchWorkItemsValidator.cs")));
+        Assert.True(File.Exists(Path.Combine(searchDirectory, "SearchWorkItemsHandler.cs")));
+        Assert.True(File.Exists(Path.Combine(searchDirectory, "SearchWorkItemsSlice.cs")));
+        Assert.Empty(
+            Directory.Exists(representativeDirectory)
+                ? Directory.GetFiles(representativeDirectory, "*.cs", SearchOption.AllDirectories)
+                : []);
+
+        var createSlice = File.ReadAllText(Path.Combine(createDirectory, "CreateWorkItemSlice.cs"));
+        var searchSlice = File.ReadAllText(Path.Combine(searchDirectory, "SearchWorkItemsSlice.cs"));
+        Assert.DoesNotContain("WorkItemService", createSlice, StringComparison.Ordinal);
+        Assert.DoesNotContain("WorkItemService", searchSlice, StringComparison.Ordinal);
+        Assert.Contains("IDocumentRepository<WorkItemDocument>", createSlice, StringComparison.Ordinal);
+        Assert.Contains("IProjectPermissionChecker", createSlice, StringComparison.Ordinal);
+        Assert.Contains("IDistributedLockProvider", createSlice, StringComparison.Ordinal);
+        Assert.Contains("IWorkItemSearchPublisher", createSlice, StringComparison.Ordinal);
+        Assert.Contains("IWorkItemActivityStore", createSlice, StringComparison.Ordinal);
+        Assert.Contains("IDocumentRepository<WorkItemDocument>", searchSlice, StringComparison.Ordinal);
+        Assert.Contains("IProjectPermissionChecker", searchSlice, StringComparison.Ordinal);
+        Assert.Contains("IWorkItemSearchIndex", searchSlice, StringComparison.Ordinal);
+
+        var createFacade = File.ReadAllText(Path.Combine(
+            moduleDirectory,
+            "Features",
+            "Create",
+            "WorkItemService.Create.cs"));
+        var searchFacade = File.ReadAllText(Path.Combine(
+            moduleDirectory,
+            "Features",
+            "Read",
+            "WorkItemService.Read.cs"));
+        Assert.Contains("createWorkItemHandler.HandleAsync", createFacade, StringComparison.Ordinal);
+        Assert.Contains("searchWorkItemsHandler.HandleAsync", searchFacade, StringComparison.Ordinal);
+
+        var composition = File.ReadAllText(Path.Combine(
+            SourceDirectory,
+            "Zumbo.Api",
+            "Endpoints",
+            "WorkItemEndpoints",
+            "WorkItemEndpoints.AddWorkItemsModule.cs"));
+        Assert.Contains("AddScoped<CreateWorkItemHandler>(provider =>", composition, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<SearchWorkItemsHandler>(provider =>", composition, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void ProductionSourceFiles_StayWithinReadabilityLimit()
     {
         const int maximumLines = 500;

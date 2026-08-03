@@ -31,7 +31,9 @@ public sealed class RefactorRuntimeContractTests
         "services.AddScoped<CreateBoardHandler>();",
         "services.AddScoped<ListBoardsByProjectHandler>();",
         "services.AddScoped<UpsertWorkflowHandler>();",
-        "services.AddScoped<GetWorkflowHandler>();"
+        "services.AddScoped<GetWorkflowHandler>();",
+        "services.AddScoped<CreateWorkItemHandler>();",
+        "services.AddScoped<SearchWorkItemsHandler>();"
     ];
 
     private static readonly string[] PortFocusedVerticalSliceDiRegistrations =
@@ -112,7 +114,37 @@ public sealed class RefactorRuntimeContractTests
         + "provider.GetRequiredService<IDistributedLockProvider>(),"
         + "provider.GetRequiredService<IOptions<DistributedLockOptions>>(),"
         + "provider.GetRequiredService<IClock>(),"
-        + "provider.GetRequiredService<IExpectedVersionAccessor>()));"
+        + "provider.GetRequiredService<IExpectedVersionAccessor>()));",
+        "services.AddScoped<CreateWorkItemHandler>(provider=>newCreateWorkItemHandler("
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemDocument>>(),"
+        + "provider.GetRequiredService<IWorkItemNotificationPublisher>(),"
+        + "provider.GetRequiredService<IWorkItemAuditPublisher>(),"
+        + "provider.GetRequiredService<IClock>(),"
+        + "provider.GetRequiredService<ICurrentUser>(),"
+        + "provider.GetRequiredService<IProjectPermissionChecker>(),"
+        + "provider.GetRequiredService<IWorkItemTeamPolicy>(),"
+        + "provider.GetRequiredService<IBoardPlacementPolicy>(),"
+        + "provider.GetRequiredService<IDistributedLockProvider>(),"
+        + "provider.GetRequiredService<IOptions<DistributedLockOptions>>(),"
+        + "provider.GetRequiredService<IWorkItemSearchPublisher>(),"
+        + "provider.GetRequiredService<IWorkItemRealtimePublisher>(),"
+        + "provider.GetRequiredService<IWorkItemCacheInvalidationPublisher>(),"
+        + "provider.GetRequiredService<IWorkItemActivityStore>(),"
+        + "provider.GetRequiredService<WorkItemGraphService>(),"
+        + "provider.GetService<WorkItemWipProjection>(),"
+        + "provider.GetRequiredService<WorkItemRankService>(),"
+        + "provider.GetRequiredService<IWorkItemTypeSchemaPolicy>(),"
+        + "provider.GetService<WorkItemCollaborationService>(),"
+        + "provider.GetService<IWorkItemAutomationEventPublisher>(),"
+        + "provider.GetService<IWorkItemAutomationChainContextAccessor>()));",
+        "services.AddScoped<SearchWorkItemsHandler>(provider=>newSearchWorkItemsHandler("
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemDocument>>(),"
+        + "provider.GetRequiredService<ICurrentUser>(),"
+        + "provider.GetRequiredService<IProjectPermissionChecker>(),"
+        + "provider.GetRequiredService<IWorkItemTypeSchemaPolicy>(),"
+        + "provider.GetRequiredService<IWorkItemSearchIndex>(),"
+        + "provider.GetRequiredService<IWorkItemActivityStore>(),"
+        + "provider.GetRequiredService<IOptions<SearchOptions>>()));"
     ];
 
     private static string ProjectDirectory => Path.GetFullPath(
@@ -207,7 +239,8 @@ public sealed class RefactorRuntimeContractTests
                 "CreateTeamHandler and ListTeamsHandler remain scoped self-services; explicit factories select their port-focused constructors while compatibility constructors remain available.",
                 "CreateProjectHandler and ListProjectsHandler remain scoped self-services; explicit factories select their port-focused constructors while compatibility constructors remain available.",
                 "CreateBoardHandler and ListBoardsByProjectHandler remain scoped self-services; explicit factories select their port-focused constructors while compatibility constructors remain available.",
-                "UpsertWorkflowHandler and GetWorkflowHandler remain scoped self-services; explicit factories select their port-focused constructors while compatibility constructors remain available."
+                "UpsertWorkflowHandler and GetWorkflowHandler remain scoped self-services; explicit factories select their port-focused constructors while compatibility constructors remain available.",
+                "CreateWorkItemHandler and SearchWorkItemsHandler remain scoped self-services; explicit factories select their port-focused constructors while compatibility constructors remain available."
             },
             intentionalConfigurationChanges = new[]
             {

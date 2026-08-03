@@ -13,7 +13,7 @@ namespace Zumbo.Modules.WorkItems;
 public sealed partial class WorkItemService
 {
     public async Task<IReadOnlyList<WorkItemResponse>> SearchAsync(WorkItemSearchRequest request, CancellationToken ct) =>
-        (await SearchPageAsync(request, ct)).Items;
+        await searchWorkItemsHandler.HandleAsync(request, ct);
 
     public async Task<WorkItemSearchPageResponse> SearchPageAsync(WorkItemSearchRequest request, CancellationToken ct)
     {

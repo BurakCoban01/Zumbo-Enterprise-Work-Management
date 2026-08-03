@@ -18,6 +18,11 @@ public sealed partial class WorkItemService
         CancellationToken ct,
         string? requestedId = null)
     {
+        if (requestedId is null)
+        {
+            return await createWorkItemHandler.HandleAsync(request, correlationId, ct);
+        }
+
         var authorization = await EnsurePermissionAsync(request.ProjectId, "WorkItemCreate", ct);
         return await CreateCoreAsync(
             request,
