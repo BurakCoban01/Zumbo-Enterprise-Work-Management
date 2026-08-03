@@ -148,7 +148,7 @@ public sealed class RefactorRuntimeContractTests
             },
             intentionalConfigurationChanges = new[]
             {
-                "Local Compose access tokens use an overridable 480-minute demo lifetime; the base default remains 30 minutes.",
+                "Local Compose access tokens use an overridable 1440-minute demo lifetime; the base default remains 30 minutes.",
                 "Local Compose Mongo commands use an overridable 300-second migration window; the base default remains 30 seconds.",
                 "API dependency health timeout is configurable with a 5-second base default and a 30-second local Compose override.",
                 "Gateway local upstream timeout changed from 30 to 60 seconds.",
@@ -319,8 +319,8 @@ public sealed class RefactorRuntimeContractTests
             "Gateway__UpstreamTimeoutSeconds: 60",
             "HealthChecks__DependencyTimeoutSeconds: 30",
             "HealthChecks__DependencyTimeoutSeconds: 30",
-            "Jwt__AccessTokenMinutes: ${ZUMBO_ACCESS_TOKEN_MINUTES:-480}",
-            "Jwt__AccessTokenMinutes: ${ZUMBO_ACCESS_TOKEN_MINUTES:-480}",
+            "Jwt__AccessTokenMinutes: ${ZUMBO_ACCESS_TOKEN_MINUTES:-1440}",
+            "Jwt__AccessTokenMinutes: ${ZUMBO_ACCESS_TOKEN_MINUTES:-1440}",
             "MongoDb__CommandTimeoutSeconds: ${ZUMBO_MONGO_COMMAND_TIMEOUT_SECONDS:-300}",
             "MongoDb__CommandTimeoutSeconds: ${ZUMBO_MONGO_COMMAND_TIMEOUT_SECONDS:-300}",
             "retries: 60",

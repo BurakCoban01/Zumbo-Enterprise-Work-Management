@@ -11,7 +11,7 @@ services:
       MongoDb__DatabaseName: Zumbo
       MongoDb__CommandTimeoutSeconds: ${ZUMBO_MONGO_COMMAND_TIMEOUT_SECONDS:-300}
       Jwt__SigningKey: ${ZUMBO_JWT_SIGNING_KEY:?ZUMBO_JWT_SIGNING_KEY must be set in Backend/.env}
-      Jwt__AccessTokenMinutes: ${ZUMBO_ACCESS_TOKEN_MINUTES:-480}
+      Jwt__AccessTokenMinutes: ${ZUMBO_ACCESS_TOKEN_MINUTES:-1440}
       IdentityBootstrap__AdminEmails__0: ${ZUMBO_IDENTITY_ADMIN_EMAIL:-}
       IdentityBootstrap__BootstrapToken: ${ZUMBO_IDENTITY_BOOTSTRAP_TOKEN:-}
       RegistrationProvisioning__Mode: ${ZUMBO_REGISTRATION_PROVISIONING_MODE:-ProductionLike}
@@ -106,7 +106,7 @@ services:
       MongoDb__DatabaseName: Zumbo
       MongoDb__CommandTimeoutSeconds: ${ZUMBO_MONGO_COMMAND_TIMEOUT_SECONDS:-300}
       Jwt__SigningKey: ${ZUMBO_JWT_SIGNING_KEY:?ZUMBO_JWT_SIGNING_KEY must be set in Backend/.env}
-      Jwt__AccessTokenMinutes: ${ZUMBO_ACCESS_TOKEN_MINUTES:-480}
+      Jwt__AccessTokenMinutes: ${ZUMBO_ACCESS_TOKEN_MINUTES:-1440}
       IdentityBootstrap__AdminEmails__0: ${ZUMBO_IDENTITY_ADMIN_EMAIL:-}
       IdentityBootstrap__BootstrapToken: ${ZUMBO_IDENTITY_BOOTSTRAP_TOKEN:-}
       RegistrationProvisioning__Mode: ${ZUMBO_REGISTRATION_PROVISIONING_MODE:-ProductionLike}
