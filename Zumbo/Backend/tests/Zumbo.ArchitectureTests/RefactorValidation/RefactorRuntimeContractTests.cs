@@ -29,7 +29,9 @@ public sealed class RefactorRuntimeContractTests
         "services.AddScoped<CreateProjectHandler>();",
         "services.AddScoped<ListProjectsHandler>();",
         "services.AddScoped<CreateBoardHandler>();",
-        "services.AddScoped<ListBoardsByProjectHandler>();"
+        "services.AddScoped<ListBoardsByProjectHandler>();",
+        "services.AddScoped<UpsertWorkflowHandler>();",
+        "services.AddScoped<GetWorkflowHandler>();"
     ];
 
     private static readonly string[] PortFocusedVerticalSliceDiRegistrations =
@@ -94,7 +96,23 @@ public sealed class RefactorRuntimeContractTests
         "services.AddScoped<ListBoardsByProjectHandler>(provider=>newListBoardsByProjectHandler("
         + "provider.GetRequiredService<IDocumentRepository<BoardDocument>>(),"
         + "provider.GetRequiredService<IBoardProjectAccessChecker>(),"
-        + "provider.GetRequiredService<ICurrentUser>()));"
+        + "provider.GetRequiredService<ICurrentUser>()));",
+        "services.AddScoped<UpsertWorkflowHandler>(provider=>newUpsertWorkflowHandler("
+        + "provider.GetRequiredService<IDocumentRepository<WorkflowDefinitionDocument>>(),"
+        + "provider.GetRequiredService<IWorkflowProjectAccessChecker>(),"
+        + "provider.GetRequiredService<IDistributedLockProvider>(),"
+        + "provider.GetRequiredService<IOptions<DistributedLockOptions>>(),"
+        + "provider.GetRequiredService<IClock>(),"
+        + "provider.GetRequiredService<IWorkflowAuditWriter>(),"
+        + "provider.GetRequiredService<IExpectedVersionAccessor>(),"
+        + "provider.GetRequiredService<IWorkflowPublicationGuard>()));",
+        "services.AddScoped<GetWorkflowHandler>(provider=>newGetWorkflowHandler("
+        + "provider.GetRequiredService<IDocumentRepository<WorkflowDefinitionDocument>>(),"
+        + "provider.GetRequiredService<IWorkflowProjectAccessChecker>(),"
+        + "provider.GetRequiredService<IDistributedLockProvider>(),"
+        + "provider.GetRequiredService<IOptions<DistributedLockOptions>>(),"
+        + "provider.GetRequiredService<IClock>(),"
+        + "provider.GetRequiredService<IExpectedVersionAccessor>()));"
     ];
 
     private static string ProjectDirectory => Path.GetFullPath(
@@ -188,7 +206,8 @@ public sealed class RefactorRuntimeContractTests
                 "CreateOrganizationHandler and ListOrganizationsHandler remain scoped self-services; explicit factories select their port-focused constructors while compatibility constructors remain available.",
                 "CreateTeamHandler and ListTeamsHandler remain scoped self-services; explicit factories select their port-focused constructors while compatibility constructors remain available.",
                 "CreateProjectHandler and ListProjectsHandler remain scoped self-services; explicit factories select their port-focused constructors while compatibility constructors remain available.",
-                "CreateBoardHandler and ListBoardsByProjectHandler remain scoped self-services; explicit factories select their port-focused constructors while compatibility constructors remain available."
+                "CreateBoardHandler and ListBoardsByProjectHandler remain scoped self-services; explicit factories select their port-focused constructors while compatibility constructors remain available.",
+                "UpsertWorkflowHandler and GetWorkflowHandler remain scoped self-services; explicit factories select their port-focused constructors while compatibility constructors remain available."
             },
             intentionalConfigurationChanges = new[]
             {

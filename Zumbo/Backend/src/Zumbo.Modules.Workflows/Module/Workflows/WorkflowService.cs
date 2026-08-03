@@ -16,26 +16,28 @@ public sealed class WorkflowService(
     IWorkflowPublicationGuard? publicationGuard = null)
 {
     private readonly ExpectedVersionState expectedVersion = new(expectedVersions);
+    private readonly UpsertWorkflowHandler upsertWorkflowHandler = new(
+        workflows,
+        accessChecker,
+        distributedLockProvider,
+        distributedLockOptions,
+        clock,
+        audit,
+        expectedVersions,
+        publicationGuard);
+    private readonly GetWorkflowHandler getWorkflowHandler = new(
+        workflows,
+        accessChecker,
+        distributedLockProvider,
+        distributedLockOptions,
+        clock,
+        expectedVersions);
 
     public Task<WorkflowResponse> UpsertAsync(CreateWorkflowRequest request, CancellationToken ct) =>
         UpsertAsync(request, "none", ct);
 
-    public async Task<WorkflowResponse> UpsertAsync(CreateWorkflowRequest request, string correlationId, CancellationToken ct)
-    {
-        UpsertWorkflowValidator.Validate(request);
-        await accessChecker.EnsureCanManageAsync(request.ProjectId, ct);
-        await using var workflowLock = await AcquireLockAsync(request.ProjectId, ct);
-        var previous = await workflows.SelectAsync(x => x.ProjectId == request.ProjectId, ct);
-        var workflow = await SaveDraftCoreAsync(request, ct);
-        var result = await PublishCoreAsync(workflow, ct);
-        await audit.WriteAsync(
-            request.ProjectId,
-            previous is null ? null : $"v{Math.Max(previous.PublishedVersion, 1)}",
-            DescribePublishedRetention(result),
-            correlationId,
-            ct);
-        return result;
-    }
+    public async Task<WorkflowResponse> UpsertAsync(CreateWorkflowRequest request, string correlationId, CancellationToken ct) =>
+        await upsertWorkflowHandler.HandleAsync(request, correlationId, ct);
 
     public async Task<WorkflowResponse> SaveDraftAsync(
         CreateWorkflowRequest request,
@@ -81,24 +83,8 @@ public sealed class WorkflowService(
             .ToList();
     }
 
-    public async Task<WorkflowResponse> GetOrCreateDefaultAsync(string projectId, CancellationToken ct)
-    {
-        await accessChecker.EnsureCanViewAsync(projectId, ct);
-        var workflow = await workflows.SelectAsync(x => x.ProjectId == projectId, ct);
-        if (workflow is not null && workflow.Statuses.Count > 0)
-        {
-            return WorkflowDocumentMapper.ToResponse(workflow);
-        }
-
-        await using var workflowLock = await AcquireLockAsync(projectId, ct);
-        workflow = await workflows.SelectAsync(x => x.ProjectId == projectId, ct);
-        if (workflow is not null && workflow.Statuses.Count > 0)
-        {
-            return WorkflowDocumentMapper.ToResponse(workflow);
-        }
-
-        return await CreateDefaultAsync(projectId, workflow, ct);
-    }
+    public async Task<WorkflowResponse> GetOrCreateDefaultAsync(string projectId, CancellationToken ct) =>
+        await getWorkflowHandler.HandleAsync(new GetWorkflowQuery(projectId), ct);
 
     public async Task<IReadOnlyCollection<WorkflowTransitionResponse>> GetTransitionsAsync(string projectId, CancellationToken ct) =>
         (await GetOrCreateDefaultAsync(projectId, ct)).Transitions;

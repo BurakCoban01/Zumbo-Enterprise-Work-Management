@@ -74,7 +74,19 @@ public sealed class RefactorSemanticPreservationTests
             ["Zumbo.Modules.Boards|Zumbo.Modules.Boards.ListBoardsByProjectHandler|method:HandleAsync:(ListBoardsByProjectQueryquery,CancellationTokenct):Task<IReadOnlyList<BoardResponse>>"] =
                 "The endpoint handler selects the independent project-board-list slice when composed from ports and retains its original facade constructor.",
             ["Zumbo.Modules.Boards|Zumbo.Modules.Boards.BoardService|ctor:(IDocumentRepository<BoardDocument>boards,IBoardProjectAccessCheckeraccessChecker,IBoardColumnUsageCheckerusageChecker,IDistributedLockProviderdistributedLockProvider,IOptions<DistributedLockOptions>distributedLockOptions,IClockclock,ICurrentUsercurrentUser,IBoardAuditWriteraudit,IExpectedVersionAccessor?expectedVersions=null,IBoardWorkflowCatalog?workflowCatalog=null)"] =
-                "The unchanged compatibility facade constructor now wires the port-focused create and list handlers from its existing dependencies; its public signature and previous expected-version assignment remain intact."
+                "The unchanged compatibility facade constructor now wires the port-focused create and list handlers from its existing dependencies; its public signature and previous expected-version assignment remain intact.",
+            ["Zumbo.Api|WorkflowEndpoints|method:AddWorkflowsModule:(thisIServiceCollectionservices,IConfiguration?configuration=null):IServiceCollection"] =
+                "Workflow upsert and read handlers remain scoped while explicit factories select their port-focused constructors and preserve compatibility constructors.",
+            ["Zumbo.Modules.Workflows|Zumbo.Modules.Workflows.WorkflowService|method:UpsertAsync:(CreateWorkflowRequestrequest,stringcorrelationId,CancellationTokenct):Task<WorkflowResponse>"] =
+                "The compatibility facade delegates workflow upsert to the port-focused UpsertWorkflow slice while preserving its public signature and behavior.",
+            ["Zumbo.Modules.Workflows|Zumbo.Modules.Workflows.WorkflowService|method:GetOrCreateDefaultAsync:(stringprojectId,CancellationTokenct):Task<WorkflowResponse>"] =
+                "The compatibility facade delegates workflow retrieval and default creation to the project-scoped GetWorkflow slice while preserving its public signature.",
+            ["Zumbo.Modules.Workflows|Zumbo.Modules.Workflows.UpsertWorkflowHandler|method:HandleAsync:(CreateWorkflowRequestrequest,stringcorrelationId,CancellationTokenct):Task<WorkflowResponse>"] =
+                "The endpoint handler selects the independent workflow-upsert slice when composed from ports and retains its original facade constructor.",
+            ["Zumbo.Modules.Workflows|Zumbo.Modules.Workflows.GetWorkflowHandler|method:HandleAsync:(GetWorkflowQueryquery,CancellationTokenct):Task<WorkflowResponse>"] =
+                "The endpoint handler selects the independent workflow-read slice when composed from ports and retains its original facade constructor.",
+            ["Zumbo.Modules.Workflows|Zumbo.Modules.Workflows.WorkflowService|ctor:(IDocumentRepository<WorkflowDefinitionDocument>workflows,IWorkflowProjectAccessCheckeraccessChecker,IDistributedLockProviderdistributedLockProvider,IOptions<DistributedLockOptions>distributedLockOptions,IClockclock,IWorkflowAuditWriteraudit,IExpectedVersionAccessor?expectedVersions=null,IWorkflowPublicationGuard?publicationGuard=null)"] =
+                "The unchanged compatibility facade constructor now wires port-focused upsert and read handlers from its existing dependencies; its public signature and expected-version state remain intact."
         };
 
     private static string ProjectDirectory => Path.GetFullPath(

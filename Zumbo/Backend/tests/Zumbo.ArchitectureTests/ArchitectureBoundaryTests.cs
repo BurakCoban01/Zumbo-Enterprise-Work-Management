@@ -714,6 +714,55 @@ public sealed class ArchitectureBoundaryTests
     }
 
     [Fact]
+    public void WorkflowUpsertAndRead_ArePortFocusedVerticalSlicesWithCompatibilityFacades()
+    {
+        var moduleDirectory = Path.Combine(SourceDirectory, "Zumbo.Modules.Workflows");
+        var upsertDirectory = Path.Combine(moduleDirectory, "Features", "UpsertWorkflow");
+        var getDirectory = Path.Combine(moduleDirectory, "Features", "GetWorkflow");
+        var representativeDirectory = Path.Combine(moduleDirectory, "Features", "RepresentativeWorkflowSlices");
+
+        Assert.True(File.Exists(Path.Combine(upsertDirectory, "CreateWorkflowRequest.cs")));
+        Assert.True(File.Exists(Path.Combine(upsertDirectory, "UpsertWorkflowValidator.cs")));
+        Assert.True(File.Exists(Path.Combine(upsertDirectory, "UpsertWorkflowHandler.cs")));
+        Assert.True(File.Exists(Path.Combine(upsertDirectory, "UpsertWorkflowSlice.cs")));
+        Assert.True(File.Exists(Path.Combine(getDirectory, "GetWorkflowQuery.cs")));
+        Assert.True(File.Exists(Path.Combine(getDirectory, "GetWorkflowValidator.cs")));
+        Assert.True(File.Exists(Path.Combine(getDirectory, "GetWorkflowHandler.cs")));
+        Assert.True(File.Exists(Path.Combine(getDirectory, "GetWorkflowSlice.cs")));
+        Assert.Empty(
+            Directory.Exists(representativeDirectory)
+                ? Directory.GetFiles(representativeDirectory, "*.cs", SearchOption.AllDirectories)
+                : []);
+
+        var upsertSlice = File.ReadAllText(Path.Combine(upsertDirectory, "UpsertWorkflowSlice.cs"));
+        var getSlice = File.ReadAllText(Path.Combine(getDirectory, "GetWorkflowSlice.cs"));
+        Assert.DoesNotContain("WorkflowService", upsertSlice, StringComparison.Ordinal);
+        Assert.DoesNotContain("WorkflowService", getSlice, StringComparison.Ordinal);
+        Assert.Contains("IDocumentRepository<WorkflowDefinitionDocument>", upsertSlice, StringComparison.Ordinal);
+        Assert.Contains("IDistributedLockProvider", upsertSlice, StringComparison.Ordinal);
+        Assert.Contains("IWorkflowAuditWriter", upsertSlice, StringComparison.Ordinal);
+        Assert.Contains("IWorkflowPublicationGuard", upsertSlice, StringComparison.Ordinal);
+        Assert.Contains("IDocumentRepository<WorkflowDefinitionDocument>", getSlice, StringComparison.Ordinal);
+        Assert.Contains("IWorkflowProjectAccessChecker", getSlice, StringComparison.Ordinal);
+
+        var facade = File.ReadAllText(Path.Combine(
+            moduleDirectory,
+            "Module",
+            "Workflows",
+            "WorkflowService.cs"));
+        Assert.Contains("upsertWorkflowHandler.HandleAsync", facade, StringComparison.Ordinal);
+        Assert.Contains("getWorkflowHandler.HandleAsync", facade, StringComparison.Ordinal);
+
+        var composition = File.ReadAllText(Path.Combine(
+            SourceDirectory,
+            "Zumbo.Api",
+            "Endpoints",
+            "WorkflowEndpoints.cs"));
+        Assert.Contains("AddScoped<UpsertWorkflowHandler>(provider =>", composition, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<GetWorkflowHandler>(provider =>", composition, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void ProductionSourceFiles_StayWithinReadabilityLimit()
     {
         const int maximumLines = 500;
