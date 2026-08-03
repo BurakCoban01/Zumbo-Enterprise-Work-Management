@@ -29,4 +29,19 @@ public sealed partial class IdentityService(
     ISessionClientContext? sessionClientContext = null,
     IIdentityAuditWriter? audit = null)
 {
+    private readonly RegisterUserHandler registerUserHandler = new(
+        users,
+        sessions,
+        transactions,
+        passwordHasher,
+        tokenIssuer,
+        jwtOptions,
+        bootstrapOptions,
+        distributedLockProvider,
+        distributedLockOptions,
+        clock,
+        registrationProvisioningPolicy,
+        sessionClientContext);
+
+    private readonly SearchUsersHandler searchUsersHandler = new(users, currentUser);
 }

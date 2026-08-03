@@ -18,6 +18,32 @@ public sealed class RefactorRuntimeContractTests
         "AddHostedService", "Configure", "PostConfigure", "AddOptions", "AddHttpClient"
     ];
 
+    private static readonly string[] ReplacedIdentityDiRegistrations =
+    [
+        "services.AddScoped<RegisterUserHandler>();",
+        "services.AddScoped<SearchUsersHandler>();"
+    ];
+
+    private static readonly string[] PortFocusedIdentityDiRegistrations =
+    [
+        "services.AddScoped<RegisterUserHandler>(provider=>newRegisterUserHandler("
+        + "provider.GetRequiredService<IUserRepository>(),"
+        + "provider.GetRequiredService<IRefreshSessionStore>(),"
+        + "provider.GetRequiredService<IDurableTransactionRunner>(),"
+        + "provider.GetRequiredService<IPasswordHasher>(),"
+        + "provider.GetRequiredService<ITokenIssuer>(),"
+        + "provider.GetRequiredService<IOptions<JwtOptions>>(),"
+        + "provider.GetRequiredService<IOptions<IdentityBootstrapOptions>>(),"
+        + "provider.GetRequiredService<IDistributedLockProvider>(),"
+        + "provider.GetRequiredService<IOptions<DistributedLockOptions>>(),"
+        + "provider.GetRequiredService<IClock>(),"
+        + "provider.GetRequiredService<IRegistrationProvisioningPolicy>(),"
+        + "provider.GetRequiredService<ISessionClientContext>()));",
+        "services.AddScoped<SearchUsersHandler>(provider=>newSearchUsersHandler("
+        + "provider.GetRequiredService<IUserRepository>(),"
+        + "provider.GetRequiredService<ICurrentUser>()));"
+    ];
+
     private static string ProjectDirectory => Path.GetFullPath(
         Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", ".."));
 
@@ -45,7 +71,12 @@ public sealed class RefactorRuntimeContractTests
         var targetMessaging = MessagingContracts(targetFiles);
 
         AssertExact("HTTP endpoint mappings", endpoints, targetEndpoints);
-        AssertExact("DI registrations", registrations, targetRegistrations);
+        AssertExactWithAllowedReplacements(
+            "DI registrations",
+            registrations,
+            targetRegistrations,
+            ReplacedIdentityDiRegistrations,
+            PortFocusedIdentityDiRegistrations);
         AssertExact("PostgreSQL migrations", migrations, targetMigrations);
         AssertExactWithAllowedAdditions(
             "Mongo contracts",
@@ -97,6 +128,10 @@ public sealed class RefactorRuntimeContractTests
             {
                 "Identity compatibility migration reads the users collection to normalize legacy document versions.",
                 "Infrastructure marker cleanup resolves its module-owned collections for dry-run counting and idempotent updates."
+            },
+            intentionalRuntimeContractReplacements = new[]
+            {
+                "RegisterUserHandler and SearchUsersHandler remain scoped self-services; explicit factories select their port-focused constructors while compatibility constructors remain available."
             },
             intentionalConfigurationChanges = new[]
             {
@@ -391,7 +426,29 @@ public sealed class RefactorRuntimeContractTests
             $"{contract} changed outside the accepted additions. "
             + $"Missing=[{string.Join(", ", difference.Removed.Take(3))}] "
             + $"Unexpected=[{string.Join(", ", unexplained.Added.Take(3))}] "
-            + $"UnobservedAccepted=[{string.Join(", ", unexplained.Removed.Take(3))}]");
+                + $"UnobservedAccepted=[{string.Join(", ", unexplained.Removed.Take(3))}]");
+    }
+
+    private static void AssertExactWithAllowedReplacements(
+        string contract,
+        IReadOnlyList<string> baseline,
+        IReadOnlyList<string> target,
+        IReadOnlyList<string> allowedRemoved,
+        IReadOnlyList<string> allowedAdded)
+    {
+        var difference = MultisetDifference(baseline, target);
+        var unexplainedRemoved = MultisetDifference(allowedRemoved, difference.Removed);
+        var unexplainedAdded = MultisetDifference(allowedAdded, difference.Added);
+        Assert.True(
+            unexplainedRemoved.Removed.Count == 0
+            && unexplainedRemoved.Added.Count == 0
+            && unexplainedAdded.Removed.Count == 0
+            && unexplainedAdded.Added.Count == 0,
+            $"{contract} changed outside the accepted replacements. "
+                + $"Missing=[{string.Join(", ", unexplainedRemoved.Added.Take(3))}] "
+                + $"Unexpected=[{string.Join(", ", unexplainedAdded.Added.Take(3))}] "
+                + $"UnobservedRemoved=[{string.Join(", ", unexplainedRemoved.Removed.Take(3))}] "
+                + $"UnobservedAdded=[{string.Join(", ", unexplainedAdded.Removed.Take(3))}]");
     }
 
     private static LineDifference MultisetDifference(

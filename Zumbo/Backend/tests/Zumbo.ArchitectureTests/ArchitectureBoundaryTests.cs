@@ -469,6 +469,60 @@ public sealed class ArchitectureBoundaryTests
     }
 
     [Fact]
+    public void IdentityRegistrationAndUserSearch_ArePortFocusedVerticalSlicesWithCompatibilityFacades()
+    {
+        var identityDirectory = Path.Combine(SourceDirectory, "Zumbo.Modules.Identity");
+        var registerDirectory = Path.Combine(identityDirectory, "Features", "RegisterUser");
+        var searchDirectory = Path.Combine(identityDirectory, "Features", "SearchUsers");
+        var representativeDirectory = Path.Combine(identityDirectory, "Features", "RepresentativeIdentitySlices");
+
+        Assert.True(File.Exists(Path.Combine(registerDirectory, "RegisterUserRequest.cs")));
+        Assert.True(File.Exists(Path.Combine(registerDirectory, "RegisterUserValidator.cs")));
+        Assert.True(File.Exists(Path.Combine(registerDirectory, "RegisterUserHandler.cs")));
+        Assert.True(File.Exists(Path.Combine(registerDirectory, "RegisterUserSlice.cs")));
+        Assert.True(File.Exists(Path.Combine(searchDirectory, "SearchUsersQuery.cs")));
+        Assert.True(File.Exists(Path.Combine(searchDirectory, "SearchUsersValidator.cs")));
+        Assert.True(File.Exists(Path.Combine(searchDirectory, "SearchUsersHandler.cs")));
+        Assert.True(File.Exists(Path.Combine(searchDirectory, "SearchUsersSlice.cs")));
+        Assert.Empty(
+            Directory.Exists(representativeDirectory)
+                ? Directory.GetFiles(representativeDirectory, "*.cs", SearchOption.AllDirectories)
+                : []);
+
+        var registerSlice = File.ReadAllText(Path.Combine(registerDirectory, "RegisterUserSlice.cs"));
+        var searchSlice = File.ReadAllText(Path.Combine(searchDirectory, "SearchUsersSlice.cs"));
+        Assert.DoesNotContain("IdentityService", registerSlice, StringComparison.Ordinal);
+        Assert.DoesNotContain("IdentityService", searchSlice, StringComparison.Ordinal);
+        Assert.Contains("IUserRepository", registerSlice, StringComparison.Ordinal);
+        Assert.Contains("IDurableTransactionRunner", registerSlice, StringComparison.Ordinal);
+        Assert.Contains("IUserRepository", searchSlice, StringComparison.Ordinal);
+        Assert.Contains("ICurrentUser", searchSlice, StringComparison.Ordinal);
+
+        var registerFacade = File.ReadAllText(Path.Combine(
+            identityDirectory,
+            "Module",
+            "Identity",
+            "IdentityService",
+            "IdentityService.RegisterAsync.cs"));
+        var searchFacade = File.ReadAllText(Path.Combine(
+            identityDirectory,
+            "Module",
+            "Identity",
+            "IdentityService",
+            "IdentityService.SearchUsersAsync.cs"));
+        Assert.Contains("registerUserHandler.HandleAsync", registerFacade, StringComparison.Ordinal);
+        Assert.Contains("searchUsersHandler.HandleAsync", searchFacade, StringComparison.Ordinal);
+
+        var composition = File.ReadAllText(Path.Combine(
+            SourceDirectory,
+            "Zumbo.Api",
+            "Endpoints",
+            "IdentityEndpoints.cs"));
+        Assert.Contains("AddScoped<RegisterUserHandler>(provider =>", composition, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<SearchUsersHandler>(provider =>", composition, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void ProductionSourceFiles_StayWithinReadabilityLimit()
     {
         const int maximumLines = 500;
