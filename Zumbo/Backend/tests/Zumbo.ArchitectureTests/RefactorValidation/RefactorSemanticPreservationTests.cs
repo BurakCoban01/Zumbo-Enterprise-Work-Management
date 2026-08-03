@@ -50,6 +50,18 @@ public sealed class RefactorSemanticPreservationTests
             ["Zumbo.Modules.Teams|Zumbo.Modules.Teams.ListTeamsHandler|method:HandleAsync:(ListTeamsQueryquery,CancellationTokenct):Task<IReadOnlyList<TeamResponse>>"] =
                 "The endpoint handler selects the independent team-list query slice when composed from ports and retains its original facade constructor.",
             ["Zumbo.Modules.Teams|Zumbo.Modules.Teams.TeamService|ctor:(IDocumentRepository<TeamDocument>teams,ITeamUserDirectoryuserDirectory,ITeamAuditWriteraudit,IClockclock,ICurrentUsercurrentUser,IExpectedVersionAccessor?expectedVersions=null,ITeamOrganizationDirectory?organizationDirectory=null,ITeamInvitationNotifier?invitationNotifier=null)"] =
+                "The unchanged compatibility facade constructor now wires the port-focused create and list handlers from its existing dependencies; its public signature and all previous assignments remain intact.",
+            ["Zumbo.Api|ProjectsEndpoints|method:AddProjectsModule:(thisIServiceCollectionservices):IServiceCollection"] =
+                "Project create and list handlers remain scoped while explicit factories select their port-focused constructors and preserve compatibility constructors.",
+            ["Zumbo.Modules.Projects|Zumbo.Modules.Projects.ProjectService|method:CreateAsync:(CreateProjectRequestrequest,stringcorrelationId,CancellationTokenct):Task<ProjectResponse>"] =
+                "The compatibility facade delegates project creation to the port-focused CreateProject slice while preserving its public signature and behavior.",
+            ["Zumbo.Modules.Projects|Zumbo.Modules.Projects.ProjectService|method:ListAsync:(stringorganizationId,CancellationTokenct,boolarchived=false):Task<IReadOnlyList<ProjectResponse>>"] =
+                "The compatibility facade delegates project listing to the tenant-scoped ListProjects query slice while preserving its public signature.",
+            ["Zumbo.Modules.Projects|Zumbo.Modules.Projects.CreateProjectHandler|method:HandleAsync:(CreateProjectRequestrequest,stringcorrelationId,CancellationTokenct):Task<ProjectResponse>"] =
+                "The endpoint handler selects the independent project-creation slice when composed from ports and retains its original facade constructor.",
+            ["Zumbo.Modules.Projects|Zumbo.Modules.Projects.ListProjectsHandler|method:HandleAsync:(ListProjectsQueryquery,CancellationTokenct):Task<IReadOnlyList<ProjectResponse>>"] =
+                "The endpoint handler selects the independent project-list query slice when composed from ports and retains its original facade constructor.",
+            ["Zumbo.Modules.Projects|Zumbo.Modules.Projects.ProjectService|ctor:(IDocumentRepository<ProjectDocument>projects,IProjectMemberDirectorymemberDirectory,IProjectTeamDirectoryteamDirectory,IProjectTeamUsageCheckerteamUsageChecker,IProjectAuditWriteraudit,IClockclock,ICurrentUsercurrentUser,IExpectedVersionAccessor?expectedVersions=null,IProjectOrganizationDirectory?organizationDirectory=null,IOptions<ProjectLifecycleOptions>?lifecycleOptions=null)"] =
                 "The unchanged compatibility facade constructor now wires the port-focused create and list handlers from its existing dependencies; its public signature and all previous assignments remain intact."
         };
 

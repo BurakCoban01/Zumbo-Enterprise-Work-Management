@@ -613,6 +613,51 @@ public sealed class ArchitectureBoundaryTests
     }
 
     [Fact]
+    public void ProjectCreateAndList_ArePortFocusedVerticalSlicesWithCompatibilityFacades()
+    {
+        var moduleDirectory = Path.Combine(SourceDirectory, "Zumbo.Modules.Projects");
+        var createDirectory = Path.Combine(moduleDirectory, "Features", "CreateProject");
+        var listDirectory = Path.Combine(moduleDirectory, "Features", "ListProjects");
+        var representativeDirectory = Path.Combine(moduleDirectory, "Features", "RepresentativeProjectSlices");
+
+        Assert.True(File.Exists(Path.Combine(createDirectory, "CreateProjectRequest.cs")));
+        Assert.True(File.Exists(Path.Combine(createDirectory, "CreateProjectValidator.cs")));
+        Assert.True(File.Exists(Path.Combine(createDirectory, "CreateProjectHandler.cs")));
+        Assert.True(File.Exists(Path.Combine(createDirectory, "CreateProjectSlice.cs")));
+        Assert.True(File.Exists(Path.Combine(listDirectory, "ListProjectsQuery.cs")));
+        Assert.True(File.Exists(Path.Combine(listDirectory, "ListProjectsValidator.cs")));
+        Assert.True(File.Exists(Path.Combine(listDirectory, "ListProjectsHandler.cs")));
+        Assert.True(File.Exists(Path.Combine(listDirectory, "ListProjectsSlice.cs")));
+        Assert.Empty(
+            Directory.Exists(representativeDirectory)
+                ? Directory.GetFiles(representativeDirectory, "*.cs", SearchOption.AllDirectories)
+                : []);
+
+        var createSlice = File.ReadAllText(Path.Combine(createDirectory, "CreateProjectSlice.cs"));
+        var listSlice = File.ReadAllText(Path.Combine(listDirectory, "ListProjectsSlice.cs"));
+        Assert.DoesNotContain("ProjectService", createSlice, StringComparison.Ordinal);
+        Assert.DoesNotContain("ProjectService", listSlice, StringComparison.Ordinal);
+        Assert.Contains("IDocumentRepository<ProjectDocument>", createSlice, StringComparison.Ordinal);
+        Assert.Contains("IProjectMemberDirectory", createSlice, StringComparison.Ordinal);
+        Assert.Contains("IProjectOrganizationDirectory", createSlice, StringComparison.Ordinal);
+        Assert.Contains("IProjectAuditWriter", createSlice, StringComparison.Ordinal);
+        Assert.Contains("IDocumentRepository<ProjectDocument>", listSlice, StringComparison.Ordinal);
+        Assert.Contains("ICurrentUser", listSlice, StringComparison.Ordinal);
+
+        var facade = File.ReadAllText(Path.Combine(moduleDirectory, "ProjectsModule.cs"));
+        Assert.Contains("createProjectHandler.HandleAsync", facade, StringComparison.Ordinal);
+        Assert.Contains("listProjectsHandler.HandleAsync", facade, StringComparison.Ordinal);
+
+        var composition = File.ReadAllText(Path.Combine(
+            SourceDirectory,
+            "Zumbo.Api",
+            "Endpoints",
+            "ProjectsEndpoints.cs"));
+        Assert.Contains("AddScoped<CreateProjectHandler>(provider =>", composition, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<ListProjectsHandler>(provider =>", composition, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void ProductionSourceFiles_StayWithinReadabilityLimit()
     {
         const int maximumLines = 500;
