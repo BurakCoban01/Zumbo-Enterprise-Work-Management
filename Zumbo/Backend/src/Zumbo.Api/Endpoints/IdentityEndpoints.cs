@@ -1,5 +1,9 @@
-using Zumbo.Modules.Identity;
+using Microsoft.Extensions.Options;
+using Zumbo.BuildingBlocks.Application.Concurrency;
+using Zumbo.BuildingBlocks.Application.Messaging;
 using Zumbo.BuildingBlocks.Application.Security;
+using Zumbo.Modules.Identity;
+using Zumbo.SharedKernel;
 
 using static ApiEndpointResults;
 
@@ -16,8 +20,22 @@ internal static class IdentityEndpoints
         services.AddSingleton<IMfaSecretProtector, MfaSecretProtectorAdapter>();
         services.AddScoped<IdentityService>();
         services.AddScoped<BrowserSessionService>();
-        services.AddScoped<RegisterUserHandler>();
-        services.AddScoped<SearchUsersHandler>();
+        services.AddScoped<RegisterUserHandler>(provider => new RegisterUserHandler(
+            provider.GetRequiredService<IUserRepository>(),
+            provider.GetRequiredService<IRefreshSessionStore>(),
+            provider.GetRequiredService<IDurableTransactionRunner>(),
+            provider.GetRequiredService<IPasswordHasher>(),
+            provider.GetRequiredService<ITokenIssuer>(),
+            provider.GetRequiredService<IOptions<JwtOptions>>(),
+            provider.GetRequiredService<IOptions<IdentityBootstrapOptions>>(),
+            provider.GetRequiredService<IDistributedLockProvider>(),
+            provider.GetRequiredService<IOptions<DistributedLockOptions>>(),
+            provider.GetRequiredService<IClock>(),
+            provider.GetRequiredService<IRegistrationProvisioningPolicy>(),
+            provider.GetRequiredService<ISessionClientContext>()));
+        services.AddScoped<SearchUsersHandler>(provider => new SearchUsersHandler(
+            provider.GetRequiredService<IUserRepository>(),
+            provider.GetRequiredService<ICurrentUser>()));
         services.AddScoped<ApiKeyService>();
         services.AddScoped<IPrivacyDataProcessor, PrivacyDataProcessorAdapter>();
         services.AddScoped<PrivacyService>();

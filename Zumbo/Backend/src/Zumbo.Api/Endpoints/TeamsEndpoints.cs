@@ -1,6 +1,8 @@
 using Zumbo.Modules.Teams;
 using Zumbo.BuildingBlocks.Application.Messaging;
+using Zumbo.BuildingBlocks.Application.Persistence;
 using Zumbo.BuildingBlocks.Application.Security;
+using Zumbo.SharedKernel;
 
 using static ApiEndpointResults;
 
@@ -17,8 +19,18 @@ internal static class TeamsEndpoints
         services.AddScoped<IDurableEventHandler, TeamInvitationNotificationHandler>();
         services.AddScoped<TeamTransactionFilter>();
         services.AddScoped<TeamService>();
-        services.AddScoped<CreateTeamHandler>();
-        services.AddScoped<ListTeamsHandler>();
+        services.AddScoped<CreateTeamHandler>(provider => new CreateTeamHandler(
+            provider.GetRequiredService<IDocumentRepository<TeamDocument>>(),
+            provider.GetRequiredService<ITeamUserDirectory>(),
+            provider.GetRequiredService<ITeamOrganizationDirectory>(),
+            provider.GetRequiredService<ITeamAuditWriter>(),
+            provider.GetRequiredService<IClock>(),
+            provider.GetRequiredService<ICurrentUser>()));
+        services.AddScoped<ListTeamsHandler>(provider => new ListTeamsHandler(
+            provider.GetRequiredService<IDocumentRepository<TeamDocument>>(),
+            provider.GetRequiredService<ITeamOrganizationDirectory>(),
+            provider.GetRequiredService<IClock>(),
+            provider.GetRequiredService<ICurrentUser>()));
         return services;
     }
 

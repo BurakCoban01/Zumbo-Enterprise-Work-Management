@@ -1,5 +1,7 @@
 using Zumbo.Modules.Projects;
+using Zumbo.BuildingBlocks.Application.Persistence;
 using Zumbo.BuildingBlocks.Application.Security;
+using Zumbo.SharedKernel;
 
 using static ApiEndpointResults;
 
@@ -20,8 +22,17 @@ internal static class ProjectsEndpoints
         services.AddScoped<IProjectTeamUsageChecker, ProjectTeamUsageCheckerAdapter>();
         services.AddScoped<IProjectAuditWriter, ProjectAuditWriterAdapter>();
         services.AddScoped<ProjectService>();
-        services.AddScoped<CreateProjectHandler>();
-        services.AddScoped<ListProjectsHandler>();
+        services.AddScoped<CreateProjectHandler>(provider => new CreateProjectHandler(
+            provider.GetRequiredService<IDocumentRepository<ProjectDocument>>(),
+            provider.GetRequiredService<IProjectMemberDirectory>(),
+            provider.GetRequiredService<IProjectOrganizationDirectory>(),
+            provider.GetRequiredService<IProjectAuditWriter>(),
+            provider.GetRequiredService<IClock>(),
+            provider.GetRequiredService<ICurrentUser>()));
+        services.AddScoped<ListProjectsHandler>(provider => new ListProjectsHandler(
+            provider.GetRequiredService<IDocumentRepository<ProjectDocument>>(),
+            provider.GetRequiredService<IProjectOrganizationDirectory>(),
+            provider.GetRequiredService<ICurrentUser>()));
         return services;
     }
 

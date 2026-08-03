@@ -1,0 +1,20 @@
+using System.Globalization;
+using System.Net.Mail;
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
+using System.Text.RegularExpressions;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Zumbo.BuildingBlocks.Application.Persistence;
+using Zumbo.BuildingBlocks.Application.Runtime;
+using Zumbo.BuildingBlocks.Application.Security;
+using Zumbo.SharedKernel;
+
+namespace Zumbo.Modules.WorkItems;
+
+public sealed partial class IntakeFormService{
+
+    public async Task<IntakeFormResponse> GetAsync(string formId, CancellationToken ct) =>
+        ToResponse(await GetManagedAsync(formId, PermissionCatalog.WorkItemView, ct));
+}

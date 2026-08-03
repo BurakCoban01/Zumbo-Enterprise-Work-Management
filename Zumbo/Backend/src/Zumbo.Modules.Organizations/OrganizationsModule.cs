@@ -17,6 +17,8 @@ public sealed partial class OrganizationService
     private readonly IOrganizationAuditWriter audit;
     private readonly ExpectedVersionState expectedVersion;
     private readonly OrganizationLifecycleOptions lifecycle;
+    private readonly CreateOrganizationHandler createOrganizationHandler;
+    private readonly ListOrganizationsHandler listOrganizationsHandler;
 
     public OrganizationService(
         IDocumentRepository<OrganizationDocument> organizations,
@@ -38,6 +40,14 @@ public sealed partial class OrganizationService
         this.audit = audit;
         expectedVersion = new ExpectedVersionState(expectedVersions);
         lifecycle = lifecycleOptions?.Value ?? new OrganizationLifecycleOptions();
+        createOrganizationHandler = new CreateOrganizationHandler(
+            organizations,
+            distributedLockProvider,
+            distributedLockOptions,
+            clock,
+            currentUser,
+            audit);
+        listOrganizationsHandler = new ListOrganizationsHandler(organizations, currentUser);
     }
 
     public Task<OrganizationResponse> CreateAsync(
@@ -48,63 +58,11 @@ public sealed partial class OrganizationService
     public async Task<OrganizationResponse> CreateAsync(
         CreateOrganizationRequest request,
         string correlationId,
-        CancellationToken ct)
-    {
-        CreateOrganizationValidator.Validate(request);
-        var tenantKey = request.TenantKey.Trim().ToLowerInvariant();
-        ValidateTenantKey(tenantKey);
-        var actorUserId = RequireCurrentUser();
-        if (!IsSystemAdmin()
-            && !string.Equals(currentUser.OrganizationId, tenantKey, StringComparison.OrdinalIgnoreCase))
-        {
-            throw new ForbiddenException("An organization can only be created for the authenticated user's tenant.");
-        }
+        CancellationToken ct) =>
+        await createOrganizationHandler.HandleAsync(request, correlationId, ct);
 
-        await using var organizationLock = await AcquireLockAsync("organization:" + tenantKey, ct);
-        var duplicate = await organizations.SelectAsync(
-            document => document.Id == tenantKey || document.TenantKey == tenantKey,
-            ct);
-        if (duplicate is not null)
-        {
-            throw new ConflictException("TENANT_KEY_EXISTS", "Tenant key must be unique.");
-        }
-
-        var organization = new OrganizationDocument
-        {
-            Id = tenantKey,
-            Name = request.Name.Trim(),
-            TenantKey = tenantKey,
-            OwnerUserId = actorUserId,
-            CreatedAt = clock.UtcNow,
-            UpdatedAt = clock.UtcNow
-        };
-        await organizations.CreateAsync(organization, ct);
-        await audit.WriteAsync(
-            "OrganizationCreated",
-            organization.Id,
-            null,
-            organization.Name,
-            correlationId,
-            ct);
-        return ToResponse(organization);
-    }
-
-    public async Task<IReadOnlyList<OrganizationResponse>> ListAsync(CancellationToken ct)
-    {
-        RequireCurrentUser();
-        var tenantId = currentUser.OrganizationId;
-        var result = IsSystemAdmin()
-            ? await organizations.ListByFilterAsync(
-                orderBy: document => document.Name,
-                pageSize: 100,
-                cancellationToken: ct)
-            : await organizations.ListByFilterAsync(
-                document => document.Id == tenantId || document.TenantKey == tenantId,
-                document => document.Name,
-                pageSize: 1,
-                cancellationToken: ct);
-        return result.Select(ToResponse).ToList();
-    }
+    public async Task<IReadOnlyList<OrganizationResponse>> ListAsync(CancellationToken ct) =>
+        await listOrganizationsHandler.HandleAsync(new ListOrganizationsQuery(), ct);
 
     public Task<OrganizationResponse> UpdateAsync(
         string organizationId,

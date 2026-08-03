@@ -1,0 +1,36 @@
+using System.Globalization;
+using System.Net.Mail;
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
+using System.Text.RegularExpressions;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Zumbo.BuildingBlocks.Application.Persistence;
+using Zumbo.BuildingBlocks.Application.Runtime;
+using Zumbo.BuildingBlocks.Application.Security;
+using Zumbo.SharedKernel;
+
+namespace Zumbo.Modules.WorkItems;
+
+public sealed partial class IntakeFormService{
+
+    public async Task<IReadOnlyCollection<IntakeFormResponse>> ListAsync(
+        string projectId,
+        CancellationToken ct)
+    {
+        var authorization = await permissions.EnsureCanAsync(
+            RequireUser(),
+            Required(projectId, "Project id", 128),
+            PermissionCatalog.WorkItemView,
+            ct);
+        var result = await forms.ListByFilterAsync(
+            x => x.OrganizationId == authorization.OrganizationId
+                && x.ProjectId == authorization.ProjectId,
+            x => x.UpdatedAt,
+            orderDescending: true,
+            pageSize: 200,
+            cancellationToken: ct);
+        return result.Select(ToResponse).ToList();
+    }
+}

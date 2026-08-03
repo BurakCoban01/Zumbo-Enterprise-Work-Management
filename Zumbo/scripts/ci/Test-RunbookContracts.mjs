@@ -40,6 +40,7 @@ const requiredTargets = [
 const checks = [];
 const temporaryEnvironment = resolve(repositoryRoot, `Backend/.env.qa002-contract-${process.pid}`);
 const skipHostPreflight = process.argv.includes('--skip-host-preflight');
+const commandTimeoutMilliseconds = 300_000;
 
 try {
   for (const [path, markers] of Object.entries(runbooks)) {
@@ -56,6 +57,24 @@ try {
     assert.ok(existsSync(resolve(repositoryRoot, path)), `Referenced target does not exist: ${path}`);
   }
   checks.push({ name: 'referenced-targets', passed: true, count: requiredTargets.length });
+
+  const demoStart = readFileSync(resolve(repositoryRoot, 'scripts/operations/demo-start.mjs'), 'utf8');
+  assert.match(demoStart, /const composeWaitTimeoutSeconds = 900;/);
+  assert.match(demoStart, /const composeCommandTimeoutMilliseconds = 930_000;/);
+  assert.match(demoStart, /const readinessRequestTimeoutMilliseconds = 60_000;/);
+
+  const compose = readFileSync(resolve(repositoryRoot, 'Backend/docker-compose.yml'), 'utf8');
+  assert.match(compose, /HealthChecks__DependencyTimeoutSeconds: 30/);
+  assert.match(compose, /Gateway__UpstreamTimeoutSeconds: 60/);
+  assert.match(compose, /opensearch:[\s\S]*?retries: 60[\s\S]*?start_period: 120s/);
+
+  const apiHealthRegistration = readFileSync(resolve(
+    repositoryRoot,
+    'Backend/src/Zumbo.Api/Hosting/ApiHostRegistration/AddZumboHost/ApiHostRegistration.ConfigureBackgroundJobsAndHealth.cs'
+  ), 'utf8');
+  assert.match(apiHealthRegistration, /GetValue\("HealthChecks:DependencyTimeoutSeconds", 5\)/);
+  assert.match(apiHealthRegistration, /dependencyHealthTimeoutSeconds is < 1 or > 120/);
+  checks.push({ name: 'demo-readiness-timeouts', passed: true });
 
   const environmentResult = createLocalEnvironment(temporaryEnvironment);
   assert.equal(environmentResult.loopbackOnly, true);
@@ -118,8 +137,10 @@ try {
 function run(command, args) {
   const result = spawnSync(command, args, {
     cwd: repositoryRoot,
-    encoding: 'utf8'
+    encoding: 'utf8',
+    timeout: commandTimeoutMilliseconds
   });
+  assert.ifError(result.error);
   assert.equal(result.status, 0, `${command} ${args.join(' ')}\n${result.stderr || result.stdout}`);
 }
 

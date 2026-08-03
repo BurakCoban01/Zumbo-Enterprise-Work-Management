@@ -14,6 +14,8 @@ public sealed partial class TeamService
     private readonly IClock clock;
     private readonly ICurrentUser currentUser;
     private readonly ExpectedVersionState expectedVersion;
+    private readonly CreateTeamHandler createTeamHandler;
+    private readonly ListTeamsHandler listTeamsHandler;
 
     public TeamService(
         IDocumentRepository<TeamDocument> teams,
@@ -33,6 +35,14 @@ public sealed partial class TeamService
         expectedVersion = new ExpectedVersionState(expectedVersions);
         this.organizationDirectory = organizationDirectory ?? AllowActiveTeamOrganizationDirectory.Instance;
         this.invitationNotifier = invitationNotifier ?? NoOpTeamInvitationNotifier.Instance;
+        createTeamHandler = new CreateTeamHandler(
+            teams,
+            userDirectory,
+            this.organizationDirectory,
+            audit,
+            clock,
+            currentUser);
+        listTeamsHandler = new ListTeamsHandler(teams, this.organizationDirectory, clock, currentUser);
     }
 
     public Task<TeamResponse> CreateAsync(CreateTeamRequest request, CancellationToken ct) =>
@@ -41,66 +51,14 @@ public sealed partial class TeamService
     public async Task<TeamResponse> CreateAsync(
         CreateTeamRequest request,
         string correlationId,
-        CancellationToken ct)
-    {
-        CreateTeamValidator.Validate(request);
-        var organizationId = request.OrganizationId.Trim();
-        EnsureOrganizationScope(organizationId);
-        await organizationDirectory.EnsureActiveAsync(organizationId, ct);
-        var userId = CurrentUserId();
-        if (!IsSystemAdmin() && !string.Equals(request.OwnerUserId, userId, StringComparison.Ordinal))
-        {
-            throw new ForbiddenException("A team can only be created for the authenticated owner.");
-        }
-
-        var owner = await RequireEligibleUserAsync(request.OwnerUserId.Trim(), organizationId, ct);
-        var name = NormalizeName(request.Name);
-        var normalizedName = name.ToLowerInvariant();
-        if (await teams.ExistsByFilterAsync(
-            team => team.OrganizationId == organizationId && team.Name.ToLower() == normalizedName,
-            ct))
-        {
-            throw new ConflictException("TEAM_NAME_EXISTS", "Team name must be unique inside the organization.");
-        }
-
-        var now = clock.UtcNow;
-        var team = new TeamDocument
-        {
-            OrganizationId = organizationId,
-            Name = name,
-            CreatedAt = now,
-            UpdatedAt = now,
-            Members =
-            [
-                new TeamMemberDocument
-                {
-                    UserId = owner.Id,
-                    Email = owner.Email,
-                    Role = TeamRoles.Owner,
-                    Status = TeamMemberStatuses.Active
-                }
-            ]
-        };
-        await teams.CreateAsync(team, ct);
-        await audit.WriteAsync("TeamCreated", team.Id, null, team.Name, correlationId, ct);
-        return ToResponse(team);
-    }
+        CancellationToken ct) =>
+        await createTeamHandler.HandleAsync(request, correlationId, ct);
 
     public async Task<IReadOnlyList<TeamResponse>> ListAsync(
         string organizationId,
         CancellationToken ct,
-        bool archived = false)
-    {
-        EnsureOrganizationScope(organizationId);
-        var normalizedOrganizationId = organizationId.Trim();
-        await organizationDirectory.EnsureActiveAsync(normalizedOrganizationId, ct);
-        var result = await teams.ListByFilterAsync(
-            team => team.OrganizationId == normalizedOrganizationId && team.Archived == archived,
-            team => team.Name,
-            pageSize: 100,
-            cancellationToken: ct);
-        return result.Select(team => ToResponse(team)).ToList();
-    }
+        bool archived = false) =>
+        await listTeamsHandler.HandleAsync(new ListTeamsQuery(organizationId, archived), ct);
 
     public Task<TeamResponse> UpdateAsync(string teamId, UpdateTeamRequest request, CancellationToken ct) =>
         UpdateAsync(teamId, request, "none", ct);

@@ -18,6 +18,8 @@ public sealed partial class ProjectService
     private readonly ICurrentUser currentUser;
     private readonly ExpectedVersionState expectedVersion;
     private readonly ProjectLifecycleOptions lifecycle;
+    private readonly CreateProjectHandler createProjectHandler;
+    private readonly ListProjectsHandler listProjectsHandler;
 
     public ProjectService(
         IDocumentRepository<ProjectDocument> projects,
@@ -41,6 +43,14 @@ public sealed partial class ProjectService
         expectedVersion = new ExpectedVersionState(expectedVersions);
         this.organizationDirectory = organizationDirectory ?? AllowActiveProjectOrganizationDirectory.Instance;
         lifecycle = lifecycleOptions?.Value ?? new ProjectLifecycleOptions();
+        createProjectHandler = new CreateProjectHandler(
+            projects,
+            memberDirectory,
+            this.organizationDirectory,
+            audit,
+            clock,
+            currentUser);
+        listProjectsHandler = new ListProjectsHandler(projects, this.organizationDirectory, currentUser);
     }
 
     public Task<ProjectResponse> CreateAsync(CreateProjectRequest request, CancellationToken ct) =>
@@ -49,75 +59,14 @@ public sealed partial class ProjectService
     public async Task<ProjectResponse> CreateAsync(
         CreateProjectRequest request,
         string correlationId,
-        CancellationToken ct)
-    {
-        CreateProjectValidator.Validate(request);
-        var organizationId = request.OrganizationId.Trim();
-        EnsureOrganizationScope(organizationId);
-        await organizationDirectory.EnsureActiveAsync(organizationId, ct);
-        var userId = CurrentUserId();
-        if (!IsSystemAdmin() && !string.Equals(request.OwnerUserId, userId, StringComparison.Ordinal))
-        {
-            throw new ForbiddenException("A project can only be created for the authenticated owner.");
-        }
-
-        var ownerUserId = request.OwnerUserId.Trim();
-        await memberDirectory.EnsureEligibleAsync(ownerUserId, organizationId, ct);
-        var key = NormalizeKey(request.Key);
-        if (await projects.ExistsByFilterAsync(
-            candidate => candidate.OrganizationId == organizationId && candidate.Key == key,
-            ct))
-        {
-            throw new ConflictException("PROJECT_KEY_EXISTS", "Project key must be unique inside the organization.");
-        }
-
-        var now = clock.UtcNow;
-        var project = new ProjectDocument
-        {
-            OrganizationId = organizationId,
-            Key = key,
-            Name = NormalizeName(request.Name),
-            Visibility = ProjectVisibilities.Normalize(request.Visibility),
-            CreatedAt = now,
-            UpdatedAt = now,
-            Members =
-            [
-                new ProjectMemberDocument { UserId = ownerUserId, Role = ProjectRoles.Owner }
-            ]
-        };
-        try
-        {
-            await projects.CreateAsync(project, ct);
-        }
-        catch (DocumentConflictException)
-        {
-            throw new ConflictException(
-                "PROJECT_KEY_EXISTS",
-                "Project key must be unique inside the organization.");
-        }
-        await audit.WriteAsync("ProjectCreated", project.Id, null, $"{project.Key}:{project.Name}", correlationId, ct);
-        return ToResponse(project);
-    }
+        CancellationToken ct) =>
+        await createProjectHandler.HandleAsync(request, correlationId, ct);
 
     public async Task<IReadOnlyList<ProjectResponse>> ListAsync(
         string organizationId,
         CancellationToken ct,
-        bool archived = false)
-    {
-        var normalizedOrganizationId = organizationId.Trim();
-        EnsureOrganizationScope(normalizedOrganizationId);
-        await organizationDirectory.EnsureActiveAsync(normalizedOrganizationId, ct);
-        var userId = CurrentUserId();
-        var result = await projects.ListByFilterAsync(
-            project => project.OrganizationId == normalizedOrganizationId
-                && project.Archived == archived
-                && (project.Visibility == ProjectVisibilities.Internal
-                    || project.Members.Any(member => member.UserId == userId)),
-            project => project.Key,
-            pageSize: 100,
-            cancellationToken: ct);
-        return result.Select(ToResponse).ToList();
-    }
+        bool archived = false) =>
+        await listProjectsHandler.HandleAsync(new ListProjectsQuery(organizationId, archived), ct);
 
     public async Task<ProjectResponse> GetAsync(string projectId, CancellationToken ct)
     {

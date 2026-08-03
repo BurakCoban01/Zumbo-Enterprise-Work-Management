@@ -1,4 +1,5 @@
 using Zumbo.Modules.Notifications;
+using Zumbo.BuildingBlocks.Application.Persistence;
 using Zumbo.BuildingBlocks.Application.Security;
 using Zumbo.SharedKernel;
 
@@ -29,8 +30,12 @@ internal static class NotificationEndpoints
         services.AddScoped<INotificationAuditWriter, NotificationAuditWriterAdapter>();
         services.AddScoped<IEmailNotificationSender, SmtpEmailNotificationSender>();
         services.AddScoped<NotificationService>();
-        services.AddScoped<ListNotificationsHandler>();
-        services.AddScoped<MarkNotificationAsReadHandler>();
+        services.AddScoped<ListNotificationsHandler>(provider => new ListNotificationsHandler(
+            provider.GetRequiredService<IDocumentRepository<NotificationDocument>>(),
+            provider.GetRequiredService<ICurrentUser>()));
+        services.AddScoped<MarkNotificationAsReadHandler>(provider => new MarkNotificationAsReadHandler(
+            provider.GetRequiredService<IDocumentRepository<NotificationDocument>>(),
+            provider.GetRequiredService<ICurrentUser>()));
         if (configuration.GetValue("BackgroundJobs:Enabled", true))
         {
             services.AddHostedService<NotificationEmailDispatcherHostedService>();
