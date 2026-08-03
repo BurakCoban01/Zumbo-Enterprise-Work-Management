@@ -1,0 +1,15 @@
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
+using Microsoft.Extensions.Options;
+using Zumbo.BuildingBlocks.Application.Messaging;
+using Zumbo.BuildingBlocks.Application.Persistence;
+using Zumbo.SharedKernel;
+
+namespace Zumbo.Modules.WorkItems;
+
+public sealed record UpdateWebhookSubscriptionRequest(
+    string Name,
+    string TargetUrl,
+    IReadOnlyCollection<string> EventScopes,
+    long ExpectedVersion);

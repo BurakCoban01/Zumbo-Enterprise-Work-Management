@@ -18,6 +18,9 @@ const evidencePath = resolve(repositoryRoot, argumentValue('--evidence') || defa
 const composePath = resolve(repositoryRoot, 'Backend/docker-compose.yml');
 const frontendDirectory = resolve(repositoryRoot, 'Frontend');
 const frontendDist = resolve(frontendDirectory, 'dist');
+const composeWaitTimeoutSeconds = 900;
+const composeCommandTimeoutMilliseconds = 930_000;
+const readinessRequestTimeoutMilliseconds = 60_000;
 const environment = parseEnvironment(readFileSync(environmentPath, 'utf8')).values;
 const secretValues = Object.entries(environment)
   .filter(([name, value]) => value && /(PASSWORD|TOKEN|SIGNING_KEY|CONNECTION_STRING|REPLICA_KEY)/i.test(name))
@@ -48,8 +51,15 @@ try {
 
   await check('compose-up', () => command(
     'docker',
-    composeArguments('up', '--detach', '--no-build', '--wait', '--wait-timeout', '300'),
-    330_000
+    composeArguments(
+      'up',
+      '--detach',
+      '--no-build',
+      '--wait',
+      '--wait-timeout',
+      String(composeWaitTimeoutSeconds)
+    ),
+    composeCommandTimeoutMilliseconds
   ));
 
   await check('service-inventory', () => verifyServiceInventory());
@@ -184,7 +194,10 @@ async function verifyHttpReadiness() {
   };
   const statuses = {};
   for (const [name, url] of Object.entries(urls)) {
-    statuses[name] = (await request(url, { acceptedStatuses: [200], timeoutMs: 10_000 })).status;
+    statuses[name] = (await request(url, {
+      acceptedStatuses: [200],
+      timeoutMs: readinessRequestTimeoutMilliseconds
+    })).status;
   }
   return statuses;
 }
@@ -192,7 +205,7 @@ async function verifyHttpReadiness() {
 async function verifyLoginEntry() {
   const response = await request(new URL('/api/browser-auth/login', environment.ZUMBO_GATEWAY_URL).toString(), {
     acceptedStatuses: [401],
-    timeoutMs: 10_000,
+    timeoutMs: readinessRequestTimeoutMilliseconds,
     method: 'POST',
     headers: {
       'content-type': 'application/json',

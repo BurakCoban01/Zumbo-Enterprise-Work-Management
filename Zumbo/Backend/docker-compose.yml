@@ -9,7 +9,9 @@ services:
       Persistence__Provider: Mongo
       MongoDb__ConnectionString: mongodb://mongo:27017/?replicaSet=rs0
       MongoDb__DatabaseName: Zumbo
+      MongoDb__CommandTimeoutSeconds: ${ZUMBO_MONGO_COMMAND_TIMEOUT_SECONDS:-300}
       Jwt__SigningKey: ${ZUMBO_JWT_SIGNING_KEY:?ZUMBO_JWT_SIGNING_KEY must be set in Backend/.env}
+      Jwt__AccessTokenMinutes: ${ZUMBO_ACCESS_TOKEN_MINUTES:-480}
       IdentityBootstrap__AdminEmails__0: ${ZUMBO_IDENTITY_ADMIN_EMAIL:-}
       IdentityBootstrap__BootstrapToken: ${ZUMBO_IDENTITY_BOOTSTRAP_TOKEN:-}
       RegistrationProvisioning__Mode: ${ZUMBO_REGISTRATION_PROVISIONING_MODE:-ProductionLike}
@@ -51,6 +53,7 @@ services:
       ReadModelCache__Provider: Redis
       ReadModelCache__TtlSeconds: 30
       ReadModelCache__KeyPrefix: "zumbo:read-model:"
+      HealthChecks__DependencyTimeoutSeconds: 30
       Runtime__Role: Api
       Runtime__InstanceId: api-1
       BackgroundJobs__Enabled: false
@@ -81,7 +84,7 @@ services:
       Gateway__NotificationExtractionEnabled: ${ZUMBO_NOTIFICATION_EXTRACTION_ENABLED:-false}
       Gateway__NotificationUpstreamBaseUrl: ${ZUMBO_NOTIFICATION_UPSTREAM_BASE_URL:-}
       Gateway__UpstreamReadyPath: /health/ready
-      Gateway__UpstreamTimeoutSeconds: 30
+      Gateway__UpstreamTimeoutSeconds: 60
       Gateway__MaxRequestBodyBytes: 27262976
       Gateway__PermitLimit: 1000
       Gateway__RateWindowSeconds: 60
@@ -101,7 +104,9 @@ services:
       Persistence__Provider: Mongo
       MongoDb__ConnectionString: mongodb://mongo:27017/?replicaSet=rs0
       MongoDb__DatabaseName: Zumbo
+      MongoDb__CommandTimeoutSeconds: ${ZUMBO_MONGO_COMMAND_TIMEOUT_SECONDS:-300}
       Jwt__SigningKey: ${ZUMBO_JWT_SIGNING_KEY:?ZUMBO_JWT_SIGNING_KEY must be set in Backend/.env}
+      Jwt__AccessTokenMinutes: ${ZUMBO_ACCESS_TOKEN_MINUTES:-480}
       IdentityBootstrap__AdminEmails__0: ${ZUMBO_IDENTITY_ADMIN_EMAIL:-}
       IdentityBootstrap__BootstrapToken: ${ZUMBO_IDENTITY_BOOTSTRAP_TOKEN:-}
       RegistrationProvisioning__Mode: ${ZUMBO_REGISTRATION_PROVISIONING_MODE:-ProductionLike}
@@ -141,6 +146,7 @@ services:
       ReadModelCache__Provider: Redis
       ReadModelCache__TtlSeconds: 30
       ReadModelCache__KeyPrefix: "zumbo:read-model:"
+      HealthChecks__DependencyTimeoutSeconds: 30
       Runtime__Role: Worker
       Runtime__InstanceId: worker-1
       BackgroundJobs__Enabled: true
@@ -160,7 +166,7 @@ services:
     healthcheck:
       test: ["CMD", "mongosh", "--quiet", "--eval", "quit(db.adminCommand('ping').ok ? 0 : 2)"]
       interval: 10s
-      timeout: 5s
+      timeout: 20s
       retries: 10
       start_period: 10s
     restart: unless-stopped
@@ -183,7 +189,7 @@ services:
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
-      timeout: 3s
+      timeout: 15s
       retries: 10
     restart: unless-stopped
 
@@ -198,7 +204,7 @@ services:
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
       interval: 10s
-      timeout: 5s
+      timeout: 20s
       retries: 10
       start_period: 10s
     restart: unless-stopped
@@ -215,9 +221,9 @@ services:
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:9200/_cluster/health | grep -q '\"status\"'"]
       interval: 15s
-      timeout: 5s
-      retries: 20
-      start_period: 45s
+      timeout: 20s
+      retries: 60
+      start_period: 120s
     restart: unless-stopped
 
   clamav:

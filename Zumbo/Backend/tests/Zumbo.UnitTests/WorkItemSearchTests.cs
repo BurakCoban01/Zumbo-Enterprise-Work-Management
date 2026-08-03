@@ -16,6 +16,7 @@ public sealed class WorkItemSearchTests
             Reply(HttpStatusCode.BadRequest),
             Reply(HttpStatusCode.OK),
             Reply(HttpStatusCode.NotFound),
+            Reply(HttpStatusCode.NotFound),
             Reply(HttpStatusCode.OK));
         var index = CreateIndex(handler);
 
@@ -27,11 +28,70 @@ public sealed class WorkItemSearchTests
                 "PUT /work-items-v1",
                 "HEAD /work-items-v1",
                 "HEAD /_alias/work-items",
+                "HEAD /work-items",
                 "POST /_aliases"
             ],
             handler.Requests.Select(x => $"{x.Method} {x.Path}"));
         Assert.Contains("mapping_version", handler.Requests[1].Body);
-        Assert.Contains("is_write_index", handler.Requests[4].Body);
+        Assert.Contains("is_write_index", handler.Requests[5].Body);
+    }
+
+    [Fact]
+    public async Task OpenSearchInitialization_MigratesLegacyConcreteIndexBeforeCreatingAlias()
+    {
+        var handler = new ScriptedHandler(
+            Reply(HttpStatusCode.OK),
+            Reply(HttpStatusCode.NotFound),
+            Reply(HttpStatusCode.OK),
+            Reply(HttpStatusCode.NotFound),
+            Reply(HttpStatusCode.OK),
+            JsonReply(HttpStatusCode.OK, """{"count":125634}"""),
+            JsonReply(HttpStatusCode.OK, """{"task":"node:42"}"""),
+            Reply(HttpStatusCode.ServiceUnavailable),
+            JsonReply(HttpStatusCode.OK, """{"completed":true,"response":{"failures":[]}}"""),
+            JsonReply(HttpStatusCode.OK, """{"count":125634}"""),
+            JsonReply(HttpStatusCode.OK, """{"count":125634}"""),
+            Reply(HttpStatusCode.OK));
+        var index = CreateIndex(handler);
+
+        await index.InitializeAsync();
+
+        Assert.Equal("HEAD /work-items-v1", Request(handler, 0));
+        Assert.Equal("HEAD /_alias/work-items", Request(handler, 1));
+        Assert.Equal("HEAD /work-items", Request(handler, 2));
+        Assert.StartsWith("HEAD /work-items-v1-legacy-", Request(handler, 3), StringComparison.Ordinal);
+        Assert.StartsWith("PUT /work-items-v1-legacy-", Request(handler, 4), StringComparison.Ordinal);
+        Assert.Equal("GET /work-items/_count", Request(handler, 5));
+        Assert.Equal("POST /_reindex", Request(handler, 6));
+        Assert.Contains("\"index\":\"work-items\"", handler.Requests[6].Body, StringComparison.Ordinal);
+        Assert.StartsWith("GET /_tasks/", Request(handler, 7), StringComparison.Ordinal);
+        Assert.StartsWith("GET /_tasks/", Request(handler, 8), StringComparison.Ordinal);
+        Assert.Contains("remove_index", handler.Requests[11].Body, StringComparison.Ordinal);
+        Assert.Contains("is_write_index", handler.Requests[11].Body, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task OpenSearchInitialization_PreservesLegacyIndexWhenMigrationCountDiffers()
+    {
+        var handler = new ScriptedHandler(
+            Reply(HttpStatusCode.OK),
+            Reply(HttpStatusCode.NotFound),
+            Reply(HttpStatusCode.OK),
+            Reply(HttpStatusCode.NotFound),
+            Reply(HttpStatusCode.OK),
+            JsonReply(HttpStatusCode.OK, """{"count":10}"""),
+            JsonReply(HttpStatusCode.OK, """{"task":"node:42"}"""),
+            JsonReply(HttpStatusCode.OK, """{"completed":true,"response":{"failures":[]}}"""),
+            JsonReply(HttpStatusCode.OK, """{"count":9}"""),
+            JsonReply(HttpStatusCode.OK, """{"count":10}"""),
+            Reply(HttpStatusCode.OK));
+        var index = CreateIndex(handler);
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() => index.InitializeAsync());
+
+        Assert.Contains("count mismatch", exception.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain(handler.Requests, request => request.Path == "/_aliases");
+        Assert.StartsWith("DELETE /work-items-v1-legacy-", Request(handler, 10), StringComparison.Ordinal);
     }
 
     [Fact]
@@ -229,6 +289,9 @@ public sealed class WorkItemSearchTests
 
     private static HttpResponseMessage JsonReply(HttpStatusCode statusCode, string json) =>
         new(statusCode) { Content = new StringContent(json, System.Text.Encoding.UTF8, "application/json") };
+
+    private static string Request(ScriptedHandler handler, int index) =>
+        $"{handler.Requests[index].Method} {handler.Requests[index].Path}";
 
     private sealed record CapturedRequest(
         string Method,

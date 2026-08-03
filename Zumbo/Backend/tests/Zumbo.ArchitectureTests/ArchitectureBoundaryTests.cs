@@ -2,6 +2,8 @@ using System.Linq.Expressions;
 using System.Reflection;
 using System.Text.Json;
 using System.Xml.Linq;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Zumbo.BuildingBlocks.Application.Events;
 using Zumbo.BuildingBlocks.Application.Persistence;
 using Zumbo.Modules.Identity;
@@ -117,7 +119,7 @@ public sealed class ArchitectureBoundaryTests
     }
 
     [Fact]
-    public void ApiHostBusinessLogicFiles_MatchExactMigrationAllowList()
+    public void ApiHostBusinessLogic_RemainsInsideEndpointAndPipelineBoundaries()
     {
         var routeMarkers = new[]
         {
@@ -135,31 +137,13 @@ public sealed class ArchitectureBoundaryTests
             })
             .Select(file => Path.GetRelativePath(apiDirectory, file).Replace('\\', '/'));
 
-        AssertExactSet(
-        [
-            "Endpoints/AuditEndpoints.cs",
-            "Endpoints/AutomationEndpoints.cs",
-            "Endpoints/BoardsEndpoints.cs",
-            "Endpoints/CapacityPlanningEndpoints.cs",
-            "Endpoints/DashboardEndpoints.cs",
-            "Endpoints/DevelopmentIntegrationEndpoints.cs",
-            "Endpoints/GoalEndpoints.cs",
-            "Endpoints/IdentityEndpoints.cs",
-            "Endpoints/IntakeEndpoints.cs",
-            "Endpoints/KnowledgeEndpoints.cs",
-            "Endpoints/NotificationEndpoints.cs",
-            "Endpoints/OperationsEndpoints.cs",
-            "Endpoints/OrganizationsEndpoints.cs",
-            "Endpoints/PortfolioEndpoints.cs",
-            "Endpoints/ProjectsEndpoints.cs",
-            "Endpoints/SprintEndpoints.cs",
-            "Endpoints/TeamsEndpoints.cs",
-            "Endpoints/WebhookEndpoints.cs",
-            "Endpoints/WorkflowEndpoints.cs",
-            "Endpoints/WorkItemEndpoints.cs",
-            "Endpoints/WorkItemTypeSchemaEndpoints.cs",
-            "Hosting/ApiPipeline.cs"
-        ], actual);
+        Assert.NotEmpty(actual);
+        Assert.All(
+            actual,
+            relativePath => Assert.True(
+                relativePath.StartsWith("Endpoints/", StringComparison.Ordinal)
+                    || relativePath == "Hosting/ApiPipeline.cs",
+                $"API business logic must remain inside endpoint or pipeline boundaries: {relativePath}"));
     }
 
     [Fact]
@@ -384,9 +368,9 @@ public sealed class ArchitectureBoundaryTests
             typeof(Entity).Assembly.GetExportedTypes(),
             type => type.Name is "Error" or "Result" || type.Name.StartsWith("Result`", StringComparison.Ordinal));
 
-        AssertServiceUsesAggregate("Zumbo.Modules.WorkItems", "WorkItemsModule.cs", "WorkItemAggregate.Rehydrate");
-        AssertServiceUsesAggregate("Zumbo.Modules.Workflows", "WorkflowsModule.cs", "WorkflowDefinitionAggregate.Define");
-        AssertServiceUsesAggregate("Zumbo.Modules.Projects", "ProjectMembership.cs", "ProjectMembershipAggregate.Rehydrate");
+        AssertModuleUsesAggregate("Zumbo.Modules.WorkItems", "WorkItemAggregate.Rehydrate");
+        AssertModuleUsesAggregate("Zumbo.Modules.Workflows", "WorkflowDefinitionAggregate.Define");
+        AssertModuleUsesAggregate("Zumbo.Modules.Projects", "ProjectMembershipAggregate.Rehydrate");
     }
 
     [Fact]
@@ -485,36 +469,54 @@ public sealed class ArchitectureBoundaryTests
     }
 
     [Fact]
-    public void LargeModuleFiles_StayBelowReducedMigrationCeilings()
+    public void ProductionSourceFiles_StayWithinReadabilityLimit()
     {
-        var reducedCeilings = new Dictionary<string, int>
-        {
-            ["Zumbo.Modules.Audit/AuditModule.cs"] = 139,
-            ["Zumbo.Modules.Boards/BoardsModule.cs"] = 732,
-            ["Zumbo.Modules.Identity/IdentityModule.cs"] = 863,
-            ["Zumbo.Modules.Notifications/NotificationsModule.cs"] = 312,
-            ["Zumbo.Modules.Organizations/OrganizationsModule.cs"] = 458,
-            ["Zumbo.Modules.Projects/ProjectsModule.cs"] = 452,
-            ["Zumbo.Modules.Teams/TeamsModule.cs"] = 520,
-            ["Zumbo.Modules.Workflows/WorkflowsModule.cs"] = 370,
-            ["Zumbo.Modules.WorkItems/WorkItemsModule.cs"] = 2183
-        };
+        const int maximumLines = 500;
+        var oversizedFiles = ProductionSourceFiles()
+            .Select(path => new
+            {
+                Path = Path.GetRelativePath(SourceDirectory, path),
+                Lines = File.ReadLines(path).Count()
+            })
+            .Where(file => file.Lines > maximumLines)
+            .OrderByDescending(file => file.Lines)
+            .ToArray();
 
-        foreach (var (relativePath, maximumLines) in reducedCeilings)
-        {
-            var path = Path.Combine(SourceDirectory, relativePath.Replace('/', Path.DirectorySeparatorChar));
-            var actualLines = File.ReadLines(path).Count();
+        Assert.True(
+            oversizedFiles.Length == 0,
+            $"Production source files must not exceed {maximumLines} lines:{Environment.NewLine}"
+                + string.Join(Environment.NewLine, oversizedFiles.Select(file => $"{file.Path}: {file.Lines}")));
+    }
 
-            Assert.True(
-                actualLines <= maximumLines,
-                $"{relativePath} has {actualLines} lines; migration ceiling is {maximumLines}.");
-        }
+    [Fact]
+    public void ProductionSourceFiles_ContainAtMostOneTopLevelType()
+    {
+        var offenders = ProductionSourceFiles()
+            .Select(path => new
+            {
+                Path = Path.GetRelativePath(SourceDirectory, path),
+                Count = TopLevelTypeCount(path)
+            })
+            .Where(file => file.Count > 1)
+            .OrderBy(file => file.Path, StringComparer.Ordinal)
+            .ToArray();
+
+        Assert.True(
+            offenders.Length == 0,
+            "Production source files must contain at most one top-level type:"
+                + Environment.NewLine
+                + string.Join(Environment.NewLine, offenders.Select(file => $"{file.Path}: {file.Count}")));
     }
 
     [Fact]
     public void WorkItemGraphTraversal_UsesBoundedIndexedRepositoryOperations()
     {
-        var path = Path.Combine(SourceDirectory, "Zumbo.Modules.WorkItems", "WorkItemGraphService.cs");
+        var path = Path.Combine(
+            SourceDirectory,
+            "Zumbo.Modules.WorkItems",
+            "Services",
+            "WorkItemGraph",
+            "WorkItemGraphService.cs");
         var source = File.ReadAllText(path);
 
         Assert.Contains("MaxTraversalDepth", source, StringComparison.Ordinal);
@@ -559,10 +561,12 @@ public sealed class ArchitectureBoundaryTests
         Assert.Equal("team.invitation-notification.v1", Zumbo.Modules.Teams.TeamDurableEventTypes.InvitationNotification);
         Assert.Equal("work-item.notification.v1", WorkItemDurableEventTypes.Notification);
 
-        var notificationAdapters = File.ReadAllText(Path.Combine(SourceDirectory, "Zumbo.Api", "NotificationAdapters.cs"));
+        var notificationAdapters = ReadSourceScope(
+            Path.Combine(SourceDirectory, "Zumbo.Api", "NotificationAdapters"));
         var notificationHost = File.ReadAllText(Path.Combine(SourceDirectory, "Zumbo.Api", "Endpoints", "NotificationEndpoints.cs"));
-        var workItemHost = File.ReadAllText(Path.Combine(SourceDirectory, "Zumbo.Api", "Endpoints", "WorkItemEndpoints.cs"));
-        var gateway = File.ReadAllText(Path.Combine(SourceDirectory, "Zumbo.Gateway", "GatewayHost.cs"));
+        var workItemHost = ReadSourceScope(
+            Path.Combine(SourceDirectory, "Zumbo.Api", "Endpoints", "WorkItemEndpoints"));
+        var gateway = ReadSourceScope(Path.Combine(SourceDirectory, "Zumbo.Gateway", "GatewayHost"));
         Assert.DoesNotContain("Zumbo.Modules.WorkItems", notificationAdapters, StringComparison.Ordinal);
         Assert.DoesNotContain("DueDateReminderHostedService", notificationHost, StringComparison.Ordinal);
         Assert.Contains("DueDateReminderHostedService", workItemHost, StringComparison.Ordinal);
@@ -604,10 +608,57 @@ public sealed class ArchitectureBoundaryTests
         Assert.All(expectedNames, expectedName => Assert.Contains(expectedName, actualNames));
     }
 
-    private static void AssertServiceUsesAggregate(string moduleName, string fileName, string invocation)
+    private static IReadOnlyList<string> ProductionSourceFiles() =>
+        Directory.GetFiles(SourceDirectory, "*.cs", SearchOption.AllDirectories)
+            .Where(path => !path.Contains(
+                $"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}",
+                StringComparison.OrdinalIgnoreCase))
+            .Where(path => !path.Contains(
+                $"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}",
+                StringComparison.OrdinalIgnoreCase))
+            .Order(StringComparer.Ordinal)
+            .ToList();
+
+    private static int TopLevelTypeCount(string path)
     {
-        var path = Path.Combine(SourceDirectory, moduleName, fileName);
-        Assert.Contains(invocation, File.ReadAllText(path), StringComparison.Ordinal);
+        var root = CSharpSyntaxTree.ParseText(File.ReadAllText(path)).GetCompilationUnitRoot();
+        return NamespaceMembers(root.Members)
+            .Count(member => member is BaseTypeDeclarationSyntax or DelegateDeclarationSyntax);
+    }
+
+    private static IEnumerable<MemberDeclarationSyntax> NamespaceMembers(
+        IEnumerable<MemberDeclarationSyntax> members)
+    {
+        foreach (var member in members)
+        {
+            if (member is BaseNamespaceDeclarationSyntax namespaceDeclaration)
+            {
+                foreach (var namespaceMember in NamespaceMembers(namespaceDeclaration.Members))
+                {
+                    yield return namespaceMember;
+                }
+
+                continue;
+            }
+
+            yield return member;
+        }
+    }
+
+    private static string ReadSourceScope(string directory) =>
+        string.Join(
+            Environment.NewLine,
+            Directory.GetFiles(directory, "*.cs", SearchOption.AllDirectories)
+                .Where(path => !path.Contains(
+                    $"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}",
+                    StringComparison.OrdinalIgnoreCase))
+                .Order(StringComparer.Ordinal)
+                .Select(File.ReadAllText));
+
+    private static void AssertModuleUsesAggregate(string moduleName, string invocation)
+    {
+        var source = ReadSourceScope(Path.Combine(SourceDirectory, moduleName));
+        Assert.Contains(invocation, source, StringComparison.Ordinal);
     }
 
     private static void AssertExactSet(IEnumerable<string> expected, IEnumerable<string> actual) =>

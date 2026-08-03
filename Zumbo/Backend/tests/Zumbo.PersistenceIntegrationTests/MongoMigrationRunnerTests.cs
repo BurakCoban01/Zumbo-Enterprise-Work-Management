@@ -117,6 +117,71 @@ public sealed class MongoMigrationRunnerTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task UserVersionBackfill_RepairsOnlyLegacyVersionsAndIsIdempotent()
+    {
+        var users = _database.GetCollection<BsonDocument>("users");
+        await users.InsertManyAsync(
+        [
+            new BsonDocument { ["_id"] = "missing-version", ["Username"] = "missing" },
+            new BsonDocument { ["_id"] = "zero-version", ["Username"] = "zero", ["Version"] = 0L },
+            new BsonDocument { ["_id"] = "current-version", ["Username"] = "current", ["Version"] = 8L }
+        ]);
+        var runner = CreateRunner(new MongoMigrationOptions
+        {
+            RunDataMigrations = true,
+            BatchSize = 1,
+            MaxBatchesPerRun = 20
+        });
+
+        var first = Outcome(
+            await runner.RunAsync(CancellationToken.None),
+            MongoMigrationRunner.UserVersionMigrationId);
+        var second = Outcome(
+            await runner.RunAsync(CancellationToken.None),
+            MongoMigrationRunner.UserVersionMigrationId);
+        var documents = await users.Find(FilterDefinition<BsonDocument>.Empty)
+            .Sort(new BsonDocument("_id", 1))
+            .ToListAsync();
+
+        Assert.Equal(MongoMigrationStates.Completed, first.Status);
+        Assert.Equal(2, first.Changed);
+        Assert.Equal(MongoMigrationStates.Skipped, second.Status);
+        Assert.Equal(8L, documents.Single(x => x["_id"] == "current-version")["Version"].AsInt64);
+        Assert.All(documents.Where(x => x["_id"] != "current-version"),
+            document => Assert.Equal(1L, document["Version"].AsInt64));
+    }
+
+    [Fact]
+    public async Task LegacyMigrationMarkerCleanup_RemovesOnlyInfrastructureMarkers()
+    {
+        var projects = _database.GetCollection<BsonDocument>("projects");
+        await projects.InsertOneAsync(new BsonDocument
+        {
+            ["_id"] = "marked-project",
+            ["Name"] = "Preserved project",
+            ["Version"] = 4L,
+            ["ProjectLifecycleMigratedBy"] = MongoMigrationRunner.ProjectLifecycleMigrationId
+        });
+        var runner = CreateRunner(new MongoMigrationOptions { BatchSize = 10, MaxBatchesPerRun = 20 });
+
+        var first = Outcome(
+            await runner.RunAsync(CancellationToken.None),
+            MongoMigrationRunner.LegacyMigrationMarkerCleanupId);
+        var second = Outcome(
+            await runner.RunAsync(CancellationToken.None),
+            MongoMigrationRunner.LegacyMigrationMarkerCleanupId);
+        var project = await projects.Find(
+            Builders<BsonDocument>.Filter.Eq("_id", "marked-project")).SingleAsync();
+
+        Assert.Equal(MongoMigrationStates.Completed, first.Status);
+        Assert.Equal(1, first.Changed);
+        Assert.Equal(MongoMigrationStates.Skipped, second.Status);
+        Assert.False(project.Contains("ProjectLifecycleMigratedBy"));
+        Assert.Equal("Preserved project", project["Name"].AsString);
+        Assert.Equal(4L, project["Version"].AsInt64);
+    }
+
+    [Fact]
     public async Task TeamInviteTokenBackfill_ExpiresOnlyLegacyHashlessInvites()
     {
         var teams = _database.GetCollection<BsonDocument>("teams");
@@ -1048,6 +1113,43 @@ public sealed class MongoMigrationRunnerTests : IAsyncLifetime
                     actual["expireAfterSeconds"].ToInt64());
             }
         }
+    }
+
+    [Fact]
+    public async Task RequiredIndexes_AcceptEquivalentLegacyNamesWithoutDroppingThem()
+    {
+        var users = _database.GetCollection<BsonDocument>("users");
+        await users.Indexes.CreateManyAsync(
+        [
+            new CreateIndexModel<BsonDocument>(
+                new BsonDocument("Username", 1),
+                new CreateIndexOptions
+                {
+                    Name = "Username_1",
+                    Unique = true,
+                    Collation = new Collation("en", strength: CollationStrength.Secondary)
+                }),
+            new CreateIndexModel<BsonDocument>(
+                new BsonDocument("Email", 1),
+                new CreateIndexOptions
+                {
+                    Name = "Email_1",
+                    Unique = true,
+                    Collation = new Collation("en", strength: CollationStrength.Secondary)
+                })
+        ]);
+
+        var outcome = Outcome(
+            await CreateRunner(new MongoMigrationOptions()).RunAsync(),
+            MongoMigrationRunner.IndexMigrationId);
+        using var cursor = await users.Indexes.ListAsync();
+        var names = (await cursor.ToListAsync()).Select(index => index["name"].AsString).ToList();
+
+        Assert.Equal(MongoMigrationStates.Completed, outcome.Status);
+        Assert.Contains("Username_1", names);
+        Assert.Contains("Email_1", names);
+        Assert.DoesNotContain("ux_users_username_ci", names);
+        Assert.DoesNotContain("ux_users_email_ci", names);
     }
 
     [Fact]
