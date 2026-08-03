@@ -38,6 +38,18 @@ public sealed class RefactorSemanticPreservationTests
             ["Zumbo.Modules.Organizations|Zumbo.Modules.Organizations.ListOrganizationsHandler|method:HandleAsync:(ListOrganizationsQueryquery,CancellationTokenct):Task<IReadOnlyList<OrganizationResponse>>"] =
                 "The endpoint handler selects the independent organization-list query slice when composed from ports and retains its original facade constructor.",
             ["Zumbo.Modules.Organizations|Zumbo.Modules.Organizations.OrganizationService|ctor:(IDocumentRepository<OrganizationDocument>organizations,IOrganizationMemberDirectorymemberDirectory,IDistributedLockProviderdistributedLockProvider,IOptions<DistributedLockOptions>distributedLockOptions,IClockclock,ICurrentUsercurrentUser,IOrganizationAuditWriteraudit,IExpectedVersionAccessor?expectedVersions=null,IOptions<OrganizationLifecycleOptions>?lifecycleOptions=null)"] =
+                "The unchanged compatibility facade constructor now wires the port-focused create and list handlers from its existing dependencies; its public signature and all previous assignments remain intact.",
+            ["Zumbo.Api|TeamsEndpoints|method:AddTeamsModule:(thisIServiceCollectionservices):IServiceCollection"] =
+                "Team create and list handlers remain scoped while explicit factories select their port-focused constructors and preserve compatibility constructors.",
+            ["Zumbo.Modules.Teams|Zumbo.Modules.Teams.TeamService|method:CreateAsync:(CreateTeamRequestrequest,stringcorrelationId,CancellationTokenct):Task<TeamResponse>"] =
+                "The compatibility facade delegates team creation to the port-focused CreateTeam slice while preserving its public signature and behavior.",
+            ["Zumbo.Modules.Teams|Zumbo.Modules.Teams.TeamService|method:ListAsync:(stringorganizationId,CancellationTokenct,boolarchived=false):Task<IReadOnlyList<TeamResponse>>"] =
+                "The compatibility facade delegates team listing to the tenant-scoped ListTeams query slice while preserving its public signature.",
+            ["Zumbo.Modules.Teams|Zumbo.Modules.Teams.CreateTeamHandler|method:HandleAsync:(CreateTeamRequestrequest,stringcorrelationId,CancellationTokenct):Task<TeamResponse>"] =
+                "The endpoint handler selects the independent team-creation slice when composed from ports and retains its original facade constructor.",
+            ["Zumbo.Modules.Teams|Zumbo.Modules.Teams.ListTeamsHandler|method:HandleAsync:(ListTeamsQueryquery,CancellationTokenct):Task<IReadOnlyList<TeamResponse>>"] =
+                "The endpoint handler selects the independent team-list query slice when composed from ports and retains its original facade constructor.",
+            ["Zumbo.Modules.Teams|Zumbo.Modules.Teams.TeamService|ctor:(IDocumentRepository<TeamDocument>teams,ITeamUserDirectoryuserDirectory,ITeamAuditWriteraudit,IClockclock,ICurrentUsercurrentUser,IExpectedVersionAccessor?expectedVersions=null,ITeamOrganizationDirectory?organizationDirectory=null,ITeamInvitationNotifier?invitationNotifier=null)"] =
                 "The unchanged compatibility facade constructor now wires the port-focused create and list handlers from its existing dependencies; its public signature and all previous assignments remain intact."
         };
 

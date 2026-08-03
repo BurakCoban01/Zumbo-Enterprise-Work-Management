@@ -23,7 +23,9 @@ public sealed class RefactorRuntimeContractTests
         "services.AddScoped<RegisterUserHandler>();",
         "services.AddScoped<SearchUsersHandler>();",
         "services.AddScoped<CreateOrganizationHandler>();",
-        "services.AddScoped<ListOrganizationsHandler>();"
+        "services.AddScoped<ListOrganizationsHandler>();",
+        "services.AddScoped<CreateTeamHandler>();",
+        "services.AddScoped<ListTeamsHandler>();"
     ];
 
     private static readonly string[] PortFocusedVerticalSliceDiRegistrations =
@@ -53,6 +55,18 @@ public sealed class RefactorRuntimeContractTests
         + "provider.GetRequiredService<IOrganizationAuditWriter>()));",
         "services.AddScoped<ListOrganizationsHandler>(provider=>newListOrganizationsHandler("
         + "provider.GetRequiredService<IDocumentRepository<OrganizationDocument>>(),"
+        + "provider.GetRequiredService<ICurrentUser>()));",
+        "services.AddScoped<CreateTeamHandler>(provider=>newCreateTeamHandler("
+        + "provider.GetRequiredService<IDocumentRepository<TeamDocument>>(),"
+        + "provider.GetRequiredService<ITeamUserDirectory>(),"
+        + "provider.GetRequiredService<ITeamOrganizationDirectory>(),"
+        + "provider.GetRequiredService<ITeamAuditWriter>(),"
+        + "provider.GetRequiredService<IClock>(),"
+        + "provider.GetRequiredService<ICurrentUser>()));",
+        "services.AddScoped<ListTeamsHandler>(provider=>newListTeamsHandler("
+        + "provider.GetRequiredService<IDocumentRepository<TeamDocument>>(),"
+        + "provider.GetRequiredService<ITeamOrganizationDirectory>(),"
+        + "provider.GetRequiredService<IClock>(),"
         + "provider.GetRequiredService<ICurrentUser>()));"
     ];
 
@@ -144,7 +158,8 @@ public sealed class RefactorRuntimeContractTests
             intentionalRuntimeContractReplacements = new[]
             {
                 "RegisterUserHandler and SearchUsersHandler remain scoped self-services; explicit factories select their port-focused constructors while compatibility constructors remain available.",
-                "CreateOrganizationHandler and ListOrganizationsHandler remain scoped self-services; explicit factories select their port-focused constructors while compatibility constructors remain available."
+                "CreateOrganizationHandler and ListOrganizationsHandler remain scoped self-services; explicit factories select their port-focused constructors while compatibility constructors remain available.",
+                "CreateTeamHandler and ListTeamsHandler remain scoped self-services; explicit factories select their port-focused constructors while compatibility constructors remain available."
             },
             intentionalConfigurationChanges = new[]
             {
