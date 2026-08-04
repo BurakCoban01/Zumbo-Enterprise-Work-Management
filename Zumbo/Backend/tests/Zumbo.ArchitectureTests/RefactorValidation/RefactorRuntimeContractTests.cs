@@ -281,7 +281,11 @@ public sealed class RefactorRuntimeContractTests
 
     private static IReadOnlyList<string> EndpointContracts(
         IReadOnlyList<RefactorSourceReader.SourceFile> files) =>
-        Parsed(files, file => file.Path.StartsWith("Backend/src/Zumbo.Api/Endpoints/", StringComparison.Ordinal))
+        Parsed(files, file =>
+                file.Path.StartsWith("Backend/src/Zumbo.Api/Endpoints/", StringComparison.Ordinal)
+                || file.Path.StartsWith(
+                    "Backend/src/Zumbo.Api/Presentation/Endpoints/",
+                    StringComparison.Ordinal))
             .SelectMany(source => source.Root.DescendantNodes().OfType<InvocationExpressionSyntax>())
             .Where(invocation => HttpMapMethods.Contains(InvocationName(invocation)))
             .Select(invocation => Normalize(

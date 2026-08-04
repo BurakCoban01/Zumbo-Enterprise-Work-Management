@@ -141,8 +141,8 @@ public sealed class ArchitectureBoundaryTests
         Assert.All(
             actual,
             relativePath => Assert.True(
-                relativePath.StartsWith("Endpoints/", StringComparison.Ordinal)
-                    || relativePath == "Hosting/ApiPipeline.cs",
+                relativePath.StartsWith("Presentation/Endpoints/", StringComparison.Ordinal)
+                    || relativePath == "Composition/Hosting/ApiPipeline.cs",
                 $"API business logic must remain inside endpoint or pipeline boundaries: {relativePath}"));
     }
 
@@ -210,7 +210,12 @@ public sealed class ArchitectureBoundaryTests
     [Fact]
     public void ApiPipeline_PreservesExactMiddlewareOrder()
     {
-        var pipeline = Path.Combine(SourceDirectory, "Zumbo.Api", "Hosting", "ApiPipeline.cs");
+        var pipeline = Path.Combine(
+            SourceDirectory,
+            "Zumbo.Api",
+            "Composition",
+            "Hosting",
+            "ApiPipeline.cs");
         var actual = File.ReadLines(pipeline)
             .Select(line => line.Trim())
             .Where(line => line.StartsWith("app.Use", StringComparison.Ordinal))
@@ -263,7 +268,7 @@ public sealed class ArchitectureBoundaryTests
             ["WorkItemEndpoints.cs"] = "Zumbo.Modules.WorkItems",
             ["WorkItemTypeSchemaEndpoints.cs"] = "Zumbo.Modules.WorkItems"
         };
-        var endpointDirectory = Path.Combine(SourceDirectory, "Zumbo.Api", "Endpoints");
+        var endpointDirectory = Path.Combine(SourceDirectory, "Zumbo.Api", "Presentation", "Endpoints");
 
         AssertExactSet(expected.Keys, Directory.GetFiles(endpointDirectory, "*.cs").Select(Path.GetFileName).OfType<string>());
         foreach (var (fileName, owningModule) in expected)
@@ -546,6 +551,7 @@ public sealed class ArchitectureBoundaryTests
         var composition = File.ReadAllText(Path.Combine(
             SourceDirectory,
             "Zumbo.Api",
+            "Presentation",
             "Endpoints",
             "IdentityEndpoints.cs"));
         Assert.Contains("AddScoped<RegisterUserHandler>(provider =>", composition, StringComparison.Ordinal);
@@ -592,6 +598,7 @@ public sealed class ArchitectureBoundaryTests
         var composition = File.ReadAllText(Path.Combine(
             SourceDirectory,
             "Zumbo.Api",
+            "Presentation",
             "Endpoints",
             "OrganizationsEndpoints.cs"));
         Assert.Contains("AddScoped<CreateOrganizationHandler>(provider =>", composition, StringComparison.Ordinal);
@@ -636,6 +643,7 @@ public sealed class ArchitectureBoundaryTests
         var composition = File.ReadAllText(Path.Combine(
             SourceDirectory,
             "Zumbo.Api",
+            "Presentation",
             "Endpoints",
             "TeamsEndpoints.cs"));
         Assert.Contains("AddScoped<CreateTeamHandler>(provider =>", composition, StringComparison.Ordinal);
@@ -681,6 +689,7 @@ public sealed class ArchitectureBoundaryTests
         var composition = File.ReadAllText(Path.Combine(
             SourceDirectory,
             "Zumbo.Api",
+            "Presentation",
             "Endpoints",
             "ProjectsEndpoints.cs"));
         Assert.Contains("AddScoped<CreateProjectHandler>(provider =>", composition, StringComparison.Ordinal);
@@ -737,6 +746,7 @@ public sealed class ArchitectureBoundaryTests
         var composition = File.ReadAllText(Path.Combine(
             SourceDirectory,
             "Zumbo.Api",
+            "Presentation",
             "Endpoints",
             "BoardsEndpoints.cs"));
         Assert.Contains("AddScoped<CreateBoardHandler>(provider =>", composition, StringComparison.Ordinal);
@@ -786,6 +796,7 @@ public sealed class ArchitectureBoundaryTests
         var composition = File.ReadAllText(Path.Combine(
             SourceDirectory,
             "Zumbo.Api",
+            "Presentation",
             "Endpoints",
             "WorkflowEndpoints.cs"));
         Assert.Contains("AddScoped<UpsertWorkflowHandler>(provider =>", composition, StringComparison.Ordinal);
@@ -845,6 +856,7 @@ public sealed class ArchitectureBoundaryTests
         var composition = File.ReadAllText(Path.Combine(
             SourceDirectory,
             "Zumbo.Api",
+            "Presentation",
             "Endpoints",
             "WorkItemEndpoints",
             "WorkItemEndpoints.AddWorkItemsModule.cs"));
@@ -899,6 +911,7 @@ public sealed class ArchitectureBoundaryTests
         var composition = File.ReadAllText(Path.Combine(
             SourceDirectory,
             "Zumbo.Api",
+            "Presentation",
             "Endpoints",
             "NotificationEndpoints.cs"));
         Assert.Contains("AddScoped<ListNotificationsHandler>(provider =>", composition, StringComparison.Ordinal);
@@ -950,6 +963,7 @@ public sealed class ArchitectureBoundaryTests
         var composition = File.ReadAllText(Path.Combine(
             SourceDirectory,
             "Zumbo.Api",
+            "Presentation",
             "Endpoints",
             "AuditEndpoints.cs"));
         Assert.Contains("AddScoped<WriteAuditLogHandler>(provider =>", composition, StringComparison.Ordinal);
@@ -999,7 +1013,7 @@ public sealed class ArchitectureBoundaryTests
     [Fact]
     public void EndpointRepositoryDependencies_AreRestrictedToCompositionMethods()
     {
-        var endpointDirectory = Path.Combine(SourceDirectory, "Zumbo.Api", "Endpoints");
+        var endpointDirectory = Path.Combine(SourceDirectory, "Zumbo.Api", "Presentation", "Endpoints");
         var violations = Directory.GetFiles(endpointDirectory, "*.cs", SearchOption.AllDirectories)
             .SelectMany(path =>
             {
@@ -1081,9 +1095,14 @@ public sealed class ArchitectureBoundaryTests
 
         var notificationAdapters = ReadSourceScope(
             Path.Combine(SourceDirectory, "Zumbo.Api", "NotificationAdapters"));
-        var notificationHost = File.ReadAllText(Path.Combine(SourceDirectory, "Zumbo.Api", "Endpoints", "NotificationEndpoints.cs"));
+        var notificationHost = File.ReadAllText(Path.Combine(
+            SourceDirectory,
+            "Zumbo.Api",
+            "Presentation",
+            "Endpoints",
+            "NotificationEndpoints.cs"));
         var workItemHost = ReadSourceScope(
-            Path.Combine(SourceDirectory, "Zumbo.Api", "Endpoints", "WorkItemEndpoints"));
+            Path.Combine(SourceDirectory, "Zumbo.Api", "Presentation", "Endpoints", "WorkItemEndpoints"));
         var gateway = ReadSourceScope(Path.Combine(SourceDirectory, "Zumbo.Gateway", "GatewayHost"));
         Assert.DoesNotContain("Zumbo.Modules.WorkItems", notificationAdapters, StringComparison.Ordinal);
         Assert.DoesNotContain("DueDateReminderHostedService", notificationHost, StringComparison.Ordinal);
