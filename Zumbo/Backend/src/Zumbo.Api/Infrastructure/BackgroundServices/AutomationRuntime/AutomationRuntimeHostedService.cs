@@ -4,6 +4,10 @@ using Zumbo.BuildingBlocks.Application.Messaging;
 using Zumbo.BuildingBlocks.Application.Persistence;
 using Zumbo.Modules.Identity;
 using Zumbo.Modules.Workflows;
+using Zumbo.Modules.Workflows.Application.Features.RunRetry;
+using Zumbo.Modules.Workflows.Application.Features.RunResume;
+using Zumbo.Modules.Workflows.Application.Features.ScheduleClaims;
+using Zumbo.Modules.Workflows.Application.Features.RunExecution;
 using Zumbo.Modules.WorkItems;
 
 public sealed class AutomationRuntimeHostedService(
@@ -40,13 +44,19 @@ public sealed class AutomationRuntimeHostedService(
     {
         await using var scope = scopeFactory.CreateAsyncScope();
         var services = scope.ServiceProvider;
-        var execution = services.GetRequiredService<AutomationExecutionService>();
+        var executeAutomation = services.GetRequiredService<ExecuteAutomationHandler>();
+        var dueRetries = services.GetRequiredService<ListDueAutomationRetriesHandler>();
+        var resumeRun = services.GetRequiredService<ResumeAutomationRunHandler>();
+        var claimSchedules = services.GetRequiredService<ClaimDueSchedulesHandler>();
+        var completeSchedule = services.GetRequiredService<CompleteScheduleClaimHandler>();
         var actors = services.GetRequiredService<AutomationActorContextRunner>();
         var sources = services.GetRequiredService<IAutomationScheduledSourceProvider>();
         var transactions = services.GetRequiredService<IDurableTransactionRunner>();
         var batchSize = Math.Clamp(options.Value.BatchSize, 1, 200);
 
-        var retries = await execution.ListDueRetriesAsync(batchSize, ct);
+        var retries = await dueRetries.HandleAsync(
+            new ListDueAutomationRetriesQuery(batchSize),
+            ct);
         foreach (var run in retries)
         {
             try
@@ -57,7 +67,9 @@ public sealed class AutomationRuntimeHostedService(
                         run.ActorUserId,
                         run.OrganizationId,
                         run.CorrelationId,
-                        available => execution.ResumeAsync(run.Id, available, token),
+                        available => resumeRun.HandleAsync(
+                            new ResumeAutomationRunCommand(run.RunId, available),
+                            token),
                         token),
                     ct);
             }
@@ -66,13 +78,15 @@ public sealed class AutomationRuntimeHostedService(
                 logger.LogWarning(
                     exception,
                     "Automation retry {RunId} could not be processed.",
-                    run.Id);
+                    run.RunId);
             }
         }
 
         var schedules = await transactions.ExecuteAsync(
             "Workflows",
-            token => execution.ClaimDueSchedulesAsync(batchSize, token),
+            token => claimSchedules.HandleAsync(
+                new ClaimDueSchedulesQuery(batchSize),
+                token),
             ct);
         foreach (var schedule in schedules)
         {
@@ -106,8 +120,8 @@ public sealed class AutomationRuntimeHostedService(
                             schedule.ActorUserId,
                             schedule.OrganizationId,
                             correlationId,
-                            available => execution.ExecuteAsync(
-                                new AutomationExecutionContext(
+                            available => executeAutomation.HandleAsync(
+                                new ExecuteAutomationCommand(new AutomationExecutionContext(
                                     schedule.OrganizationId,
                                     schedule.ProjectId,
                                     "Schedule",
@@ -119,7 +133,7 @@ public sealed class AutomationRuntimeHostedService(
                                     schedule.ScheduledForUtc,
                                     source.Fields,
                                     available,
-                                    RuleId: schedule.RuleId),
+                                    RuleId: schedule.RuleId)),
                                 token),
                             token),
                         ct);
@@ -139,10 +153,11 @@ public sealed class AutomationRuntimeHostedService(
             {
                 await transactions.ExecuteAsync(
                     "Workflows",
-                    token => execution.CompleteScheduleClaimAsync(
-                        schedule.RuleId,
-                        schedule.ScheduledForUtc,
-                        schedule.ClaimToken,
+                    token => completeSchedule.HandleAsync(
+                        new CompleteScheduleClaimCommand(
+                            schedule.RuleId,
+                            schedule.ScheduledForUtc,
+                            schedule.ClaimToken),
                         token),
                     ct);
             }

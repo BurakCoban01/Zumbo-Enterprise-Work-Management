@@ -1,6 +1,13 @@
 using Zumbo.BuildingBlocks.Application.Security;
 using Zumbo.BuildingBlocks.Application.Messaging;
 using Zumbo.Modules.Workflows;
+using Zumbo.Modules.Workflows.Application.Features.RunQueries;
+using Zumbo.Modules.Workflows.Application.Features.RunReplay;
+using Zumbo.Modules.Workflows.Application.Features.RunRetry;
+using Zumbo.Modules.Workflows.Application.Features.ActionExecution;
+using Zumbo.Modules.Workflows.Application.Features.RunResume;
+using Zumbo.Modules.Workflows.Application.Features.ScheduleClaims;
+using Zumbo.Modules.Workflows.Application.Features.RunExecution;
 
 using static ApiEndpointResults;
 
@@ -17,6 +24,15 @@ internal static class AutomationEndpoints
         services.AddScoped<AutomationActorContextRunner>();
         services.AddScoped<AutomationRuleService>();
         services.AddScoped<AutomationExecutionService>();
+        services.AddScoped<GetAutomationRunHandler>();
+        services.AddScoped<ListAutomationRunsHandler>();
+        services.AddScoped<ReplayAutomationRunHandler>();
+        services.AddScoped<ListDueAutomationRetriesHandler>();
+        services.AddScoped<AutomationRunActionExecutor>();
+        services.AddScoped<ResumeAutomationRunHandler>();
+        services.AddScoped<ClaimDueSchedulesHandler>();
+        services.AddScoped<CompleteScheduleClaimHandler>();
+        services.AddScoped<ExecuteAutomationHandler>();
         services.AddScoped<IDurableEventHandler, WorkItemAutomationDurableHandler>();
         services.AddScoped<AutomationTransactionFilter>();
         services.AddOptions<AutomationRuntimeOptions>()
@@ -61,30 +77,31 @@ internal static class AutomationEndpoints
             string? status,
             int? page,
             int? pageSize,
-            AutomationExecutionService service,
+            ListAutomationRunsHandler handler,
             HttpContext http,
             CancellationToken ct) =>
-            Ok(await service.ListAsync(
+            Ok(await handler.HandleAsync(new ListAutomationRunsQuery(
                 projectId,
                 ruleId,
                 status,
                 page ?? 1,
-                pageSize ?? 50,
-                ct), http));
+                pageSize ?? 50), ct), http));
 
         group.MapGet("/runs/{runId}", async (
             string runId,
-            AutomationExecutionService service,
+            GetAutomationRunHandler handler,
             HttpContext http,
             CancellationToken ct) =>
-            Ok(await service.GetAsync(runId, ct), http));
+            Ok(await handler.HandleAsync(new GetAutomationRunQuery(runId), ct), http));
 
         group.MapPost("/runs/{runId}/replay", async (
             string runId,
-            AutomationExecutionService service,
+            ReplayAutomationRunHandler handler,
             HttpContext http,
             CancellationToken ct) =>
-            Ok(await service.ReplayAsync(runId, CorrelationId(http), ct), http))
+            Ok(await handler.HandleAsync(
+                new ReplayAutomationRunCommand(runId, CorrelationId(http)),
+                ct), http))
             .WithZumboPermission(PermissionCatalog.WorkflowManage);
 
         group.MapGet("/{ruleId}", async (

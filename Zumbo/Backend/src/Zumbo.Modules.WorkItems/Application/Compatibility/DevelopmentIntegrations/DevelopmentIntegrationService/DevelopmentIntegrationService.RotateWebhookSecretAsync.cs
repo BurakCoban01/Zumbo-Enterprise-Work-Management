@@ -1,8 +1,4 @@
-using System.Security.Cryptography;
-using System.Text;
-using Zumbo.BuildingBlocks.Application.Persistence;
-using Zumbo.BuildingBlocks.Application.Security;
-using Zumbo.SharedKernel;
+using Zumbo.Modules.WorkItems.Application.Features.Development.Credentials;
 
 namespace Zumbo.Modules.WorkItems;
 
@@ -13,27 +9,8 @@ public sealed partial class DevelopmentIntegrationService{
         DevelopmentVersionRequest request,
         string correlationId,
         CancellationToken ct)
-    {
-        var connection = await GetManagedConnectionAsync(connectionId, ct);
-        EnsureConnected(connection);
-        var secret = GenerateWebhookSecret(connection.Provider);
-        connection.PreviousWebhookSecretProtected = connection.WebhookSecretProtected;
-        connection.PreviousWebhookSecretVersion = connection.WebhookSecretVersion;
-        connection.PreviousWebhookSecretValidUntilUtc = clock.UtcNow.AddMinutes(15);
-        connection.WebhookSecretProtected = credentialProtector.Protect(secret);
-        connection.WebhookSecretFingerprint = Fingerprint(secret);
-        connection.WebhookSecretVersion++;
-        connection.UpdatedAtUtc = clock.UtcNow;
-        await ReplaceConnectionAsync(connection, request.ExpectedVersion, ct);
-        await WriteAuditAsync(
-            "DevelopmentWebhookSecretRotated",
-            "DevelopmentConnection",
-            connection.Id,
-            "previous-version",
-            $"v{connection.WebhookSecretVersion}|{connection.WebhookSecretFingerprint}",
-            correlationId,
+        => await rotateWebhookSecretHandler.HandleAsync(
+            new RotateWebhookSecretCommand(connectionId, request, correlationId),
             ct);
-        return new DevelopmentConnectionReceipt(ToResponse(connection), secret);
-    }
 
 }

@@ -1,8 +1,4 @@
-using System.Security.Cryptography;
-using System.Text;
-using Zumbo.BuildingBlocks.Application.Persistence;
-using Zumbo.BuildingBlocks.Application.Security;
-using Zumbo.SharedKernel;
+using Zumbo.Modules.WorkItems.Application.Features.Development.Mappings;
 
 namespace Zumbo.Modules.WorkItems;
 
@@ -12,21 +8,8 @@ public sealed partial class DevelopmentIntegrationService{
         ListWorkItemMappingsAsync(
             string workItemId,
             CancellationToken ct)
-    {
-        var (workItem, organizationId) = await GetWorkItemAsync(
-            workItemId,
-            PermissionCatalog.WorkItemLink,
+        => await listWorkItemMappingsHandler.HandleAsync(
+            new ListWorkItemMappingsQuery(workItemId),
             ct);
-        var documents = await ListAllAsync(
-            mappings,
-            item => item.OrganizationId == organizationId
-                && item.ProjectId == workItem.ProjectId
-                && item.IsActive,
-            ct);
-        return documents
-            .OrderBy(item => item.RepositoryFullName, StringComparer.OrdinalIgnoreCase)
-            .Select(ToResponse)
-            .ToList();
-    }
 
 }

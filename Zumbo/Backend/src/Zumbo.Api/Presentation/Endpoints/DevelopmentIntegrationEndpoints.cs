@@ -1,5 +1,12 @@
 using Zumbo.BuildingBlocks.Application.Security;
 using Zumbo.Modules.WorkItems;
+using Zumbo.Modules.WorkItems.Application.Features.Development.Connections;
+using Zumbo.Modules.WorkItems.Application.Features.Development.Credentials;
+using Zumbo.Modules.WorkItems.Application.Features.Development.ProviderHealth;
+using Zumbo.Modules.WorkItems.Application.Features.Development.Repositories;
+using Zumbo.Modules.WorkItems.Application.Features.Development.Mappings;
+using Zumbo.Modules.WorkItems.Application.Features.Development.Links;
+using Zumbo.Modules.WorkItems.Application.Features.Development.Webhooks;
 using Zumbo.SharedKernel;
 
 using static ApiEndpointResults;
@@ -17,40 +24,40 @@ internal static class DevelopmentIntegrationEndpoints
 
         management.MapPost("/", async (
             CreateDevelopmentConnectionRequest request,
-            DevelopmentIntegrationService service,
+            CreateConnectionHandler handler,
             HttpContext http,
             CancellationToken ct) =>
             Created(
-                await service.CreateAsync(
-                    request,
-                    CorrelationId(http),
+                await handler.HandleAsync(
+                    new CreateConnectionCommand(request, CorrelationId(http)),
                     ct),
                 http));
 
         management.MapGet("/", async (
-            DevelopmentIntegrationService service,
+            ListConnectionsHandler handler,
             HttpContext http,
             CancellationToken ct) =>
-            Ok(await service.ListAsync(ct), http));
+            Ok(await handler.HandleAsync(new ListConnectionsQuery(), ct), http));
 
         management.MapGet("/{connectionId}", async (
             string connectionId,
-            DevelopmentIntegrationService service,
+            GetConnectionHandler handler,
             HttpContext http,
             CancellationToken ct) =>
-            Ok(await service.GetAsync(connectionId, ct), http));
+            Ok(await handler.HandleAsync(new GetConnectionQuery(connectionId), ct), http));
 
         management.MapPost("/{connectionId}/rotate-credential", async (
             string connectionId,
             RotateDevelopmentCredentialRequest request,
-            DevelopmentIntegrationService service,
+            RotateCredentialHandler handler,
             HttpContext http,
             CancellationToken ct) =>
             Ok(
-                await service.RotateCredentialAsync(
-                    connectionId,
-                    request,
-                    CorrelationId(http),
+                await handler.HandleAsync(
+                    new RotateCredentialCommand(
+                        connectionId,
+                        request,
+                        CorrelationId(http)),
                     ct),
                 http))
             .RequireRateLimiting("bulk");
@@ -58,40 +65,41 @@ internal static class DevelopmentIntegrationEndpoints
         management.MapPost("/{connectionId}/rotate-webhook-secret", async (
             string connectionId,
             DevelopmentVersionRequest request,
-            DevelopmentIntegrationService service,
+            RotateWebhookSecretHandler handler,
             HttpContext http,
             CancellationToken ct) =>
             Ok(
-                await service.RotateWebhookSecretAsync(
-                    connectionId,
-                    request,
-                    CorrelationId(http),
+                await handler.HandleAsync(
+                    new RotateWebhookSecretCommand(
+                        connectionId,
+                        request,
+                        CorrelationId(http)),
                     ct),
                 http))
             .RequireRateLimiting("bulk");
 
         management.MapPost("/{connectionId}/health", async (
             string connectionId,
-            DevelopmentIntegrationService service,
+            CheckProviderHealthHandler handler,
             HttpContext http,
             CancellationToken ct) =>
             Ok(
-                await service.CheckHealthAsync(
-                    connectionId,
-                    CorrelationId(http),
+                await handler.HandleAsync(
+                    new CheckProviderHealthCommand(
+                        connectionId,
+                        CorrelationId(http)),
                     ct),
                 http))
             .RequireRateLimiting("bulk");
 
         management.MapGet("/{connectionId}/repositories", async (
             string connectionId,
-            DevelopmentIntegrationService service,
+            ListRepositoriesHandler handler,
             HttpContext http,
             CancellationToken ct) =>
         {
-            var result = await service.ListProviderRepositoriesAsync(
-                connectionId,
-                ct);
+            var result = await handler.HandleAsync(
+                new ListRepositoriesQuery(connectionId), ct);
             return Ok(
                 new DevelopmentRepositoryPage(
                     result.Items
@@ -108,36 +116,42 @@ internal static class DevelopmentIntegrationEndpoints
 
         management.MapGet("/{connectionId}/mappings", async (
             string connectionId,
-            DevelopmentIntegrationService service,
+            ListConnectionMappingsHandler handler,
             HttpContext http,
             CancellationToken ct) =>
-            Ok(await service.ListMappingsAsync(connectionId, ct), http));
+            Ok(
+                await handler.HandleAsync(
+                    new ListConnectionMappingsQuery(connectionId),
+                    ct),
+                http));
 
         management.MapPost("/{connectionId}/mappings", async (
             string connectionId,
             CreateDevelopmentRepositoryMappingRequest request,
-            DevelopmentIntegrationService service,
+            CreateMappingHandler handler,
             HttpContext http,
             CancellationToken ct) =>
             Created(
-                await service.CreateMappingAsync(
-                    connectionId,
-                    request,
-                    CorrelationId(http),
+                await handler.HandleAsync(
+                    new CreateMappingCommand(
+                        connectionId,
+                        request,
+                        CorrelationId(http)),
                     ct),
                 http));
 
         management.MapDelete("/mappings/{mappingId}", async (
             string mappingId,
             long expectedVersion,
-            DevelopmentIntegrationService service,
+            DeleteMappingHandler handler,
             HttpContext http,
             CancellationToken ct) =>
         {
-            await service.DeleteMappingAsync(
-                mappingId,
-                expectedVersion,
-                CorrelationId(http),
+            await handler.HandleAsync(
+                new DeleteMappingCommand(
+                    mappingId,
+                    expectedVersion,
+                    CorrelationId(http)),
                 ct);
             return Results.NoContent();
         });
@@ -145,28 +159,30 @@ internal static class DevelopmentIntegrationEndpoints
         management.MapPost("/{connectionId}/disconnect", async (
             string connectionId,
             DevelopmentVersionRequest request,
-            DevelopmentIntegrationService service,
+            DisconnectConnectionHandler handler,
             HttpContext http,
             CancellationToken ct) =>
             Ok(
-                await service.DisconnectAsync(
-                    connectionId,
-                    request,
-                    CorrelationId(http),
+                await handler.HandleAsync(
+                    new DisconnectConnectionCommand(
+                        connectionId,
+                        request,
+                        CorrelationId(http)),
                     ct),
                 http));
 
         management.MapDelete("/{connectionId}", async (
             string connectionId,
             long expectedVersion,
-            DevelopmentIntegrationService service,
+            DeleteConnectionHandler handler,
             HttpContext http,
             CancellationToken ct) =>
         {
-            await service.DeleteConnectionAsync(
-                connectionId,
-                expectedVersion,
-                CorrelationId(http),
+            await handler.HandleAsync(
+                new DeleteConnectionCommand(
+                    connectionId,
+                    expectedVersion,
+                    CorrelationId(http)),
                 ct);
             return Results.NoContent();
         });
@@ -180,30 +196,39 @@ internal static class DevelopmentIntegrationEndpoints
 
         workItemLinks.MapGet("/", async (
             string workItemId,
-            DevelopmentIntegrationService service,
+            ListWorkItemLinksHandler handler,
             HttpContext http,
             CancellationToken ct) =>
-            Ok(await service.ListWorkItemLinksAsync(workItemId, ct), http));
+            Ok(
+                await handler.HandleAsync(
+                    new ListWorkItemLinksQuery(workItemId),
+                    ct),
+                http));
 
         workItemLinks.MapGet("/mappings", async (
             string workItemId,
-            DevelopmentIntegrationService service,
+            ListWorkItemMappingsHandler handler,
             HttpContext http,
             CancellationToken ct) =>
-            Ok(await service.ListWorkItemMappingsAsync(workItemId, ct), http))
+            Ok(
+                await handler.HandleAsync(
+                    new ListWorkItemMappingsQuery(workItemId),
+                    ct),
+                http))
             .WithZumboPermission(PermissionCatalog.WorkItemLink);
 
         workItemLinks.MapPost("/", async (
             string workItemId,
             CreateWorkItemDevelopmentLinkRequest request,
-            DevelopmentIntegrationService service,
+            CreateWorkItemLinkHandler handler,
             HttpContext http,
             CancellationToken ct) =>
             Created(
-                await service.CreateWorkItemLinkAsync(
-                    workItemId,
-                    request,
-                    CorrelationId(http),
+                await handler.HandleAsync(
+                    new CreateWorkItemLinkCommand(
+                        workItemId,
+                        request,
+                        CorrelationId(http)),
                     ct),
                 http))
             .WithZumboPermission(PermissionCatalog.WorkItemLink);
@@ -212,15 +237,16 @@ internal static class DevelopmentIntegrationEndpoints
             string workItemId,
             string linkId,
             long expectedVersion,
-            DevelopmentIntegrationService service,
+            DeleteWorkItemLinkHandler handler,
             HttpContext http,
             CancellationToken ct) =>
         {
-            await service.DeleteWorkItemLinkAsync(
-                workItemId,
-                linkId,
-                expectedVersion,
-                CorrelationId(http),
+            await handler.HandleAsync(
+                new DeleteWorkItemLinkCommand(
+                    workItemId,
+                    linkId,
+                    expectedVersion,
+                    CorrelationId(http)),
                 ct);
             return Results.NoContent();
         }).WithZumboPermission(PermissionCatalog.WorkItemLink);
@@ -228,7 +254,7 @@ internal static class DevelopmentIntegrationEndpoints
         var ingress = api.MapGroup("/integrations/development")
             .WithTags("Development integrations");
         ingress.AddEndpointFilter<WorkItemTransactionFilter>();
-        ingress.MapPost("/{connectionId}/webhook", ReceiveWebhookAsync)
+        ingress.MapPost("/{connectionId}/webhook", ReceiveWebhookWithHandlerAsync)
             .AllowAnonymous();
     }
 
@@ -261,6 +287,42 @@ internal static class DevelopmentIntegrationEndpoints
         var result = await service.ReceiveWebhookAsync(
             connectionId,
             request,
+            ct);
+        return Results.Json(
+            ApiResponse<DevelopmentWebhookResult>.Ok(
+                result,
+                CorrelationId(http)),
+            statusCode: StatusCodes.Status202Accepted);
+    }
+
+    private static async Task<IResult> ReceiveWebhookWithHandlerAsync(
+        string connectionId,
+        ReceiveWebhookHandler handler,
+        HttpContext http,
+        CancellationToken ct)
+    {
+        var payload = await ReadPayloadAsync(http.Request, ct);
+        var request = new DevelopmentWebhookRequest(
+            Header(
+                http.Request,
+                200,
+                "X-GitHub-Delivery",
+                "webhook-id",
+                "Idempotency-Key"),
+            Header(
+                http.Request,
+                120,
+                "X-GitHub-Event",
+                "X-Gitlab-Event"),
+            OptionalHeader(http.Request, 32, "webhook-timestamp"),
+            Header(
+                http.Request,
+                2_048,
+                "X-Hub-Signature-256",
+                "webhook-signature"),
+            payload);
+        var result = await handler.HandleAsync(
+            new ReceiveWebhookCommand(connectionId, request),
             ct);
         return Results.Json(
             ApiResponse<DevelopmentWebhookResult>.Ok(

@@ -37,7 +37,8 @@ public sealed class RefactorRuntimeContractTests
         "services.AddScoped<ListNotificationsHandler>();",
         "services.AddScoped<MarkNotificationAsReadHandler>();",
         "services.AddScoped<WriteAuditLogHandler>();",
-        "services.AddScoped<QueryAuditLogHandler>();"
+        "services.AddScoped<QueryAuditLogHandler>();",
+        "services.AddScoped<IDurableEventHandler,DevelopmentWebhookDurableHandler>();"
     ];
 
     private static readonly string[] PortFocusedVerticalSliceDiRegistrations =
@@ -117,6 +118,15 @@ public sealed class RefactorRuntimeContractTests
         "services.AddScoped<DisableMfaHandler>();",
         "services.AddScoped<RegenerateMfaRecoveryCodesHandler>();",
         "services.AddScoped<DeactivateAccountHandler>();",
+        "services.AddScoped<GetAutomationRunHandler>();",
+        "services.AddScoped<ListAutomationRunsHandler>();",
+        "services.AddScoped<ReplayAutomationRunHandler>();",
+        "services.AddScoped<ListDueAutomationRetriesHandler>();",
+        "services.AddScoped<AutomationRunActionExecutor>();",
+        "services.AddScoped<ResumeAutomationRunHandler>();",
+        "services.AddScoped<ClaimDueSchedulesHandler>();",
+        "services.AddScoped<CompleteScheduleClaimHandler>();",
+        "services.AddScoped<ExecuteAutomationHandler>();",
         "services.AddScoped<ChangePasswordHandler>();",
         "services.AddScoped<ForgotPasswordHandler>();",
         "services.AddScoped<ResetPasswordHandler>();",
@@ -190,7 +200,27 @@ public sealed class RefactorRuntimeContractTests
         + "provider.GetService<IDistributedLockProvider>()));",
         "services.AddScoped<QueryAuditLogHandler>(provider=>newQueryAuditLogHandler("
         + "provider.GetRequiredService<IDocumentRepository<AuditLogDocument>>(),"
-        + "provider.GetRequiredService<IAuditAccessChecker>()));"
+        + "provider.GetRequiredService<IAuditAccessChecker>()));",
+        "services.AddScoped<IDurableEventHandler,DevelopmentWebhookProcessingDurableHandler>();",
+        "services.AddScoped<CheckProviderHealthHandler>();",
+        "services.AddScoped<ListRepositoriesHandler>();",
+        "services.AddScoped<ListConnectionsHandler>();",
+        "services.AddScoped<GetConnectionHandler>();",
+        "services.AddScoped<CreateConnectionHandler>();",
+        "services.AddScoped<RotateCredentialHandler>();",
+        "services.AddScoped<RotateWebhookSecretHandler>();",
+        "services.AddScoped<DisconnectConnectionHandler>();",
+        "services.AddScoped<DeleteConnectionHandler>();",
+        "services.AddScoped<ListConnectionMappingsHandler>();",
+        "services.AddScoped<CreateMappingHandler>();",
+        "services.AddScoped<DeleteMappingHandler>();",
+        "services.AddScoped<ListWorkItemMappingsHandler>();",
+        "services.AddScoped<ListWorkItemLinksHandler>();",
+        "services.AddScoped<CreateWorkItemLinkHandler>();",
+        "services.AddScoped<DeleteWorkItemLinkHandler>();",
+        "services.AddScoped<ReceiveWebhookHandler>();",
+        "services.AddScoped<ApplyWebhookLinksHandler>();",
+        "services.AddScoped<ProcessWebhookHandler>();"
     ];
 
     private static readonly string[] ReplacedVerticalSliceEndpointMappings =
@@ -232,6 +262,13 @@ public sealed class RefactorRuntimeContractTests
         "group.MapPost(\"/deactivate\",async(DeactivateAccountRequestrequest,IdentityServiceservice,HttpContexthttp,CancellationTokenct)=>"
         + "Ok(awaitservice.DeactivateAsync(request,ct),http)).RequireAuthorization()"
         + ".WithZumboPermission(PermissionCatalog.ProfileRead);",
+        "group.MapGet(\"/runs/{runId}\",async(stringrunId,AutomationExecutionServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.GetAsync(runId,ct),http));",
+        "group.MapGet(\"/runs\",async(stringprojectId,string?ruleId,string?status,int?page,int?pageSize,AutomationExecutionServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.ListAsync(projectId,ruleId,status,page??1,pageSize??50,ct),http));",
+        "group.MapPost(\"/runs/{runId}/replay\",async(stringrunId,AutomationExecutionServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.ReplayAsync(runId,CorrelationId(http),ct),http))"
+        + ".WithZumboPermission(PermissionCatalog.WorkflowManage);",
         "group.MapPut(\"/{boardId}\",async(stringboardId,UpdateBoardRequestrequest,BoardServiceservice,HttpContexthttp,CancellationTokenct)=>"
         + "Ok(awaitservice.UpdateAsync(boardId,request,CorrelationId(http),ct),http)).WithZumboPermission(PermissionCatalog.BoardManage);",
         "group.MapDelete(\"/{boardId}\",async(stringboardId,BoardServiceservice,HttpContexthttp,CancellationTokenct)=>"
@@ -263,7 +300,42 @@ public sealed class RefactorRuntimeContractTests
         + ".WithZumboPermission(PermissionCatalog.BoardManage);",
         "group.MapDelete(\"/{boardId}/views/{viewId}\",async(stringboardId,stringviewId,BoardServiceservice,HttpContexthttp,CancellationTokenct)=>"
         + "Ok(awaitservice.DeleteViewAsync(boardId,viewId,CorrelationId(http),ct),http))"
-        + ".WithZumboPermission(PermissionCatalog.BoardManage);"
+        + ".WithZumboPermission(PermissionCatalog.BoardManage);",
+        "management.MapPost(\"/{connectionId}/health\",async(stringconnectionId,DevelopmentIntegrationServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.CheckHealthAsync(connectionId,CorrelationId(http),ct),http)).RequireRateLimiting(\"bulk\");",
+        "management.MapGet(\"/{connectionId}/repositories\",async(stringconnectionId,DevelopmentIntegrationServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "{varresult=awaitservice.ListProviderRepositoriesAsync(connectionId,ct);returnOk(newDevelopmentRepositoryPage("
+        + "result.Items.Select(item=>newDevelopmentRepositoryResponse(item.ExternalRepositoryId,item.Name,item.FullName,item.Url,item.DefaultBranch))"
+        + ".ToList(),result.Partial?\"Partial\":\"Complete\"),http);}).RequireRateLimiting(\"bulk\");",
+        "management.MapGet(\"/\",async(DevelopmentIntegrationServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.ListAsync(ct),http));",
+        "management.MapGet(\"/{connectionId}\",async(stringconnectionId,DevelopmentIntegrationServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.GetAsync(connectionId,ct),http));",
+        "management.MapPost(\"/\",async(CreateDevelopmentConnectionRequestrequest,DevelopmentIntegrationServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Created(awaitservice.CreateAsync(request,CorrelationId(http),ct),http));",
+        "management.MapPost(\"/{connectionId}/rotate-credential\",async(stringconnectionId,RotateDevelopmentCredentialRequestrequest,DevelopmentIntegrationServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.RotateCredentialAsync(connectionId,request,CorrelationId(http),ct),http)).RequireRateLimiting(\"bulk\");",
+        "management.MapPost(\"/{connectionId}/rotate-webhook-secret\",async(stringconnectionId,DevelopmentVersionRequestrequest,DevelopmentIntegrationServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.RotateWebhookSecretAsync(connectionId,request,CorrelationId(http),ct),http)).RequireRateLimiting(\"bulk\");",
+        "management.MapPost(\"/{connectionId}/disconnect\",async(stringconnectionId,DevelopmentVersionRequestrequest,DevelopmentIntegrationServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.DisconnectAsync(connectionId,request,CorrelationId(http),ct),http));",
+        "management.MapDelete(\"/{connectionId}\",async(stringconnectionId,longexpectedVersion,DevelopmentIntegrationServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "{awaitservice.DeleteConnectionAsync(connectionId,expectedVersion,CorrelationId(http),ct);returnResults.NoContent();});",
+        "management.MapGet(\"/{connectionId}/mappings\",async(stringconnectionId,DevelopmentIntegrationServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.ListMappingsAsync(connectionId,ct),http));",
+        "management.MapPost(\"/{connectionId}/mappings\",async(stringconnectionId,CreateDevelopmentRepositoryMappingRequestrequest,DevelopmentIntegrationServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Created(awaitservice.CreateMappingAsync(connectionId,request,CorrelationId(http),ct),http));",
+        "management.MapDelete(\"/mappings/{mappingId}\",async(stringmappingId,longexpectedVersion,DevelopmentIntegrationServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "{awaitservice.DeleteMappingAsync(mappingId,expectedVersion,CorrelationId(http),ct);returnResults.NoContent();});",
+        "workItemLinks.MapGet(\"/mappings\",async(stringworkItemId,DevelopmentIntegrationServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.ListWorkItemMappingsAsync(workItemId,ct),http)).WithZumboPermission(PermissionCatalog.WorkItemLink);",
+        "workItemLinks.MapGet(\"/\",async(stringworkItemId,DevelopmentIntegrationServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.ListWorkItemLinksAsync(workItemId,ct),http));",
+        "workItemLinks.MapPost(\"/\",async(stringworkItemId,CreateWorkItemDevelopmentLinkRequestrequest,DevelopmentIntegrationServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Created(awaitservice.CreateWorkItemLinkAsync(workItemId,request,CorrelationId(http),ct),http)).WithZumboPermission(PermissionCatalog.WorkItemLink);",
+        "workItemLinks.MapDelete(\"/{linkId}\",async(stringworkItemId,stringlinkId,longexpectedVersion,DevelopmentIntegrationServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "{awaitservice.DeleteWorkItemLinkAsync(workItemId,linkId,expectedVersion,CorrelationId(http),ct);returnResults.NoContent();}).WithZumboPermission(PermissionCatalog.WorkItemLink);",
+        "ingress.MapPost(\"/{connectionId}/webhook\",ReceiveWebhookAsync).AllowAnonymous();"
     ];
 
     private static readonly string[] PortFocusedVerticalSliceEndpointMappings =
@@ -305,6 +377,13 @@ public sealed class RefactorRuntimeContractTests
         "group.MapPost(\"/deactivate\",async(DeactivateAccountRequestrequest,DeactivateAccountHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
         + "Ok(awaithandler.HandleAsync(request,ct),http)).RequireAuthorization()"
         + ".WithZumboPermission(PermissionCatalog.ProfileRead);",
+        "group.MapGet(\"/runs/{runId}\",async(stringrunId,GetAutomationRunHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newGetAutomationRunQuery(runId),ct),http));",
+        "group.MapGet(\"/runs\",async(stringprojectId,string?ruleId,string?status,int?page,int?pageSize,ListAutomationRunsHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newListAutomationRunsQuery(projectId,ruleId,status,page??1,pageSize??50),ct),http));",
+        "group.MapPost(\"/runs/{runId}/replay\",async(stringrunId,ReplayAutomationRunHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newReplayAutomationRunCommand(runId,CorrelationId(http)),ct),http))"
+        + ".WithZumboPermission(PermissionCatalog.WorkflowManage);",
         "group.MapPut(\"/{boardId}\",async(stringboardId,UpdateBoardRequestrequest,UpdateBoardHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
         + "Ok(awaithandler.HandleAsync(boardId,request,CorrelationId(http),ct),http)).WithZumboPermission(PermissionCatalog.BoardManage);",
         "group.MapDelete(\"/{boardId}\",async(stringboardId,ArchiveBoardHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
@@ -336,7 +415,42 @@ public sealed class RefactorRuntimeContractTests
         + ".WithZumboPermission(PermissionCatalog.BoardManage);",
         "group.MapDelete(\"/{boardId}/views/{viewId}\",async(stringboardId,stringviewId,DeleteViewHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
         + "Ok(awaithandler.HandleAsync(boardId,viewId,CorrelationId(http),ct),http))"
-        + ".WithZumboPermission(PermissionCatalog.BoardManage);"
+        + ".WithZumboPermission(PermissionCatalog.BoardManage);",
+        "management.MapPost(\"/{connectionId}/health\",async(stringconnectionId,CheckProviderHealthHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newCheckProviderHealthCommand(connectionId,CorrelationId(http)),ct),http)).RequireRateLimiting(\"bulk\");",
+        "management.MapGet(\"/{connectionId}/repositories\",async(stringconnectionId,ListRepositoriesHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "{varresult=awaithandler.HandleAsync(newListRepositoriesQuery(connectionId),ct);returnOk(newDevelopmentRepositoryPage("
+        + "result.Items.Select(item=>newDevelopmentRepositoryResponse(item.ExternalRepositoryId,item.Name,item.FullName,item.Url,item.DefaultBranch))"
+        + ".ToList(),result.Partial?\"Partial\":\"Complete\"),http);}).RequireRateLimiting(\"bulk\");",
+        "management.MapGet(\"/\",async(ListConnectionsHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newListConnectionsQuery(),ct),http));",
+        "management.MapGet(\"/{connectionId}\",async(stringconnectionId,GetConnectionHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newGetConnectionQuery(connectionId),ct),http));",
+        "management.MapPost(\"/\",async(CreateDevelopmentConnectionRequestrequest,CreateConnectionHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Created(awaithandler.HandleAsync(newCreateConnectionCommand(request,CorrelationId(http)),ct),http));",
+        "management.MapPost(\"/{connectionId}/rotate-credential\",async(stringconnectionId,RotateDevelopmentCredentialRequestrequest,RotateCredentialHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newRotateCredentialCommand(connectionId,request,CorrelationId(http)),ct),http)).RequireRateLimiting(\"bulk\");",
+        "management.MapPost(\"/{connectionId}/rotate-webhook-secret\",async(stringconnectionId,DevelopmentVersionRequestrequest,RotateWebhookSecretHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newRotateWebhookSecretCommand(connectionId,request,CorrelationId(http)),ct),http)).RequireRateLimiting(\"bulk\");",
+        "management.MapPost(\"/{connectionId}/disconnect\",async(stringconnectionId,DevelopmentVersionRequestrequest,DisconnectConnectionHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newDisconnectConnectionCommand(connectionId,request,CorrelationId(http)),ct),http));",
+        "management.MapDelete(\"/{connectionId}\",async(stringconnectionId,longexpectedVersion,DeleteConnectionHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "{awaithandler.HandleAsync(newDeleteConnectionCommand(connectionId,expectedVersion,CorrelationId(http)),ct);returnResults.NoContent();});",
+        "management.MapGet(\"/{connectionId}/mappings\",async(stringconnectionId,ListConnectionMappingsHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newListConnectionMappingsQuery(connectionId),ct),http));",
+        "management.MapPost(\"/{connectionId}/mappings\",async(stringconnectionId,CreateDevelopmentRepositoryMappingRequestrequest,CreateMappingHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Created(awaithandler.HandleAsync(newCreateMappingCommand(connectionId,request,CorrelationId(http)),ct),http));",
+        "management.MapDelete(\"/mappings/{mappingId}\",async(stringmappingId,longexpectedVersion,DeleteMappingHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "{awaithandler.HandleAsync(newDeleteMappingCommand(mappingId,expectedVersion,CorrelationId(http)),ct);returnResults.NoContent();});",
+        "workItemLinks.MapGet(\"/mappings\",async(stringworkItemId,ListWorkItemMappingsHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newListWorkItemMappingsQuery(workItemId),ct),http)).WithZumboPermission(PermissionCatalog.WorkItemLink);",
+        "workItemLinks.MapGet(\"/\",async(stringworkItemId,ListWorkItemLinksHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newListWorkItemLinksQuery(workItemId),ct),http));",
+        "workItemLinks.MapPost(\"/\",async(stringworkItemId,CreateWorkItemDevelopmentLinkRequestrequest,CreateWorkItemLinkHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Created(awaithandler.HandleAsync(newCreateWorkItemLinkCommand(workItemId,request,CorrelationId(http)),ct),http)).WithZumboPermission(PermissionCatalog.WorkItemLink);",
+        "workItemLinks.MapDelete(\"/{linkId}\",async(stringworkItemId,stringlinkId,longexpectedVersion,DeleteWorkItemLinkHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "{awaithandler.HandleAsync(newDeleteWorkItemLinkCommand(workItemId,linkId,expectedVersion,CorrelationId(http)),ct);returnResults.NoContent();}).WithZumboPermission(PermissionCatalog.WorkItemLink);",
+        "ingress.MapPost(\"/{connectionId}/webhook\",ReceiveWebhookWithHandlerAsync).AllowAnonymous();"
     ];
 
     private static string ProjectDirectory => Path.GetFullPath(
@@ -439,7 +553,25 @@ public sealed class RefactorRuntimeContractTests
                 "UpsertWorkflowHandler and GetWorkflowHandler remain scoped self-services; explicit factories select their port-focused constructors while compatibility constructors remain available.",
                 "CreateWorkItemHandler and SearchWorkItemsHandler remain scoped self-services; explicit factories select their port-focused constructors while compatibility constructors remain available.",
                 "ListNotificationsHandler and MarkNotificationAsReadHandler remain scoped self-services; explicit factories select their port-focused constructors while compatibility constructors remain available.",
-                "WriteAuditLogHandler and QueryAuditLogHandler remain scoped self-services; explicit factories select their port-focused constructors while compatibility constructors remain available."
+                "WriteAuditLogHandler and QueryAuditLogHandler remain scoped self-services; explicit factories select their port-focused constructors while compatibility constructors remain available.",
+                "The development provider-health route resolves CheckProviderHealthHandler directly; its route, policy, rate limit, correlation ID, response mapping, compatibility facade, and scoped registration remain preserved.",
+                "The development repository-discovery route resolves ListRepositoriesHandler directly; its route, policy, rate limit, page projection, partial-result marker, compatibility facade, and scoped registration remain preserved.",
+                "The development connection-list route resolves ListConnectionsHandler directly; its route, policy, response mapping, compatibility facade, and scoped registration remain preserved.",
+                "The development connection-read route resolves GetConnectionHandler directly; its route, policy, tenant masking, response mapping, compatibility facade, and scoped registration remain preserved.",
+                "The development connection-create route resolves CreateConnectionHandler directly; its route, policy, correlation ID, created response mapping, compatibility facade, and scoped registration remain preserved.",
+                "The development credential-rotation route resolves RotateCredentialHandler directly; its route, policy, rate limit, correlation ID, response mapping, compatibility facade, and scoped registration remain preserved.",
+                "The development webhook-secret-rotation route resolves RotateWebhookSecretHandler directly; its route, policy, rate limit, correlation ID, receipt mapping, previous-secret grace behavior, compatibility facade, and scoped registration remain preserved.",
+                "The development disconnect route resolves DisconnectConnectionHandler directly; its route, policy, correlation ID, lifecycle cleanup, mapping deactivation, response mapping, compatibility facade, and scoped registration remain preserved.",
+                "The development connection-delete route resolves DeleteConnectionHandler directly; its route, policy, expected-version binding, correlation ID, linked data cleanup, optimistic concurrency, audit, no-content response, compatibility facade, and scoped registration remain preserved.",
+                "The development connection-mapping-list route resolves ListConnectionMappingsHandler directly; its route, policy, tenant masking, ordering, response mapping, compatibility facade, and scoped registration remain preserved.",
+                "The development connection-mapping-create route resolves CreateMappingHandler directly; its route, policy, correlation ID, created response mapping, project authorization, compatibility facade, and scoped registration remain preserved.",
+                "The development connection-mapping-delete route resolves DeleteMappingHandler directly; its route, policy, expected-version binding, correlation ID, no-content response, linked-data cleanup, compatibility facade, and scoped registration remain preserved.",
+                "The development work-item-mapping route resolves ListWorkItemMappingsHandler directly; its route, transaction filter, WorkItemLink permission, tenant masking, active-project filtering, response mapping, compatibility facade, and scoped registration remain preserved.",
+                "The development work-item-link-list route resolves ListWorkItemLinksHandler directly; its route, transaction filter, WorkItemView permission, tenant masking, connection-state projection, response mapping, compatibility facade, and scoped registration remain preserved.",
+                "The development work-item-link-create route resolves CreateWorkItemLinkHandler directly; its route, transaction filter, WorkItemLink permission, correlation ID, validation, deterministic identity, idempotency, audit, created response mapping, compatibility facade, and scoped registration remain preserved.",
+                "The development work-item-link-delete route resolves DeleteWorkItemLinkHandler directly; its route, transaction filter, WorkItemLink permission, expected-version binding, correlation ID, tenant masking, optimistic concurrency, audit, no-content response, compatibility facade, and scoped registration remain preserved.",
+                "The development webhook ingress resolves ReceiveWebhookHandler directly after HTTP header and payload binding; its anonymous route, transaction filter, signature verification, previous-secret grace behavior, deduplication, collision detection, durable queueing, accepted response, compatibility facade, and scoped registration remain preserved.",
+                "The development webhook durable adapter resolves ProcessWebhookHandler directly; receipt idempotency, connection lifecycle rejection, repository mapping, reference matching, deterministic link creation, stale-event protection, optimistic concurrency, audit behavior, compatibility facade, consumer name, event type, and scoped registration remain preserved."
             },
             intentionalConfigurationChanges = new[]
             {
