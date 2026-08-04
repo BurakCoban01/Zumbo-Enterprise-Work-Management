@@ -141,8 +141,8 @@ public sealed class ArchitectureBoundaryTests
         Assert.All(
             actual,
             relativePath => Assert.True(
-                relativePath.StartsWith("Endpoints/", StringComparison.Ordinal)
-                    || relativePath == "Hosting/ApiPipeline.cs",
+                relativePath.StartsWith("Presentation/Endpoints/", StringComparison.Ordinal)
+                    || relativePath == "Composition/Hosting/ApiPipeline.cs",
                 $"API business logic must remain inside endpoint or pipeline boundaries: {relativePath}"));
     }
 
@@ -210,7 +210,12 @@ public sealed class ArchitectureBoundaryTests
     [Fact]
     public void ApiPipeline_PreservesExactMiddlewareOrder()
     {
-        var pipeline = Path.Combine(SourceDirectory, "Zumbo.Api", "Hosting", "ApiPipeline.cs");
+        var pipeline = Path.Combine(
+            SourceDirectory,
+            "Zumbo.Api",
+            "Composition",
+            "Hosting",
+            "ApiPipeline.cs");
         var actual = File.ReadLines(pipeline)
             .Select(line => line.Trim())
             .Where(line => line.StartsWith("app.Use", StringComparison.Ordinal))
@@ -263,7 +268,7 @@ public sealed class ArchitectureBoundaryTests
             ["WorkItemEndpoints.cs"] = "Zumbo.Modules.WorkItems",
             ["WorkItemTypeSchemaEndpoints.cs"] = "Zumbo.Modules.WorkItems"
         };
-        var endpointDirectory = Path.Combine(SourceDirectory, "Zumbo.Api", "Endpoints");
+        var endpointDirectory = Path.Combine(SourceDirectory, "Zumbo.Api", "Presentation", "Endpoints");
 
         AssertExactSet(expected.Keys, Directory.GetFiles(endpointDirectory, "*.cs").Select(Path.GetFileName).OfType<string>());
         foreach (var (fileName, owningModule) in expected)
@@ -271,7 +276,9 @@ public sealed class ArchitectureBoundaryTests
             var moduleUsings = File.ReadLines(Path.Combine(endpointDirectory, fileName))
                 .Select(line => line.Trim())
                 .Where(line => line.StartsWith("using Zumbo.Modules.", StringComparison.Ordinal))
-                .Select(line => line["using ".Length..^1]);
+                .Select(line => line["using ".Length..^1])
+                .Select(moduleNamespace => string.Join('.', moduleNamespace.Split('.').Take(3)))
+                .Distinct(StringComparer.Ordinal);
 
             AssertExactSet(owningModule is null ? [] : [owningModule], moduleUsings);
         }
@@ -502,9 +509,13 @@ public sealed class ArchitectureBoundaryTests
     public void IdentityRegistrationAndUserSearch_ArePortFocusedVerticalSlicesWithCompatibilityFacades()
     {
         var identityDirectory = Path.Combine(SourceDirectory, "Zumbo.Modules.Identity");
-        var registerDirectory = Path.Combine(identityDirectory, "Features", "RegisterUser");
-        var searchDirectory = Path.Combine(identityDirectory, "Features", "SearchUsers");
-        var representativeDirectory = Path.Combine(identityDirectory, "Features", "RepresentativeIdentitySlices");
+        var registerDirectory = Path.Combine(identityDirectory, "Application", "Features", "Registration");
+        var searchDirectory = Path.Combine(identityDirectory, "Application", "Features", "UserSearch");
+        var representativeDirectory = Path.Combine(
+            identityDirectory,
+            "Application",
+            "Features",
+            "RepresentativeIdentitySlices");
 
         Assert.True(File.Exists(Path.Combine(registerDirectory, "RegisterUserRequest.cs")));
         Assert.True(File.Exists(Path.Combine(registerDirectory, "RegisterUserValidator.cs")));
@@ -528,24 +539,20 @@ public sealed class ArchitectureBoundaryTests
         Assert.Contains("IUserRepository", searchSlice, StringComparison.Ordinal);
         Assert.Contains("ICurrentUser", searchSlice, StringComparison.Ordinal);
 
+        var compatibilityDirectory = Path.Combine(identityDirectory, "Application", "Compatibility");
         var registerFacade = File.ReadAllText(Path.Combine(
-            identityDirectory,
-            "Module",
-            "Identity",
-            "IdentityService",
-            "IdentityService.RegisterAsync.cs"));
+            compatibilityDirectory,
+            "IdentityService.Authentication.cs"));
         var searchFacade = File.ReadAllText(Path.Combine(
-            identityDirectory,
-            "Module",
-            "Identity",
-            "IdentityService",
-            "IdentityService.SearchUsersAsync.cs"));
+            compatibilityDirectory,
+            "IdentityService.Account.cs"));
         Assert.Contains("registerUserHandler.HandleAsync", registerFacade, StringComparison.Ordinal);
         Assert.Contains("searchUsersHandler.HandleAsync", searchFacade, StringComparison.Ordinal);
 
         var composition = File.ReadAllText(Path.Combine(
             SourceDirectory,
             "Zumbo.Api",
+            "Presentation",
             "Endpoints",
             "IdentityEndpoints.cs"));
         Assert.Contains("AddScoped<RegisterUserHandler>(provider =>", composition, StringComparison.Ordinal);
@@ -556,10 +563,11 @@ public sealed class ArchitectureBoundaryTests
     public void OrganizationCreateAndList_ArePortFocusedVerticalSlicesWithCompatibilityFacades()
     {
         var moduleDirectory = Path.Combine(SourceDirectory, "Zumbo.Modules.Organizations");
-        var createDirectory = Path.Combine(moduleDirectory, "Features", "CreateOrganization");
-        var listDirectory = Path.Combine(moduleDirectory, "Features", "ListOrganizations");
+        var createDirectory = Path.Combine(moduleDirectory, "Application", "Features", "OrganizationsCore");
+        var listDirectory = createDirectory;
         var representativeDirectory = Path.Combine(
             moduleDirectory,
+            "Application",
             "Features",
             "RepresentativeOrganizationSlices");
 
@@ -585,13 +593,18 @@ public sealed class ArchitectureBoundaryTests
         Assert.Contains("IDocumentRepository<OrganizationDocument>", listSlice, StringComparison.Ordinal);
         Assert.Contains("ICurrentUser", listSlice, StringComparison.Ordinal);
 
-        var facade = File.ReadAllText(Path.Combine(moduleDirectory, "OrganizationsModule.cs"));
+        var facade = File.ReadAllText(Path.Combine(
+            moduleDirectory,
+            "Application",
+            "Compatibility",
+            "OrganizationService.cs"));
         Assert.Contains("createOrganizationHandler.HandleAsync", facade, StringComparison.Ordinal);
         Assert.Contains("listOrganizationsHandler.HandleAsync", facade, StringComparison.Ordinal);
 
         var composition = File.ReadAllText(Path.Combine(
             SourceDirectory,
             "Zumbo.Api",
+            "Presentation",
             "Endpoints",
             "OrganizationsEndpoints.cs"));
         Assert.Contains("AddScoped<CreateOrganizationHandler>(provider =>", composition, StringComparison.Ordinal);
@@ -602,9 +615,13 @@ public sealed class ArchitectureBoundaryTests
     public void TeamCreateAndList_ArePortFocusedVerticalSlicesWithCompatibilityFacades()
     {
         var moduleDirectory = Path.Combine(SourceDirectory, "Zumbo.Modules.Teams");
-        var createDirectory = Path.Combine(moduleDirectory, "Features", "CreateTeam");
-        var listDirectory = Path.Combine(moduleDirectory, "Features", "ListTeams");
-        var representativeDirectory = Path.Combine(moduleDirectory, "Features", "RepresentativeTeamSlices");
+        var createDirectory = Path.Combine(moduleDirectory, "Application", "Features", "TeamsCore");
+        var listDirectory = createDirectory;
+        var representativeDirectory = Path.Combine(
+            moduleDirectory,
+            "Application",
+            "Features",
+            "RepresentativeTeamSlices");
 
         Assert.True(File.Exists(Path.Combine(createDirectory, "CreateTeamRequest.cs")));
         Assert.True(File.Exists(Path.Combine(createDirectory, "CreateTeamValidator.cs")));
@@ -629,13 +646,18 @@ public sealed class ArchitectureBoundaryTests
         Assert.Contains("IDocumentRepository<TeamDocument>", listSlice, StringComparison.Ordinal);
         Assert.Contains("ICurrentUser", listSlice, StringComparison.Ordinal);
 
-        var facade = File.ReadAllText(Path.Combine(moduleDirectory, "TeamsModule.cs"));
+        var facade = File.ReadAllText(Path.Combine(
+            moduleDirectory,
+            "Application",
+            "Compatibility",
+            "TeamService.cs"));
         Assert.Contains("createTeamHandler.HandleAsync", facade, StringComparison.Ordinal);
         Assert.Contains("listTeamsHandler.HandleAsync", facade, StringComparison.Ordinal);
 
         var composition = File.ReadAllText(Path.Combine(
             SourceDirectory,
             "Zumbo.Api",
+            "Presentation",
             "Endpoints",
             "TeamsEndpoints.cs"));
         Assert.Contains("AddScoped<CreateTeamHandler>(provider =>", composition, StringComparison.Ordinal);
@@ -646,9 +668,13 @@ public sealed class ArchitectureBoundaryTests
     public void ProjectCreateAndList_ArePortFocusedVerticalSlicesWithCompatibilityFacades()
     {
         var moduleDirectory = Path.Combine(SourceDirectory, "Zumbo.Modules.Projects");
-        var createDirectory = Path.Combine(moduleDirectory, "Features", "CreateProject");
-        var listDirectory = Path.Combine(moduleDirectory, "Features", "ListProjects");
-        var representativeDirectory = Path.Combine(moduleDirectory, "Features", "RepresentativeProjectSlices");
+        var createDirectory = Path.Combine(moduleDirectory, "Application", "Features", "ProjectsCore");
+        var listDirectory = createDirectory;
+        var representativeDirectory = Path.Combine(
+            moduleDirectory,
+            "Application",
+            "Features",
+            "RepresentativeProjectSlices");
 
         Assert.True(File.Exists(Path.Combine(createDirectory, "CreateProjectRequest.cs")));
         Assert.True(File.Exists(Path.Combine(createDirectory, "CreateProjectValidator.cs")));
@@ -674,13 +700,18 @@ public sealed class ArchitectureBoundaryTests
         Assert.Contains("IDocumentRepository<ProjectDocument>", listSlice, StringComparison.Ordinal);
         Assert.Contains("ICurrentUser", listSlice, StringComparison.Ordinal);
 
-        var facade = File.ReadAllText(Path.Combine(moduleDirectory, "ProjectsModule.cs"));
+        var facade = File.ReadAllText(Path.Combine(
+            moduleDirectory,
+            "Application",
+            "Compatibility",
+            "ProjectService.cs"));
         Assert.Contains("createProjectHandler.HandleAsync", facade, StringComparison.Ordinal);
         Assert.Contains("listProjectsHandler.HandleAsync", facade, StringComparison.Ordinal);
 
         var composition = File.ReadAllText(Path.Combine(
             SourceDirectory,
             "Zumbo.Api",
+            "Presentation",
             "Endpoints",
             "ProjectsEndpoints.cs"));
         Assert.Contains("AddScoped<CreateProjectHandler>(provider =>", composition, StringComparison.Ordinal);
@@ -691,14 +722,35 @@ public sealed class ArchitectureBoundaryTests
     public void BoardCreateAndProjectList_ArePortFocusedVerticalSlicesWithCompatibilityFacades()
     {
         var moduleDirectory = Path.Combine(SourceDirectory, "Zumbo.Modules.Boards");
-        var createDirectory = Path.Combine(moduleDirectory, "Features", "CreateBoard");
-        var listDirectory = Path.Combine(moduleDirectory, "Features", "ListBoardsByProject");
-        var representativeDirectory = Path.Combine(moduleDirectory, "Features", "RepresentativeBoardSlices");
+        var createDirectory = Path.Combine(moduleDirectory, "Application", "Features", "BoardsCore");
+        var listDirectory = createDirectory;
+        var lifecycleDirectory = Path.Combine(moduleDirectory, "Application", "Features", "Lifecycle");
+        var swimlaneDirectory = Path.Combine(moduleDirectory, "Application", "Features", "Swimlanes");
+        var columnsDirectory = Path.Combine(moduleDirectory, "Application", "Features", "Columns");
+        var representativeDirectory = Path.Combine(
+            moduleDirectory,
+            "Application",
+            "Features",
+            "RepresentativeBoardSlices");
 
         Assert.True(File.Exists(Path.Combine(createDirectory, "CreateBoardRequest.cs")));
         Assert.True(File.Exists(Path.Combine(createDirectory, "CreateBoardValidator.cs")));
         Assert.True(File.Exists(Path.Combine(createDirectory, "CreateBoardHandler.cs")));
         Assert.True(File.Exists(Path.Combine(createDirectory, "CreateBoardSlice.cs")));
+        Assert.True(File.Exists(Path.Combine(createDirectory, "UpdateBoardValidator.cs")));
+        Assert.True(File.Exists(Path.Combine(createDirectory, "UpdateBoardHandler.cs")));
+        Assert.True(File.Exists(Path.Combine(lifecycleDirectory, "ArchiveBoardCommand.cs")));
+        Assert.True(File.Exists(Path.Combine(lifecycleDirectory, "ArchiveBoardValidator.cs")));
+        Assert.True(File.Exists(Path.Combine(lifecycleDirectory, "ArchiveBoardHandler.cs")));
+        Assert.True(File.Exists(Path.Combine(lifecycleDirectory, "RestoreBoardCommand.cs")));
+        Assert.True(File.Exists(Path.Combine(lifecycleDirectory, "RestoreBoardValidator.cs")));
+        Assert.True(File.Exists(Path.Combine(lifecycleDirectory, "RestoreBoardHandler.cs")));
+        Assert.True(File.Exists(Path.Combine(swimlaneDirectory, "UpdateSwimlaneValidator.cs")));
+        Assert.True(File.Exists(Path.Combine(swimlaneDirectory, "UpdateSwimlaneHandler.cs")));
+        Assert.True(File.Exists(Path.Combine(columnsDirectory, "AddColumnValidator.cs")));
+        Assert.True(File.Exists(Path.Combine(columnsDirectory, "AddColumnHandler.cs")));
+        Assert.True(File.Exists(Path.Combine(columnsDirectory, "UpdateColumnValidator.cs")));
+        Assert.True(File.Exists(Path.Combine(columnsDirectory, "UpdateColumnHandler.cs")));
         Assert.True(File.Exists(Path.Combine(listDirectory, "ListBoardsByProjectQuery.cs")));
         Assert.True(File.Exists(Path.Combine(listDirectory, "ListBoardsByProjectValidator.cs")));
         Assert.True(File.Exists(Path.Combine(listDirectory, "ListBoardsByProjectHandler.cs")));
@@ -710,46 +762,86 @@ public sealed class ArchitectureBoundaryTests
 
         var createSlice = File.ReadAllText(Path.Combine(createDirectory, "CreateBoardSlice.cs"));
         var listSlice = File.ReadAllText(Path.Combine(listDirectory, "ListBoardsByProjectSlice.cs"));
+        var updateHandler = File.ReadAllText(Path.Combine(createDirectory, "UpdateBoardHandler.cs"));
         Assert.DoesNotContain("BoardService", createSlice, StringComparison.Ordinal);
         Assert.DoesNotContain("BoardService", listSlice, StringComparison.Ordinal);
+        Assert.DoesNotContain("BoardService", updateHandler, StringComparison.Ordinal);
         Assert.Contains("IDocumentRepository<BoardDocument>", createSlice, StringComparison.Ordinal);
         Assert.Contains("IBoardProjectAccessChecker", createSlice, StringComparison.Ordinal);
         Assert.Contains("IDistributedLockProvider", createSlice, StringComparison.Ordinal);
         Assert.Contains("IBoardAuditWriter", createSlice, StringComparison.Ordinal);
         Assert.Contains("IDocumentRepository<BoardDocument>", listSlice, StringComparison.Ordinal);
         Assert.Contains("ICurrentUser", listSlice, StringComparison.Ordinal);
+        Assert.Contains("IDocumentRepository<BoardDocument>", updateHandler, StringComparison.Ordinal);
+        Assert.Contains("IBoardProjectAccessChecker", updateHandler, StringComparison.Ordinal);
+        Assert.Contains("IBoardAuditWriter", updateHandler, StringComparison.Ordinal);
 
-        var createFacade = File.ReadAllText(Path.Combine(
+        var boardsFacade = File.ReadAllText(Path.Combine(
             moduleDirectory,
-            "Module",
-            "Boards",
+            "Application",
+            "Compatibility",
             "BoardService",
-            "BoardService.CreateAsync.cs"));
-        var listFacade = File.ReadAllText(Path.Combine(
+            "BoardService.Boards.cs"));
+        Assert.Contains("createBoardHandler.HandleAsync", boardsFacade, StringComparison.Ordinal);
+        Assert.Contains("listBoardsByProjectHandler.HandleAsync", boardsFacade, StringComparison.Ordinal);
+        Assert.Contains("updateBoardHandler.HandleAsync", boardsFacade, StringComparison.Ordinal);
+        var lifecycleFacade = File.ReadAllText(Path.Combine(
             moduleDirectory,
-            "Module",
-            "Boards",
+            "Application",
+            "Compatibility",
             "BoardService",
-            "BoardService.ListByProjectAsync.cs"));
-        Assert.Contains("createBoardHandler.HandleAsync", createFacade, StringComparison.Ordinal);
-        Assert.Contains("listBoardsByProjectHandler.HandleAsync", listFacade, StringComparison.Ordinal);
+            "BoardService.Lifecycle.cs"));
+        Assert.Contains("archiveBoardHandler.HandleAsync", lifecycleFacade, StringComparison.Ordinal);
+        Assert.Contains("restoreBoardHandler.HandleAsync", lifecycleFacade, StringComparison.Ordinal);
+        var swimlaneFacade = File.ReadAllText(Path.Combine(
+            moduleDirectory,
+            "Application",
+            "Compatibility",
+            "BoardService",
+            "BoardService.Swimlanes.cs"));
+        Assert.Contains("updateSwimlaneHandler.HandleAsync", swimlaneFacade, StringComparison.Ordinal);
+        var columnsFacade = File.ReadAllText(Path.Combine(
+            moduleDirectory,
+            "Application",
+            "Compatibility",
+            "BoardService",
+            "BoardService.Columns.cs"));
+        Assert.Contains("addColumnHandler.HandleAsync", columnsFacade, StringComparison.Ordinal);
+        Assert.Contains("updateColumnHandler.HandleAsync", columnsFacade, StringComparison.Ordinal);
 
         var composition = File.ReadAllText(Path.Combine(
             SourceDirectory,
             "Zumbo.Api",
+            "Presentation",
             "Endpoints",
             "BoardsEndpoints.cs"));
         Assert.Contains("AddScoped<CreateBoardHandler>(provider =>", composition, StringComparison.Ordinal);
         Assert.Contains("AddScoped<ListBoardsByProjectHandler>(provider =>", composition, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<UpdateBoardHandler>()", composition, StringComparison.Ordinal);
+        Assert.Contains("UpdateBoardHandler handler", composition, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<ArchiveBoardHandler>()", composition, StringComparison.Ordinal);
+        Assert.Contains("ArchiveBoardHandler handler", composition, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<RestoreBoardHandler>()", composition, StringComparison.Ordinal);
+        Assert.Contains("RestoreBoardHandler handler", composition, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<UpdateSwimlaneHandler>()", composition, StringComparison.Ordinal);
+        Assert.Contains("UpdateSwimlaneHandler handler", composition, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<AddColumnHandler>()", composition, StringComparison.Ordinal);
+        Assert.Contains("AddColumnHandler handler", composition, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<UpdateColumnHandler>()", composition, StringComparison.Ordinal);
+        Assert.Contains("UpdateColumnHandler handler", composition, StringComparison.Ordinal);
     }
 
     [Fact]
     public void WorkflowUpsertAndRead_ArePortFocusedVerticalSlicesWithCompatibilityFacades()
     {
         var moduleDirectory = Path.Combine(SourceDirectory, "Zumbo.Modules.Workflows");
-        var upsertDirectory = Path.Combine(moduleDirectory, "Features", "UpsertWorkflow");
-        var getDirectory = Path.Combine(moduleDirectory, "Features", "GetWorkflow");
-        var representativeDirectory = Path.Combine(moduleDirectory, "Features", "RepresentativeWorkflowSlices");
+        var upsertDirectory = Path.Combine(moduleDirectory, "Application", "Features", "WorkflowDefinitions");
+        var getDirectory = upsertDirectory;
+        var representativeDirectory = Path.Combine(
+            moduleDirectory,
+            "Application",
+            "Features",
+            "RepresentativeWorkflowSlices");
 
         Assert.True(File.Exists(Path.Combine(upsertDirectory, "CreateWorkflowRequest.cs")));
         Assert.True(File.Exists(Path.Combine(upsertDirectory, "UpsertWorkflowValidator.cs")));
@@ -777,8 +869,9 @@ public sealed class ArchitectureBoundaryTests
 
         var facade = File.ReadAllText(Path.Combine(
             moduleDirectory,
-            "Module",
-            "Workflows",
+            "Application",
+            "Compatibility",
+            "WorkflowDefinitions",
             "WorkflowService.cs"));
         Assert.Contains("upsertWorkflowHandler.HandleAsync", facade, StringComparison.Ordinal);
         Assert.Contains("getWorkflowHandler.HandleAsync", facade, StringComparison.Ordinal);
@@ -786,6 +879,7 @@ public sealed class ArchitectureBoundaryTests
         var composition = File.ReadAllText(Path.Combine(
             SourceDirectory,
             "Zumbo.Api",
+            "Presentation",
             "Endpoints",
             "WorkflowEndpoints.cs"));
         Assert.Contains("AddScoped<UpsertWorkflowHandler>(provider =>", composition, StringComparison.Ordinal);
@@ -796,10 +890,11 @@ public sealed class ArchitectureBoundaryTests
     public void WorkItemCreateAndSearch_ArePortFocusedVerticalSlicesWithCompatibilityFacades()
     {
         var moduleDirectory = Path.Combine(SourceDirectory, "Zumbo.Modules.WorkItems");
-        var createDirectory = Path.Combine(moduleDirectory, "Features", "CreateWorkItem");
-        var searchDirectory = Path.Combine(moduleDirectory, "Features", "SearchWorkItems");
+        var createDirectory = Path.Combine(moduleDirectory, "Application", "Features", "WorkItemsCore");
+        var searchDirectory = Path.Combine(moduleDirectory, "Application", "Features", "Search");
         var representativeDirectory = Path.Combine(
             moduleDirectory,
+            "Application",
             "Features",
             "RepresentativeWorkItemSlices");
 
@@ -831,13 +926,15 @@ public sealed class ArchitectureBoundaryTests
 
         var createFacade = File.ReadAllText(Path.Combine(
             moduleDirectory,
-            "Features",
-            "Create",
+            "Application",
+            "Compatibility",
+            "WorkItemService",
             "WorkItemService.Create.cs"));
         var searchFacade = File.ReadAllText(Path.Combine(
             moduleDirectory,
-            "Features",
-            "Read",
+            "Application",
+            "Compatibility",
+            "WorkItemService",
             "WorkItemService.Read.cs"));
         Assert.Contains("createWorkItemHandler.HandleAsync", createFacade, StringComparison.Ordinal);
         Assert.Contains("searchWorkItemsHandler.HandleAsync", searchFacade, StringComparison.Ordinal);
@@ -845,6 +942,7 @@ public sealed class ArchitectureBoundaryTests
         var composition = File.ReadAllText(Path.Combine(
             SourceDirectory,
             "Zumbo.Api",
+            "Presentation",
             "Endpoints",
             "WorkItemEndpoints",
             "WorkItemEndpoints.AddWorkItemsModule.cs"));
@@ -856,10 +954,11 @@ public sealed class ArchitectureBoundaryTests
     public void NotificationListAndMarkRead_ArePortFocusedVerticalSlicesWithCompatibilityFacades()
     {
         var moduleDirectory = Path.Combine(SourceDirectory, "Zumbo.Modules.Notifications");
-        var listDirectory = Path.Combine(moduleDirectory, "Features", "ListNotifications");
-        var markReadDirectory = Path.Combine(moduleDirectory, "Features", "MarkNotificationAsRead");
+        var listDirectory = Path.Combine(moduleDirectory, "Application", "Features", "NotificationsCore");
+        var markReadDirectory = Path.Combine(moduleDirectory, "Application", "Features", "ReadState");
         var representativeDirectory = Path.Combine(
             moduleDirectory,
+            "Application",
             "Features",
             "RepresentativeNotificationSlices");
 
@@ -887,11 +986,15 @@ public sealed class ArchitectureBoundaryTests
 
         var listFacade = File.ReadAllText(Path.Combine(
             moduleDirectory,
-            "NotificationImplementation",
+            "Application",
+            "Compatibility",
+            "NotificationService",
             "NotificationService.ListAsync.cs"));
         var markReadFacade = File.ReadAllText(Path.Combine(
             moduleDirectory,
-            "NotificationImplementation",
+            "Application",
+            "Compatibility",
+            "NotificationService",
             "NotificationService.MarkAsReadAsync.cs"));
         Assert.Contains("listNotificationsHandler.HandleAsync", listFacade, StringComparison.Ordinal);
         Assert.Contains("markNotificationAsReadHandler.HandleAsync", markReadFacade, StringComparison.Ordinal);
@@ -899,6 +1002,7 @@ public sealed class ArchitectureBoundaryTests
         var composition = File.ReadAllText(Path.Combine(
             SourceDirectory,
             "Zumbo.Api",
+            "Presentation",
             "Endpoints",
             "NotificationEndpoints.cs"));
         Assert.Contains("AddScoped<ListNotificationsHandler>(provider =>", composition, StringComparison.Ordinal);
@@ -909,10 +1013,11 @@ public sealed class ArchitectureBoundaryTests
     public void AuditWriteAndQuery_ArePortFocusedVerticalSlicesWithCompatibilityFacades()
     {
         var moduleDirectory = Path.Combine(SourceDirectory, "Zumbo.Modules.Audit");
-        var writeDirectory = Path.Combine(moduleDirectory, "Features", "WriteAuditLog");
-        var queryDirectory = Path.Combine(moduleDirectory, "Features", "QueryAuditLog");
+        var writeDirectory = Path.Combine(moduleDirectory, "Application", "Features", "WriteAuditLog");
+        var queryDirectory = Path.Combine(moduleDirectory, "Application", "Features", "QueryAuditLog");
         var representativeDirectory = Path.Combine(
             moduleDirectory,
+            "Application",
             "Features",
             "RepresentativeAuditSlices");
 
@@ -942,7 +1047,8 @@ public sealed class ArchitectureBoundaryTests
 
         var facade = File.ReadAllText(Path.Combine(
             moduleDirectory,
-            "Services",
+            "Application",
+            "Compatibility",
             "AuditService.cs"));
         Assert.Contains("writeAuditLogHandler.HandleUncheckedAsync", facade, StringComparison.Ordinal);
         Assert.Contains("queryAuditLogHandler.HandleAsync", facade, StringComparison.Ordinal);
@@ -950,6 +1056,7 @@ public sealed class ArchitectureBoundaryTests
         var composition = File.ReadAllText(Path.Combine(
             SourceDirectory,
             "Zumbo.Api",
+            "Presentation",
             "Endpoints",
             "AuditEndpoints.cs"));
         Assert.Contains("AddScoped<WriteAuditLogHandler>(provider =>", composition, StringComparison.Ordinal);
@@ -999,7 +1106,7 @@ public sealed class ArchitectureBoundaryTests
     [Fact]
     public void EndpointRepositoryDependencies_AreRestrictedToCompositionMethods()
     {
-        var endpointDirectory = Path.Combine(SourceDirectory, "Zumbo.Api", "Endpoints");
+        var endpointDirectory = Path.Combine(SourceDirectory, "Zumbo.Api", "Presentation", "Endpoints");
         var violations = Directory.GetFiles(endpointDirectory, "*.cs", SearchOption.AllDirectories)
             .SelectMany(path =>
             {
@@ -1032,8 +1139,9 @@ public sealed class ArchitectureBoundaryTests
         var path = Path.Combine(
             SourceDirectory,
             "Zumbo.Modules.WorkItems",
-            "Services",
-            "WorkItemGraph",
+            "Application",
+            "Features",
+            "WorkItemsCore",
             "WorkItemGraphService.cs");
         var source = File.ReadAllText(path);
 
@@ -1081,9 +1189,14 @@ public sealed class ArchitectureBoundaryTests
 
         var notificationAdapters = ReadSourceScope(
             Path.Combine(SourceDirectory, "Zumbo.Api", "NotificationAdapters"));
-        var notificationHost = File.ReadAllText(Path.Combine(SourceDirectory, "Zumbo.Api", "Endpoints", "NotificationEndpoints.cs"));
+        var notificationHost = File.ReadAllText(Path.Combine(
+            SourceDirectory,
+            "Zumbo.Api",
+            "Presentation",
+            "Endpoints",
+            "NotificationEndpoints.cs"));
         var workItemHost = ReadSourceScope(
-            Path.Combine(SourceDirectory, "Zumbo.Api", "Endpoints", "WorkItemEndpoints"));
+            Path.Combine(SourceDirectory, "Zumbo.Api", "Presentation", "Endpoints", "WorkItemEndpoints"));
         var gateway = ReadSourceScope(Path.Combine(SourceDirectory, "Zumbo.Gateway", "GatewayHost"));
         Assert.DoesNotContain("Zumbo.Modules.WorkItems", notificationAdapters, StringComparison.Ordinal);
         Assert.DoesNotContain("DueDateReminderHostedService", notificationHost, StringComparison.Ordinal);

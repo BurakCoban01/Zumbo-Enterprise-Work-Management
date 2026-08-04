@@ -39,6 +39,39 @@ public sealed class DevelopmentIntegrationServiceTests
     }
 
     [Fact]
+    public async Task RotateWebhookSecretPreservesPreviousSecretForFifteenMinutes()
+    {
+        var fixture = new Fixture();
+        var created = await fixture.CreateConnectionAsync(DevelopmentProviders.GitHub);
+        var before = await fixture.Connections.SelectAsync(
+            item => item.Id == created.Connection.Id);
+        Assert.NotNull(before);
+
+        var rotated = await fixture.Service.RotateWebhookSecretAsync(
+            created.Connection.Id,
+            new DevelopmentVersionRequest(created.Connection.Version),
+            "rotate-webhook-correlation",
+            CancellationToken.None);
+        var stored = await fixture.Connections.SelectAsync(
+            item => item.Id == created.Connection.Id);
+
+        Assert.NotNull(stored);
+        Assert.NotEqual(created.WebhookSecret, rotated.WebhookSecret);
+        Assert.Equal(before.WebhookSecretProtected, stored.PreviousWebhookSecretProtected);
+        Assert.Equal(before.WebhookSecretVersion, stored.PreviousWebhookSecretVersion);
+        Assert.Equal(
+            fixture.Clock.UtcNow.AddMinutes(15),
+            stored.PreviousWebhookSecretValidUntilUtc);
+        Assert.Equal(before.WebhookSecretVersion + 1, stored.WebhookSecretVersion);
+        Assert.Equal(rotated.Connection.WebhookSecretFingerprint, stored.WebhookSecretFingerprint);
+        Assert.Equal(rotated.WebhookSecret, fixture.Protector.Unprotect(stored.WebhookSecretProtected));
+        Assert.Contains(
+            fixture.Audit.Entries,
+            entry => entry.Action == "DevelopmentWebhookSecretRotated"
+                && entry.CorrelationId == "rotate-webhook-correlation");
+    }
+
+    [Fact]
     public async Task WorkItemMappingDiscoveryReturnsOnlyActiveMappingsForItsProject()
     {
         var fixture = new Fixture();
@@ -62,6 +95,225 @@ public sealed class DevelopmentIntegrationServiceTests
         Assert.Empty(await fixture.Service.ListWorkItemMappingsAsync(
             "abcdef1234567890",
             CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task ConnectionMappingListIsTenantScopedAndDeterministicallyOrdered()
+    {
+        var fixture = new Fixture();
+        var setup = await fixture.CreateMappedConnectionAsync(DevelopmentProviders.GitHub);
+        _ = await fixture.Service.CreateMappingAsync(
+            setup.Connection.Connection.Id,
+            new CreateDevelopmentRepositoryMappingRequest(
+                "project-1",
+                "41",
+                "another-repo",
+                "acme/another-repo",
+                "https://github.com/acme/another-repo",
+                "main"),
+            "second-mapping-correlation",
+            CancellationToken.None);
+
+        var mappings = await fixture.Service.ListMappingsAsync(
+            setup.Connection.Connection.Id,
+            CancellationToken.None);
+        Assert.Equal(
+            ["acme/another-repo", "acme/repo"],
+            mappings.Select(item => item.RepositoryFullName));
+
+        fixture.Current.OrganizationIdValue = "foreign-organization";
+        await Assert.ThrowsAsync<NotFoundException>(() =>
+            fixture.Service.ListMappingsAsync(
+                setup.Connection.Connection.Id,
+                CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task DeleteMappingRejectsStaleVersionThenRemovesLinkedDevelopmentData()
+    {
+        var fixture = new Fixture();
+        var setup = await fixture.CreateMappedConnectionAsync(DevelopmentProviders.GitHub);
+        var link = await fixture.Service.CreateWorkItemLinkAsync(
+            "abcdef1234567890",
+            new CreateWorkItemDevelopmentLinkRequest(
+                setup.Mapping.Id,
+                DevelopmentLinkKinds.PullRequest,
+                "pr:18",
+                "Synthetic pull request",
+                "https://github.com/acme/repo/pull/18",
+                "feature/delete-mapping",
+                "0123456789abcdef",
+                "Open"),
+            "link-correlation",
+            CancellationToken.None);
+
+        await Assert.ThrowsAsync<ConflictException>(() =>
+            fixture.Service.DeleteMappingAsync(
+                setup.Mapping.Id,
+                setup.Mapping.Version + 1,
+                "stale-delete-correlation",
+                CancellationToken.None));
+        Assert.NotNull(await fixture.Mappings.SelectAsync(
+            item => item.Id == setup.Mapping.Id));
+        Assert.NotNull(await fixture.Links.SelectAsync(item => item.Id == link.Id));
+
+        await fixture.Service.DeleteMappingAsync(
+            setup.Mapping.Id,
+            setup.Mapping.Version,
+            "delete-mapping-correlation",
+            CancellationToken.None);
+
+        Assert.Null(await fixture.Mappings.SelectAsync(
+            item => item.Id == setup.Mapping.Id));
+        Assert.Null(await fixture.Links.SelectAsync(item => item.Id == link.Id));
+        Assert.Contains(
+            fixture.Audit.Entries,
+            entry => entry.Action == "DevelopmentRepositoryUnmapped"
+                && entry.CorrelationId == "delete-mapping-correlation");
+    }
+
+    [Fact]
+    public async Task CreateWorkItemLinkIsIdempotentNormalizesAndAuditsOnce()
+    {
+        var fixture = new Fixture();
+        var setup = await fixture.CreateMappedConnectionAsync(
+            DevelopmentProviders.GitHub);
+        var request = new CreateWorkItemDevelopmentLinkRequest(
+            $"  {setup.Mapping.Id}  ",
+            " pullrequest ",
+            " pr:24 ",
+            " Synthetic pull request ",
+            "https://github.com/acme/repo/pull/24",
+            " feature/link-handler ",
+            " 0123456789abcdef ",
+            " open ");
+
+        var first = await fixture.Service.CreateWorkItemLinkAsync(
+            "abcdef1234567890",
+            request,
+            "create-link-correlation",
+            CancellationToken.None);
+        var second = await fixture.Service.CreateWorkItemLinkAsync(
+            "abcdef1234567890",
+            request,
+            "duplicate-link-correlation",
+            CancellationToken.None);
+
+        Assert.Equal(first.Id, second.Id);
+        Assert.Equal(DevelopmentLinkKinds.PullRequest, first.Kind);
+        Assert.Equal("pr:24", first.ExternalId);
+        Assert.Equal("Synthetic pull request", first.Title);
+        Assert.Equal("feature/link-handler", first.Branch);
+        Assert.Equal("0123456789abcdef", first.CommitSha);
+        Assert.Equal("Open", first.Status);
+        Assert.Equal(1, await fixture.Links.CountByFilterAsync());
+        Assert.Single(
+            fixture.Audit.Entries,
+            entry => entry.Action == "WorkItemDevelopmentLinkCreated"
+                && entry.CorrelationId == "create-link-correlation");
+    }
+
+    [Fact]
+    public async Task DeleteWorkItemLinkRejectsStaleVersionThenDeletesAndAudits()
+    {
+        var fixture = new Fixture();
+        var setup = await fixture.CreateMappedConnectionAsync(
+            DevelopmentProviders.GitHub);
+        var link = await fixture.Service.CreateWorkItemLinkAsync(
+            "abcdef1234567890",
+            new CreateWorkItemDevelopmentLinkRequest(
+                setup.Mapping.Id,
+                DevelopmentLinkKinds.Commit,
+                "commit:24",
+                "Synthetic commit",
+                "https://github.com/acme/repo/commit/0123456789abcdef",
+                "feature/delete-link",
+                "0123456789abcdef",
+                "Pushed"),
+            "create-delete-link-correlation",
+            CancellationToken.None);
+
+        await Assert.ThrowsAsync<ConflictException>(() =>
+            fixture.Service.DeleteWorkItemLinkAsync(
+                "abcdef1234567890",
+                link.Id,
+                link.Version + 1,
+                "stale-delete-link-correlation",
+                CancellationToken.None));
+        Assert.NotNull(await fixture.Links.SelectAsync(item => item.Id == link.Id));
+
+        await fixture.Service.DeleteWorkItemLinkAsync(
+            "abcdef1234567890",
+            link.Id,
+            link.Version,
+            "delete-link-correlation",
+            CancellationToken.None);
+
+        Assert.Null(await fixture.Links.SelectAsync(item => item.Id == link.Id));
+        Assert.Contains(
+            fixture.Audit.Entries,
+            entry => entry.Action == "WorkItemDevelopmentLinkDeleted"
+                && entry.CorrelationId == "delete-link-correlation");
+    }
+
+    [Fact]
+    public async Task DeleteConnectionRejectsStaleVersionThenRemovesOwnedDataAndAudits()
+    {
+        var fixture = new Fixture();
+        var setup = await fixture.CreateMappedConnectionAsync(
+            DevelopmentProviders.GitHub);
+        var link = await fixture.Service.CreateWorkItemLinkAsync(
+            "abcdef1234567890",
+            new CreateWorkItemDevelopmentLinkRequest(
+                setup.Mapping.Id,
+                DevelopmentLinkKinds.PullRequest,
+                "pr:delete-connection",
+                "Connection deletion link",
+                "https://github.com/acme/repo/pull/31",
+                "feature/delete-connection",
+                "0123456789abcdef",
+                "Open"),
+            "create-delete-connection-link",
+            CancellationToken.None);
+        await fixture.Receipts.CreateAsync(new DevelopmentWebhookReceiptDocument
+        {
+            Id = "delete-connection-receipt",
+            OrganizationId = Fixture.OrganizationId,
+            ConnectionId = setup.Connection.Connection.Id,
+            DeliveryId = "delete-connection-delivery",
+            ExpiresAtUtc = fixture.Clock.UtcNow.AddDays(1).UtcDateTime
+        });
+        var current = await fixture.Service.GetAsync(
+            setup.Connection.Connection.Id,
+            CancellationToken.None);
+
+        await Assert.ThrowsAsync<ConflictException>(() =>
+            fixture.Service.DeleteConnectionAsync(
+                current.Id,
+                current.Version + 1,
+                "stale-delete-connection",
+                CancellationToken.None));
+        Assert.NotNull(await fixture.Connections.SelectAsync(item => item.Id == current.Id));
+        Assert.NotNull(await fixture.Mappings.SelectAsync(item => item.Id == setup.Mapping.Id));
+        Assert.NotNull(await fixture.Links.SelectAsync(item => item.Id == link.Id));
+        Assert.NotNull(await fixture.Receipts.SelectAsync(
+            item => item.Id == "delete-connection-receipt"));
+
+        await fixture.Service.DeleteConnectionAsync(
+            current.Id,
+            current.Version,
+            "delete-connection",
+            CancellationToken.None);
+
+        Assert.Null(await fixture.Connections.SelectAsync(item => item.Id == current.Id));
+        Assert.Null(await fixture.Mappings.SelectAsync(item => item.Id == setup.Mapping.Id));
+        Assert.Null(await fixture.Links.SelectAsync(item => item.Id == link.Id));
+        Assert.Null(await fixture.Receipts.SelectAsync(
+            item => item.Id == "delete-connection-receipt"));
+        Assert.Contains(
+            fixture.Audit.Entries,
+            entry => entry.Action == "DevelopmentConnectionDeleted"
+                && entry.CorrelationId == "delete-connection");
     }
 
     [Fact]

@@ -108,6 +108,147 @@ public sealed class CapacityPlanningServiceTests
     }
 
     [Fact]
+    public async Task ViewerWithoutVisibleProjectCannotReadPlan()
+    {
+        var fixture = new Fixture();
+        var plan = await fixture.Service.SaveAsync(
+            null,
+            Request(),
+            "create-capacity-plan",
+            CancellationToken.None);
+        fixture.Current.UserIdValue = "viewer-1";
+        fixture.Directory.ProjectsAvailable = false;
+
+        await Assert.ThrowsAsync<NotFoundException>(() =>
+            fixture.Service.GetAsync(plan.Id, false, CancellationToken.None));
+
+        fixture.Current.UserIdValue = "owner-1";
+        Assert.True((await fixture.Service.GetAsync(
+            plan.Id,
+            false,
+            CancellationToken.None)).CanEdit);
+    }
+
+    [Fact]
+    public async Task ListNormalizesPagingAndFiltersViewerProjectAccess()
+    {
+        var fixture = new Fixture();
+        await fixture.Service.SaveAsync(
+            null,
+            Request(),
+            "create-first-plan",
+            CancellationToken.None);
+        await fixture.Service.SaveAsync(
+            null,
+            Request() with { Name = "Second plan" },
+            "create-second-plan",
+            CancellationToken.None);
+        fixture.Current.UserIdValue = "viewer-1";
+        fixture.Directory.ProjectsAvailable = false;
+
+        Assert.Empty((await fixture.Service.ListAsync(
+            false,
+            1,
+            50,
+            CancellationToken.None)).Items);
+
+        fixture.Directory.ProjectsAvailable = true;
+        var normalized = await fixture.Service.ListAsync(
+            false,
+            0,
+            500,
+            CancellationToken.None);
+        Assert.Equal(1, normalized.Page);
+        Assert.Equal(100, normalized.PageSize);
+        Assert.Equal(2, normalized.Total);
+        Assert.Equal(2, normalized.Items.Count);
+        Assert.All(normalized.Items, item => Assert.False(item.CanEdit));
+
+        var secondPage = await fixture.Service.ListAsync(
+            false,
+            2,
+            1,
+            CancellationToken.None);
+        Assert.Equal(2, secondPage.Page);
+        Assert.Equal(1, secondPage.PageSize);
+        Assert.Equal(2, secondPage.Total);
+        Assert.Single(secondPage.Items);
+    }
+
+    [Fact]
+    public async Task SharingNormalizesViewersRequiresOwnerAndWritesAudit()
+    {
+        var fixture = new Fixture();
+        var plan = await fixture.Service.SaveAsync(
+            null,
+            Request(),
+            "create-capacity-plan",
+            CancellationToken.None);
+
+        await Assert.ThrowsAsync<ValidationException>(() =>
+            fixture.Service.ShareAsync(
+                plan.Id,
+                new ShareCapacityPlanRequest(["owner-1"]),
+                "owner-as-viewer",
+                CancellationToken.None));
+
+        fixture.Current.UserIdValue = "viewer-1";
+        await Assert.ThrowsAsync<ForbiddenException>(() =>
+            fixture.Service.ShareAsync(
+                plan.Id,
+                new ShareCapacityPlanRequest(["viewer-2"]),
+                "viewer-share",
+                CancellationToken.None));
+
+        fixture.Current.UserIdValue = "owner-1";
+        var shared = await fixture.Service.ShareAsync(
+            plan.Id,
+            new ShareCapacityPlanRequest(
+                [" viewer-2 ", "viewer-2", "viewer-3"]),
+            "owner-share",
+            CancellationToken.None);
+
+        Assert.Equal(["viewer-2", "viewer-3"], shared.ViewerUserIds);
+        Assert.Contains(
+            fixture.Audit.Entries,
+            entry => entry.Action == "CapacityPlanSharingUpdated"
+                && entry.PlanId == plan.Id
+                && entry.CorrelationId == "owner-share");
+    }
+
+    [Fact]
+    public async Task SaveCreatesThenUpdatesPlanAndWritesLifecycleAudit()
+    {
+        var fixture = new Fixture();
+
+        var created = await fixture.Service.SaveAsync(
+            null,
+            Request() with { Name = "  Quarterly staffing  " },
+            "create-plan",
+            CancellationToken.None);
+        var updated = await fixture.Service.SaveAsync(
+            created.Id,
+            Request() with { Name = "Updated staffing" },
+            "update-plan",
+            CancellationToken.None);
+
+        Assert.Equal("Quarterly staffing", created.Name);
+        Assert.Equal(created.Id, updated.Id);
+        Assert.Equal("Updated staffing", updated.Name);
+        Assert.True(updated.Version > created.Version);
+        Assert.Contains(
+            fixture.Audit.Entries,
+            entry => entry.Action == "CapacityPlanCreated"
+                && entry.PlanId == created.Id
+                && entry.CorrelationId == "create-plan");
+        Assert.Contains(
+            fixture.Audit.Entries,
+            entry => entry.Action == "CapacityPlanUpdated"
+                && entry.PlanId == created.Id
+                && entry.CorrelationId == "update-plan");
+    }
+
+    [Fact]
     public async Task RejectsInvalidPeriodAllocationAndMemberBounds()
     {
         var fixture = new Fixture();
@@ -144,6 +285,42 @@ public sealed class CapacityPlanningServiceTests
                 },
                 "correlation",
                 CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task ArchiveRequiresOwnerHidesPlanAndWritesAudit()
+    {
+        var fixture = new Fixture();
+        var plan = await fixture.Service.SaveAsync(
+            null,
+            Request(),
+            "create-capacity-plan",
+            CancellationToken.None);
+        fixture.Current.UserIdValue = "viewer-1";
+
+        await Assert.ThrowsAsync<ForbiddenException>(() =>
+            fixture.Service.ArchiveAsync(
+                plan.Id,
+                "viewer-archive",
+                CancellationToken.None));
+
+        fixture.Current.UserIdValue = "owner-1";
+        await fixture.Service.ArchiveAsync(
+            plan.Id,
+            "owner-archive",
+            CancellationToken.None);
+
+        await Assert.ThrowsAsync<NotFoundException>(() =>
+            fixture.Service.GetAsync(plan.Id, false, CancellationToken.None));
+        Assert.True((await fixture.Service.GetAsync(
+            plan.Id,
+            true,
+            CancellationToken.None)).Archived);
+        Assert.Contains(
+            fixture.Audit.Entries,
+            entry => entry.Action == "CapacityPlanArchived"
+                && entry.PlanId == plan.Id
+                && entry.CorrelationId == "owner-archive");
     }
 
     private static SaveCapacityPlanRequest Request() => new(
@@ -188,6 +365,8 @@ public sealed class CapacityPlanningServiceTests
         public InMemoryDocumentRepository<CapacityPlanDocument> Plans { get; } = new();
         public InMemoryDocumentRepository<WorkItemDocument> WorkItems { get; } = new();
         public CurrentUser Current { get; } = new();
+        public Audit Audit { get; } = new();
+        public Directory Directory { get; } = new();
         public CapacityPlanningService Service { get; }
 
         public Fixture()
@@ -195,8 +374,8 @@ public sealed class CapacityPlanningServiceTests
             Service = new CapacityPlanningService(
                 Plans,
                 WorkItems,
-                new Directory(),
-                new Audit(),
+                Directory,
+                Audit,
                 Current,
                 new Clock());
         }
@@ -204,6 +383,8 @@ public sealed class CapacityPlanningServiceTests
 
     private sealed class Directory : ICapacityPlanningDirectory
     {
+        public bool ProjectsAvailable { get; set; } = true;
+
         public Task EnsureOrganizationUsersAndTeamsAsync(
             string organizationId,
             IReadOnlyCollection<CapacityMemberRequest> members,
@@ -223,19 +404,34 @@ public sealed class CapacityPlanningServiceTests
             IReadOnlyCollection<string> projectIds,
             CancellationToken ct) =>
             Task.FromResult<IReadOnlyCollection<CapacityProjectAccess>>(
-                projectIds.Select(id => new CapacityProjectAccess(id, id, id, true)).ToList());
+                projectIds.Select(id => new CapacityProjectAccess(
+                    id,
+                    id,
+                    id,
+                    ProjectsAvailable)).ToList());
     }
 
     private sealed class Audit : ICapacityPlanningAuditWriter
     {
+        public List<AuditEntry> Entries { get; } = [];
+
         public Task WriteAsync(
             string action,
             string planId,
             string? oldValue,
             string? newValue,
             string correlationId,
-            CancellationToken ct) => Task.CompletedTask;
+            CancellationToken ct)
+        {
+            Entries.Add(new AuditEntry(action, planId, correlationId));
+            return Task.CompletedTask;
+        }
     }
+
+    private sealed record AuditEntry(
+        string Action,
+        string PlanId,
+        string CorrelationId);
 
     private sealed class CurrentUser : ICurrentUser
     {

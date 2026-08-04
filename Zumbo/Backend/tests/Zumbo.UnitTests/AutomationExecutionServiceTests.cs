@@ -3,6 +3,13 @@ using Zumbo.BuildingBlocks.Application.Concurrency;
 using Zumbo.BuildingBlocks.Infrastructure.Concurrency;
 using Zumbo.BuildingBlocks.Infrastructure.Persistence;
 using Zumbo.Modules.Workflows;
+using Zumbo.Modules.Workflows.Application.Features.RunQueries;
+using Zumbo.Modules.Workflows.Application.Features.RunReplay;
+using Zumbo.Modules.Workflows.Application.Features.RunRetry;
+using Zumbo.Modules.Workflows.Application.Features.ActionExecution;
+using Zumbo.Modules.Workflows.Application.Features.RunResume;
+using Zumbo.Modules.Workflows.Application.Features.ScheduleClaims;
+using Zumbo.Modules.Workflows.Application.Features.RunExecution;
 using Zumbo.SharedKernel;
 
 namespace Zumbo.UnitTests;
@@ -17,8 +24,12 @@ public sealed class AutomationExecutionServiceTests
         var fixture = await Fixture.CreateAsync();
         var context = fixture.Context("trigger-1");
 
-        var first = Assert.Single(await fixture.Service.ExecuteAsync(context, default));
-        var duplicate = Assert.Single(await fixture.Service.ExecuteAsync(context, default));
+        var first = Assert.Single(await fixture.ExecuteHandler.HandleAsync(
+            new ExecuteAutomationCommand(context),
+            default));
+        var duplicate = Assert.Single(await fixture.ExecuteHandler.HandleAsync(
+            new ExecuteAutomationCommand(context),
+            default));
 
         Assert.Equal(first.Id, duplicate.Id);
         Assert.Equal(AutomationRunStates.Succeeded, first.Status);
@@ -32,26 +43,26 @@ public sealed class AutomationExecutionServiceTests
     {
         var fixture = await Fixture.CreateAsync(conditionValue: "Critical");
 
-        var conditionMismatch = Assert.Single(await fixture.Service.ExecuteAsync(
-            fixture.Context("trigger-condition", priority: "High"),
+        var conditionMismatch = Assert.Single(await fixture.ExecuteHandler.HandleAsync(
+            new ExecuteAutomationCommand(fixture.Context("trigger-condition", priority: "High")),
             default));
-        var loopPrevented = Assert.Single(await fixture.Service.ExecuteAsync(
-            fixture.Context(
+        var loopPrevented = Assert.Single(await fixture.ExecuteHandler.HandleAsync(
+            new ExecuteAutomationCommand(fixture.Context(
                 "trigger-loop",
                 priority: "Critical",
-                visitedRuleIds: [fixture.Rule.Id]),
+                visitedRuleIds: [fixture.Rule.Id])),
             default));
-        var depthExceeded = Assert.Single(await fixture.Service.ExecuteAsync(
-            fixture.Context(
+        var depthExceeded = Assert.Single(await fixture.ExecuteHandler.HandleAsync(
+            new ExecuteAutomationCommand(fixture.Context(
                 "trigger-depth",
                 priority: "Critical",
-                chainDepth: 3),
+                chainDepth: 3)),
             default));
-        var actorUnavailable = Assert.Single(await fixture.Service.ExecuteAsync(
-            fixture.Context(
+        var actorUnavailable = Assert.Single(await fixture.ExecuteHandler.HandleAsync(
+            new ExecuteAutomationCommand(fixture.Context(
                 "trigger-actor",
                 priority: "Critical",
-                actorAvailable: false),
+                actorAvailable: false)),
             default));
 
         Assert.Equal(AutomationRunStates.Skipped, conditionMismatch.Status);
@@ -68,26 +79,42 @@ public sealed class AutomationExecutionServiceTests
         var fixture = await Fixture.CreateAsync();
         fixture.Executor.FailuresRemaining = 3;
 
-        var first = Assert.Single(await fixture.Service.ExecuteAsync(
-            fixture.Context("trigger-retry"),
+        var first = Assert.Single(await fixture.ExecuteHandler.HandleAsync(
+            new ExecuteAutomationCommand(fixture.Context("trigger-retry")),
             default));
         Assert.Equal(AutomationRunStates.RetryScheduled, first.Status);
         Assert.Equal("Unexpected", first.FailureCategory);
+        Assert.Empty(await fixture.DueRetriesHandler.HandleAsync(
+            new ListDueAutomationRetriesQuery(500),
+            default));
 
         fixture.Clock.Advance(TimeSpan.FromMinutes(1));
-        var second = await fixture.Service.ResumeAsync(first.Id, actorAvailable: true, default);
+        var dueRetry = Assert.Single(await fixture.DueRetriesHandler.HandleAsync(
+            new ListDueAutomationRetriesQuery(500),
+            default));
+        Assert.Equal(first.Id, dueRetry.RunId);
+        Assert.Equal("organization-1", dueRetry.OrganizationId);
+        var second = await fixture.ResumeHandler.HandleAsync(
+            new ResumeAutomationRunCommand(first.Id, ActorAvailable: true),
+            default);
         fixture.Clock.Advance(TimeSpan.FromMinutes(2));
-        var third = await fixture.Service.ResumeAsync(first.Id, actorAvailable: true, default);
+        var third = await fixture.ResumeHandler.HandleAsync(
+            new ResumeAutomationRunCommand(first.Id, ActorAvailable: true),
+            default);
         Assert.Equal(AutomationRunStates.DeadLetter, third.Status);
         Assert.Equal(3, third.Attempt);
 
-        var replay = await fixture.Service.ReplayAsync(first.Id, "manual-replay", default);
+        var replay = await fixture.ReplayHandler.HandleAsync(
+            new ReplayAutomationRunCommand(first.Id, "manual-replay"),
+            default);
         Assert.Equal(AutomationRunStates.RetryScheduled, replay.Status);
         Assert.Equal(0, replay.Attempt);
         Assert.Contains("AutomationRunReplayed", fixture.Audit.Actions);
 
         fixture.Clock.Advance(TimeSpan.FromSeconds(1));
-        var succeeded = await fixture.Service.ResumeAsync(first.Id, actorAvailable: true, default);
+        var succeeded = await fixture.ResumeHandler.HandleAsync(
+            new ResumeAutomationRunCommand(first.Id, ActorAvailable: true),
+            default);
         Assert.Equal(AutomationRunStates.Succeeded, succeeded.Status);
         Assert.Equal(1, succeeded.Attempt);
         Assert.Equal(4, fixture.Executor.Executions.Count);
@@ -97,11 +124,11 @@ public sealed class AutomationExecutionServiceTests
     public async Task Execute_EnforcesHourlyLimitAndTenantScopedRunListing()
     {
         var fixture = await Fixture.CreateAsync(maximumExecutionsPerHour: 1);
-        var first = Assert.Single(await fixture.Service.ExecuteAsync(
-            fixture.Context("trigger-limit-1"),
+        var first = Assert.Single(await fixture.ExecuteHandler.HandleAsync(
+            new ExecuteAutomationCommand(fixture.Context("trigger-limit-1")),
             default));
-        var limited = Assert.Single(await fixture.Service.ExecuteAsync(
-            fixture.Context("trigger-limit-2"),
+        var limited = Assert.Single(await fixture.ExecuteHandler.HandleAsync(
+            new ExecuteAutomationCommand(fixture.Context("trigger-limit-2")),
             default));
         var page = await fixture.Service.ListAsync(
             "project-1",
@@ -126,20 +153,28 @@ public sealed class AutomationExecutionServiceTests
             scheduleIntervalMinutes: 30,
             nextRunAtUtc: scheduledFor);
 
-        var firstClaim = Assert.Single(await fixture.Service.ClaimDueSchedulesAsync(10, default));
-        var secondClaim = await fixture.Service.ClaimDueSchedulesAsync(10, default);
+        var firstClaim = Assert.Single(await fixture.ClaimSchedulesHandler.HandleAsync(
+            new ClaimDueSchedulesQuery(10),
+            default));
+        var secondClaim = await fixture.ClaimSchedulesHandler.HandleAsync(
+            new ClaimDueSchedulesQuery(10),
+            default);
         fixture.Clock.Advance(TimeSpan.FromMinutes(5).Add(TimeSpan.FromSeconds(1)));
         var recoveredClaim = Assert.Single(
-            await fixture.Service.ClaimDueSchedulesAsync(10, default));
-        var staleCompletion = await fixture.Service.CompleteScheduleClaimAsync(
-            firstClaim.RuleId,
-            firstClaim.ScheduledForUtc,
-            firstClaim.ClaimToken,
+            await fixture.ClaimSchedulesHandler.HandleAsync(
+                new ClaimDueSchedulesQuery(10),
+                default));
+        var staleCompletion = await fixture.CompleteScheduleHandler.HandleAsync(
+            new CompleteScheduleClaimCommand(
+                firstClaim.RuleId,
+                firstClaim.ScheduledForUtc,
+                firstClaim.ClaimToken),
             default);
-        var completed = await fixture.Service.CompleteScheduleClaimAsync(
-            recoveredClaim.RuleId,
-            recoveredClaim.ScheduledForUtc,
-            recoveredClaim.ClaimToken,
+        var completed = await fixture.CompleteScheduleHandler.HandleAsync(
+            new CompleteScheduleClaimCommand(
+                recoveredClaim.RuleId,
+                recoveredClaim.ScheduledForUtc,
+                recoveredClaim.ClaimToken),
             default);
         var updatedRule = await fixture.GetRuleAsync();
 
@@ -153,6 +188,83 @@ public sealed class AutomationExecutionServiceTests
         Assert.Empty(secondClaim);
     }
 
+    [Fact]
+    public async Task GetAutomationRunHandler_ReturnsTenantScopedRun()
+    {
+        var runs = new InMemoryDocumentRepository<AutomationRunDocument>();
+        await runs.CreateAsync(new AutomationRunDocument
+        {
+            Id = "run-query-1",
+            OrganizationId = "organization-1",
+            ProjectId = "project-1",
+            RuleId = "rule-query-1",
+            RuleVersion = 2,
+            RuleName = "Query rule",
+            TriggerType = "Event",
+            TriggerId = "trigger-query-1",
+            SourceId = "work-query-1",
+            ActorUserId = "user-1",
+            RootRunId = "run-query-1",
+            Status = AutomationRunStates.Succeeded,
+            Outcome = AutomationRunStates.Succeeded,
+            CreatedAtUtc = Start
+        });
+        var handler = new GetAutomationRunHandler(runs, new FixedAccess());
+
+        var response = await handler.HandleAsync(
+            new GetAutomationRunQuery("run-query-1"),
+            default);
+
+        Assert.Equal("run-query-1", response.Id);
+        Assert.Equal("project-1", response.ProjectId);
+        Assert.Equal(2, response.RuleVersion);
+        Assert.Equal(AutomationRunStates.Succeeded, response.Status);
+    }
+
+    [Fact]
+    public async Task ListAutomationRunsHandler_AppliesRuleStatusAndTenantFilters()
+    {
+        var runs = new InMemoryDocumentRepository<AutomationRunDocument>();
+        foreach (var run in new[]
+        {
+            new AutomationRunDocument
+            {
+                Id = "run-list-1", OrganizationId = "organization-1", ProjectId = "project-1",
+                RuleId = "rule-list", RuleName = "List rule", TriggerType = "Event",
+                TriggerId = "trigger-list-1", SourceId = "work-list-1", ActorUserId = "user-1",
+                RootRunId = "run-list-1", Status = AutomationRunStates.Succeeded,
+                Outcome = AutomationRunStates.Succeeded, CreatedAtUtc = Start
+            },
+            new AutomationRunDocument
+            {
+                Id = "run-list-2", OrganizationId = "organization-1", ProjectId = "project-1",
+                RuleId = "other-rule", RuleName = "Other rule", TriggerType = "Event",
+                TriggerId = "trigger-list-2", SourceId = "work-list-2", ActorUserId = "user-1",
+                RootRunId = "run-list-2", Status = AutomationRunStates.DeadLetter,
+                Outcome = AutomationRunStates.DeadLetter, CreatedAtUtc = Start.AddMinutes(1)
+            }
+        })
+        {
+            await runs.CreateAsync(run);
+        }
+        var handler = new ListAutomationRunsHandler(runs, new FixedAccess());
+
+        var response = await handler.HandleAsync(
+            new ListAutomationRunsQuery(
+                "project-1",
+                " rule-list ",
+                " Succeeded ",
+                0,
+                500),
+            default);
+
+        var item = Assert.Single(response.Items);
+        Assert.Equal("run-list-1", item.Id);
+        Assert.Equal(1, response.Page);
+        Assert.Equal(100, response.PageSize);
+        Assert.Equal(1, response.Total);
+    }
+
     private sealed class Fixture
     {
         private readonly InMemoryDocumentRepository<AutomationRuleDocument> rules = new();
@@ -163,6 +275,12 @@ public sealed class AutomationExecutionServiceTests
         public CapturingAudit Audit { get; } = new();
         public AutomationRuleDocument Rule { get; private set; } = null!;
         public AutomationExecutionService Service { get; private set; } = null!;
+        public ReplayAutomationRunHandler ReplayHandler { get; private set; } = null!;
+        public ListDueAutomationRetriesHandler DueRetriesHandler { get; private set; } = null!;
+        public ResumeAutomationRunHandler ResumeHandler { get; private set; } = null!;
+        public ClaimDueSchedulesHandler ClaimSchedulesHandler { get; private set; } = null!;
+        public CompleteScheduleClaimHandler CompleteScheduleHandler { get; private set; } = null!;
+        public ExecuteAutomationHandler ExecuteHandler { get; private set; } = null!;
 
         public static async Task<Fixture> CreateAsync(
             string? conditionValue = null,
@@ -221,15 +339,52 @@ public sealed class AutomationExecutionServiceTests
                 CreatedAt = Start,
                 UpdatedAt = Start
             });
+            var access = new FixedAccess();
+            var locks = new InMemoryDistributedLockProvider();
+            var lockOptions = Options.Create(new DistributedLockOptions());
             fixture.Service = new AutomationExecutionService(
                 fixture.rules,
                 fixture.runs,
-                new FixedAccess(),
+                access,
                 fixture.Executor,
-                new InMemoryDistributedLockProvider(),
-                Options.Create(new DistributedLockOptions()),
+                locks,
+                lockOptions,
                 fixture.Clock,
                 fixture.Audit);
+            fixture.ReplayHandler = new ReplayAutomationRunHandler(
+                fixture.runs,
+                access,
+                locks,
+                lockOptions,
+                fixture.Clock,
+                fixture.Audit);
+            fixture.DueRetriesHandler = new ListDueAutomationRetriesHandler(
+                fixture.runs,
+                fixture.Clock);
+            fixture.ResumeHandler = new ResumeAutomationRunHandler(
+                fixture.rules,
+                fixture.runs,
+                locks,
+                lockOptions,
+                fixture.Clock,
+                new AutomationRunActionExecutor(fixture.runs, fixture.Executor, fixture.Clock));
+            fixture.ClaimSchedulesHandler = new ClaimDueSchedulesHandler(
+                fixture.rules,
+                locks,
+                lockOptions,
+                fixture.Clock);
+            fixture.CompleteScheduleHandler = new CompleteScheduleClaimHandler(
+                fixture.rules,
+                locks,
+                lockOptions,
+                fixture.Clock);
+            fixture.ExecuteHandler = new ExecuteAutomationHandler(
+                fixture.rules,
+                fixture.runs,
+                locks,
+                lockOptions,
+                fixture.Clock,
+                new AutomationRunActionExecutor(fixture.runs, fixture.Executor, fixture.Clock));
             return fixture;
         }
 
