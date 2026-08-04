@@ -837,10 +837,11 @@ public sealed class ArchitectureBoundaryTests
     public void WorkItemCreateAndSearch_ArePortFocusedVerticalSlicesWithCompatibilityFacades()
     {
         var moduleDirectory = Path.Combine(SourceDirectory, "Zumbo.Modules.WorkItems");
-        var createDirectory = Path.Combine(moduleDirectory, "Features", "CreateWorkItem");
-        var searchDirectory = Path.Combine(moduleDirectory, "Features", "SearchWorkItems");
+        var createDirectory = Path.Combine(moduleDirectory, "Application", "Features", "WorkItemsCore");
+        var searchDirectory = Path.Combine(moduleDirectory, "Application", "Features", "Search");
         var representativeDirectory = Path.Combine(
             moduleDirectory,
+            "Application",
             "Features",
             "RepresentativeWorkItemSlices");
 
@@ -872,13 +873,15 @@ public sealed class ArchitectureBoundaryTests
 
         var createFacade = File.ReadAllText(Path.Combine(
             moduleDirectory,
-            "Features",
-            "Create",
+            "Application",
+            "Compatibility",
+            "WorkItemService",
             "WorkItemService.Create.cs"));
         var searchFacade = File.ReadAllText(Path.Combine(
             moduleDirectory,
-            "Features",
-            "Read",
+            "Application",
+            "Compatibility",
+            "WorkItemService",
             "WorkItemService.Read.cs"));
         Assert.Contains("createWorkItemHandler.HandleAsync", createFacade, StringComparison.Ordinal);
         Assert.Contains("searchWorkItemsHandler.HandleAsync", searchFacade, StringComparison.Ordinal);
@@ -898,10 +901,11 @@ public sealed class ArchitectureBoundaryTests
     public void NotificationListAndMarkRead_ArePortFocusedVerticalSlicesWithCompatibilityFacades()
     {
         var moduleDirectory = Path.Combine(SourceDirectory, "Zumbo.Modules.Notifications");
-        var listDirectory = Path.Combine(moduleDirectory, "Features", "ListNotifications");
-        var markReadDirectory = Path.Combine(moduleDirectory, "Features", "MarkNotificationAsRead");
+        var listDirectory = Path.Combine(moduleDirectory, "Application", "Features", "NotificationsCore");
+        var markReadDirectory = Path.Combine(moduleDirectory, "Application", "Features", "ReadState");
         var representativeDirectory = Path.Combine(
             moduleDirectory,
+            "Application",
             "Features",
             "RepresentativeNotificationSlices");
 
@@ -929,11 +933,15 @@ public sealed class ArchitectureBoundaryTests
 
         var listFacade = File.ReadAllText(Path.Combine(
             moduleDirectory,
-            "NotificationImplementation",
+            "Application",
+            "Compatibility",
+            "NotificationService",
             "NotificationService.ListAsync.cs"));
         var markReadFacade = File.ReadAllText(Path.Combine(
             moduleDirectory,
-            "NotificationImplementation",
+            "Application",
+            "Compatibility",
+            "NotificationService",
             "NotificationService.MarkAsReadAsync.cs"));
         Assert.Contains("listNotificationsHandler.HandleAsync", listFacade, StringComparison.Ordinal);
         Assert.Contains("markNotificationAsReadHandler.HandleAsync", markReadFacade, StringComparison.Ordinal);
@@ -952,10 +960,11 @@ public sealed class ArchitectureBoundaryTests
     public void AuditWriteAndQuery_ArePortFocusedVerticalSlicesWithCompatibilityFacades()
     {
         var moduleDirectory = Path.Combine(SourceDirectory, "Zumbo.Modules.Audit");
-        var writeDirectory = Path.Combine(moduleDirectory, "Features", "WriteAuditLog");
-        var queryDirectory = Path.Combine(moduleDirectory, "Features", "QueryAuditLog");
+        var writeDirectory = Path.Combine(moduleDirectory, "Application", "Features", "WriteAuditLog");
+        var queryDirectory = Path.Combine(moduleDirectory, "Application", "Features", "QueryAuditLog");
         var representativeDirectory = Path.Combine(
             moduleDirectory,
+            "Application",
             "Features",
             "RepresentativeAuditSlices");
 
@@ -985,7 +994,8 @@ public sealed class ArchitectureBoundaryTests
 
         var facade = File.ReadAllText(Path.Combine(
             moduleDirectory,
-            "Services",
+            "Application",
+            "Compatibility",
             "AuditService.cs"));
         Assert.Contains("writeAuditLogHandler.HandleUncheckedAsync", facade, StringComparison.Ordinal);
         Assert.Contains("queryAuditLogHandler.HandleAsync", facade, StringComparison.Ordinal);
@@ -1076,8 +1086,9 @@ public sealed class ArchitectureBoundaryTests
         var path = Path.Combine(
             SourceDirectory,
             "Zumbo.Modules.WorkItems",
-            "Services",
-            "WorkItemGraph",
+            "Application",
+            "Features",
+            "WorkItemsCore",
             "WorkItemGraphService.cs");
         var source = File.ReadAllText(path);
 
