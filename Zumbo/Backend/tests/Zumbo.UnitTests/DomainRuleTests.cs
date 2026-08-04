@@ -11,6 +11,12 @@ using Zumbo.BuildingBlocks.Infrastructure.Search;
 using Zumbo.BuildingBlocks.Infrastructure.Security;
 using Zumbo.Modules.Audit;
 using Zumbo.Modules.Boards;
+using Zumbo.Modules.Boards.Application.Features.BoardsCore;
+using Zumbo.Modules.Boards.Application.Features.ColumnOrdering;
+using Zumbo.Modules.Boards.Application.Features.Columns;
+using Zumbo.Modules.Boards.Application.Features.Lifecycle;
+using Zumbo.Modules.Boards.Application.Features.Swimlanes;
+using Zumbo.Modules.Boards.Application.Features.Views;
 using Zumbo.Modules.Identity;
 using Zumbo.Modules.Notifications;
 using Zumbo.Modules.Organizations;
@@ -84,6 +90,455 @@ public sealed class DomainRuleTests
             service.DeleteColumnAsync(board.Id, done.Id, CancellationToken.None));
 
         Assert.Equal("DONE_COLUMN_LOCKED", error.Code);
+    }
+
+    [Fact]
+    public async Task BoardUpdateHandler_UpdatesBoardAndWritesAudit()
+    {
+        var boards = new InMemoryDocumentRepository<BoardDocument>();
+        var accessChecker = new AllowBoardProjectAccessChecker();
+        var audit = new RecordingLifecycleAuditWriter();
+        var service = new BoardService(
+            boards,
+            accessChecker,
+            new EmptyBoardColumnUsageChecker(),
+            new InMemoryDistributedLockProvider(),
+            Options.Create(new DistributedLockOptions()),
+            _clock,
+            _currentUser,
+            audit);
+        var board = await service.CreateAsync(
+            new CreateBoardRequest("project-1", "Delivery", "Kanban"),
+            CancellationToken.None);
+        var handler = new UpdateBoardHandler(
+            boards,
+            accessChecker,
+            _clock,
+            _currentUser,
+            audit);
+
+        var updated = await handler.HandleAsync(
+            board.Id,
+            new UpdateBoardRequest("Delivery Flow", "Scrum"),
+            "board-update-test",
+            CancellationToken.None);
+
+        Assert.Equal("Delivery Flow", updated.Name);
+        Assert.Equal("Scrum", updated.Type);
+        Assert.Contains("BoardUpdated", audit.Actions);
+    }
+
+    [Fact]
+    public async Task ArchiveBoardHandler_ArchivesUnusedBoardAndWritesAudit()
+    {
+        var boards = new InMemoryDocumentRepository<BoardDocument>();
+        var accessChecker = new AllowBoardProjectAccessChecker();
+        var audit = new RecordingLifecycleAuditWriter();
+        var service = new BoardService(
+            boards,
+            accessChecker,
+            new EmptyBoardColumnUsageChecker(),
+            new InMemoryDistributedLockProvider(),
+            Options.Create(new DistributedLockOptions()),
+            _clock,
+            _currentUser,
+            audit);
+        var board = await service.CreateAsync(
+            new CreateBoardRequest("project-1", "Archive Candidate", "Kanban"),
+            CancellationToken.None);
+        var handler = new ArchiveBoardHandler(
+            boards,
+            accessChecker,
+            new EmptyBoardColumnUsageChecker(),
+            _clock,
+            _currentUser,
+            audit);
+
+        await handler.HandleAsync(
+            new ArchiveBoardCommand(board.Id, "board-archive-test"),
+            CancellationToken.None);
+
+        var archived = await boards.SelectAsync(x => x.Id == board.Id, CancellationToken.None);
+        Assert.True(archived!.Archived);
+        Assert.Contains("BoardArchived", audit.Actions);
+    }
+
+    [Fact]
+    public async Task RestoreBoardHandler_RestoresArchivedBoardAndWritesAudit()
+    {
+        var boards = new InMemoryDocumentRepository<BoardDocument>();
+        var accessChecker = new AllowBoardProjectAccessChecker();
+        var usageChecker = new EmptyBoardColumnUsageChecker();
+        var audit = new RecordingLifecycleAuditWriter();
+        var service = new BoardService(
+            boards,
+            accessChecker,
+            usageChecker,
+            new InMemoryDistributedLockProvider(),
+            Options.Create(new DistributedLockOptions()),
+            _clock,
+            _currentUser,
+            audit);
+        var board = await service.CreateAsync(
+            new CreateBoardRequest("project-1", "Restore Candidate", "Kanban"),
+            CancellationToken.None);
+        var archiveHandler = new ArchiveBoardHandler(
+            boards,
+            accessChecker,
+            usageChecker,
+            _clock,
+            _currentUser,
+            audit);
+        await archiveHandler.HandleAsync(
+            new ArchiveBoardCommand(board.Id, "board-archive-test"),
+            CancellationToken.None);
+        var restoreHandler = new RestoreBoardHandler(
+            boards,
+            accessChecker,
+            _clock,
+            _currentUser,
+            audit);
+
+        var restored = await restoreHandler.HandleAsync(
+            new RestoreBoardCommand(board.Id, "board-restore-test"),
+            CancellationToken.None);
+
+        Assert.False(restored.Archived);
+        Assert.Contains("BoardRestored", audit.Actions);
+    }
+
+    [Fact]
+    public async Task BoardUpdateSwimlaneHandler_NormalizesModeAndWritesAudit()
+    {
+        var boards = new InMemoryDocumentRepository<BoardDocument>();
+        var accessChecker = new AllowBoardProjectAccessChecker();
+        var audit = new RecordingLifecycleAuditWriter();
+        var service = new BoardService(
+            boards,
+            accessChecker,
+            new EmptyBoardColumnUsageChecker(),
+            new InMemoryDistributedLockProvider(),
+            Options.Create(new DistributedLockOptions()),
+            _clock,
+            _currentUser,
+            audit);
+        var board = await service.CreateAsync(
+            new CreateBoardRequest("project-1", "Swimlanes", "Kanban"),
+            CancellationToken.None);
+        var handler = new UpdateSwimlaneHandler(
+            boards,
+            accessChecker,
+            _clock,
+            _currentUser,
+            audit);
+
+        var updated = await handler.HandleAsync(
+            board.Id,
+            new UpdateSwimlaneRequest("team"),
+            "board-swimlane-test",
+            CancellationToken.None);
+
+        Assert.Equal("Team", updated.SwimlaneMode);
+        Assert.Contains("BoardSwimlaneUpdated", audit.Actions);
+    }
+
+    [Fact]
+    public async Task BoardAddColumnHandler_AddsMappedColumnAndWritesAudit()
+    {
+        var boards = new InMemoryDocumentRepository<BoardDocument>();
+        var accessChecker = new AllowBoardProjectAccessChecker();
+        var audit = new RecordingLifecycleAuditWriter();
+        var service = new BoardService(
+            boards,
+            accessChecker,
+            new EmptyBoardColumnUsageChecker(),
+            new InMemoryDistributedLockProvider(),
+            Options.Create(new DistributedLockOptions()),
+            _clock,
+            _currentUser,
+            audit);
+        var board = await service.CreateAsync(
+            new CreateBoardRequest("project-1", "Columns", "Kanban"),
+            CancellationToken.None);
+        var handler = new AddColumnHandler(
+            boards,
+            accessChecker,
+            _clock,
+            _currentUser,
+            audit);
+
+        var updated = await handler.HandleAsync(
+            board.Id,
+            new CreateColumnRequest("Ready for Release", "Custom", 2, ["Ready for Release"]),
+            "board-column-test",
+            CancellationToken.None);
+
+        Assert.Contains(updated.Columns, column => column.Name == "Ready for Release" && column.WipLimit == 2);
+        Assert.Contains("BoardColumnCreated", audit.Actions);
+    }
+
+    [Fact]
+    public async Task BoardUpdateColumnHandler_UpdatesCustomColumnAndWritesAudit()
+    {
+        var boards = new InMemoryDocumentRepository<BoardDocument>();
+        var accessChecker = new AllowBoardProjectAccessChecker();
+        var usageChecker = new EmptyBoardColumnUsageChecker();
+        var audit = new RecordingLifecycleAuditWriter();
+        var service = new BoardService(
+            boards,
+            accessChecker,
+            usageChecker,
+            new InMemoryDistributedLockProvider(),
+            Options.Create(new DistributedLockOptions()),
+            _clock,
+            _currentUser,
+            audit);
+        var board = await service.CreateAsync(
+            new CreateBoardRequest("project-1", "Column Update", "Kanban"),
+            CancellationToken.None);
+        var addHandler = new AddColumnHandler(boards, accessChecker, _clock, _currentUser, audit);
+        board = await addHandler.HandleAsync(
+            board.Id,
+            new CreateColumnRequest("Ready", "Custom", 2, ["Ready"]),
+            "board-column-add-test",
+            CancellationToken.None);
+        var column = board.Columns.Single(x => x.Name == "Ready");
+        var handler = new UpdateColumnHandler(
+            boards,
+            accessChecker,
+            usageChecker,
+            _clock,
+            _currentUser,
+            audit);
+
+        var updated = await handler.HandleAsync(
+            board.Id,
+            column.Id,
+            new UpdateColumnRequest("Ready to Ship", "Custom", 3, ["Ready to Ship"]),
+            "board-column-update-test",
+            CancellationToken.None);
+
+        Assert.Contains(updated.Columns, item => item.Id == column.Id && item.Name == "Ready to Ship" && item.WipLimit == 3);
+        Assert.Contains("BoardColumnUpdated", audit.Actions);
+    }
+
+    [Fact]
+    public async Task BoardDeleteColumnHandler_DeletesUnusedCustomColumnAndWritesAudit()
+    {
+        var boards = new InMemoryDocumentRepository<BoardDocument>();
+        var accessChecker = new AllowBoardProjectAccessChecker();
+        var usageChecker = new EmptyBoardColumnUsageChecker();
+        var audit = new RecordingLifecycleAuditWriter();
+        var service = new BoardService(
+            boards,
+            accessChecker,
+            usageChecker,
+            new InMemoryDistributedLockProvider(),
+            Options.Create(new DistributedLockOptions()),
+            _clock,
+            _currentUser,
+            audit);
+        var board = await service.CreateAsync(
+            new CreateBoardRequest("project-1", "Column Delete", "Kanban"),
+            CancellationToken.None);
+        var addHandler = new AddColumnHandler(boards, accessChecker, _clock, _currentUser, audit);
+        board = await addHandler.HandleAsync(
+            board.Id,
+            new CreateColumnRequest("Temporary", "Custom", null, ["Temporary"]),
+            "board-column-add-delete-test",
+            CancellationToken.None);
+        var column = board.Columns.Single(x => x.Name == "Temporary");
+        var handler = new DeleteColumnHandler(
+            boards,
+            accessChecker,
+            usageChecker,
+            _clock,
+            _currentUser,
+            audit);
+
+        var updated = await handler.HandleAsync(
+            new DeleteColumnCommand(board.Id, column.Id, "board-column-delete-test"),
+            CancellationToken.None);
+
+        Assert.DoesNotContain(updated.Columns, item => item.Id == column.Id);
+        Assert.Equal(
+            Enumerable.Range(1, updated.Columns.Count),
+            updated.Columns.OrderBy(item => item.Position).Select(item => item.Position));
+        Assert.Contains("BoardColumnDeleted", audit.Actions);
+    }
+
+    [Fact]
+    public async Task BoardReorderColumnsHandler_ReordersEveryColumnAndWritesAudit()
+    {
+        var boards = new InMemoryDocumentRepository<BoardDocument>();
+        var accessChecker = new AllowBoardProjectAccessChecker();
+        var audit = new RecordingLifecycleAuditWriter();
+        var service = new BoardService(
+            boards,
+            accessChecker,
+            new EmptyBoardColumnUsageChecker(),
+            new InMemoryDistributedLockProvider(),
+            Options.Create(new DistributedLockOptions()),
+            _clock,
+            _currentUser,
+            audit);
+        var board = await service.CreateAsync(
+            new CreateBoardRequest("project-1", "Column Order", "Kanban"),
+            CancellationToken.None);
+        var expectedOrder = board.Columns
+            .OrderByDescending(column => column.Position)
+            .Select(column => column.Id)
+            .ToArray();
+        var handler = new ReorderColumnsHandler(
+            boards,
+            accessChecker,
+            _clock,
+            _currentUser,
+            audit);
+
+        var updated = await handler.HandleAsync(
+            board.Id,
+            new ReorderColumnsRequest(expectedOrder),
+            "board-column-reorder-test",
+            CancellationToken.None);
+
+        Assert.Equal(expectedOrder, updated.Columns.OrderBy(column => column.Position).Select(column => column.Id));
+        Assert.Contains("BoardColumnsReordered", audit.Actions);
+    }
+
+    [Fact]
+    public async Task BoardCreateViewHandler_CreatesNormalizedPersonalViewAndWritesAudit()
+    {
+        var boards = new InMemoryDocumentRepository<BoardDocument>();
+        var accessChecker = new AllowBoardProjectAccessChecker();
+        var audit = new RecordingLifecycleAuditWriter();
+        var service = new BoardService(
+            boards,
+            accessChecker,
+            new EmptyBoardColumnUsageChecker(),
+            new InMemoryDistributedLockProvider(),
+            Options.Create(new DistributedLockOptions()),
+            _clock,
+            _currentUser,
+            audit);
+        var board = await service.CreateAsync(
+            new CreateBoardRequest("project-1", "Saved Views", "Kanban"),
+            CancellationToken.None);
+        var handler = new CreateViewHandler(
+            boards,
+            accessChecker,
+            _clock,
+            _currentUser,
+            audit);
+
+        var updated = await handler.HandleAsync(
+            board.Id,
+            new CreateBoardViewRequest(
+                "  My urgent work  ",
+                false,
+                "priority",
+                new BoardFilterRequest(" user-1 ", null, [" In Progress "], ["High"], ["urgent"], " api ")),
+            "board-view-create-test",
+            CancellationToken.None);
+
+        var view = Assert.Single(updated.Views);
+        Assert.Equal("My urgent work", view.Name);
+        Assert.Equal("Priority", view.SwimlaneMode);
+        Assert.Equal("user-1", view.Filter.AssigneeUserId);
+        Assert.Equal(["In Progress"], view.Filter.Statuses);
+        Assert.Equal("api", view.Filter.Text);
+        Assert.Contains("BoardViewCreated", audit.Actions);
+    }
+
+    [Fact]
+    public async Task BoardUpdateViewHandler_UpdatesOwnedPersonalViewAndWritesAudit()
+    {
+        var boards = new InMemoryDocumentRepository<BoardDocument>();
+        var accessChecker = new AllowBoardProjectAccessChecker();
+        var audit = new RecordingLifecycleAuditWriter();
+        var service = new BoardService(
+            boards,
+            accessChecker,
+            new EmptyBoardColumnUsageChecker(),
+            new InMemoryDistributedLockProvider(),
+            Options.Create(new DistributedLockOptions()),
+            _clock,
+            _currentUser,
+            audit);
+        var board = await service.CreateAsync(
+            new CreateBoardRequest("project-1", "Saved View Update", "Kanban"),
+            CancellationToken.None);
+        var createHandler = new CreateViewHandler(boards, accessChecker, _clock, _currentUser, audit);
+        board = await createHandler.HandleAsync(
+            board.Id,
+            new CreateBoardViewRequest(
+                "My work",
+                false,
+                "none",
+                new BoardFilterRequest(null, null, [], [], [], null)),
+            "board-view-add-update-test",
+            CancellationToken.None);
+        var view = Assert.Single(board.Views);
+        var handler = new UpdateViewHandler(boards, accessChecker, _clock, _currentUser, audit);
+
+        var updated = await handler.HandleAsync(
+            board.Id,
+            view.Id,
+            new UpdateBoardViewRequest(
+                "My priority work",
+                false,
+                "priority",
+                new BoardFilterRequest(null, "team-1", ["In Progress"], ["High"], [], " release ")),
+            "board-view-update-test",
+            CancellationToken.None);
+
+        var updatedView = Assert.Single(updated.Views);
+        Assert.Equal("My priority work", updatedView.Name);
+        Assert.Equal("Priority", updatedView.SwimlaneMode);
+        Assert.Equal("team-1", updatedView.Filter.TeamId);
+        Assert.Equal("release", updatedView.Filter.Text);
+        Assert.Contains("BoardViewUpdated", audit.Actions);
+    }
+
+    [Fact]
+    public async Task BoardDeleteViewHandler_DeletesOwnedPersonalViewAndWritesAudit()
+    {
+        var boards = new InMemoryDocumentRepository<BoardDocument>();
+        var accessChecker = new AllowBoardProjectAccessChecker();
+        var audit = new RecordingLifecycleAuditWriter();
+        var service = new BoardService(
+            boards,
+            accessChecker,
+            new EmptyBoardColumnUsageChecker(),
+            new InMemoryDistributedLockProvider(),
+            Options.Create(new DistributedLockOptions()),
+            _clock,
+            _currentUser,
+            audit);
+        var board = await service.CreateAsync(
+            new CreateBoardRequest("project-1", "Saved View Delete", "Kanban"),
+            CancellationToken.None);
+        var createHandler = new CreateViewHandler(boards, accessChecker, _clock, _currentUser, audit);
+        board = await createHandler.HandleAsync(
+            board.Id,
+            new CreateBoardViewRequest(
+                "Temporary view",
+                false,
+                "none",
+                new BoardFilterRequest(null, null, [], [], [], null)),
+            "board-view-add-delete-test",
+            CancellationToken.None);
+        var view = Assert.Single(board.Views);
+        var handler = new DeleteViewHandler(boards, accessChecker, _clock, _currentUser, audit);
+
+        var updated = await handler.HandleAsync(
+            board.Id,
+            view.Id,
+            "board-view-delete-test",
+            CancellationToken.None);
+
+        Assert.Empty(updated.Views);
+        Assert.Contains("BoardViewDeleted", audit.Actions);
     }
 
     [Fact]

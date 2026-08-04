@@ -1,5 +1,11 @@
 using Microsoft.Extensions.Options;
 using Zumbo.Modules.Boards;
+using Zumbo.Modules.Boards.Application.Features.BoardsCore;
+using Zumbo.Modules.Boards.Application.Features.ColumnOrdering;
+using Zumbo.Modules.Boards.Application.Features.Columns;
+using Zumbo.Modules.Boards.Application.Features.Lifecycle;
+using Zumbo.Modules.Boards.Application.Features.Swimlanes;
+using Zumbo.Modules.Boards.Application.Features.Views;
 using Zumbo.BuildingBlocks.Application.Concurrency;
 using Zumbo.BuildingBlocks.Application.Persistence;
 using Zumbo.BuildingBlocks.Application.Security;
@@ -30,6 +36,17 @@ internal static class BoardsEndpoints
             provider.GetRequiredService<IDocumentRepository<BoardDocument>>(),
             provider.GetRequiredService<IBoardProjectAccessChecker>(),
             provider.GetRequiredService<ICurrentUser>()));
+        services.AddScoped<UpdateBoardHandler>();
+        services.AddScoped<ArchiveBoardHandler>();
+        services.AddScoped<RestoreBoardHandler>();
+        services.AddScoped<UpdateSwimlaneHandler>();
+        services.AddScoped<AddColumnHandler>();
+        services.AddScoped<UpdateColumnHandler>();
+        services.AddScoped<DeleteColumnHandler>();
+        services.AddScoped<ReorderColumnsHandler>();
+        services.AddScoped<CreateViewHandler>();
+        services.AddScoped<UpdateViewHandler>();
+        services.AddScoped<DeleteViewHandler>();
         return services;
     }
 
@@ -45,42 +62,42 @@ internal static class BoardsEndpoints
             Created(await handler.HandleAsync(request, CorrelationId(http), ct), http))
             .WithZumboPermission(PermissionCatalog.BoardManage);
 
-        group.MapPut("/{boardId}", async (string boardId, UpdateBoardRequest request, BoardService service, HttpContext http, CancellationToken ct) =>
-            Ok(await service.UpdateAsync(boardId, request, CorrelationId(http), ct), http))
+        group.MapPut("/{boardId}", async (string boardId, UpdateBoardRequest request, UpdateBoardHandler handler, HttpContext http, CancellationToken ct) =>
+            Ok(await handler.HandleAsync(boardId, request, CorrelationId(http), ct), http))
             .WithZumboPermission(PermissionCatalog.BoardManage);
 
-        group.MapPatch("/{boardId}/swimlane", async (string boardId, UpdateSwimlaneRequest request, BoardService service, HttpContext http, CancellationToken ct) =>
-            Ok(await service.UpdateSwimlaneAsync(boardId, request, CorrelationId(http), ct), http))
+        group.MapPatch("/{boardId}/swimlane", async (string boardId, UpdateSwimlaneRequest request, UpdateSwimlaneHandler handler, HttpContext http, CancellationToken ct) =>
+            Ok(await handler.HandleAsync(boardId, request, CorrelationId(http), ct), http))
             .WithZumboPermission(PermissionCatalog.BoardManage);
 
-        group.MapPost("/{boardId}/views", async (string boardId, CreateBoardViewRequest request, BoardService service, HttpContext http, CancellationToken ct) =>
-            Ok(await service.CreateViewAsync(boardId, request, CorrelationId(http), ct), http))
+        group.MapPost("/{boardId}/views", async (string boardId, CreateBoardViewRequest request, CreateViewHandler handler, HttpContext http, CancellationToken ct) =>
+            Ok(await handler.HandleAsync(boardId, request, CorrelationId(http), ct), http))
             .WithZumboPermission(PermissionCatalog.BoardManage);
 
-        group.MapPut("/{boardId}/views/{viewId}", async (string boardId, string viewId, UpdateBoardViewRequest request, BoardService service, HttpContext http, CancellationToken ct) =>
-            Ok(await service.UpdateViewAsync(boardId, viewId, request, CorrelationId(http), ct), http))
+        group.MapPut("/{boardId}/views/{viewId}", async (string boardId, string viewId, UpdateBoardViewRequest request, UpdateViewHandler handler, HttpContext http, CancellationToken ct) =>
+            Ok(await handler.HandleAsync(boardId, viewId, request, CorrelationId(http), ct), http))
             .WithZumboPermission(PermissionCatalog.BoardManage);
 
-        group.MapDelete("/{boardId}/views/{viewId}", async (string boardId, string viewId, BoardService service, HttpContext http, CancellationToken ct) =>
-            Ok(await service.DeleteViewAsync(boardId, viewId, CorrelationId(http), ct), http))
+        group.MapDelete("/{boardId}/views/{viewId}", async (string boardId, string viewId, DeleteViewHandler handler, HttpContext http, CancellationToken ct) =>
+            Ok(await handler.HandleAsync(boardId, viewId, CorrelationId(http), ct), http))
             .WithZumboPermission(PermissionCatalog.BoardManage);
 
-        group.MapPost("/{boardId}/columns", async (string boardId, CreateColumnRequest request, BoardService service, HttpContext http, CancellationToken ct) =>
-            Ok(await service.AddColumnAsync(boardId, request, CorrelationId(http), ct), http))
+        group.MapPost("/{boardId}/columns", async (string boardId, CreateColumnRequest request, AddColumnHandler handler, HttpContext http, CancellationToken ct) =>
+            Ok(await handler.HandleAsync(boardId, request, CorrelationId(http), ct), http))
             .WithZumboPermission(PermissionCatalog.BoardManage);
 
         group.MapPut("/{boardId}/columns/{columnId}", async (
             string boardId,
             string columnId,
             UpdateColumnRequest request,
-            BoardService service,
+            UpdateColumnHandler handler,
             HttpContext http,
             CancellationToken ct) =>
-            Ok(await service.UpdateColumnAsync(boardId, columnId, request, CorrelationId(http), ct), http))
+            Ok(await handler.HandleAsync(boardId, columnId, request, CorrelationId(http), ct), http))
             .WithZumboPermission(PermissionCatalog.BoardManage);
 
-        group.MapPut("/{boardId}/columns/reorder", async (string boardId, ReorderColumnsRequest request, BoardService service, HttpContext http, CancellationToken ct) =>
-            Ok(await service.ReorderColumnsAsync(boardId, request, CorrelationId(http), ct), http))
+        group.MapPut("/{boardId}/columns/reorder", async (string boardId, ReorderColumnsRequest request, ReorderColumnsHandler handler, HttpContext http, CancellationToken ct) =>
+            Ok(await handler.HandleAsync(boardId, request, CorrelationId(http), ct), http))
             .WithZumboPermission(PermissionCatalog.BoardManage);
 
         group.MapPut("/{boardId}/workflow-mapping", async (
@@ -92,18 +109,18 @@ internal static class BoardsEndpoints
             Ok(await service.ConfigureAsync(boardId, request, CorrelationId(http), ct), http))
             .WithZumboPermission(PermissionCatalog.BoardManage);
 
-        group.MapDelete("/{boardId}/columns/{columnId}", async (string boardId, string columnId, BoardService service, HttpContext http, CancellationToken ct) =>
-            Ok(await service.DeleteColumnAsync(boardId, columnId, CorrelationId(http), ct), http))
+        group.MapDelete("/{boardId}/columns/{columnId}", async (string boardId, string columnId, DeleteColumnHandler handler, HttpContext http, CancellationToken ct) =>
+            Ok(await handler.HandleAsync(new DeleteColumnCommand(boardId, columnId, CorrelationId(http)), ct), http))
             .WithZumboPermission(PermissionCatalog.BoardManage);
 
-        group.MapDelete("/{boardId}", async (string boardId, BoardService service, HttpContext http, CancellationToken ct) =>
+        group.MapDelete("/{boardId}", async (string boardId, ArchiveBoardHandler handler, HttpContext http, CancellationToken ct) =>
         {
-            await service.ArchiveAsync(boardId, CorrelationId(http), ct);
+            await handler.HandleAsync(new ArchiveBoardCommand(boardId, CorrelationId(http)), ct);
             return Ok(new { archived = true }, http);
         }).WithZumboPermission(PermissionCatalog.BoardManage);
 
-        group.MapPost("/{boardId}/restore", async (string boardId, BoardService service, HttpContext http, CancellationToken ct) =>
-            Ok(await service.RestoreAsync(boardId, CorrelationId(http), ct), http))
+        group.MapPost("/{boardId}/restore", async (string boardId, RestoreBoardHandler handler, HttpContext http, CancellationToken ct) =>
+            Ok(await handler.HandleAsync(new RestoreBoardCommand(boardId, CorrelationId(http)), ct), http))
             .WithZumboPermission(PermissionCatalog.BoardManage);
     }
 }

@@ -276,7 +276,9 @@ public sealed class ArchitectureBoundaryTests
             var moduleUsings = File.ReadLines(Path.Combine(endpointDirectory, fileName))
                 .Select(line => line.Trim())
                 .Where(line => line.StartsWith("using Zumbo.Modules.", StringComparison.Ordinal))
-                .Select(line => line["using ".Length..^1]);
+                .Select(line => line["using ".Length..^1])
+                .Select(moduleNamespace => string.Join('.', moduleNamespace.Split('.').Take(3)))
+                .Distinct(StringComparer.Ordinal);
 
             AssertExactSet(owningModule is null ? [] : [owningModule], moduleUsings);
         }
@@ -723,6 +725,9 @@ public sealed class ArchitectureBoundaryTests
         var moduleDirectory = Path.Combine(SourceDirectory, "Zumbo.Modules.Boards");
         var createDirectory = Path.Combine(moduleDirectory, "Application", "Features", "BoardsCore");
         var listDirectory = createDirectory;
+        var lifecycleDirectory = Path.Combine(moduleDirectory, "Application", "Features", "Lifecycle");
+        var swimlaneDirectory = Path.Combine(moduleDirectory, "Application", "Features", "Swimlanes");
+        var columnsDirectory = Path.Combine(moduleDirectory, "Application", "Features", "Columns");
         var representativeDirectory = Path.Combine(
             moduleDirectory,
             "Application",
@@ -733,6 +738,20 @@ public sealed class ArchitectureBoundaryTests
         Assert.True(File.Exists(Path.Combine(createDirectory, "CreateBoardValidator.cs")));
         Assert.True(File.Exists(Path.Combine(createDirectory, "CreateBoardHandler.cs")));
         Assert.True(File.Exists(Path.Combine(createDirectory, "CreateBoardSlice.cs")));
+        Assert.True(File.Exists(Path.Combine(createDirectory, "UpdateBoardValidator.cs")));
+        Assert.True(File.Exists(Path.Combine(createDirectory, "UpdateBoardHandler.cs")));
+        Assert.True(File.Exists(Path.Combine(lifecycleDirectory, "ArchiveBoardCommand.cs")));
+        Assert.True(File.Exists(Path.Combine(lifecycleDirectory, "ArchiveBoardValidator.cs")));
+        Assert.True(File.Exists(Path.Combine(lifecycleDirectory, "ArchiveBoardHandler.cs")));
+        Assert.True(File.Exists(Path.Combine(lifecycleDirectory, "RestoreBoardCommand.cs")));
+        Assert.True(File.Exists(Path.Combine(lifecycleDirectory, "RestoreBoardValidator.cs")));
+        Assert.True(File.Exists(Path.Combine(lifecycleDirectory, "RestoreBoardHandler.cs")));
+        Assert.True(File.Exists(Path.Combine(swimlaneDirectory, "UpdateSwimlaneValidator.cs")));
+        Assert.True(File.Exists(Path.Combine(swimlaneDirectory, "UpdateSwimlaneHandler.cs")));
+        Assert.True(File.Exists(Path.Combine(columnsDirectory, "AddColumnValidator.cs")));
+        Assert.True(File.Exists(Path.Combine(columnsDirectory, "AddColumnHandler.cs")));
+        Assert.True(File.Exists(Path.Combine(columnsDirectory, "UpdateColumnValidator.cs")));
+        Assert.True(File.Exists(Path.Combine(columnsDirectory, "UpdateColumnHandler.cs")));
         Assert.True(File.Exists(Path.Combine(listDirectory, "ListBoardsByProjectQuery.cs")));
         Assert.True(File.Exists(Path.Combine(listDirectory, "ListBoardsByProjectValidator.cs")));
         Assert.True(File.Exists(Path.Combine(listDirectory, "ListBoardsByProjectHandler.cs")));
@@ -744,29 +763,52 @@ public sealed class ArchitectureBoundaryTests
 
         var createSlice = File.ReadAllText(Path.Combine(createDirectory, "CreateBoardSlice.cs"));
         var listSlice = File.ReadAllText(Path.Combine(listDirectory, "ListBoardsByProjectSlice.cs"));
+        var updateHandler = File.ReadAllText(Path.Combine(createDirectory, "UpdateBoardHandler.cs"));
         Assert.DoesNotContain("BoardService", createSlice, StringComparison.Ordinal);
         Assert.DoesNotContain("BoardService", listSlice, StringComparison.Ordinal);
+        Assert.DoesNotContain("BoardService", updateHandler, StringComparison.Ordinal);
         Assert.Contains("IDocumentRepository<BoardDocument>", createSlice, StringComparison.Ordinal);
         Assert.Contains("IBoardProjectAccessChecker", createSlice, StringComparison.Ordinal);
         Assert.Contains("IDistributedLockProvider", createSlice, StringComparison.Ordinal);
         Assert.Contains("IBoardAuditWriter", createSlice, StringComparison.Ordinal);
         Assert.Contains("IDocumentRepository<BoardDocument>", listSlice, StringComparison.Ordinal);
         Assert.Contains("ICurrentUser", listSlice, StringComparison.Ordinal);
+        Assert.Contains("IDocumentRepository<BoardDocument>", updateHandler, StringComparison.Ordinal);
+        Assert.Contains("IBoardProjectAccessChecker", updateHandler, StringComparison.Ordinal);
+        Assert.Contains("IBoardAuditWriter", updateHandler, StringComparison.Ordinal);
 
-        var createFacade = File.ReadAllText(Path.Combine(
+        var boardsFacade = File.ReadAllText(Path.Combine(
             moduleDirectory,
             "Application",
             "Compatibility",
             "BoardService",
-            "BoardService.CreateAsync.cs"));
-        var listFacade = File.ReadAllText(Path.Combine(
+            "BoardService.Boards.cs"));
+        Assert.Contains("createBoardHandler.HandleAsync", boardsFacade, StringComparison.Ordinal);
+        Assert.Contains("listBoardsByProjectHandler.HandleAsync", boardsFacade, StringComparison.Ordinal);
+        Assert.Contains("updateBoardHandler.HandleAsync", boardsFacade, StringComparison.Ordinal);
+        var lifecycleFacade = File.ReadAllText(Path.Combine(
             moduleDirectory,
             "Application",
             "Compatibility",
             "BoardService",
-            "BoardService.ListByProjectAsync.cs"));
-        Assert.Contains("createBoardHandler.HandleAsync", createFacade, StringComparison.Ordinal);
-        Assert.Contains("listBoardsByProjectHandler.HandleAsync", listFacade, StringComparison.Ordinal);
+            "BoardService.Lifecycle.cs"));
+        Assert.Contains("archiveBoardHandler.HandleAsync", lifecycleFacade, StringComparison.Ordinal);
+        Assert.Contains("restoreBoardHandler.HandleAsync", lifecycleFacade, StringComparison.Ordinal);
+        var swimlaneFacade = File.ReadAllText(Path.Combine(
+            moduleDirectory,
+            "Application",
+            "Compatibility",
+            "BoardService",
+            "BoardService.Swimlanes.cs"));
+        Assert.Contains("updateSwimlaneHandler.HandleAsync", swimlaneFacade, StringComparison.Ordinal);
+        var columnsFacade = File.ReadAllText(Path.Combine(
+            moduleDirectory,
+            "Application",
+            "Compatibility",
+            "BoardService",
+            "BoardService.Columns.cs"));
+        Assert.Contains("addColumnHandler.HandleAsync", columnsFacade, StringComparison.Ordinal);
+        Assert.Contains("updateColumnHandler.HandleAsync", columnsFacade, StringComparison.Ordinal);
 
         var composition = File.ReadAllText(Path.Combine(
             SourceDirectory,
@@ -776,6 +818,18 @@ public sealed class ArchitectureBoundaryTests
             "BoardsEndpoints.cs"));
         Assert.Contains("AddScoped<CreateBoardHandler>(provider =>", composition, StringComparison.Ordinal);
         Assert.Contains("AddScoped<ListBoardsByProjectHandler>(provider =>", composition, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<UpdateBoardHandler>()", composition, StringComparison.Ordinal);
+        Assert.Contains("UpdateBoardHandler handler", composition, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<ArchiveBoardHandler>()", composition, StringComparison.Ordinal);
+        Assert.Contains("ArchiveBoardHandler handler", composition, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<RestoreBoardHandler>()", composition, StringComparison.Ordinal);
+        Assert.Contains("RestoreBoardHandler handler", composition, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<UpdateSwimlaneHandler>()", composition, StringComparison.Ordinal);
+        Assert.Contains("UpdateSwimlaneHandler handler", composition, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<AddColumnHandler>()", composition, StringComparison.Ordinal);
+        Assert.Contains("AddColumnHandler handler", composition, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<UpdateColumnHandler>()", composition, StringComparison.Ordinal);
+        Assert.Contains("UpdateColumnHandler handler", composition, StringComparison.Ordinal);
     }
 
     [Fact]

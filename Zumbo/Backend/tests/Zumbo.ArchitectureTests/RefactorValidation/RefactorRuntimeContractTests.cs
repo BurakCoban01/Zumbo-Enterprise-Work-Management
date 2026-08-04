@@ -103,6 +103,17 @@ public sealed class RefactorRuntimeContractTests
         + "provider.GetRequiredService<IDocumentRepository<BoardDocument>>(),"
         + "provider.GetRequiredService<IBoardProjectAccessChecker>(),"
         + "provider.GetRequiredService<ICurrentUser>()));",
+        "services.AddScoped<UpdateBoardHandler>();",
+        "services.AddScoped<ArchiveBoardHandler>();",
+        "services.AddScoped<RestoreBoardHandler>();",
+        "services.AddScoped<UpdateSwimlaneHandler>();",
+        "services.AddScoped<AddColumnHandler>();",
+        "services.AddScoped<UpdateColumnHandler>();",
+        "services.AddScoped<DeleteColumnHandler>();",
+        "services.AddScoped<ReorderColumnsHandler>();",
+        "services.AddScoped<CreateViewHandler>();",
+        "services.AddScoped<UpdateViewHandler>();",
+        "services.AddScoped<DeleteViewHandler>();",
         "services.AddScoped<UpsertWorkflowHandler>(provider=>newUpsertWorkflowHandler("
         + "provider.GetRequiredService<IDocumentRepository<WorkflowDefinitionDocument>>(),"
         + "provider.GetRequiredService<IWorkflowProjectAccessChecker>(),"
@@ -168,6 +179,78 @@ public sealed class RefactorRuntimeContractTests
         + "provider.GetRequiredService<IAuditAccessChecker>()));"
     ];
 
+    private static readonly string[] ReplacedVerticalSliceEndpointMappings =
+    [
+        "group.MapPut(\"/{boardId}\",async(stringboardId,UpdateBoardRequestrequest,BoardServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.UpdateAsync(boardId,request,CorrelationId(http),ct),http)).WithZumboPermission(PermissionCatalog.BoardManage);",
+        "group.MapDelete(\"/{boardId}\",async(stringboardId,BoardServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "{awaitservice.ArchiveAsync(boardId,CorrelationId(http),ct);returnOk(new{archived=true},http);})"
+        + ".WithZumboPermission(PermissionCatalog.BoardManage);",
+        "group.MapPost(\"/{boardId}/restore\",async(stringboardId,BoardServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.RestoreAsync(boardId,CorrelationId(http),ct),http))"
+        + ".WithZumboPermission(PermissionCatalog.BoardManage);",
+        "group.MapPatch(\"/{boardId}/swimlane\",async(stringboardId,UpdateSwimlaneRequestrequest,BoardServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.UpdateSwimlaneAsync(boardId,request,CorrelationId(http),ct),http))"
+        + ".WithZumboPermission(PermissionCatalog.BoardManage);",
+        "group.MapPost(\"/{boardId}/columns\",async(stringboardId,CreateColumnRequestrequest,BoardServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.AddColumnAsync(boardId,request,CorrelationId(http),ct),http))"
+        + ".WithZumboPermission(PermissionCatalog.BoardManage);",
+        "group.MapPut(\"/{boardId}/columns/{columnId}\",async(stringboardId,stringcolumnId,UpdateColumnRequestrequest,BoardServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.UpdateColumnAsync(boardId,columnId,request,CorrelationId(http),ct),http))"
+        + ".WithZumboPermission(PermissionCatalog.BoardManage);",
+        "group.MapDelete(\"/{boardId}/columns/{columnId}\",async(stringboardId,stringcolumnId,BoardServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.DeleteColumnAsync(boardId,columnId,CorrelationId(http),ct),http))"
+        + ".WithZumboPermission(PermissionCatalog.BoardManage);",
+        "group.MapPut(\"/{boardId}/columns/reorder\",async(stringboardId,ReorderColumnsRequestrequest,BoardServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.ReorderColumnsAsync(boardId,request,CorrelationId(http),ct),http))"
+        + ".WithZumboPermission(PermissionCatalog.BoardManage);",
+        "group.MapPost(\"/{boardId}/views\",async(stringboardId,CreateBoardViewRequestrequest,BoardServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.CreateViewAsync(boardId,request,CorrelationId(http),ct),http))"
+        + ".WithZumboPermission(PermissionCatalog.BoardManage);",
+        "group.MapPut(\"/{boardId}/views/{viewId}\",async(stringboardId,stringviewId,UpdateBoardViewRequestrequest,BoardServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.UpdateViewAsync(boardId,viewId,request,CorrelationId(http),ct),http))"
+        + ".WithZumboPermission(PermissionCatalog.BoardManage);",
+        "group.MapDelete(\"/{boardId}/views/{viewId}\",async(stringboardId,stringviewId,BoardServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.DeleteViewAsync(boardId,viewId,CorrelationId(http),ct),http))"
+        + ".WithZumboPermission(PermissionCatalog.BoardManage);"
+    ];
+
+    private static readonly string[] PortFocusedVerticalSliceEndpointMappings =
+    [
+        "group.MapPut(\"/{boardId}\",async(stringboardId,UpdateBoardRequestrequest,UpdateBoardHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(boardId,request,CorrelationId(http),ct),http)).WithZumboPermission(PermissionCatalog.BoardManage);",
+        "group.MapDelete(\"/{boardId}\",async(stringboardId,ArchiveBoardHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "{awaithandler.HandleAsync(newArchiveBoardCommand(boardId,CorrelationId(http)),ct);returnOk(new{archived=true},http);})"
+        + ".WithZumboPermission(PermissionCatalog.BoardManage);",
+        "group.MapPost(\"/{boardId}/restore\",async(stringboardId,RestoreBoardHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newRestoreBoardCommand(boardId,CorrelationId(http)),ct),http))"
+        + ".WithZumboPermission(PermissionCatalog.BoardManage);",
+        "group.MapPatch(\"/{boardId}/swimlane\",async(stringboardId,UpdateSwimlaneRequestrequest,UpdateSwimlaneHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(boardId,request,CorrelationId(http),ct),http))"
+        + ".WithZumboPermission(PermissionCatalog.BoardManage);",
+        "group.MapPost(\"/{boardId}/columns\",async(stringboardId,CreateColumnRequestrequest,AddColumnHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(boardId,request,CorrelationId(http),ct),http))"
+        + ".WithZumboPermission(PermissionCatalog.BoardManage);",
+        "group.MapPut(\"/{boardId}/columns/{columnId}\",async(stringboardId,stringcolumnId,UpdateColumnRequestrequest,UpdateColumnHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(boardId,columnId,request,CorrelationId(http),ct),http))"
+        + ".WithZumboPermission(PermissionCatalog.BoardManage);",
+        "group.MapDelete(\"/{boardId}/columns/{columnId}\",async(stringboardId,stringcolumnId,DeleteColumnHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newDeleteColumnCommand(boardId,columnId,CorrelationId(http)),ct),http))"
+        + ".WithZumboPermission(PermissionCatalog.BoardManage);",
+        "group.MapPut(\"/{boardId}/columns/reorder\",async(stringboardId,ReorderColumnsRequestrequest,ReorderColumnsHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(boardId,request,CorrelationId(http),ct),http))"
+        + ".WithZumboPermission(PermissionCatalog.BoardManage);",
+        "group.MapPost(\"/{boardId}/views\",async(stringboardId,CreateBoardViewRequestrequest,CreateViewHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(boardId,request,CorrelationId(http),ct),http))"
+        + ".WithZumboPermission(PermissionCatalog.BoardManage);",
+        "group.MapPut(\"/{boardId}/views/{viewId}\",async(stringboardId,stringviewId,UpdateBoardViewRequestrequest,UpdateViewHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(boardId,viewId,request,CorrelationId(http),ct),http))"
+        + ".WithZumboPermission(PermissionCatalog.BoardManage);",
+        "group.MapDelete(\"/{boardId}/views/{viewId}\",async(stringboardId,stringviewId,DeleteViewHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(boardId,viewId,CorrelationId(http),ct),http))"
+        + ".WithZumboPermission(PermissionCatalog.BoardManage);"
+    ];
+
     private static string ProjectDirectory => Path.GetFullPath(
         Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", ".."));
 
@@ -194,7 +277,12 @@ public sealed class RefactorRuntimeContractTests
         var messaging = MessagingContracts(baselineFiles);
         var targetMessaging = MessagingContracts(targetFiles);
 
-        AssertExact("HTTP endpoint mappings", endpoints, targetEndpoints);
+        AssertExactWithAllowedReplacements(
+            "HTTP endpoint mappings",
+            endpoints,
+            targetEndpoints,
+            ReplacedVerticalSliceEndpointMappings,
+            PortFocusedVerticalSliceEndpointMappings);
         AssertExactWithAllowedReplacements(
             "DI registrations",
             registrations,

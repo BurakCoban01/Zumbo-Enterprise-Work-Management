@@ -29,7 +29,7 @@ public sealed class ModuleFirstSourceLayoutTests
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 
     private static readonly Regex MethodPartialFilePattern = new(
-        "^[^.]+\\.[A-Z][A-Za-z0-9]*(?:Async)?\\.cs$",
+        "^[^.]+\\.(?<fragment>[A-Z][A-Za-z0-9]*(?:Async)?)\\.cs$",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 
     private static readonly Regex PartialDeclarationPattern = new(
@@ -191,8 +191,20 @@ public sealed class ModuleFirstSourceLayoutTests
     public void MethodNamedPartialFiles_AreNotUsed()
     {
         var violations = ProductionSourceFiles()
-            .Where(path => MethodPartialFilePattern.IsMatch(Path.GetFileName(path)))
             .Where(path => PartialDeclarationPattern.IsMatch(File.ReadAllText(path)))
+            .Where(path =>
+            {
+                var match = MethodPartialFilePattern.Match(Path.GetFileName(path));
+                if (!match.Success)
+                {
+                    return false;
+                }
+
+                var fragmentName = match.Groups["fragment"].Value;
+                return Parse(path).DescendantNodes()
+                    .OfType<MethodDeclarationSyntax>()
+                    .Any(method => method.Identifier.ValueText.Equals(fragmentName, StringComparison.Ordinal));
+            })
             .Select(RelativePath);
 
         AssertMatchesAllowList("method-partial-files", violations);

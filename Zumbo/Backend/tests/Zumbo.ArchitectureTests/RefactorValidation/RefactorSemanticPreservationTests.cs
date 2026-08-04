@@ -65,10 +65,34 @@ public sealed class RefactorSemanticPreservationTests
                 "The unchanged compatibility facade constructor now wires the port-focused create and list handlers from its existing dependencies; its public signature and all previous assignments remain intact.",
             ["Zumbo.Api|BoardsEndpoints|method:AddBoardsModule:(thisIServiceCollectionservices):IServiceCollection"] =
                 "Board create and project-list handlers remain scoped while explicit factories select their port-focused constructors and preserve compatibility constructors.",
+            ["Zumbo.Api|BoardsEndpoints|method:MapBoardsEndpoints:(thisRouteGroupBuilderapi):void"] =
+                "The board update route resolves the independent UpdateBoard handler while preserving its route, authorization, request, response, and correlation behavior.",
             ["Zumbo.Modules.Boards|Zumbo.Modules.Boards.BoardService|method:CreateAsync:(CreateBoardRequestrequest,stringcorrelationId,CancellationTokenct):Task<BoardResponse>"] =
                 "The compatibility facade delegates board creation to the port-focused CreateBoard slice while preserving its public signature and behavior.",
             ["Zumbo.Modules.Boards|Zumbo.Modules.Boards.BoardService|method:ListByProjectAsync:(stringprojectId,CancellationTokenct,boolarchived=false):Task<IReadOnlyList<BoardResponse>>"] =
                 "The compatibility facade delegates board listing to the project-scoped ListBoardsByProject query slice while preserving its public signature.",
+            ["Zumbo.Modules.Boards|Zumbo.Modules.Boards.BoardService|method:UpdateAsync:(stringboardId,UpdateBoardRequestrequest,stringcorrelationId,CancellationTokenct):Task<BoardResponse>"] =
+                "The compatibility facade delegates board updates to the port-focused UpdateBoard handler while preserving its public signature and behavior.",
+            ["Zumbo.Modules.Boards|Zumbo.Modules.Boards.BoardService|method:ArchiveAsync:(stringboardId,stringcorrelationId,CancellationTokenct):Task"] =
+                "The compatibility facade delegates board archival to the port-focused ArchiveBoard handler while preserving its public signature and behavior.",
+            ["Zumbo.Modules.Boards|Zumbo.Modules.Boards.BoardService|method:RestoreAsync:(stringboardId,stringcorrelationId,CancellationTokenct):Task<BoardResponse>"] =
+                "The compatibility facade delegates board restoration to the port-focused RestoreBoard handler while preserving its public signature and behavior.",
+            ["Zumbo.Modules.Boards|Zumbo.Modules.Boards.BoardService|method:UpdateSwimlaneAsync:(stringboardId,UpdateSwimlaneRequestrequest,stringcorrelationId,CancellationTokenct):Task<BoardResponse>"] =
+                "The compatibility facade delegates swimlane updates to the port-focused UpdateSwimlane handler while preserving its public signature and behavior.",
+            ["Zumbo.Modules.Boards|Zumbo.Modules.Boards.BoardService|method:AddColumnAsync:(stringboardId,CreateColumnRequestrequest,stringcorrelationId,CancellationTokenct):Task<BoardResponse>"] =
+                "The compatibility facade delegates column creation to the port-focused AddColumn handler while preserving its public signature and behavior.",
+            ["Zumbo.Modules.Boards|Zumbo.Modules.Boards.BoardService|method:UpdateColumnAsync:(stringboardId,stringcolumnId,UpdateColumnRequestrequest,stringcorrelationId,CancellationTokenct):Task<BoardResponse>"] =
+                "The compatibility facade delegates column updates to the port-focused UpdateColumn handler while preserving its public signature and behavior.",
+            ["Zumbo.Modules.Boards|Zumbo.Modules.Boards.BoardService|method:DeleteColumnAsync:(stringboardId,stringcolumnId,stringcorrelationId,CancellationTokenct):Task<BoardResponse>"] =
+                "The compatibility facade delegates column deletion to the port-focused DeleteColumn handler while preserving its public signature and behavior.",
+            ["Zumbo.Modules.Boards|Zumbo.Modules.Boards.BoardService|method:ReorderColumnsAsync:(stringboardId,ReorderColumnsRequestrequest,stringcorrelationId,CancellationTokenct):Task<BoardResponse>"] =
+                "The compatibility facade delegates column ordering to the port-focused ReorderColumns handler while preserving its public signature and behavior.",
+            ["Zumbo.Modules.Boards|Zumbo.Modules.Boards.BoardService|method:CreateViewAsync:(stringboardId,CreateBoardViewRequestrequest,stringcorrelationId,CancellationTokenct):Task<BoardResponse>"] =
+                "The compatibility facade delegates saved-view creation to the port-focused CreateView handler while preserving its public signature and behavior.",
+            ["Zumbo.Modules.Boards|Zumbo.Modules.Boards.BoardService|method:UpdateViewAsync:(stringboardId,stringviewId,UpdateBoardViewRequestrequest,stringcorrelationId,CancellationTokenct):Task<BoardResponse>"] =
+                "The compatibility facade delegates saved-view updates to the port-focused UpdateView handler while preserving its public signature and behavior.",
+            ["Zumbo.Modules.Boards|Zumbo.Modules.Boards.BoardService|method:DeleteViewAsync:(stringboardId,stringviewId,stringcorrelationId,CancellationTokenct):Task<BoardResponse>"] =
+                "The compatibility facade delegates saved-view deletion to the port-focused DeleteView handler while preserving its public signature and behavior.",
             ["Zumbo.Modules.Boards|Zumbo.Modules.Boards.CreateBoardHandler|method:HandleAsync:(CreateBoardRequestrequest,stringcorrelationId,CancellationTokenct):Task<BoardResponse>"] =
                 "The endpoint handler selects the independent board-creation slice when composed from ports and retains its original facade constructor.",
             ["Zumbo.Modules.Boards|Zumbo.Modules.Boards.ListBoardsByProjectHandler|method:HandleAsync:(ListBoardsByProjectQueryquery,CancellationTokenct):Task<IReadOnlyList<BoardResponse>>"] =
