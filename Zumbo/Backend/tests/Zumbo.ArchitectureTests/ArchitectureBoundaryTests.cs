@@ -507,9 +507,13 @@ public sealed class ArchitectureBoundaryTests
     public void IdentityRegistrationAndUserSearch_ArePortFocusedVerticalSlicesWithCompatibilityFacades()
     {
         var identityDirectory = Path.Combine(SourceDirectory, "Zumbo.Modules.Identity");
-        var registerDirectory = Path.Combine(identityDirectory, "Features", "RegisterUser");
-        var searchDirectory = Path.Combine(identityDirectory, "Features", "SearchUsers");
-        var representativeDirectory = Path.Combine(identityDirectory, "Features", "RepresentativeIdentitySlices");
+        var registerDirectory = Path.Combine(identityDirectory, "Application", "Features", "Registration");
+        var searchDirectory = Path.Combine(identityDirectory, "Application", "Features", "UserSearch");
+        var representativeDirectory = Path.Combine(
+            identityDirectory,
+            "Application",
+            "Features",
+            "RepresentativeIdentitySlices");
 
         Assert.True(File.Exists(Path.Combine(registerDirectory, "RegisterUserRequest.cs")));
         Assert.True(File.Exists(Path.Combine(registerDirectory, "RegisterUserValidator.cs")));
@@ -534,15 +538,11 @@ public sealed class ArchitectureBoundaryTests
         Assert.Contains("ICurrentUser", searchSlice, StringComparison.Ordinal);
 
         var registerFacade = File.ReadAllText(Path.Combine(
-            identityDirectory,
-            "Module",
-            "Identity",
+            registerDirectory,
             "IdentityService",
             "IdentityService.RegisterAsync.cs"));
         var searchFacade = File.ReadAllText(Path.Combine(
-            identityDirectory,
-            "Module",
-            "Identity",
+            searchDirectory,
             "IdentityService",
             "IdentityService.SearchUsersAsync.cs"));
         Assert.Contains("registerUserHandler.HandleAsync", registerFacade, StringComparison.Ordinal);
@@ -562,10 +562,11 @@ public sealed class ArchitectureBoundaryTests
     public void OrganizationCreateAndList_ArePortFocusedVerticalSlicesWithCompatibilityFacades()
     {
         var moduleDirectory = Path.Combine(SourceDirectory, "Zumbo.Modules.Organizations");
-        var createDirectory = Path.Combine(moduleDirectory, "Features", "CreateOrganization");
-        var listDirectory = Path.Combine(moduleDirectory, "Features", "ListOrganizations");
+        var createDirectory = Path.Combine(moduleDirectory, "Application", "Features", "OrganizationsCore");
+        var listDirectory = createDirectory;
         var representativeDirectory = Path.Combine(
             moduleDirectory,
+            "Application",
             "Features",
             "RepresentativeOrganizationSlices");
 
@@ -591,7 +592,11 @@ public sealed class ArchitectureBoundaryTests
         Assert.Contains("IDocumentRepository<OrganizationDocument>", listSlice, StringComparison.Ordinal);
         Assert.Contains("ICurrentUser", listSlice, StringComparison.Ordinal);
 
-        var facade = File.ReadAllText(Path.Combine(moduleDirectory, "OrganizationsModule.cs"));
+        var facade = File.ReadAllText(Path.Combine(
+            moduleDirectory,
+            "Application",
+            "Compatibility",
+            "OrganizationService.cs"));
         Assert.Contains("createOrganizationHandler.HandleAsync", facade, StringComparison.Ordinal);
         Assert.Contains("listOrganizationsHandler.HandleAsync", facade, StringComparison.Ordinal);
 
@@ -609,9 +614,13 @@ public sealed class ArchitectureBoundaryTests
     public void TeamCreateAndList_ArePortFocusedVerticalSlicesWithCompatibilityFacades()
     {
         var moduleDirectory = Path.Combine(SourceDirectory, "Zumbo.Modules.Teams");
-        var createDirectory = Path.Combine(moduleDirectory, "Features", "CreateTeam");
-        var listDirectory = Path.Combine(moduleDirectory, "Features", "ListTeams");
-        var representativeDirectory = Path.Combine(moduleDirectory, "Features", "RepresentativeTeamSlices");
+        var createDirectory = Path.Combine(moduleDirectory, "Application", "Features", "TeamsCore");
+        var listDirectory = createDirectory;
+        var representativeDirectory = Path.Combine(
+            moduleDirectory,
+            "Application",
+            "Features",
+            "RepresentativeTeamSlices");
 
         Assert.True(File.Exists(Path.Combine(createDirectory, "CreateTeamRequest.cs")));
         Assert.True(File.Exists(Path.Combine(createDirectory, "CreateTeamValidator.cs")));
@@ -636,7 +645,11 @@ public sealed class ArchitectureBoundaryTests
         Assert.Contains("IDocumentRepository<TeamDocument>", listSlice, StringComparison.Ordinal);
         Assert.Contains("ICurrentUser", listSlice, StringComparison.Ordinal);
 
-        var facade = File.ReadAllText(Path.Combine(moduleDirectory, "TeamsModule.cs"));
+        var facade = File.ReadAllText(Path.Combine(
+            moduleDirectory,
+            "Application",
+            "Compatibility",
+            "TeamService.cs"));
         Assert.Contains("createTeamHandler.HandleAsync", facade, StringComparison.Ordinal);
         Assert.Contains("listTeamsHandler.HandleAsync", facade, StringComparison.Ordinal);
 
