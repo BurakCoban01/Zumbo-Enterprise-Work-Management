@@ -18,6 +18,14 @@ using Zumbo.Modules.Boards.Application.Features.Lifecycle;
 using Zumbo.Modules.Boards.Application.Features.Swimlanes;
 using Zumbo.Modules.Boards.Application.Features.Views;
 using Zumbo.Modules.Identity;
+using Zumbo.Modules.Identity.Application.Features.AccountLifecycle;
+using Zumbo.Modules.Identity.Application.Features.Login;
+using Zumbo.Modules.Identity.Application.Features.Logout;
+using Zumbo.Modules.Identity.Application.Features.Mfa;
+using Zumbo.Modules.Identity.Application.Features.PasswordChange;
+using Zumbo.Modules.Identity.Application.Features.PasswordReset;
+using Zumbo.Modules.Identity.Application.Features.SessionManagement;
+using Zumbo.Modules.Identity.Application.Features.TokenRefresh;
 using Zumbo.Modules.Notifications;
 using Zumbo.Modules.Organizations;
 using Zumbo.Modules.Projects;
@@ -807,6 +815,601 @@ public sealed class DomainRuleTests
         Assert.Contains(storedSessions, x => x.TokenHash == RefreshTokenSecurity.Hash(registration.RefreshToken));
         Assert.All(storedSessions, x => Assert.False(string.IsNullOrWhiteSpace(x.Id)));
         Assert.Empty(stored.RefreshTokens);
+    }
+
+    [Fact]
+    public async Task IdentityLoginHandler_IssuesTokensAndCreatesHashedSession()
+    {
+        var userDocuments = new InMemoryDocumentRepository<UserDocument>();
+        var users = new UserRepository(userDocuments);
+        var sessionDocuments = new InMemoryDocumentRepository<RefreshSessionDocument>();
+        var sessions = new RefreshSessionStore(sessionDocuments);
+        var passwordHasher = new Pbkdf2PasswordHasher();
+        var user = new UserDocument
+        {
+            Username = "handler-login",
+            Email = "handler-login@zumbo.local",
+            OrganizationId = "org-login-handler",
+            PasswordHash = passwordHasher.Hash("P@ssword123"),
+            CreatedAt = _clock.UtcNow
+        };
+        await users.AddAsync(user, CancellationToken.None);
+        var handler = new LoginHandler(
+            users,
+            sessions,
+            new InMemoryDurableTransactionRunner(),
+            passwordHasher,
+            new JwtTokenIssuer(),
+            Options.Create(new JwtOptions { SigningKey = "unit-test-signing-key-with-more-than-32-chars" }),
+            Options.Create(new LoginSecurityOptions()),
+            new PlainMfaSecretProtector(),
+            _clock);
+
+        var response = await handler.HandleAsync(
+            new LoginRequest(user.Username, "P@ssword123"),
+            CancellationToken.None);
+
+        Assert.False(string.IsNullOrWhiteSpace(response.AccessToken));
+        Assert.False(string.IsNullOrWhiteSpace(response.RefreshToken));
+        var storedSessions = await sessionDocuments.ListByFilterAsync(
+            item => item.UserId == user.Id,
+            cancellationToken: CancellationToken.None);
+        var session = Assert.Single(storedSessions);
+        Assert.Equal(RefreshTokenSecurity.Hash(response.RefreshToken), session.TokenHash);
+        Assert.NotEqual(response.RefreshToken, session.TokenHash);
+    }
+
+    [Fact]
+    public async Task IdentityLogoutHandler_RevokesActiveSessionIdempotently()
+    {
+        var users = new UserRepository(new InMemoryDocumentRepository<UserDocument>());
+        var sessionDocuments = new InMemoryDocumentRepository<RefreshSessionDocument>();
+        var sessions = new RefreshSessionStore(sessionDocuments);
+        var rawToken = "logout-handler-token-" + Guid.NewGuid().ToString("N");
+        await sessions.CreateAsync(
+            new RefreshSessionDocument
+            {
+                UserId = "logout-user",
+                OrganizationId = "logout-org",
+                TokenHash = RefreshTokenSecurity.Hash(rawToken),
+                CreatedAt = _clock.UtcNow,
+                LastSeenAt = _clock.UtcNow,
+                ExpiresAt = _clock.UtcNow.AddDays(1),
+                ExpiresAtUtc = _clock.UtcNow.AddDays(1).UtcDateTime,
+                RetainUntilUtc = _clock.UtcNow.AddDays(31).UtcDateTime
+            },
+            CancellationToken.None);
+        var handler = new LogoutHandler(users, sessions, new InMemoryDurableTransactionRunner(), _clock);
+
+        var first = await handler.HandleAsync(new LogoutRequest(rawToken), CancellationToken.None);
+        var second = await handler.HandleAsync(new LogoutRequest(rawToken), CancellationToken.None);
+
+        Assert.True(first.LoggedOut);
+        Assert.Equal(1, first.RevokedSessions);
+        Assert.True(second.LoggedOut);
+        Assert.Equal(0, second.RevokedSessions);
+        Assert.NotNull((await sessions.GetByTokenAsync(rawToken, CancellationToken.None))!.RevokedAt);
+    }
+
+    [Fact]
+    public async Task IdentityRefreshTokenHandler_RotatesActiveSessionAndPreservesClientMetadata()
+    {
+        var users = new UserRepository(new InMemoryDocumentRepository<UserDocument>());
+        var sessionDocuments = new InMemoryDocumentRepository<RefreshSessionDocument>();
+        var sessions = new RefreshSessionStore(sessionDocuments);
+        var user = new UserDocument
+        {
+            Username = "refresh-handler",
+            Email = "refresh-handler@zumbo.local",
+            OrganizationId = "refresh-handler-org",
+            PasswordHash = new Pbkdf2PasswordHasher().Hash("P@ssword123"),
+            CreatedAt = _clock.UtcNow
+        };
+        await users.AddAsync(user, CancellationToken.None);
+        var rawToken = "refresh-handler-token-" + Guid.NewGuid().ToString("N");
+        var original = new RefreshSessionDocument
+        {
+            UserId = user.Id,
+            OrganizationId = user.OrganizationId,
+            TokenHash = RefreshTokenSecurity.Hash(rawToken),
+            CreatedAt = _clock.UtcNow,
+            LastSeenAt = _clock.UtcNow,
+            DeviceName = "Desktop demo",
+            ClientFingerprint = "demo-fingerprint",
+            ExpiresAt = _clock.UtcNow.AddDays(1),
+            ExpiresAtUtc = _clock.UtcNow.AddDays(1).UtcDateTime,
+            RetainUntilUtc = _clock.UtcNow.AddDays(31).UtcDateTime
+        };
+        await sessions.CreateAsync(original, CancellationToken.None);
+        var handler = new RefreshTokenHandler(
+            users,
+            sessions,
+            new InMemoryDurableTransactionRunner(),
+            new JwtTokenIssuer(),
+            Options.Create(new JwtOptions { SigningKey = "unit-test-signing-key-with-more-than-32-chars" }),
+            _clock);
+
+        var response = await handler.HandleAsync(new RefreshTokenRequest(rawToken), CancellationToken.None);
+        var storedOriginal = await sessions.GetByTokenAsync(rawToken, CancellationToken.None);
+        var replacement = await sessions.GetByTokenAsync(response.RefreshToken, CancellationToken.None);
+
+        Assert.NotNull(storedOriginal!.RevokedAt);
+        Assert.Equal(replacement!.Id, storedOriginal.ReplacedBySessionId);
+        Assert.Equal("Desktop demo", replacement.DeviceName);
+        Assert.Equal("demo-fingerprint", replacement.ClientFingerprint);
+    }
+
+    [Fact]
+    public async Task IdentityChangePasswordHandler_RevokesExistingSessionsAndIssuesReplacement()
+    {
+        var documents = new InMemoryDocumentRepository<UserDocument>();
+        var users = new UserRepository(documents);
+        var sessionDocuments = new InMemoryDocumentRepository<RefreshSessionDocument>();
+        var sessions = new RefreshSessionStore(sessionDocuments);
+        var hasher = new Pbkdf2PasswordHasher();
+        var user = new UserDocument
+        {
+            Username = "change-password-handler",
+            Email = "change-password-handler@zumbo.local",
+            OrganizationId = "change-password-org",
+            PasswordHash = hasher.Hash("Current123!"),
+            CreatedAt = _clock.UtcNow
+        };
+        await users.AddAsync(user, CancellationToken.None);
+        var oldToken = "change-password-token-" + Guid.NewGuid().ToString("N");
+        await sessions.CreateAsync(
+            new RefreshSessionDocument
+            {
+                UserId = user.Id,
+                OrganizationId = user.OrganizationId,
+                TokenHash = RefreshTokenSecurity.Hash(oldToken),
+                CreatedAt = _clock.UtcNow,
+                LastSeenAt = _clock.UtcNow,
+                ExpiresAt = _clock.UtcNow.AddDays(1),
+                ExpiresAtUtc = _clock.UtcNow.AddDays(1).UtcDateTime,
+                RetainUntilUtc = _clock.UtcNow.AddDays(31).UtcDateTime
+            },
+            CancellationToken.None);
+        var currentUser = new FixedCurrentUser
+        {
+            UserId = user.Id,
+            OrganizationId = user.OrganizationId
+        };
+        var handler = new ChangePasswordHandler(
+            users,
+            sessions,
+            new InMemoryDurableTransactionRunner(),
+            hasher,
+            new JwtTokenIssuer(),
+            Options.Create(new JwtOptions { SigningKey = "unit-test-signing-key-with-more-than-32-chars" }),
+            _clock,
+            currentUser);
+
+        var response = await handler.HandleAsync(
+            new ChangePasswordRequest("Current123!", "Replacement456!"),
+            "change-password-correlation",
+            CancellationToken.None);
+        var stored = await users.GetByIdAsync(user.Id, CancellationToken.None);
+
+        Assert.True(hasher.Verify("Replacement456!", stored!.PasswordHash));
+        Assert.NotNull((await sessions.GetByTokenAsync(oldToken, CancellationToken.None))!.RevokedAt);
+        Assert.NotNull(await sessions.GetByTokenAsync(response.RefreshToken, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task IdentityForgotPasswordHandler_PersistsHashedTokenAndNotifiesActiveUser()
+    {
+        var users = new UserRepository(new InMemoryDocumentRepository<UserDocument>());
+        var user = new UserDocument
+        {
+            Username = "forgot-password-handler",
+            Email = "forgot-password-handler@zumbo.local",
+            OrganizationId = "forgot-password-org",
+            PasswordHash = new Pbkdf2PasswordHasher().Hash("Current123!"),
+            CreatedAt = _clock.UtcNow
+        };
+        await users.AddAsync(user, CancellationToken.None);
+        var notifier = new RecordingPasswordResetNotifier();
+        var handler = new ForgotPasswordHandler(
+            users,
+            Options.Create(new PasswordResetOptions { ExpiryMinutes = 45 }),
+            notifier,
+            _clock);
+
+        var response = await handler.HandleAsync(
+            new ForgotPasswordRequest(user.Email),
+            CancellationToken.None);
+        var notification = Assert.Single(notifier.Tokens);
+        var stored = await users.GetByIdAsync(user.Id, CancellationToken.None);
+
+        Assert.True(response.Accepted);
+        Assert.Equal(user.Email, notification.Email);
+        Assert.Equal(RefreshTokenSecurity.Hash(notification.Token), stored!.PasswordResetTokenHash);
+        Assert.Equal(_clock.UtcNow.AddMinutes(45), stored.PasswordResetTokenExpiresAt);
+    }
+
+    [Fact]
+    public async Task IdentityResetPasswordHandler_ConsumesTokenClearsLockoutAndRevokesSessions()
+    {
+        var documents = new InMemoryDocumentRepository<UserDocument>();
+        var users = new UserRepository(documents);
+        var sessionDocuments = new InMemoryDocumentRepository<RefreshSessionDocument>();
+        var sessions = new RefreshSessionStore(sessionDocuments);
+        var hasher = new Pbkdf2PasswordHasher();
+        var rawResetToken = "reset-password-handler-" + Guid.NewGuid().ToString("N");
+        var user = new UserDocument
+        {
+            Username = "reset-password-handler",
+            Email = "reset-password-handler@zumbo.local",
+            OrganizationId = "reset-password-org",
+            PasswordHash = hasher.Hash("Current123!"),
+            PasswordResetTokenHash = RefreshTokenSecurity.Hash(rawResetToken),
+            PasswordResetTokenExpiresAt = _clock.UtcNow.AddMinutes(30),
+            FailedLoginCount = 4,
+            LockedUntil = _clock.UtcNow.AddMinutes(10),
+            CreatedAt = _clock.UtcNow
+        };
+        await users.AddAsync(user, CancellationToken.None);
+        var rawRefreshToken = "reset-existing-session-" + Guid.NewGuid().ToString("N");
+        await sessions.CreateAsync(
+            new RefreshSessionDocument
+            {
+                UserId = user.Id,
+                OrganizationId = user.OrganizationId,
+                TokenHash = RefreshTokenSecurity.Hash(rawRefreshToken),
+                CreatedAt = _clock.UtcNow,
+                LastSeenAt = _clock.UtcNow,
+                ExpiresAt = _clock.UtcNow.AddDays(1),
+                ExpiresAtUtc = _clock.UtcNow.AddDays(1).UtcDateTime,
+                RetainUntilUtc = _clock.UtcNow.AddDays(31).UtcDateTime
+            },
+            CancellationToken.None);
+        var handler = new ResetPasswordHandler(
+            users,
+            sessions,
+            new InMemoryDurableTransactionRunner(),
+            hasher,
+            _clock);
+
+        var response = await handler.HandleAsync(
+            new ResetPasswordRequest(rawResetToken, "Replacement456!"),
+            "reset-password-correlation",
+            CancellationToken.None);
+        var stored = await users.GetByIdAsync(user.Id, CancellationToken.None);
+
+        Assert.True(response.Reset);
+        Assert.True(hasher.Verify("Replacement456!", stored!.PasswordHash));
+        Assert.Null(stored.PasswordResetTokenHash);
+        Assert.Null(stored.PasswordResetTokenExpiresAt);
+        Assert.Equal(0, stored.FailedLoginCount);
+        Assert.Null(stored.LockedUntil);
+        Assert.NotNull((await sessions.GetByTokenAsync(rawRefreshToken, CancellationToken.None))!.RevokedAt);
+        await Assert.ThrowsAsync<UnauthorizedException>(() => handler.HandleAsync(
+            new ResetPasswordRequest(rawResetToken, "Another789!"),
+            "reset-password-reuse",
+            CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task IdentityListSessionsHandler_ReturnsOnlyOwnedSessionsAndMarksCurrent()
+    {
+        var users = new UserRepository(new InMemoryDocumentRepository<UserDocument>());
+        var sessionDocuments = new InMemoryDocumentRepository<RefreshSessionDocument>();
+        var sessions = new RefreshSessionStore(sessionDocuments);
+        var user = new UserDocument
+        {
+            Username = "list-sessions-handler",
+            Email = "list-sessions-handler@zumbo.local",
+            OrganizationId = "list-sessions-org",
+            PasswordHash = new Pbkdf2PasswordHasher().Hash("Current123!"),
+            CreatedAt = _clock.UtcNow
+        };
+        await users.AddAsync(user, CancellationToken.None);
+        var ownedSession = new RefreshSessionDocument
+        {
+            UserId = user.Id,
+            OrganizationId = user.OrganizationId,
+            TokenHash = RefreshTokenSecurity.Hash("owned-list-session"),
+            DeviceName = "Demo desktop",
+            ClientFingerprint = "owned-fingerprint",
+            CreatedAt = _clock.UtcNow,
+            LastSeenAt = _clock.UtcNow,
+            ExpiresAt = _clock.UtcNow.AddDays(1),
+            ExpiresAtUtc = _clock.UtcNow.AddDays(1).UtcDateTime,
+            RetainUntilUtc = _clock.UtcNow.AddDays(31).UtcDateTime
+        };
+        await sessions.CreateAsync(ownedSession, CancellationToken.None);
+        await sessions.CreateAsync(
+            new RefreshSessionDocument
+            {
+                UserId = "foreign-user",
+                OrganizationId = user.OrganizationId,
+                TokenHash = RefreshTokenSecurity.Hash("foreign-list-session"),
+                CreatedAt = _clock.UtcNow,
+                LastSeenAt = _clock.UtcNow,
+                ExpiresAt = _clock.UtcNow.AddDays(1),
+                ExpiresAtUtc = _clock.UtcNow.AddDays(1).UtcDateTime,
+                RetainUntilUtc = _clock.UtcNow.AddDays(31).UtcDateTime
+            },
+            CancellationToken.None);
+        var handler = new ListSessionsHandler(
+            users,
+            sessions,
+            new FixedCurrentUser { UserId = user.Id, OrganizationId = user.OrganizationId });
+
+        var result = await handler.HandleAsync(ownedSession.Id, CancellationToken.None);
+
+        var listed = Assert.Single(result);
+        Assert.Equal(ownedSession.Id, listed.Id);
+        Assert.True(listed.IsCurrent);
+        Assert.Equal("Demo desktop", listed.DeviceName);
+    }
+
+    [Fact]
+    public async Task IdentityRevokeSessionHandler_RevokesOwnedSessionIdempotently()
+    {
+        var users = new UserRepository(new InMemoryDocumentRepository<UserDocument>());
+        var sessionDocuments = new InMemoryDocumentRepository<RefreshSessionDocument>();
+        var sessions = new RefreshSessionStore(sessionDocuments);
+        var user = new UserDocument
+        {
+            Username = "revoke-session-handler",
+            Email = "revoke-session-handler@zumbo.local",
+            OrganizationId = "revoke-session-org",
+            PasswordHash = new Pbkdf2PasswordHasher().Hash("Current123!"),
+            CreatedAt = _clock.UtcNow
+        };
+        await users.AddAsync(user, CancellationToken.None);
+        var ownedSession = new RefreshSessionDocument
+        {
+            UserId = user.Id,
+            OrganizationId = user.OrganizationId,
+            TokenHash = RefreshTokenSecurity.Hash("owned-revoke-session"),
+            CreatedAt = _clock.UtcNow,
+            LastSeenAt = _clock.UtcNow,
+            ExpiresAt = _clock.UtcNow.AddDays(1),
+            ExpiresAtUtc = _clock.UtcNow.AddDays(1).UtcDateTime,
+            RetainUntilUtc = _clock.UtcNow.AddDays(31).UtcDateTime
+        };
+        await sessions.CreateAsync(ownedSession, CancellationToken.None);
+        var handler = new RevokeSessionHandler(
+            users,
+            sessions,
+            _clock,
+            new FixedCurrentUser { UserId = user.Id, OrganizationId = user.OrganizationId });
+
+        await handler.HandleAsync(ownedSession.Id, "revoke-session-correlation", CancellationToken.None);
+        await handler.HandleAsync(ownedSession.Id, "revoke-session-idempotent", CancellationToken.None);
+
+        Assert.NotNull((await sessions.GetByIdAsync(
+            ownedSession.Id,
+            user.Id,
+            user.OrganizationId,
+            CancellationToken.None))!.RevokedAt);
+        await Assert.ThrowsAsync<NotFoundException>(() => handler.HandleAsync(
+            "foreign-session",
+            "revoke-session-foreign",
+            CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task IdentityGetMfaStatusHandler_ReturnsEnabledStateAndRecoveryCount()
+    {
+        var users = new UserRepository(new InMemoryDocumentRepository<UserDocument>());
+        var user = new UserDocument
+        {
+            Username = "mfa-status-handler",
+            Email = "mfa-status-handler@zumbo.local",
+            OrganizationId = "mfa-status-org",
+            PasswordHash = new Pbkdf2PasswordHasher().Hash("Current123!"),
+            MfaEnabled = true,
+            MfaRecoveryCodeHashes = ["hash-a", "hash-b"],
+            CreatedAt = _clock.UtcNow
+        };
+        await users.AddAsync(user, CancellationToken.None);
+        var handler = new GetMfaStatusHandler(
+            users,
+            new FixedCurrentUser { UserId = user.Id, OrganizationId = user.OrganizationId });
+
+        var response = await handler.HandleAsync(CancellationToken.None);
+
+        Assert.True(response.Enabled);
+        Assert.Equal(2, response.RemainingRecoveryCodes);
+    }
+
+    [Fact]
+    public async Task IdentityBeginMfaSetupHandler_PersistsProtectedPendingSecret()
+    {
+        var users = new UserRepository(new InMemoryDocumentRepository<UserDocument>());
+        var hasher = new Pbkdf2PasswordHasher();
+        var user = new UserDocument
+        {
+            Username = "mfa-setup-handler",
+            Email = "mfa-setup-handler@zumbo.local",
+            OrganizationId = "mfa-setup-org",
+            PasswordHash = hasher.Hash("Current123!"),
+            CreatedAt = _clock.UtcNow
+        };
+        await users.AddAsync(user, CancellationToken.None);
+        var handler = new BeginMfaSetupHandler(
+            users,
+            hasher,
+            new PlainMfaSecretProtector(),
+            _clock,
+            new FixedCurrentUser { UserId = user.Id, OrganizationId = user.OrganizationId });
+
+        var response = await handler.HandleAsync(
+            new BeginMfaSetupRequest("Current123!"),
+            "mfa-setup-correlation",
+            CancellationToken.None);
+        var stored = await users.GetByIdAsync(user.Id, CancellationToken.None);
+
+        Assert.Equal("protected:" + response.Secret, stored!.PendingMfaSecretProtected);
+        Assert.Equal(_clock.UtcNow.AddMinutes(10), stored.PendingMfaExpiresAt);
+        Assert.Contains("otpauth://totp/Zumbo:", response.ProvisioningUri, StringComparison.Ordinal);
+        Assert.Contains("secret=" + response.Secret, response.ProvisioningUri, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task IdentityConfirmMfaSetupHandler_EnablesMfaAndCreatesRecoveryCodes()
+    {
+        var users = new UserRepository(new InMemoryDocumentRepository<UserDocument>());
+        var sessions = new RefreshSessionStore(new InMemoryDocumentRepository<RefreshSessionDocument>());
+        var secret = TotpSecurity.GenerateSecret();
+        var user = new UserDocument
+        {
+            Username = "mfa-confirm-handler",
+            Email = "mfa-confirm-handler@zumbo.local",
+            OrganizationId = "mfa-confirm-org",
+            PasswordHash = new Pbkdf2PasswordHasher().Hash("Current123!"),
+            PendingMfaSecretProtected = "protected:" + secret,
+            PendingMfaExpiresAt = _clock.UtcNow.AddMinutes(10),
+            CreatedAt = _clock.UtcNow
+        };
+        await users.AddAsync(user, CancellationToken.None);
+        var handler = new ConfirmMfaSetupHandler(
+            users,
+            sessions,
+            new InMemoryDurableTransactionRunner(),
+            new PlainMfaSecretProtector(),
+            _clock,
+            new FixedCurrentUser { UserId = user.Id, OrganizationId = user.OrganizationId });
+
+        var response = await handler.HandleAsync(
+            new ConfirmMfaSetupRequest(TotpSecurity.GenerateCode(secret, _clock.UtcNow)),
+            "mfa-confirm-correlation",
+            CancellationToken.None);
+        var stored = await users.GetByIdAsync(user.Id, CancellationToken.None);
+
+        Assert.True(response.Enabled);
+        Assert.Equal(8, response.RecoveryCodes.Count);
+        Assert.True(stored!.MfaEnabled);
+        Assert.Equal("protected:" + secret, stored.MfaSecretProtected);
+        Assert.Null(stored.PendingMfaSecretProtected);
+        Assert.Null(stored.PendingMfaExpiresAt);
+        Assert.Equal(response.RecoveryCodes.Select(TotpSecurity.HashRecoveryCode), stored.MfaRecoveryCodeHashes);
+    }
+
+    [Fact]
+    public async Task IdentityDisableMfaHandler_ConsumesRecoveryCodeAndClearsMfaState()
+    {
+        var users = new UserRepository(new InMemoryDocumentRepository<UserDocument>());
+        var sessions = new RefreshSessionStore(new InMemoryDocumentRepository<RefreshSessionDocument>());
+        var hasher = new Pbkdf2PasswordHasher();
+        var recoveryCode = TotpSecurity.GenerateRecoveryCode();
+        var user = new UserDocument
+        {
+            Username = "mfa-disable-handler",
+            Email = "mfa-disable-handler@zumbo.local",
+            OrganizationId = "mfa-disable-org",
+            PasswordHash = hasher.Hash("Current123!"),
+            MfaEnabled = true,
+            MfaSecretProtected = "protected:" + TotpSecurity.GenerateSecret(),
+            MfaRecoveryCodeHashes = [TotpSecurity.HashRecoveryCode(recoveryCode)],
+            CreatedAt = _clock.UtcNow
+        };
+        await users.AddAsync(user, CancellationToken.None);
+        var originalSecurityStamp = user.SecurityStamp;
+        var handler = new DisableMfaHandler(
+            users,
+            sessions,
+            new InMemoryDurableTransactionRunner(),
+            hasher,
+            new PlainMfaSecretProtector(),
+            _clock,
+            new FixedCurrentUser { UserId = user.Id, OrganizationId = user.OrganizationId });
+
+        var response = await handler.HandleAsync(
+            new DisableMfaRequest("Current123!", recoveryCode),
+            "mfa-disable-correlation",
+            CancellationToken.None);
+        var stored = await users.GetByIdAsync(user.Id, CancellationToken.None);
+
+        Assert.False(response.Enabled);
+        Assert.False(stored!.MfaEnabled);
+        Assert.Null(stored.MfaSecretProtected);
+        Assert.Null(stored.PendingMfaSecretProtected);
+        Assert.Empty(stored.MfaRecoveryCodeHashes);
+        Assert.NotEqual(originalSecurityStamp, stored.SecurityStamp);
+    }
+
+    [Fact]
+    public async Task IdentityRegenerateMfaRecoveryCodesHandler_ReplacesCodesAndKeepsMfaEnabled()
+    {
+        var users = new UserRepository(new InMemoryDocumentRepository<UserDocument>());
+        var sessions = new RefreshSessionStore(new InMemoryDocumentRepository<RefreshSessionDocument>());
+        var hasher = new Pbkdf2PasswordHasher();
+        var oldRecoveryCode = TotpSecurity.GenerateRecoveryCode();
+        var oldRecoveryHash = TotpSecurity.HashRecoveryCode(oldRecoveryCode);
+        var user = new UserDocument
+        {
+            Username = "mfa-recovery-handler",
+            Email = "mfa-recovery-handler@zumbo.local",
+            OrganizationId = "mfa-recovery-org",
+            PasswordHash = hasher.Hash("Current123!"),
+            MfaEnabled = true,
+            MfaSecretProtected = "protected:" + TotpSecurity.GenerateSecret(),
+            MfaRecoveryCodeHashes = [oldRecoveryHash],
+            CreatedAt = _clock.UtcNow
+        };
+        await users.AddAsync(user, CancellationToken.None);
+        var originalSecurityStamp = user.SecurityStamp;
+        var handler = new RegenerateMfaRecoveryCodesHandler(
+            users,
+            sessions,
+            new InMemoryDurableTransactionRunner(),
+            hasher,
+            new PlainMfaSecretProtector(),
+            _clock,
+            new FixedCurrentUser { UserId = user.Id, OrganizationId = user.OrganizationId });
+
+        var response = await handler.HandleAsync(
+            new RegenerateMfaRecoveryCodesRequest("Current123!", oldRecoveryCode),
+            "mfa-recovery-correlation",
+            CancellationToken.None);
+        var stored = await users.GetByIdAsync(user.Id, CancellationToken.None);
+
+        Assert.Equal(8, response.RecoveryCodes.Count);
+        Assert.True(stored!.MfaEnabled);
+        Assert.DoesNotContain(oldRecoveryHash, stored.MfaRecoveryCodeHashes);
+        Assert.Equal(response.RecoveryCodes.Select(TotpSecurity.HashRecoveryCode), stored.MfaRecoveryCodeHashes);
+        Assert.NotEqual(originalSecurityStamp, stored.SecurityStamp);
+    }
+
+    [Fact]
+    public async Task IdentityDeactivateAccountHandler_DisablesAccountAndRotatesSecurityStamp()
+    {
+        var users = new UserRepository(new InMemoryDocumentRepository<UserDocument>());
+        var sessions = new RefreshSessionStore(new InMemoryDocumentRepository<RefreshSessionDocument>());
+        var hasher = new Pbkdf2PasswordHasher();
+        var user = new UserDocument
+        {
+            Username = "deactivate-handler",
+            Email = "deactivate-handler@zumbo.local",
+            OrganizationId = "deactivate-org",
+            PasswordHash = hasher.Hash("Current123!"),
+            IsActive = true,
+            CreatedAt = _clock.UtcNow
+        };
+        await users.AddAsync(user, CancellationToken.None);
+        var originalSecurityStamp = user.SecurityStamp;
+        var handler = new DeactivateAccountHandler(
+            users,
+            sessions,
+            new InMemoryDurableTransactionRunner(),
+            hasher,
+            _clock,
+            new FixedCurrentUser { UserId = user.Id, OrganizationId = user.OrganizationId });
+
+        var response = await handler.HandleAsync(
+            new DeactivateAccountRequest("Current123!"),
+            CancellationToken.None);
+        var stored = await users.GetByIdAsync(user.Id, CancellationToken.None);
+
+        Assert.Equal(user.Id, response.UserId);
+        Assert.False(response.IsActive);
+        Assert.False(stored!.IsActive);
+        Assert.NotEqual(originalSecurityStamp, stored.SecurityStamp);
     }
 
     [Fact]

@@ -1,17 +1,16 @@
 using System.Security.Cryptography;
-using System.Text;
 using Microsoft.Extensions.Options;
-using Zumbo.BuildingBlocks.Application.Concurrency;
-using Zumbo.BuildingBlocks.Application.Messaging;
-using Zumbo.BuildingBlocks.Application.Persistence;
-using Zumbo.BuildingBlocks.Application.Security;
 using Zumbo.SharedKernel;
 
-namespace Zumbo.Modules.Identity;
+namespace Zumbo.Modules.Identity.Application.Features.PasswordReset;
 
-public sealed partial class IdentityService{
-
-    public async Task<PasswordResetRequestedResponse> ForgotPasswordAsync(
+public sealed class ForgotPasswordHandler(
+    IUserRepository users,
+    IOptions<PasswordResetOptions> passwordResetOptions,
+    IPasswordResetNotifier passwordResetNotifier,
+    IClock clock)
+{
+    public async Task<PasswordResetRequestedResponse> HandleAsync(
         ForgotPasswordRequest request,
         CancellationToken ct)
     {

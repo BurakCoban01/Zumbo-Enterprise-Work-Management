@@ -109,6 +109,20 @@ public sealed class RefactorRuntimeContractTests
         "services.AddScoped<UpdateSwimlaneHandler>();",
         "services.AddScoped<AddColumnHandler>();",
         "services.AddScoped<UpdateColumnHandler>();",
+        "services.AddScoped<LoginHandler>();",
+        "services.AddScoped<LogoutHandler>();",
+        "services.AddScoped<GetMfaStatusHandler>();",
+        "services.AddScoped<BeginMfaSetupHandler>();",
+        "services.AddScoped<ConfirmMfaSetupHandler>();",
+        "services.AddScoped<DisableMfaHandler>();",
+        "services.AddScoped<RegenerateMfaRecoveryCodesHandler>();",
+        "services.AddScoped<DeactivateAccountHandler>();",
+        "services.AddScoped<ChangePasswordHandler>();",
+        "services.AddScoped<ForgotPasswordHandler>();",
+        "services.AddScoped<ResetPasswordHandler>();",
+        "services.AddScoped<ListSessionsHandler>();",
+        "services.AddScoped<RevokeSessionHandler>();",
+        "services.AddScoped<RefreshTokenHandler>();",
         "services.AddScoped<DeleteColumnHandler>();",
         "services.AddScoped<ReorderColumnsHandler>();",
         "services.AddScoped<CreateViewHandler>();",
@@ -181,6 +195,43 @@ public sealed class RefactorRuntimeContractTests
 
     private static readonly string[] ReplacedVerticalSliceEndpointMappings =
     [
+        "group.MapPost(\"/login\",async(LoginRequestrequest,IdentityServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.LoginAsync(request,ct),http)).RequireRateLimiting(\"login\");",
+        "group.MapPost(\"/logout\",async(LogoutRequestrequest,IdentityServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.LogoutAsync(request,ct),http));",
+        "group.MapPost(\"/refresh\",async(RefreshTokenRequestrequest,IdentityServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.RefreshAsync(request,ct),http));",
+        "group.MapPost(\"/change-password\",async(ChangePasswordRequestrequest,IdentityServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.ChangePasswordAsync(request,CorrelationId(http),ct),http))"
+        + ".RequireAuthorization().WithZumboPermission(PermissionCatalog.ProfileRead);",
+        "group.MapPost(\"/forgot-password\",async(ForgotPasswordRequestrequest,IdentityServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.ForgotPasswordAsync(request,ct),http)).RequireRateLimiting(\"password-reset\");",
+        "group.MapPost(\"/reset-password\",async(ResetPasswordRequestrequest,IdentityServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.ResetPasswordAsync(request,CorrelationId(http),ct),http)).RequireRateLimiting(\"password-reset\");",
+        "group.MapGet(\"/sessions\",async(IdentityServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.ListSessionsAsync(http.User.FindFirst(\"sessionId\")?.Value,ct),http))"
+        + ".RequireAuthorization().WithZumboPermission(PermissionCatalog.ProfileRead);",
+        "group.MapDelete(\"/sessions/{sessionId}\",async(stringsessionId,IdentityServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "{awaitservice.RevokeSessionAsync(sessionId,CorrelationId(http),ct);returnOk(new{revoked=true},http);})"
+        + ".RequireAuthorization().WithZumboPermission(PermissionCatalog.ProfileRead);",
+        "group.MapGet(\"/mfa\",async(IdentityServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.GetMfaStatusAsync(ct),http)).RequireAuthorization()"
+        + ".WithZumboPermission(PermissionCatalog.ProfileRead);",
+        "group.MapPost(\"/mfa/setup\",async(BeginMfaSetupRequestrequest,IdentityServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.BeginMfaSetupAsync(request,CorrelationId(http),ct),http)).RequireAuthorization()"
+        + ".WithZumboPermission(PermissionCatalog.ProfileRead);",
+        "group.MapPost(\"/mfa/confirm\",async(ConfirmMfaSetupRequestrequest,IdentityServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.ConfirmMfaSetupAsync(request,CorrelationId(http),ct),http)).RequireAuthorization()"
+        + ".WithZumboPermission(PermissionCatalog.ProfileRead);",
+        "group.MapPost(\"/mfa/disable\",async(DisableMfaRequestrequest,IdentityServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.DisableMfaAsync(request,CorrelationId(http),ct),http)).RequireAuthorization()"
+        + ".WithZumboPermission(PermissionCatalog.ProfileRead);",
+        "group.MapPost(\"/mfa/recovery-codes\",async(RegenerateMfaRecoveryCodesRequestrequest,IdentityServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.RegenerateMfaRecoveryCodesAsync(request,CorrelationId(http),ct),http)).RequireAuthorization()"
+        + ".WithZumboPermission(PermissionCatalog.ProfileRead);",
+        "group.MapPost(\"/deactivate\",async(DeactivateAccountRequestrequest,IdentityServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.DeactivateAsync(request,ct),http)).RequireAuthorization()"
+        + ".WithZumboPermission(PermissionCatalog.ProfileRead);",
         "group.MapPut(\"/{boardId}\",async(stringboardId,UpdateBoardRequestrequest,BoardServiceservice,HttpContexthttp,CancellationTokenct)=>"
         + "Ok(awaitservice.UpdateAsync(boardId,request,CorrelationId(http),ct),http)).WithZumboPermission(PermissionCatalog.BoardManage);",
         "group.MapDelete(\"/{boardId}\",async(stringboardId,BoardServiceservice,HttpContexthttp,CancellationTokenct)=>"
@@ -217,6 +268,43 @@ public sealed class RefactorRuntimeContractTests
 
     private static readonly string[] PortFocusedVerticalSliceEndpointMappings =
     [
+        "group.MapPost(\"/login\",async(LoginRequestrequest,LoginHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(request,ct),http)).RequireRateLimiting(\"login\");",
+        "group.MapPost(\"/logout\",async(LogoutRequestrequest,LogoutHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(request,ct),http));",
+        "group.MapPost(\"/refresh\",async(RefreshTokenRequestrequest,RefreshTokenHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(request,ct),http));",
+        "group.MapPost(\"/change-password\",async(ChangePasswordRequestrequest,ChangePasswordHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(request,CorrelationId(http),ct),http))"
+        + ".RequireAuthorization().WithZumboPermission(PermissionCatalog.ProfileRead);",
+        "group.MapPost(\"/forgot-password\",async(ForgotPasswordRequestrequest,ForgotPasswordHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(request,ct),http)).RequireRateLimiting(\"password-reset\");",
+        "group.MapPost(\"/reset-password\",async(ResetPasswordRequestrequest,ResetPasswordHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(request,CorrelationId(http),ct),http)).RequireRateLimiting(\"password-reset\");",
+        "group.MapGet(\"/sessions\",async(ListSessionsHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(http.User.FindFirst(\"sessionId\")?.Value,ct),http))"
+        + ".RequireAuthorization().WithZumboPermission(PermissionCatalog.ProfileRead);",
+        "group.MapDelete(\"/sessions/{sessionId}\",async(stringsessionId,RevokeSessionHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "{awaithandler.HandleAsync(sessionId,CorrelationId(http),ct);returnOk(new{revoked=true},http);})"
+        + ".RequireAuthorization().WithZumboPermission(PermissionCatalog.ProfileRead);",
+        "group.MapGet(\"/mfa\",async(GetMfaStatusHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(ct),http)).RequireAuthorization()"
+        + ".WithZumboPermission(PermissionCatalog.ProfileRead);",
+        "group.MapPost(\"/mfa/setup\",async(BeginMfaSetupRequestrequest,BeginMfaSetupHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(request,CorrelationId(http),ct),http)).RequireAuthorization()"
+        + ".WithZumboPermission(PermissionCatalog.ProfileRead);",
+        "group.MapPost(\"/mfa/confirm\",async(ConfirmMfaSetupRequestrequest,ConfirmMfaSetupHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(request,CorrelationId(http),ct),http)).RequireAuthorization()"
+        + ".WithZumboPermission(PermissionCatalog.ProfileRead);",
+        "group.MapPost(\"/mfa/disable\",async(DisableMfaRequestrequest,DisableMfaHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(request,CorrelationId(http),ct),http)).RequireAuthorization()"
+        + ".WithZumboPermission(PermissionCatalog.ProfileRead);",
+        "group.MapPost(\"/mfa/recovery-codes\",async(RegenerateMfaRecoveryCodesRequestrequest,RegenerateMfaRecoveryCodesHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(request,CorrelationId(http),ct),http)).RequireAuthorization()"
+        + ".WithZumboPermission(PermissionCatalog.ProfileRead);",
+        "group.MapPost(\"/deactivate\",async(DeactivateAccountRequestrequest,DeactivateAccountHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(request,ct),http)).RequireAuthorization()"
+        + ".WithZumboPermission(PermissionCatalog.ProfileRead);",
         "group.MapPut(\"/{boardId}\",async(stringboardId,UpdateBoardRequestrequest,UpdateBoardHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
         + "Ok(awaithandler.HandleAsync(boardId,request,CorrelationId(http),ct),http)).WithZumboPermission(PermissionCatalog.BoardManage);",
         "group.MapDelete(\"/{boardId}\",async(stringboardId,ArchiveBoardHandlerhandler,HttpContexthttp,CancellationTokenct)=>"

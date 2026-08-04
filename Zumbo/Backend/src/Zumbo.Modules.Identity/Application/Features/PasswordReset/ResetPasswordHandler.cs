@@ -1,20 +1,19 @@
-using System.Security.Cryptography;
-using System.Text;
-using Microsoft.Extensions.Options;
-using Zumbo.BuildingBlocks.Application.Concurrency;
 using Zumbo.BuildingBlocks.Application.Messaging;
 using Zumbo.BuildingBlocks.Application.Persistence;
 using Zumbo.BuildingBlocks.Application.Security;
 using Zumbo.SharedKernel;
 
-namespace Zumbo.Modules.Identity;
+namespace Zumbo.Modules.Identity.Application.Features.PasswordReset;
 
-public sealed partial class IdentityService{
-
-    public Task<PasswordResetResponse> ResetPasswordAsync(ResetPasswordRequest request, CancellationToken ct) =>
-        ResetPasswordAsync(request, "system", ct);
-
-    public async Task<PasswordResetResponse> ResetPasswordAsync(
+public sealed class ResetPasswordHandler(
+    IUserRepository users,
+    IRefreshSessionStore sessions,
+    IDurableTransactionRunner transactions,
+    IPasswordHasher passwordHasher,
+    IClock clock,
+    IIdentityAuditWriter? audit = null)
+{
+    public async Task<PasswordResetResponse> HandleAsync(
         ResetPasswordRequest request,
         string correlationId,
         CancellationToken ct)
@@ -68,5 +67,28 @@ public sealed partial class IdentityService{
 
         await WriteAuditAsync("PasswordReset", user.Id, null, null, correlationId, ct);
         return new PasswordResetResponse(true);
+    }
+
+    private Task WriteAuditAsync(
+        string action,
+        string entityId,
+        string? oldValue,
+        string? newValue,
+        string correlationId,
+        CancellationToken ct) =>
+        audit?.WriteAsync(action, entityId, oldValue, newValue, correlationId, ct)
+        ?? Task.CompletedTask;
+
+    private static void GuardPassword(string password)
+    {
+        if (string.IsNullOrWhiteSpace(password)
+            || password.Length < 10
+            || !password.Any(char.IsUpper)
+            || !password.Any(char.IsLower)
+            || !password.Any(char.IsDigit)
+            || password.All(char.IsLetterOrDigit))
+        {
+            throw new ValidationException("Password must be at least 10 characters and include upper-case, lower-case, number and symbol characters.");
+        }
     }
 }

@@ -1,17 +1,17 @@
-using System.Security.Cryptography;
-using System.Text;
-using Microsoft.Extensions.Options;
-using Zumbo.BuildingBlocks.Application.Concurrency;
-using Zumbo.BuildingBlocks.Application.Messaging;
 using Zumbo.BuildingBlocks.Application.Persistence;
 using Zumbo.BuildingBlocks.Application.Security;
 using Zumbo.SharedKernel;
 
-namespace Zumbo.Modules.Identity;
+namespace Zumbo.Modules.Identity.Application.Features.SessionManagement;
 
-public sealed partial class IdentityService{
-
-    public async Task RevokeSessionAsync(string sessionId, string correlationId, CancellationToken ct)
+public sealed class RevokeSessionHandler(
+    IUserRepository users,
+    IRefreshSessionStore sessions,
+    IClock clock,
+    ICurrentUser currentUser,
+    IIdentityAuditWriter? audit = null)
+{
+    public async Task HandleAsync(string sessionId, string correlationId, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(sessionId) || sessionId.Length > 64)
         {
@@ -53,16 +53,25 @@ public sealed partial class IdentityService{
         throw new ConflictException("SESSION_REVOKE_CONFLICT", "Session could not be revoked; retry the operation.");
     }
 
-    private async Task<int> RevokeSessionAsync(
-        RefreshSessionDocument? session,
-        DateTimeOffset now,
-        CancellationToken ct)
+    private async Task<UserDocument> GetCurrentUserAsync(CancellationToken ct)
     {
-        if (session is null || !session.IsActive(now))
+        var userId = currentUser.UserId;
+        if (string.IsNullOrWhiteSpace(userId))
         {
-            return 0;
+            throw new UnauthorizedException("Authenticated user is required.");
         }
 
-        return await sessions.RevokeAsync(session, now, null, ct) ? 1 : 0;
+        return await users.GetByIdAsync(userId, ct)
+            ?? throw new UnauthorizedException("Authenticated user was not found.");
     }
+
+    private Task WriteAuditAsync(
+        string action,
+        string entityId,
+        string? oldValue,
+        string? newValue,
+        string correlationId,
+        CancellationToken ct) =>
+        audit?.WriteAsync(action, entityId, oldValue, newValue, correlationId, ct)
+        ?? Task.CompletedTask;
 }

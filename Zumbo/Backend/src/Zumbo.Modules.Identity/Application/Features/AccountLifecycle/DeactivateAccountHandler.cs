@@ -1,19 +1,29 @@
-using System.Security.Cryptography;
-using System.Text;
-using Microsoft.Extensions.Options;
-using Zumbo.BuildingBlocks.Application.Concurrency;
 using Zumbo.BuildingBlocks.Application.Messaging;
-using Zumbo.BuildingBlocks.Application.Persistence;
 using Zumbo.BuildingBlocks.Application.Security;
 using Zumbo.SharedKernel;
 
-namespace Zumbo.Modules.Identity;
+namespace Zumbo.Modules.Identity.Application.Features.AccountLifecycle;
 
-public sealed partial class IdentityService{
-
-    public async Task<AccountStatusResponse> DeactivateAsync(DeactivateAccountRequest request, CancellationToken ct)
+public sealed class DeactivateAccountHandler(
+    IUserRepository users,
+    IRefreshSessionStore sessions,
+    IDurableTransactionRunner transactions,
+    IPasswordHasher passwordHasher,
+    IClock clock,
+    ICurrentUser currentUser)
+{
+    public async Task<AccountStatusResponse> HandleAsync(
+        DeactivateAccountRequest request,
+        CancellationToken ct)
     {
-        var user = await GetCurrentUserAsync(ct);
+        var userId = currentUser.UserId;
+        if (string.IsNullOrWhiteSpace(userId))
+        {
+            throw new UnauthorizedException("Authenticated user is required.");
+        }
+
+        var user = await users.GetByIdAsync(userId, ct)
+            ?? throw new UnauthorizedException("Authenticated user was not found.");
         if (string.IsNullOrWhiteSpace(request.Password)
             || !passwordHasher.Verify(request.Password, user.PasswordHash))
         {

@@ -3,6 +3,14 @@ using Zumbo.BuildingBlocks.Application.Concurrency;
 using Zumbo.BuildingBlocks.Application.Messaging;
 using Zumbo.BuildingBlocks.Application.Security;
 using Zumbo.Modules.Identity;
+using Zumbo.Modules.Identity.Application.Features.AccountLifecycle;
+using Zumbo.Modules.Identity.Application.Features.Login;
+using Zumbo.Modules.Identity.Application.Features.Logout;
+using Zumbo.Modules.Identity.Application.Features.Mfa;
+using Zumbo.Modules.Identity.Application.Features.PasswordChange;
+using Zumbo.Modules.Identity.Application.Features.PasswordReset;
+using Zumbo.Modules.Identity.Application.Features.SessionManagement;
+using Zumbo.Modules.Identity.Application.Features.TokenRefresh;
 using Zumbo.SharedKernel;
 
 using static ApiEndpointResults;
@@ -36,6 +44,20 @@ internal static class IdentityEndpoints
         services.AddScoped<SearchUsersHandler>(provider => new SearchUsersHandler(
             provider.GetRequiredService<IUserRepository>(),
             provider.GetRequiredService<ICurrentUser>()));
+        services.AddScoped<LoginHandler>();
+        services.AddScoped<LogoutHandler>();
+        services.AddScoped<GetMfaStatusHandler>();
+        services.AddScoped<BeginMfaSetupHandler>();
+        services.AddScoped<ConfirmMfaSetupHandler>();
+        services.AddScoped<DisableMfaHandler>();
+        services.AddScoped<RegenerateMfaRecoveryCodesHandler>();
+        services.AddScoped<DeactivateAccountHandler>();
+        services.AddScoped<ChangePasswordHandler>();
+        services.AddScoped<ForgotPasswordHandler>();
+        services.AddScoped<ResetPasswordHandler>();
+        services.AddScoped<ListSessionsHandler>();
+        services.AddScoped<RevokeSessionHandler>();
+        services.AddScoped<RefreshTokenHandler>();
         services.AddScoped<ApiKeyService>();
         services.AddScoped<IPrivacyDataProcessor, PrivacyDataProcessorAdapter>();
         services.AddScoped<PrivacyService>();
@@ -64,62 +86,62 @@ internal static class IdentityEndpoints
         group.MapPost("/register", async (RegisterUserRequest request, RegisterUserHandler handler, HttpContext http, CancellationToken ct) =>
             Ok(await handler.HandleAsync(request, ct), http));
 
-        group.MapPost("/login", async (LoginRequest request, IdentityService service, HttpContext http, CancellationToken ct) =>
-            Ok(await service.LoginAsync(request, ct), http))
+        group.MapPost("/login", async (LoginRequest request, LoginHandler handler, HttpContext http, CancellationToken ct) =>
+            Ok(await handler.HandleAsync(request, ct), http))
             .RequireRateLimiting("login");
 
-        group.MapPost("/refresh", async (RefreshTokenRequest request, IdentityService service, HttpContext http, CancellationToken ct) =>
-            Ok(await service.RefreshAsync(request, ct), http));
+        group.MapPost("/refresh", async (RefreshTokenRequest request, RefreshTokenHandler handler, HttpContext http, CancellationToken ct) =>
+            Ok(await handler.HandleAsync(request, ct), http));
 
-        group.MapPost("/logout", async (LogoutRequest request, IdentityService service, HttpContext http, CancellationToken ct) =>
-            Ok(await service.LogoutAsync(request, ct), http));
+        group.MapPost("/logout", async (LogoutRequest request, LogoutHandler handler, HttpContext http, CancellationToken ct) =>
+            Ok(await handler.HandleAsync(request, ct), http));
 
-        group.MapPost("/change-password", async (ChangePasswordRequest request, IdentityService service, HttpContext http, CancellationToken ct) =>
-            Ok(await service.ChangePasswordAsync(request, CorrelationId(http), ct), http))
+        group.MapPost("/change-password", async (ChangePasswordRequest request, ChangePasswordHandler handler, HttpContext http, CancellationToken ct) =>
+            Ok(await handler.HandleAsync(request, CorrelationId(http), ct), http))
             .RequireAuthorization()
             .WithZumboPermission(PermissionCatalog.ProfileRead);
 
-        group.MapPost("/forgot-password", async (ForgotPasswordRequest request, IdentityService service, HttpContext http, CancellationToken ct) =>
-            Ok(await service.ForgotPasswordAsync(request, ct), http))
+        group.MapPost("/forgot-password", async (ForgotPasswordRequest request, ForgotPasswordHandler handler, HttpContext http, CancellationToken ct) =>
+            Ok(await handler.HandleAsync(request, ct), http))
             .RequireRateLimiting("password-reset");
 
-        group.MapPost("/reset-password", async (ResetPasswordRequest request, IdentityService service, HttpContext http, CancellationToken ct) =>
-            Ok(await service.ResetPasswordAsync(request, CorrelationId(http), ct), http))
+        group.MapPost("/reset-password", async (ResetPasswordRequest request, ResetPasswordHandler handler, HttpContext http, CancellationToken ct) =>
+            Ok(await handler.HandleAsync(request, CorrelationId(http), ct), http))
             .RequireRateLimiting("password-reset");
 
-        group.MapGet("/mfa", async (IdentityService service, HttpContext http, CancellationToken ct) =>
-            Ok(await service.GetMfaStatusAsync(ct), http))
+        group.MapGet("/mfa", async (GetMfaStatusHandler handler, HttpContext http, CancellationToken ct) =>
+            Ok(await handler.HandleAsync(ct), http))
             .RequireAuthorization()
             .WithZumboPermission(PermissionCatalog.ProfileRead);
 
-        group.MapPost("/mfa/setup", async (BeginMfaSetupRequest request, IdentityService service, HttpContext http, CancellationToken ct) =>
-            Ok(await service.BeginMfaSetupAsync(request, CorrelationId(http), ct), http))
+        group.MapPost("/mfa/setup", async (BeginMfaSetupRequest request, BeginMfaSetupHandler handler, HttpContext http, CancellationToken ct) =>
+            Ok(await handler.HandleAsync(request, CorrelationId(http), ct), http))
             .RequireAuthorization()
             .WithZumboPermission(PermissionCatalog.ProfileRead);
 
-        group.MapPost("/mfa/confirm", async (ConfirmMfaSetupRequest request, IdentityService service, HttpContext http, CancellationToken ct) =>
-            Ok(await service.ConfirmMfaSetupAsync(request, CorrelationId(http), ct), http))
+        group.MapPost("/mfa/confirm", async (ConfirmMfaSetupRequest request, ConfirmMfaSetupHandler handler, HttpContext http, CancellationToken ct) =>
+            Ok(await handler.HandleAsync(request, CorrelationId(http), ct), http))
             .RequireAuthorization()
             .WithZumboPermission(PermissionCatalog.ProfileRead);
 
-        group.MapPost("/mfa/disable", async (DisableMfaRequest request, IdentityService service, HttpContext http, CancellationToken ct) =>
-            Ok(await service.DisableMfaAsync(request, CorrelationId(http), ct), http))
+        group.MapPost("/mfa/disable", async (DisableMfaRequest request, DisableMfaHandler handler, HttpContext http, CancellationToken ct) =>
+            Ok(await handler.HandleAsync(request, CorrelationId(http), ct), http))
             .RequireAuthorization()
             .WithZumboPermission(PermissionCatalog.ProfileRead);
 
-        group.MapPost("/mfa/recovery-codes", async (RegenerateMfaRecoveryCodesRequest request, IdentityService service, HttpContext http, CancellationToken ct) =>
-            Ok(await service.RegenerateMfaRecoveryCodesAsync(request, CorrelationId(http), ct), http))
+        group.MapPost("/mfa/recovery-codes", async (RegenerateMfaRecoveryCodesRequest request, RegenerateMfaRecoveryCodesHandler handler, HttpContext http, CancellationToken ct) =>
+            Ok(await handler.HandleAsync(request, CorrelationId(http), ct), http))
             .RequireAuthorization()
             .WithZumboPermission(PermissionCatalog.ProfileRead);
 
-        group.MapGet("/sessions", async (IdentityService service, HttpContext http, CancellationToken ct) =>
-            Ok(await service.ListSessionsAsync(http.User.FindFirst("sessionId")?.Value, ct), http))
+        group.MapGet("/sessions", async (ListSessionsHandler handler, HttpContext http, CancellationToken ct) =>
+            Ok(await handler.HandleAsync(http.User.FindFirst("sessionId")?.Value, ct), http))
             .RequireAuthorization()
             .WithZumboPermission(PermissionCatalog.ProfileRead);
 
-        group.MapDelete("/sessions/{sessionId}", async (string sessionId, IdentityService service, HttpContext http, CancellationToken ct) =>
+        group.MapDelete("/sessions/{sessionId}", async (string sessionId, RevokeSessionHandler handler, HttpContext http, CancellationToken ct) =>
         {
-            await service.RevokeSessionAsync(sessionId, CorrelationId(http), ct);
+            await handler.HandleAsync(sessionId, CorrelationId(http), ct);
             return Ok(new { revoked = true }, http);
         }).RequireAuthorization()
             .WithZumboPermission(PermissionCatalog.ProfileRead);
@@ -250,8 +272,8 @@ internal static class IdentityEndpoints
             .RequireAuthorization()
             .WithZumboPermission(PermissionCatalog.ProfileRead);
 
-        group.MapPost("/deactivate", async (DeactivateAccountRequest request, IdentityService service, HttpContext http, CancellationToken ct) =>
-            Ok(await service.DeactivateAsync(request, ct), http))
+        group.MapPost("/deactivate", async (DeactivateAccountRequest request, DeactivateAccountHandler handler, HttpContext http, CancellationToken ct) =>
+            Ok(await handler.HandleAsync(request, ct), http))
             .RequireAuthorization()
             .WithZumboPermission(PermissionCatalog.ProfileRead);
 

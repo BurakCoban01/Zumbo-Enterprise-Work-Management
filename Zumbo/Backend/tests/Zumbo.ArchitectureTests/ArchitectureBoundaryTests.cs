@@ -539,14 +539,13 @@ public sealed class ArchitectureBoundaryTests
         Assert.Contains("IUserRepository", searchSlice, StringComparison.Ordinal);
         Assert.Contains("ICurrentUser", searchSlice, StringComparison.Ordinal);
 
+        var compatibilityDirectory = Path.Combine(identityDirectory, "Application", "Compatibility");
         var registerFacade = File.ReadAllText(Path.Combine(
-            registerDirectory,
-            "IdentityService",
-            "IdentityService.RegisterAsync.cs"));
+            compatibilityDirectory,
+            "IdentityService.Authentication.cs"));
         var searchFacade = File.ReadAllText(Path.Combine(
-            searchDirectory,
-            "IdentityService",
-            "IdentityService.SearchUsersAsync.cs"));
+            compatibilityDirectory,
+            "IdentityService.Account.cs"));
         Assert.Contains("registerUserHandler.HandleAsync", registerFacade, StringComparison.Ordinal);
         Assert.Contains("searchUsersHandler.HandleAsync", searchFacade, StringComparison.Ordinal);
 
