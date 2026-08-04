@@ -13,6 +13,8 @@ using Zumbo.Modules.WorkItems.Application.Features.Development.Repositories;
 using Zumbo.Modules.WorkItems.Application.Features.Development.Mappings;
 using Zumbo.Modules.WorkItems.Application.Features.Development.Links;
 using Zumbo.Modules.WorkItems.Application.Features.Development.Webhooks;
+using Zumbo.Modules.WorkItems.Application.Features.Webhooks.Deliveries;
+using Zumbo.Modules.WorkItems.Application.Features.Webhooks.Subscriptions;
 using Zumbo.SharedKernel;
 
 using static ApiEndpointResults;
@@ -120,8 +122,23 @@ internal static partial class WorkItemEndpoints
         services.AddSingleton<IWebhookSecretProtector, WebhookSecretProtectorAdapter>();
         services.AddSingleton<IWebhookSender, PinnedWebhookSender>();
         services.AddScoped<IWebhookAuthorization, WebhookAuthorizationAdapter>();
+        services.AddScoped<ListWebhookSubscriptionsHandler>();
+        services.AddScoped<GetWebhookSubscriptionHandler>();
+        services.AddScoped<GetWebhookDeliveryMetricsHandler>();
+        services.AddScoped<ListWebhookDeliveriesHandler>();
+        services.AddScoped<GetWebhookDeliveryHandler>();
+        services.AddScoped<ReplayWebhookDeliveryHandler>();
+        services.AddScoped<SetSubscriptionStateHandler>();
+        services.AddScoped<UpdateSubscriptionHandler>();
+        services.AddScoped<CreateSubscriptionHandler>();
+        services.AddScoped<RotateSecretHandler>();
+        services.AddScoped<QueueTestDeliveryHandler>();
+        services.AddScoped<QueueDeliveryHandler>();
+        services.AddScoped<DispatchDeliveriesHandler>();
         services.AddScoped<WorkItemWebhookService>();
-        services.AddScoped<IWorkItemWebhookDelivery, WorkItemWebhookDeliveryAdapter>();
+        services.AddScoped<IWorkItemWebhookDelivery>(provider =>
+            new WorkItemWebhookDeliveryAdapter(
+                provider.GetRequiredService<QueueDeliveryHandler>()));
         services.AddOptions<DevelopmentProviderOptions>()
             .BindConfiguration("DevelopmentProviders")
             .Validate(

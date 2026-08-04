@@ -6,6 +6,7 @@ using Microsoft.Extensions.Options;
 using Zumbo.BuildingBlocks.Application.Persistence;
 using Zumbo.BuildingBlocks.Application.Runtime;
 using Zumbo.Modules.WorkItems;
+using Zumbo.Modules.WorkItems.Application.Features.Webhooks.Deliveries;
 using Zumbo.Modules.Organizations;
 using Zumbo.SharedKernel;
 
@@ -26,10 +27,12 @@ public sealed class WebhookDispatcherHostedService(
             try
             {
                 await using var scope = scopeFactory.CreateAsyncScope();
-                var service = scope.ServiceProvider.GetRequiredService<WorkItemWebhookService>();
-                await service.DispatchAsync(
-                    Math.Clamp(options.Value.DispatchBatchSize, 1, 100),
-                    workerId,
+                var handler = scope.ServiceProvider
+                    .GetRequiredService<DispatchDeliveriesHandler>();
+                await handler.HandleAsync(
+                    new DispatchDeliveriesCommand(
+                        Math.Clamp(options.Value.DispatchBatchSize, 1, 100),
+                        workerId),
                     stoppingToken);
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)

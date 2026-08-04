@@ -38,6 +38,7 @@ public sealed class RefactorRuntimeContractTests
         "services.AddScoped<MarkNotificationAsReadHandler>();",
         "services.AddScoped<WriteAuditLogHandler>();",
         "services.AddScoped<QueryAuditLogHandler>();",
+        "services.AddScoped<IWorkItemWebhookDelivery,WorkItemWebhookDeliveryAdapter>();",
         "services.AddScoped<IDurableEventHandler,DevelopmentWebhookDurableHandler>();"
     ];
 
@@ -201,6 +202,29 @@ public sealed class RefactorRuntimeContractTests
         "services.AddScoped<QueryAuditLogHandler>(provider=>newQueryAuditLogHandler("
         + "provider.GetRequiredService<IDocumentRepository<AuditLogDocument>>(),"
         + "provider.GetRequiredService<IAuditAccessChecker>()));",
+        "services.AddScoped<CapacityPlanAccessPolicy>();",
+        "services.AddScoped<ArchiveCapacityPlanHandler>();",
+        "services.AddScoped<GetCapacityPlanHandler>();",
+        "services.AddScoped<ListCapacityPlansHandler>();",
+        "services.AddScoped<ShareCapacityPlanHandler>();",
+        "services.AddScoped<SaveCapacityPlanHandler>();",
+        "services.AddScoped<GetCapacitySnapshotHandler>();",
+        "services.AddScoped<PreviewScenarioHandler>();",
+        "services.AddScoped<ListWebhookSubscriptionsHandler>();",
+        "services.AddScoped<GetWebhookSubscriptionHandler>();",
+        "services.AddScoped<GetWebhookDeliveryMetricsHandler>();",
+        "services.AddScoped<ListWebhookDeliveriesHandler>();",
+        "services.AddScoped<GetWebhookDeliveryHandler>();",
+        "services.AddScoped<ReplayWebhookDeliveryHandler>();",
+        "services.AddScoped<SetSubscriptionStateHandler>();",
+        "services.AddScoped<UpdateSubscriptionHandler>();",
+        "services.AddScoped<CreateSubscriptionHandler>();",
+        "services.AddScoped<RotateSecretHandler>();",
+        "services.AddScoped<QueueTestDeliveryHandler>();",
+        "services.AddScoped<QueueDeliveryHandler>();",
+        "services.AddScoped<DispatchDeliveriesHandler>();",
+        "services.AddScoped<IWorkItemWebhookDelivery>(provider=>newWorkItemWebhookDeliveryAdapter("
+        + "provider.GetRequiredService<QueueDeliveryHandler>()));",
         "services.AddScoped<IDurableEventHandler,DevelopmentWebhookProcessingDurableHandler>();",
         "services.AddScoped<CheckProviderHealthHandler>();",
         "services.AddScoped<ListRepositoriesHandler>();",
@@ -301,6 +325,46 @@ public sealed class RefactorRuntimeContractTests
         "group.MapDelete(\"/{boardId}/views/{viewId}\",async(stringboardId,stringviewId,BoardServiceservice,HttpContexthttp,CancellationTokenct)=>"
         + "Ok(awaitservice.DeleteViewAsync(boardId,viewId,CorrelationId(http),ct),http))"
         + ".WithZumboPermission(PermissionCatalog.BoardManage);",
+        "group.MapDelete(\"/{planId}\",async(stringplanId,[FromServices]CapacityPlanningServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "{awaitservice.ArchiveAsync(planId,CorrelationId(http),ct);returnOk(new{archived=true},http);});",
+        "group.MapGet(\"/{planId}\",async(stringplanId,bool?includeArchived,[FromServices]CapacityPlanningServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.GetAsync(planId,includeArchived??false,ct),http));",
+        "group.MapGet(\"\",async(bool?includeArchived,int?page,int?pageSize,[FromServices]CapacityPlanningServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.ListAsync(includeArchived??false,page??1,pageSize??50,ct),http));",
+        "group.MapPut(\"/{planId}/sharing\",async(stringplanId,ShareCapacityPlanRequestrequest,[FromServices]CapacityPlanningServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.ShareAsync(planId,request,CorrelationId(http),ct),http));",
+        "group.MapPost(\"\",async(SaveCapacityPlanRequestrequest,[FromServices]CapacityPlanningServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.SaveAsync(null,request,CorrelationId(http),ct),http));",
+        "group.MapPut(\"/{planId}\",async(stringplanId,SaveCapacityPlanRequestrequest,[FromServices]CapacityPlanningServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.SaveAsync(planId,request,CorrelationId(http),ct),http));",
+        "group.MapGet(\"/{planId}/snapshot\",async(stringplanId,[FromServices]CapacityPlanningServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.GetSnapshotAsync(planId,ct),http)).RequireRateLimiting(\"report\");",
+        "group.MapPost(\"/{planId}/scenarios\",async(stringplanId,CapacityScenarioRequestrequest,[FromServices]CapacityPlanningServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.PreviewScenarioAsync(planId,request,ct),http)).RequireRateLimiting(\"report\");",
+        "group.MapGet(\"/\",async(WorkItemWebhookServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.ListAsync(ct),http));",
+        "group.MapGet(\"/{id}\",async(stringid,WorkItemWebhookServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.GetAsync(id,ct),http));",
+        "group.MapGet(\"/metrics\",async(WorkItemWebhookServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.GetMetricsAsync(ct),http));",
+        "group.MapGet(\"/{id}/deliveries\",async(stringid,string?cursor,int?pageSize,WorkItemWebhookServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.ListDeliveriesAsync(id,cursor,pageSize??50,ct),http));",
+        "group.MapGet(\"/deliveries/{deliveryId}\",async(stringdeliveryId,WorkItemWebhookServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.GetDeliveryAsync(deliveryId,ct),http));",
+        "group.MapPost(\"/deliveries/{deliveryId}/replay\",async(stringdeliveryId,WorkItemWebhookServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.ReplayAsync(deliveryId,ct,http.TraceIdentifier),http)).RequireRateLimiting(\"bulk\");",
+        "group.MapPost(\"/{id}/enable\",async(stringid,SetWebhookSubscriptionStateRequestrequest,WorkItemWebhookServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.SetActiveAsync(id,true,request,ct,http.TraceIdentifier),http));",
+        "group.MapPost(\"/{id}/disable\",async(stringid,SetWebhookSubscriptionStateRequestrequest,WorkItemWebhookServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.SetActiveAsync(id,false,request,ct,http.TraceIdentifier),http));",
+        "group.MapPut(\"/{id}\",async(stringid,UpdateWebhookSubscriptionRequestrequest,WorkItemWebhookServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.UpdateAsync(id,request,ct,http.TraceIdentifier),http));",
+        "group.MapPost(\"/\",async(CreateWebhookSubscriptionRequestrequest,WorkItemWebhookServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Created(awaitservice.CreateAsync(request,ct,http.TraceIdentifier),http));",
+        "group.MapPost(\"/{id}/rotate-secret\",async(stringid,RotateWebhookSecretRequestrequest,WorkItemWebhookServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.RotateSecretAsync(id,request,ct,http.TraceIdentifier),http)).RequireRateLimiting(\"bulk\");",
+        "group.MapPost(\"/{id}/test-delivery\",async(stringid,WorkItemWebhookServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Created(awaitservice.QueueTestDeliveryAsync(id,ct,http.TraceIdentifier),http)).RequireRateLimiting(\"bulk\");",
         "management.MapPost(\"/{connectionId}/health\",async(stringconnectionId,DevelopmentIntegrationServiceservice,HttpContexthttp,CancellationTokenct)=>"
         + "Ok(awaitservice.CheckHealthAsync(connectionId,CorrelationId(http),ct),http)).RequireRateLimiting(\"bulk\");",
         "management.MapGet(\"/{connectionId}/repositories\",async(stringconnectionId,DevelopmentIntegrationServiceservice,HttpContexthttp,CancellationTokenct)=>"
@@ -416,6 +480,46 @@ public sealed class RefactorRuntimeContractTests
         "group.MapDelete(\"/{boardId}/views/{viewId}\",async(stringboardId,stringviewId,DeleteViewHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
         + "Ok(awaithandler.HandleAsync(boardId,viewId,CorrelationId(http),ct),http))"
         + ".WithZumboPermission(PermissionCatalog.BoardManage);",
+        "group.MapDelete(\"/{planId}\",async(stringplanId,[FromServices]ArchiveCapacityPlanHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "{awaithandler.HandleAsync(newArchiveCapacityPlanCommand(planId,CorrelationId(http)),ct);returnOk(new{archived=true},http);});",
+        "group.MapGet(\"/{planId}\",async(stringplanId,bool?includeArchived,[FromServices]GetCapacityPlanHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newGetCapacityPlanQuery(planId,includeArchived??false),ct),http));",
+        "group.MapGet(\"\",async(bool?includeArchived,int?page,int?pageSize,[FromServices]ListCapacityPlansHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newListCapacityPlansQuery(includeArchived??false,page??1,pageSize??50),ct),http));",
+        "group.MapPut(\"/{planId}/sharing\",async(stringplanId,ShareCapacityPlanRequestrequest,[FromServices]ShareCapacityPlanHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newShareCapacityPlanCommand(planId,request,CorrelationId(http)),ct),http));",
+        "group.MapPost(\"\",async(SaveCapacityPlanRequestrequest,[FromServices]SaveCapacityPlanHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newSaveCapacityPlanCommand(null,request,CorrelationId(http)),ct),http));",
+        "group.MapPut(\"/{planId}\",async(stringplanId,SaveCapacityPlanRequestrequest,[FromServices]SaveCapacityPlanHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newSaveCapacityPlanCommand(planId,request,CorrelationId(http)),ct),http));",
+        "group.MapGet(\"/{planId}/snapshot\",async(stringplanId,[FromServices]GetCapacitySnapshotHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newGetCapacitySnapshotQuery(planId),ct),http)).RequireRateLimiting(\"report\");",
+        "group.MapPost(\"/{planId}/scenarios\",async(stringplanId,CapacityScenarioRequestrequest,[FromServices]PreviewScenarioHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newPreviewScenarioQuery(planId,request),ct),http)).RequireRateLimiting(\"report\");",
+        "group.MapGet(\"/\",async(ListWebhookSubscriptionsHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newListWebhookSubscriptionsQuery(),ct),http));",
+        "group.MapGet(\"/{id}\",async(stringid,GetWebhookSubscriptionHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newGetWebhookSubscriptionQuery(id),ct),http));",
+        "group.MapGet(\"/metrics\",async(GetWebhookDeliveryMetricsHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newGetWebhookDeliveryMetricsQuery(),ct),http));",
+        "group.MapGet(\"/{id}/deliveries\",async(stringid,string?cursor,int?pageSize,ListWebhookDeliveriesHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newListWebhookDeliveriesQuery(id,cursor,pageSize??50),ct),http));",
+        "group.MapGet(\"/deliveries/{deliveryId}\",async(stringdeliveryId,GetWebhookDeliveryHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newGetWebhookDeliveryQuery(deliveryId),ct),http));",
+        "group.MapPost(\"/deliveries/{deliveryId}/replay\",async(stringdeliveryId,ReplayWebhookDeliveryHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newReplayWebhookDeliveryCommand(deliveryId,http.TraceIdentifier),ct),http)).RequireRateLimiting(\"bulk\");",
+        "group.MapPost(\"/{id}/enable\",async(stringid,SetWebhookSubscriptionStateRequestrequest,SetSubscriptionStateHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newSetSubscriptionStateCommand(id,true,request,http.TraceIdentifier),ct),http));",
+        "group.MapPost(\"/{id}/disable\",async(stringid,SetWebhookSubscriptionStateRequestrequest,SetSubscriptionStateHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newSetSubscriptionStateCommand(id,false,request,http.TraceIdentifier),ct),http));",
+        "group.MapPut(\"/{id}\",async(stringid,UpdateWebhookSubscriptionRequestrequest,UpdateSubscriptionHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newUpdateSubscriptionCommand(id,request,http.TraceIdentifier),ct),http));",
+        "group.MapPost(\"/\",async(CreateWebhookSubscriptionRequestrequest,CreateSubscriptionHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Created(awaithandler.HandleAsync(newCreateSubscriptionCommand(request,http.TraceIdentifier),ct),http));",
+        "group.MapPost(\"/{id}/rotate-secret\",async(stringid,RotateWebhookSecretRequestrequest,RotateSecretHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newRotateSecretCommand(id,request,http.TraceIdentifier),ct),http)).RequireRateLimiting(\"bulk\");",
+        "group.MapPost(\"/{id}/test-delivery\",async(stringid,QueueTestDeliveryHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Created(awaithandler.HandleAsync(newQueueTestDeliveryCommand(id,http.TraceIdentifier),ct),http)).RequireRateLimiting(\"bulk\");",
         "management.MapPost(\"/{connectionId}/health\",async(stringconnectionId,CheckProviderHealthHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
         + "Ok(awaithandler.HandleAsync(newCheckProviderHealthCommand(connectionId,CorrelationId(http)),ct),http)).RequireRateLimiting(\"bulk\");",
         "management.MapGet(\"/{connectionId}/repositories\",async(stringconnectionId,ListRepositoriesHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
@@ -554,6 +658,26 @@ public sealed class RefactorRuntimeContractTests
                 "CreateWorkItemHandler and SearchWorkItemsHandler remain scoped self-services; explicit factories select their port-focused constructors while compatibility constructors remain available.",
                 "ListNotificationsHandler and MarkNotificationAsReadHandler remain scoped self-services; explicit factories select their port-focused constructors while compatibility constructors remain available.",
                 "WriteAuditLogHandler and QueryAuditLogHandler remain scoped self-services; explicit factories select their port-focused constructors while compatibility constructors remain available.",
+                "The capacity-plan archive route resolves ArchiveCapacityPlanHandler directly; its route, authorization, transaction filter, correlation ID, owner and visibility checks, optimistic concurrency, audit, response mapping, compatibility facade, and scoped registration remain preserved.",
+                "The capacity-plan read route resolves GetCapacityPlanHandler directly; its route, authorization, transaction filter, archived binding, tenant and viewer masking, project visibility, response mapping, compatibility facade, and scoped registration remain preserved.",
+                "The capacity-plan list route resolves ListCapacityPlansHandler through CapacityPlanAccessPolicy; its route, authorization, transaction filter, paging defaults and clamps, archived binding, tenant and viewer filtering, project visibility, ordering, response mapping, compatibility facade, and scoped registrations remain preserved.",
+                "The capacity-plan sharing route resolves ShareCapacityPlanHandler through CapacityPlanAccessPolicy; its route, authorization, transaction filter, correlation ID, owner semantics, viewer normalization and limit, directory validation, optimistic concurrency, audit, response mapping, compatibility facade, and scoped registration remain preserved.",
+                "The capacity-plan create and update routes resolve SaveCapacityPlanHandler; their routes, authorization, transaction filter, correlation IDs, request normalization, owner and tenant semantics, directory validation, optimistic concurrency, audit, response mapping, compatibility facade, and scoped registration remain preserved.",
+                "The capacity-plan snapshot route resolves GetCapacitySnapshotHandler; its route, authorization, transaction filter, report rate limit, tenant and viewer masking, project visibility, source bounds, calculation formulas, response mapping, compatibility facade, and scoped registration remain preserved.",
+                "The capacity-plan scenario route resolves PreviewScenarioHandler; its route, authorization, transaction filter, report rate limit, tenant and owner checks, allocation validation, shared source bounds and calculations, baseline/candidate response mapping, compatibility facade, and scoped registration remain preserved.",
+                "The webhook subscription-list route resolves ListWebhookSubscriptionsHandler; its route, authorization, tenant resolution, manage permission, cursor traversal, response mapping, compatibility facade, and scoped registration remain preserved.",
+                "The webhook subscription-read route resolves GetWebhookSubscriptionHandler; its route, authorization, tenant resolution, manage permission, ownership filter, not-found contract, response mapping, compatibility facade, and scoped registration remain preserved.",
+                "The webhook delivery-metrics route resolves GetWebhookDeliveryMetricsHandler; its route, authorization, tenant resolution, manage permission, status counts, oldest-pending ordering, captured timestamp, response mapping, compatibility facade, and scoped registration remain preserved.",
+                "The webhook delivery-list route resolves ListWebhookDeliveriesHandler; its route, authorization, tenant resolution, manage permission, subscription ownership, cursor normalization, page-size bounds, response mapping, compatibility facade, and scoped registration remain preserved.",
+                "The webhook delivery-read route resolves GetWebhookDeliveryHandler; its route, authorization, tenant resolution, manage permission, ownership filter, not-found contract, response mapping, compatibility facade, and scoped registration remain preserved.",
+                "The webhook delivery-replay route resolves ReplayWebhookDeliveryHandler; its route, authorization, rate limit, dead-letter filter, state reset, lease cleanup, optimistic replacement, audit, response mapping, compatibility facade, and scoped registration remain preserved.",
+                "The webhook subscription enable and disable routes resolve SetSubscriptionStateHandler; their routes, authorization, requested state, expected version, optimistic replacement, audit actions and values, response mapping, compatibility facade, and scoped registration remain preserved.",
+                "The webhook subscription-update route resolves UpdateSubscriptionHandler; its route, authorization, ownership filter, validation and normalization order, target policy, expected version, optimistic replacement, audit snapshots, response mapping, compatibility facade, and scoped registration remain preserved.",
+                "The webhook subscription-create route resolves CreateSubscriptionHandler; its route, authorization, organization and user requirements, validation and normalization order, target policy, secret generation and protection, fingerprint, timestamps, audit, receipt mapping, compatibility facade, and scoped registration remain preserved.",
+                "The webhook subscription secret-rotation route resolves RotateSecretHandler; its route, authorization, rate limit, ownership filter, secret generation and protection, previous-secret overlap, fingerprint and version updates, optimistic replacement, audit, receipt mapping, compatibility facade, and scoped registration remain preserved.",
+                "The webhook test-delivery route resolves QueueTestDeliveryHandler; its route, authorization, rate limit, ownership and active-state checks, event identity, immutable payload and hash, pending delivery persistence, audit, response mapping, compatibility facade, and scoped registration remain preserved.",
+                "QueueDeliveryHandler remains scoped and WorkItemWebhookDeliveryAdapter resolves it through an explicit factory while its original service constructor and WorkItemWebhookService.QueueAsync remain compatibility paths; scope filtering, subscription traversal, deterministic identity, payload schema, hashing, timestamps and idempotent conflict handling remain preserved.",
+                "DispatchDeliveriesHandler remains scoped while WorkItemWebhookService.DispatchAsync delegates webhook delivery execution; due selection, lease claims, current and overlap signatures, sending, success finalization, retry jitter, dead-letter transitions, compatibility facade, and hosted-service contract remain preserved.",
                 "The development provider-health route resolves CheckProviderHealthHandler directly; its route, policy, rate limit, correlation ID, response mapping, compatibility facade, and scoped registration remain preserved.",
                 "The development repository-discovery route resolves ListRepositoriesHandler directly; its route, policy, rate limit, page projection, partial-result marker, compatibility facade, and scoped registration remain preserved.",
                 "The development connection-list route resolves ListConnectionsHandler directly; its route, policy, response mapping, compatibility facade, and scoped registration remain preserved.",

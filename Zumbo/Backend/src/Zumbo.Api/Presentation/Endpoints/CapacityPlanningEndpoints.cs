@@ -1,6 +1,10 @@
 using Microsoft.AspNetCore.Mvc;
 using Zumbo.BuildingBlocks.Application.Security;
 using Zumbo.Modules.WorkItems;
+using Zumbo.Modules.WorkItems.Application.Features.CapacityPlanning;
+using Zumbo.Modules.WorkItems.Application.Features.CapacityPlanning.Scenarios;
+using Zumbo.Modules.WorkItems.Application.Features.CapacityPlanning.Snapshots;
+using Zumbo.Modules.WorkItems.Application.Policies.CapacityPlanning;
 
 using static ApiEndpointResults;
 
@@ -11,6 +15,14 @@ internal static class CapacityPlanningEndpoints
     {
         services.AddScoped<ICapacityPlanningDirectory, CapacityPlanningDirectoryAdapter>();
         services.AddScoped<ICapacityPlanningAuditWriter, CapacityPlanningAuditWriterAdapter>();
+        services.AddScoped<CapacityPlanAccessPolicy>();
+        services.AddScoped<ArchiveCapacityPlanHandler>();
+        services.AddScoped<GetCapacityPlanHandler>();
+        services.AddScoped<ListCapacityPlansHandler>();
+        services.AddScoped<ShareCapacityPlanHandler>();
+        services.AddScoped<SaveCapacityPlanHandler>();
+        services.AddScoped<GetCapacitySnapshotHandler>();
+        services.AddScoped<PreviewScenarioHandler>();
         services.AddScoped<CapacityPlanningService>();
         return services;
     }
@@ -27,79 +39,92 @@ internal static class CapacityPlanningEndpoints
             bool? includeArchived,
             int? page,
             int? pageSize,
-            [FromServices] CapacityPlanningService service,
+            [FromServices] ListCapacityPlansHandler handler,
             HttpContext http,
             CancellationToken ct) =>
-            Ok(await service.ListAsync(
-                includeArchived ?? false,
-                page ?? 1,
-                pageSize ?? 50,
+            Ok(await handler.HandleAsync(
+                new ListCapacityPlansQuery(
+                    includeArchived ?? false,
+                    page ?? 1,
+                    pageSize ?? 50),
                 ct), http));
 
         group.MapGet("/{planId}", async (
             string planId,
             bool? includeArchived,
-            [FromServices] CapacityPlanningService service,
+            [FromServices] GetCapacityPlanHandler handler,
             HttpContext http,
             CancellationToken ct) =>
-            Ok(await service.GetAsync(planId, includeArchived ?? false, ct), http));
+            Ok(await handler.HandleAsync(
+                new GetCapacityPlanQuery(planId, includeArchived ?? false),
+                ct), http));
 
         group.MapPost("", async (
             SaveCapacityPlanRequest request,
-            [FromServices] CapacityPlanningService service,
+            [FromServices] SaveCapacityPlanHandler handler,
             HttpContext http,
             CancellationToken ct) =>
-            Ok(await service.SaveAsync(null, request, CorrelationId(http), ct), http));
+            Ok(await handler.HandleAsync(
+                new SaveCapacityPlanCommand(null, request, CorrelationId(http)),
+                ct), http));
 
         group.MapPut("/{planId}", async (
             string planId,
             SaveCapacityPlanRequest request,
-            [FromServices] CapacityPlanningService service,
+            [FromServices] SaveCapacityPlanHandler handler,
             HttpContext http,
             CancellationToken ct) =>
-            Ok(await service.SaveAsync(
-                planId,
-                request,
-                CorrelationId(http),
+            Ok(await handler.HandleAsync(
+                new SaveCapacityPlanCommand(
+                    planId,
+                    request,
+                    CorrelationId(http)),
                 ct), http));
 
         group.MapPut("/{planId}/sharing", async (
             string planId,
             ShareCapacityPlanRequest request,
-            [FromServices] CapacityPlanningService service,
+            [FromServices] ShareCapacityPlanHandler handler,
             HttpContext http,
             CancellationToken ct) =>
-            Ok(await service.ShareAsync(
-                planId,
-                request,
-                CorrelationId(http),
+            Ok(await handler.HandleAsync(
+                new ShareCapacityPlanCommand(
+                    planId,
+                    request,
+                    CorrelationId(http)),
                 ct), http));
 
         group.MapDelete("/{planId}", async (
             string planId,
-            [FromServices] CapacityPlanningService service,
+            [FromServices] ArchiveCapacityPlanHandler handler,
             HttpContext http,
             CancellationToken ct) =>
         {
-            await service.ArchiveAsync(planId, CorrelationId(http), ct);
+            await handler.HandleAsync(
+                new ArchiveCapacityPlanCommand(planId, CorrelationId(http)),
+                ct);
             return Ok(new { archived = true }, http);
         });
 
         group.MapGet("/{planId}/snapshot", async (
             string planId,
-            [FromServices] CapacityPlanningService service,
+            [FromServices] GetCapacitySnapshotHandler handler,
             HttpContext http,
             CancellationToken ct) =>
-            Ok(await service.GetSnapshotAsync(planId, ct), http))
+            Ok(await handler.HandleAsync(
+                new GetCapacitySnapshotQuery(planId),
+                ct), http))
             .RequireRateLimiting("report");
 
         group.MapPost("/{planId}/scenarios", async (
             string planId,
             CapacityScenarioRequest request,
-            [FromServices] CapacityPlanningService service,
+            [FromServices] PreviewScenarioHandler handler,
             HttpContext http,
             CancellationToken ct) =>
-            Ok(await service.PreviewScenarioAsync(planId, request, ct), http))
+            Ok(await handler.HandleAsync(
+                new PreviewScenarioQuery(planId, request),
+                ct), http))
             .RequireRateLimiting("report");
     }
 }
