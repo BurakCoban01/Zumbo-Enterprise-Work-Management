@@ -667,9 +667,13 @@ public sealed class ArchitectureBoundaryTests
     public void ProjectCreateAndList_ArePortFocusedVerticalSlicesWithCompatibilityFacades()
     {
         var moduleDirectory = Path.Combine(SourceDirectory, "Zumbo.Modules.Projects");
-        var createDirectory = Path.Combine(moduleDirectory, "Features", "CreateProject");
-        var listDirectory = Path.Combine(moduleDirectory, "Features", "ListProjects");
-        var representativeDirectory = Path.Combine(moduleDirectory, "Features", "RepresentativeProjectSlices");
+        var createDirectory = Path.Combine(moduleDirectory, "Application", "Features", "ProjectsCore");
+        var listDirectory = createDirectory;
+        var representativeDirectory = Path.Combine(
+            moduleDirectory,
+            "Application",
+            "Features",
+            "RepresentativeProjectSlices");
 
         Assert.True(File.Exists(Path.Combine(createDirectory, "CreateProjectRequest.cs")));
         Assert.True(File.Exists(Path.Combine(createDirectory, "CreateProjectValidator.cs")));
@@ -695,7 +699,11 @@ public sealed class ArchitectureBoundaryTests
         Assert.Contains("IDocumentRepository<ProjectDocument>", listSlice, StringComparison.Ordinal);
         Assert.Contains("ICurrentUser", listSlice, StringComparison.Ordinal);
 
-        var facade = File.ReadAllText(Path.Combine(moduleDirectory, "ProjectsModule.cs"));
+        var facade = File.ReadAllText(Path.Combine(
+            moduleDirectory,
+            "Application",
+            "Compatibility",
+            "ProjectService.cs"));
         Assert.Contains("createProjectHandler.HandleAsync", facade, StringComparison.Ordinal);
         Assert.Contains("listProjectsHandler.HandleAsync", facade, StringComparison.Ordinal);
 
@@ -713,9 +721,13 @@ public sealed class ArchitectureBoundaryTests
     public void BoardCreateAndProjectList_ArePortFocusedVerticalSlicesWithCompatibilityFacades()
     {
         var moduleDirectory = Path.Combine(SourceDirectory, "Zumbo.Modules.Boards");
-        var createDirectory = Path.Combine(moduleDirectory, "Features", "CreateBoard");
-        var listDirectory = Path.Combine(moduleDirectory, "Features", "ListBoardsByProject");
-        var representativeDirectory = Path.Combine(moduleDirectory, "Features", "RepresentativeBoardSlices");
+        var createDirectory = Path.Combine(moduleDirectory, "Application", "Features", "BoardsCore");
+        var listDirectory = createDirectory;
+        var representativeDirectory = Path.Combine(
+            moduleDirectory,
+            "Application",
+            "Features",
+            "RepresentativeBoardSlices");
 
         Assert.True(File.Exists(Path.Combine(createDirectory, "CreateBoardRequest.cs")));
         Assert.True(File.Exists(Path.Combine(createDirectory, "CreateBoardValidator.cs")));
@@ -743,14 +755,14 @@ public sealed class ArchitectureBoundaryTests
 
         var createFacade = File.ReadAllText(Path.Combine(
             moduleDirectory,
-            "Module",
-            "Boards",
+            "Application",
+            "Compatibility",
             "BoardService",
             "BoardService.CreateAsync.cs"));
         var listFacade = File.ReadAllText(Path.Combine(
             moduleDirectory,
-            "Module",
-            "Boards",
+            "Application",
+            "Compatibility",
             "BoardService",
             "BoardService.ListByProjectAsync.cs"));
         Assert.Contains("createBoardHandler.HandleAsync", createFacade, StringComparison.Ordinal);
@@ -770,9 +782,13 @@ public sealed class ArchitectureBoundaryTests
     public void WorkflowUpsertAndRead_ArePortFocusedVerticalSlicesWithCompatibilityFacades()
     {
         var moduleDirectory = Path.Combine(SourceDirectory, "Zumbo.Modules.Workflows");
-        var upsertDirectory = Path.Combine(moduleDirectory, "Features", "UpsertWorkflow");
-        var getDirectory = Path.Combine(moduleDirectory, "Features", "GetWorkflow");
-        var representativeDirectory = Path.Combine(moduleDirectory, "Features", "RepresentativeWorkflowSlices");
+        var upsertDirectory = Path.Combine(moduleDirectory, "Application", "Features", "WorkflowDefinitions");
+        var getDirectory = upsertDirectory;
+        var representativeDirectory = Path.Combine(
+            moduleDirectory,
+            "Application",
+            "Features",
+            "RepresentativeWorkflowSlices");
 
         Assert.True(File.Exists(Path.Combine(upsertDirectory, "CreateWorkflowRequest.cs")));
         Assert.True(File.Exists(Path.Combine(upsertDirectory, "UpsertWorkflowValidator.cs")));
@@ -800,8 +816,9 @@ public sealed class ArchitectureBoundaryTests
 
         var facade = File.ReadAllText(Path.Combine(
             moduleDirectory,
-            "Module",
-            "Workflows",
+            "Application",
+            "Compatibility",
+            "WorkflowDefinitions",
             "WorkflowService.cs"));
         Assert.Contains("upsertWorkflowHandler.HandleAsync", facade, StringComparison.Ordinal);
         Assert.Contains("getWorkflowHandler.HandleAsync", facade, StringComparison.Ordinal);
