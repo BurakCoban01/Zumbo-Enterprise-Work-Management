@@ -84,6 +84,18 @@ public sealed class WorkItemTypeSchemaApiTests : IClassFixture<WebApplicationFac
         Assert.Equal(schema.SchemaVersion, incident.IssueTypeSchemaVersion);
         Assert.Equal(2, incident.CustomFields!.Count);
 
+        incident = await SendVersionedAsync<WorkItemResponse>(
+            HttpMethod.Put,
+            $"/api/work-items/{incident.Id}/custom-fields",
+            new SetWorkItemCustomFieldsRequest(
+            [
+                new WorkItemCustomFieldValueRequest("severity", OptionKey: "Critical"),
+                new WorkItemCustomFieldValueRequest("customer", TextValue: "Acme Enterprise")
+            ]),
+            incident.Version);
+        Assert.Contains(incident.CustomFields!, field =>
+            field.FieldKey == "customer" && field.TextValue == "Acme Enterprise");
+
         var searchUrl = $"/api/work-items?projectId={project.Id}&issueType=incident"
             + "&customFieldKey=SEVERITY&customFieldValue=critical";
         var search = await EventuallyAsync(searchUrl, incident.Id);

@@ -1020,6 +1020,113 @@ public sealed class ApiFlowTests : IClassFixture<WebApplicationFactory<Program>>
     }
 
     [Fact]
+    public async Task WorkItemAssignment_UpdatesAssigneeAndPublishesAuditAndNotification()
+    {
+        var suffix = Guid.NewGuid().ToString("N");
+        var organizationId = "org-assign-" + suffix;
+        var registration = await PostAsync<AuthResponse>("/api/auth/register", new RegisterUserRequest(
+            "assign-" + suffix,
+            $"assign-{suffix}@zumbo.local",
+            "P@ssword123",
+            organizationId));
+        _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
+            "Bearer",
+            registration.AccessToken);
+        await PostAsync<OrganizationResponse>(
+            "/api/organizations",
+            new CreateOrganizationRequest("Assignment Organization", organizationId));
+        var project = await PostAsync<ProjectResponse>("/api/projects", new CreateProjectRequest(
+            organizationId,
+            "ASN",
+            "Assignment project",
+            registration.User.Id));
+        var board = await PostAsync<BoardResponse>("/api/boards", new CreateBoardRequest(
+            project.Id,
+            "Assignment board",
+            "Kanban"));
+        var workItem = await PostAsync<WorkItemResponse>("/api/work-items", new CreateWorkItemRequest(
+            project.Id,
+            board.Id,
+            "Assign through vertical slice",
+            "Task",
+            "Medium",
+            null,
+            null));
+
+        var assigned = await PatchAsync<WorkItemResponse>(
+            $"/api/work-items/{workItem.Id}/assignee",
+            new AssignWorkItemRequest(registration.User.Id));
+
+        Assert.Equal(registration.User.Id, assigned.AssigneeUserId);
+        var audit = await EventuallyAsync(
+            () => GetAsync<AuditLogPageResponse>(
+                $"/api/audit?entityType=WorkItem&entityId={workItem.Id}&page=1&pageSize=10"),
+            value => value.Items.Any(item => item.Action == "WorkItemAssigned"),
+            "Assignment audit event was not consumed.");
+        Assert.Contains(audit.Items, item => item.Action == "WorkItemAssigned");
+        var notification = await EventuallyAsync(
+            () => GetAsync<IReadOnlyList<NotificationResponse>>("/api/notifications?page=1&pageSize=20"),
+            items => items.Any(item => item.Type == "Assignment"),
+            "Assignment notification was not published.");
+        Assert.Contains(notification, item => item.Type == "Assignment");
+    }
+
+    [Fact]
+    public async Task WorkItemTeamUpdate_UsesLinkedTeamAndRejectsUnchangedSelection()
+    {
+        var suffix = Guid.NewGuid().ToString("N");
+        var organizationId = "org-work-item-team-" + suffix;
+        var registration = await PostAsync<AuthResponse>("/api/auth/register", new RegisterUserRequest(
+            "work-item-team-" + suffix,
+            $"work-item-team-{suffix}@zumbo.local",
+            "P@ssword123",
+            organizationId));
+        _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
+            "Bearer",
+            registration.AccessToken);
+        await PostAsync<OrganizationResponse>(
+            "/api/organizations",
+            new CreateOrganizationRequest("Work Item Team Organization", organizationId));
+        var team = await PostAsync<TeamResponse>("/api/teams", new CreateTeamRequest(
+            organizationId,
+            "Work Item Team",
+            registration.User.Id));
+        var project = await PostAsync<ProjectResponse>("/api/projects", new CreateProjectRequest(
+            organizationId,
+            "WIT",
+            "Work item team project",
+            registration.User.Id));
+        project = await PostAsync<ProjectResponse>(
+            $"/api/projects/{project.Id}/teams",
+            new AddProjectTeamRequest(team.Id));
+        Assert.Contains(team.Id, project.TeamIds);
+        var board = await PostAsync<BoardResponse>("/api/boards", new CreateBoardRequest(
+            project.Id,
+            "Work item team board",
+            "Kanban"));
+        var workItem = await PostAsync<WorkItemResponse>("/api/work-items", new CreateWorkItemRequest(
+            project.Id,
+            board.Id,
+            "Select a linked team",
+            "Task",
+            "Medium",
+            null,
+            null));
+
+        var updated = await PatchAsync<WorkItemResponse>(
+            $"/api/work-items/{workItem.Id}/team",
+            new SetWorkItemTeamRequest(team.Id));
+        Assert.Equal(team.Id, updated.TeamId);
+
+        var unchanged = await _client.PatchAsJsonAsync(
+            $"/api/work-items/{workItem.Id}/team",
+            new SetWorkItemTeamRequest(team.Id));
+        Assert.Equal(HttpStatusCode.Conflict, unchanged.StatusCode);
+        var error = await unchanged.Content.ReadFromJsonAsync<ApiResponse<object>>();
+        Assert.Equal("WORK_ITEM_TEAM_UNCHANGED", error!.Error!.Code);
+    }
+
+    [Fact]
     public async Task IdentityPrivacy_ExportsOwnDataAndAnonymizationRevokesEveryCredential()
     {
         var stamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();

@@ -13,31 +13,7 @@ namespace Zumbo.Modules.WorkItems;
 public sealed partial class WorkItemService
 {
     public async Task<WorkItemResponse> AddWorkLogAsync(string id, AddWorkLogRequest request, CancellationToken ct)
-    {
-        if (request.Hours <= 0 || request.Hours > 24)
-        {
-            throw new ValidationException("Work log hours must be between 0 and 24.");
-        }
-
-        var workItem = await GetWorkItem(id, ct);
-        await EnsurePermissionAsync(workItem.ProjectId, "WorkLogCreate", ct);
-        await EnsureSeparatedAsync(workItem, ct);
-        var workLog = new WorkLogDocument
-        {
-            UserId = request.UserId,
-            Hours = request.Hours,
-            Note = request.Note,
-            CreatedAt = clock.UtcNow
-        };
-        await activityStore.CreateWorkLogAsync(
-            WorkItemActivityStore.ToActivity(workItem, CurrentOrganizationId(workItem.ProjectId), workLog),
-            ct);
-        workItem.WorkLogs.Add(workLog);
-        await cacheInvalidationPublisher.InvalidateProjectAsync(workItem.ProjectId, ct);
-        await RecordActivityAndNotifyWatchersAsync(
-            workItem, "WorkItemWorkLogAdded", "Work log added", workLog.Id, ct);
-        return ToResponse(workItem);
-    }
+        => await addWorkLogHandler.HandleAsync(new AddWorkLogCommand(id, request), ct);
 
     public async Task<WorkItemResponse> SetParentAsync(
         string id,

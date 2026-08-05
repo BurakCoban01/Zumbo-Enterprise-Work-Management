@@ -7,7 +7,7 @@ using static ApiEndpointResults;
 
 internal static partial class WorkItemEndpoints
 {
-private static void MapPatchByIdAssignee(RouteGroupBuilder group){group.MapPatch("/{id}/assignee", async (string id, AssignWorkItemRequest request, WorkItemService service, HttpContext http, CancellationToken ct) =>
-            Ok(await service.AssignAsync(id, request, CorrelationId(http), ct), http))
+private static void MapPatchByIdAssignee(RouteGroupBuilder group){group.MapPatch("/{id}/assignee", async (string id, AssignWorkItemRequest request, AssignWorkItemHandler handler, HttpContext http, CancellationToken ct) =>
+            Ok(await handler.HandleAsync(new AssignWorkItemCommand(id, request, CorrelationId(http)), ct), http))
             .WithZumboPermission(PermissionCatalog.WorkItemAssign);
 }}

@@ -13,66 +13,10 @@ namespace Zumbo.Modules.WorkItems;
 public sealed partial class WorkItemService
 {
     public async Task ArchiveAsync(string id, string correlationId, CancellationToken ct)
-    {
-        var initialWorkItem = await GetWorkItem(id, ct);
-        await using var structureLock = await AcquireRequiredLockAsync("project-structure:" + initialWorkItem.ProjectId, ct);
-        var workItem = await GetWorkItem(id, ct);
-        await EnsurePermissionAsync(workItem.ProjectId, "WorkItemDelete", ct);
-        await EnsureHasNoActiveChildrenAsync(workItem.Id, ct);
-        if (wipProjection is not null)
-        {
-            await wipProjection.ReleaseAsync(workItem, ct);
-        }
-        workItem.Archived = true;
-        workItem.UpdatedAt = clock.UtcNow;
-        await SaveAsync(workItem, ct);
-        await searchPublisher.DeleteAsync(workItem.Id, ct);
-        await audit.WriteAsync("WorkItemArchived", "WorkItem", workItem.Id, "active", "archived", correlationId, ct);
-        await RecordActivityAndNotifyWatchersAsync(
-            workItem, "WorkItemArchived", "Work item archived", correlationId, ct);
-        await PublishRealtimeAsync("archived", workItem, correlationId, ct);
-        await cacheInvalidationPublisher.InvalidateProjectAsync(workItem.ProjectId, ct);
-    }
+        => await archiveWorkItemHandler.HandleAsync(new ArchiveWorkItemCommand(id, correlationId), ct);
 
     public async Task<WorkItemResponse> RestoreAsync(string id, string correlationId, CancellationToken ct)
-    {
-        var initialWorkItem = await GetArchivedWorkItem(id, ct);
-        await using var structureLock = await AcquireRequiredLockAsync("project-structure:" + initialWorkItem.ProjectId, ct);
-        var workItem = await GetArchivedWorkItem(id, ct);
-        await EnsurePermissionAsync(workItem.ProjectId, "WorkItemDelete", ct);
-
-        var placement = await boardPlacementPolicy.EnsureCanMoveAsync(
-            workItem.ProjectId,
-            workItem.BoardId,
-            workItem.Id,
-            workItem.Status,
-            ct);
-        await using (await AcquirePlacementLockAsync(workItem.BoardId, placement, ct))
-        {
-            if (wipProjection is null)
-            {
-                await boardPlacementPolicy.EnsureHasCapacityAsync(workItem.BoardId, placement.ColumnId, workItem.Id, ct);
-            }
-            else
-            {
-                await wipProjection.ReserveCreateAsync(workItem.ProjectId, workItem.BoardId, placement, ct);
-            }
-            workItem.ColumnId = placement.ColumnId;
-            workItem.Status = placement.Status;
-            workItem.Rank = await ranks.NextRankAsync(workItem.BoardId, placement.ColumnId, workItem.Id, ct);
-            workItem.Archived = false;
-            workItem.UpdatedAt = clock.UtcNow;
-            await SaveAsync(workItem, ct);
-        }
-
-        await searchPublisher.IndexAsync(ToScopedSearchRecord(workItem), ct);
-        await audit.WriteAsync("WorkItemRestored", "WorkItem", workItem.Id, "archived", "active", correlationId, ct);
-        await RecordActivityAndNotifyWatchersAsync(
-            workItem, "WorkItemRestored", "Work item restored", correlationId, ct);
-        await PublishRealtimeAsync("restored", workItem, correlationId, ct);
-        await cacheInvalidationPublisher.InvalidateProjectAsync(workItem.ProjectId, ct);
-        return ToResponse(workItem);
-    }
+        => await restoreWorkItemHandler.HandleAsync(new RestoreWorkItemCommand(id, correlationId), ct);
 
     public Task<BulkWorkItemResponse> BulkMoveAsync(BulkMoveWorkItemsRequest request, string correlationId, CancellationToken ct) =>
         ExecuteBulkAsync(

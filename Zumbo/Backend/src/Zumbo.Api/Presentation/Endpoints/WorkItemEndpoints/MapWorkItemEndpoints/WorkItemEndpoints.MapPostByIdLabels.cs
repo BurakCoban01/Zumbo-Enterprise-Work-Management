@@ -7,7 +7,7 @@ using static ApiEndpointResults;
 
 internal static partial class WorkItemEndpoints
 {
-private static void MapPostByIdLabels(RouteGroupBuilder group){group.MapPost("/{id}/labels", async (string id, AddLabelRequest request, WorkItemService service, HttpContext http, CancellationToken ct) =>
-            Ok(await service.AddLabelAsync(id, request, ct), http))
+private static void MapPostByIdLabels(RouteGroupBuilder group){group.MapPost("/{id}/labels", async (string id, AddLabelRequest request, AddLabelHandler handler, HttpContext http, CancellationToken ct) =>
+            Ok(await handler.HandleAsync(new AddLabelCommand(id, request), ct), http))
             .WithZumboPermission(PermissionCatalog.WorkItemUpdate);
 }}

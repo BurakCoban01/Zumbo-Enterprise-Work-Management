@@ -100,9 +100,5 @@ public sealed partial class WorkItemService
     }
 
     public async Task<WorkItemResponse> GetAsync(string id, CancellationToken ct)
-    {
-        var workItem = await GetWorkItem(id, ct);
-        await EnsurePermissionAsync(workItem.ProjectId, "WorkItemView", ct);
-        return ToResponse(workItem);
-    }
+        => await getWorkItemHandler.HandleAsync(new GetWorkItemQuery(id), ct);
 }

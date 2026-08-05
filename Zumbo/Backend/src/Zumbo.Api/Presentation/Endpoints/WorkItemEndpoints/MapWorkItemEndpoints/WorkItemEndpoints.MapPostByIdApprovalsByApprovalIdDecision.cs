@@ -11,9 +11,10 @@ private static void MapPostByIdApprovalsByApprovalIdDecision(RouteGroupBuilder g
             string id,
             string approvalId,
             DecideWorkItemApprovalRequest request,
-            WorkItemService service,
+            DecideApprovalHandler handler,
             HttpContext http,
             CancellationToken ct) =>
-            Ok(await service.DecideApprovalAsync(id, approvalId, request, CorrelationId(http), ct), http))
+            Ok(await handler.HandleAsync(
+                new DecideApprovalCommand(id, approvalId, request, CorrelationId(http)), ct), http))
             .WithZumboPermission(PermissionCatalog.WorkItemApprove);
 }}

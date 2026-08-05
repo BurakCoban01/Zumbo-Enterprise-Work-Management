@@ -7,6 +7,6 @@ using static ApiEndpointResults;
 
 internal static partial class WorkItemEndpoints
 {
-private static void MapGetById(RouteGroupBuilder group){group.MapGet("/{id}", async (string id, WorkItemService service, HttpContext http, CancellationToken ct) =>
-            Ok(await service.GetAsync(id, ct), http));
+private static void MapGetById(RouteGroupBuilder group){group.MapGet("/{id}", async (string id, GetWorkItemHandler handler, HttpContext http, CancellationToken ct) =>
+            Ok(await handler.HandleAsync(new GetWorkItemQuery(id), ct), http));
 }}

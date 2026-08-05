@@ -7,7 +7,7 @@ using static ApiEndpointResults;
 
 internal static partial class WorkItemEndpoints
 {
-private static void MapPostByIdRestore(RouteGroupBuilder group){group.MapPost("/{id}/restore", async (string id, WorkItemService service, HttpContext http, CancellationToken ct) =>
-            Ok(await service.RestoreAsync(id, CorrelationId(http), ct), http))
+private static void MapPostByIdRestore(RouteGroupBuilder group){group.MapPost("/{id}/restore", async (string id, RestoreWorkItemHandler handler, HttpContext http, CancellationToken ct) =>
+            Ok(await handler.HandleAsync(new RestoreWorkItemCommand(id, CorrelationId(http)), ct), http))
             .WithZumboPermission(PermissionCatalog.WorkItemDelete);
 }}

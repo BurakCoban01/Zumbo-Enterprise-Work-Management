@@ -7,7 +7,7 @@ using static ApiEndpointResults;
 
 internal static partial class WorkItemEndpoints
 {
-private static void MapPatchByIdChecklistByItemId(RouteGroupBuilder group){group.MapPatch("/{id}/checklist/{itemId}", async (string id, string itemId, CompleteChecklistItemRequest request, WorkItemService service, HttpContext http, CancellationToken ct) =>
-            Ok(await service.CompleteChecklistItemAsync(id, itemId, request, ct), http))
+private static void MapPatchByIdChecklistByItemId(RouteGroupBuilder group){group.MapPatch("/{id}/checklist/{itemId}", async (string id, string itemId, CompleteChecklistItemRequest request, CompleteChecklistItemHandler handler, HttpContext http, CancellationToken ct) =>
+            Ok(await handler.HandleAsync(new CompleteChecklistItemCommand(id, itemId, request), ct), http))
             .WithZumboPermission(PermissionCatalog.WorkItemUpdate);
 }}

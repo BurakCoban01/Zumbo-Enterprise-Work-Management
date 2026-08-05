@@ -10,9 +10,9 @@ internal static partial class WorkItemEndpoints
 private static void MapPutByIdCustomFields(RouteGroupBuilder group){group.MapPut("/{id}/custom-fields", async (
                 string id,
                 SetWorkItemCustomFieldsRequest request,
-                WorkItemService service,
+                SetCustomFieldsHandler handler,
                 HttpContext http,
                 CancellationToken ct) =>
-            Ok(await service.SetCustomFieldsAsync(id, request, CorrelationId(http), ct), http))
+            Ok(await handler.HandleAsync(new SetCustomFieldsCommand(id, request, CorrelationId(http)), ct), http))
             .WithZumboPermission(PermissionCatalog.WorkItemUpdate);
 }}
