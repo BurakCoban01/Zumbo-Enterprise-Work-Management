@@ -7,7 +7,7 @@ using static ApiEndpointResults;
 
 internal static partial class WorkItemEndpoints
 {
-private static void MapGetReportsDueDateRisksByProjectId(RouteGroupBuilder group){group.MapGet("/reports/due-date-risks/{projectId}", async (string projectId, int? days, WorkItemService service, HttpContext http, CancellationToken ct) =>
-            ReportOk(await service.DueDateRisksSnapshotAsync(projectId, days ?? 14, ct), http))
+private static void MapGetReportsDueDateRisksByProjectId(RouteGroupBuilder group){group.MapGet("/reports/due-date-risks/{projectId}", async (string projectId, int? days, DueDateRisksHandler handler, HttpContext http, CancellationToken ct) =>
+            ReportOk(await handler.HandleAsync(new DueDateRisksQuery(projectId, days ?? 14), ct), http))
             .RequireRateLimiting("report");
 }}

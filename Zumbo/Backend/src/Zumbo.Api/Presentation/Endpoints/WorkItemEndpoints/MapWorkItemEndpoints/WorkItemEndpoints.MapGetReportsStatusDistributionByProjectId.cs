@@ -7,7 +7,7 @@ using static ApiEndpointResults;
 
 internal static partial class WorkItemEndpoints
 {
-private static void MapGetReportsStatusDistributionByProjectId(RouteGroupBuilder group){group.MapGet("/reports/status-distribution/{projectId}", async (string projectId, WorkItemService service, HttpContext http, CancellationToken ct) =>
-            ReportOk(await service.StatusDistributionSnapshotAsync(projectId, ct), http))
+private static void MapGetReportsStatusDistributionByProjectId(RouteGroupBuilder group){group.MapGet("/reports/status-distribution/{projectId}", async (string projectId, StatusDistributionHandler handler, HttpContext http, CancellationToken ct) =>
+            ReportOk(await handler.HandleAsync(new StatusDistributionQuery(projectId), ct), http))
             .RequireRateLimiting("report");
 }}

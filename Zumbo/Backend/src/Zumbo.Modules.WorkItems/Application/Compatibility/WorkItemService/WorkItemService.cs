@@ -56,6 +56,67 @@ public sealed partial class WorkItemService(
         searchIndex,
         activityStore,
         searchOptions ?? Options.Create(new SearchOptions()));
+    private readonly SendDueDateRemindersHandler sendDueDateRemindersHandler = new(
+        workItems,
+        notifications,
+        clock,
+        permissionChecker,
+        distributedLockProvider,
+        distributedLockOptions,
+        activityStore,
+        expectedVersions);
+    private readonly ProjectSummaryHandler projectSummaryHandler = new(
+        workItems,
+        clock,
+        currentUser,
+        permissionChecker,
+        readModelCache,
+        readModelCacheOptions);
+    private readonly StatusDistributionHandler statusDistributionHandler = new(
+        workItems,
+        currentUser,
+        permissionChecker,
+        readModelCache,
+        readModelCacheOptions);
+    private readonly UserWorkloadHandler userWorkloadHandler = new(
+        workItems,
+        clock,
+        currentUser,
+        permissionChecker,
+        readModelCache,
+        readModelCacheOptions,
+        activityStore);
+    private readonly DueDateRisksHandler dueDateRisksHandler = new(
+        workItems,
+        clock,
+        currentUser,
+        permissionChecker,
+        readModelCache,
+        readModelCacheOptions);
+    private readonly FlowTimeHandler flowTimeHandler = new(
+        workItems,
+        clock,
+        currentUser,
+        permissionChecker,
+        readModelCache,
+        readModelCacheOptions,
+        activityStore);
+    private readonly CompletionRateHandler completionRateHandler = new(
+        workItems,
+        clock,
+        currentUser,
+        permissionChecker,
+        readModelCache,
+        readModelCacheOptions);
+    private readonly TeamPerformanceHandler teamPerformanceHandler = new(
+        workItems,
+        clock,
+        currentUser,
+        permissionChecker,
+        teamPolicy,
+        readModelCache,
+        readModelCacheOptions,
+        activityStore);
     private readonly CreateWorkItemHandler createWorkItemHandler = new(
         workItems,
         notifications,

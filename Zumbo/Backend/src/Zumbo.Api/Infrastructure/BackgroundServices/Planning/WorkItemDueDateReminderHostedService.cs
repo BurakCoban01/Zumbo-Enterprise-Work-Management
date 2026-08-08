@@ -21,11 +21,13 @@ public sealed class DueDateReminderHostedService(
             try
             {
                 await using var scope = scopeFactory.CreateAsyncScope();
-                var service = scope.ServiceProvider.GetRequiredService<WorkItemService>();
+                var handler = scope.ServiceProvider.GetRequiredService<SendDueDateRemindersHandler>();
                 var transactions = scope.ServiceProvider.GetRequiredService<IDurableTransactionRunner>();
                 await transactions.ExecuteAsync(
                     "WorkItems",
-                    token => service.SendDueDateRemindersAsync(options.Value.HorizonHours, token),
+                    token => handler.HandleAsync(
+                        new SendDueDateRemindersCommand(options.Value.HorizonHours),
+                        token),
                     stoppingToken);
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)

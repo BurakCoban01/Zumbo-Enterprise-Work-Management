@@ -664,6 +664,69 @@ public sealed class DomainRuleTests
     }
 
     [Fact]
+    public async Task WorkItem_CreatePreservesRequestedIdThroughCompatibilityFacade()
+    {
+        var repository = new InMemoryDocumentRepository<WorkItemDocument>();
+        var service = CreateWorkItemService(repository);
+
+        var created = await service.CreateAsync(
+            new CreateWorkItemRequest(
+                "project-1",
+                "board-1",
+                "Imported task",
+                "Task",
+                "Medium",
+                null,
+                null),
+            "requested-id-correlation",
+            CancellationToken.None,
+            "requested-work-item-id");
+
+        Assert.Equal("requested-work-item-id", created.Id);
+        Assert.NotNull(await repository.SelectAsync(
+            item => item.Id == "requested-work-item-id",
+            CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task WorkItem_IntakeCreatePreservesStableIdentityMetadataAndIdempotency()
+    {
+        var repository = new InMemoryDocumentRepository<WorkItemDocument>();
+        var service = CreateWorkItemService(repository);
+        var creator = Assert.IsAssignableFrom<IIntakeWorkItemCreator>(service);
+        var creation = new IntakeWorkItemCreation(
+            "org-1",
+            "submission-1",
+            new CreateWorkItemRequest(
+                "project-1",
+                "board-1",
+                "Intake task",
+                "Task",
+                "High",
+                null,
+                null),
+            "  Submitted description  ",
+            [new StoredAttachment(
+                "brief.txt",
+                "text/plain",
+                12,
+                "attachments/brief.txt",
+                "checksum")],
+            "intake-correlation");
+
+        var first = await creator.CreateAsync(creation, CancellationToken.None);
+        var second = await creator.CreateAsync(creation, CancellationToken.None);
+
+        Assert.Equal(IntakeStableIds.WorkItemId("submission-1"), first.Id);
+        Assert.Equal(first.Id, second.Id);
+        Assert.Equal("Submitted description", second.Description);
+        Assert.Equal("brief.txt", Assert.Single(second.Attachments).FileName);
+        var stored = await repository.SelectAsync(item => item.Id == first.Id, CancellationToken.None);
+        Assert.NotNull(stored);
+        Assert.Equal("submission-1", stored.SourceIntakeSubmissionId);
+    }
+
+    [Fact]
     public async Task WorkItem_ReorderPersistsRankAndBoardQueryOrder()
     {
         var service = CreateWorkItemService();

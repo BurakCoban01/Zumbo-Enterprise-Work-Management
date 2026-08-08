@@ -899,6 +899,7 @@ public sealed class ArchitectureBoundaryTests
             "RepresentativeWorkItemSlices");
 
         Assert.True(File.Exists(Path.Combine(createDirectory, "CreateWorkItemRequest.cs")));
+        Assert.True(File.Exists(Path.Combine(createDirectory, "CreateWorkItemContext.cs")));
         Assert.True(File.Exists(Path.Combine(createDirectory, "CreateWorkItemValidator.cs")));
         Assert.True(File.Exists(Path.Combine(createDirectory, "CreateWorkItemHandler.cs")));
         Assert.True(File.Exists(Path.Combine(createDirectory, "CreateWorkItemSlice.cs")));
@@ -920,6 +921,8 @@ public sealed class ArchitectureBoundaryTests
         Assert.Contains("IDistributedLockProvider", createSlice, StringComparison.Ordinal);
         Assert.Contains("IWorkItemSearchPublisher", createSlice, StringComparison.Ordinal);
         Assert.Contains("IWorkItemActivityStore", createSlice, StringComparison.Ordinal);
+        Assert.Contains("IntakeStableIds.WorkItemId", createSlice, StringComparison.Ordinal);
+        Assert.Contains("SourceIntakeSubmissionId = context.IntakeSubmissionId", createSlice, StringComparison.Ordinal);
         Assert.Contains("IDocumentRepository<WorkItemDocument>", searchSlice, StringComparison.Ordinal);
         Assert.Contains("IProjectPermissionChecker", searchSlice, StringComparison.Ordinal);
         Assert.Contains("IWorkItemSearchIndex", searchSlice, StringComparison.Ordinal);
@@ -937,6 +940,11 @@ public sealed class ArchitectureBoundaryTests
             "WorkItemService",
             "WorkItemService.Read.cs"));
         Assert.Contains("createWorkItemHandler.HandleAsync", createFacade, StringComparison.Ordinal);
+        Assert.Contains("createWorkItemHandler.CreateAsync", createFacade, StringComparison.Ordinal);
+        Assert.Contains("createWorkItemHandler.HandleScopedAsync", createFacade, StringComparison.Ordinal);
+        Assert.DoesNotContain("CreateWorkItemValidator.Validate", createFacade, StringComparison.Ordinal);
+        Assert.DoesNotContain("workItems.CreateAsync", createFacade, StringComparison.Ordinal);
+        Assert.DoesNotContain("activityStore.CreateTimelineAsync", createFacade, StringComparison.Ordinal);
         Assert.Contains("searchWorkItemsHandler.HandleAsync", searchFacade, StringComparison.Ordinal);
 
         var composition = File.ReadAllText(Path.Combine(

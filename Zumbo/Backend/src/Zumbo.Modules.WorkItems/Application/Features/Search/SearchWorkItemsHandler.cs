@@ -32,4 +32,10 @@ public sealed class SearchWorkItemsHandler(WorkItemService service)
     public Task<IReadOnlyList<WorkItemResponse>> HandleAsync(WorkItemSearchRequest request, CancellationToken ct) =>
         slice?.HandleAsync(request, ct)
         ?? service.SearchAsync(request, ct);
+
+    public Task<WorkItemSearchPageResponse> HandlePageAsync(
+        WorkItemSearchRequest request,
+        CancellationToken ct) =>
+        slice?.HandlePageAsync(request, ct)
+        ?? service.SearchPageAsync(request, ct);
 }

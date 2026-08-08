@@ -2,6 +2,7 @@ using Microsoft.Extensions.Options;
 using Zumbo.BuildingBlocks.Application.Concurrency;
 using Zumbo.BuildingBlocks.Application.Persistence;
 using Zumbo.BuildingBlocks.Application.Security;
+using Zumbo.Modules.WorkItems.Application.Features.WorkItemsCore;
 using Zumbo.SharedKernel;
 
 namespace Zumbo.Modules.WorkItems;
@@ -34,22 +35,67 @@ internal sealed class CreateWorkItemSlice(
     internal async Task<WorkItemResponse> HandleAsync(
         CreateWorkItemRequest request,
         string correlationId,
-        CancellationToken ct)
+        CancellationToken ct,
+        string? requestedId = null)
     {
         var authorization = await EnsurePermissionAsync(request.ProjectId, "WorkItemCreate", ct);
-        return await CreateAsync(
+        return await HandleScopedAsync(
             request,
-            authorization.OrganizationId,
             correlationId,
-            currentUser.UserId ?? "system",
+            new CreateWorkItemContext(
+                authorization.OrganizationId,
+                requestedId,
+                currentUser.UserId ?? "system",
+                IntakeSubmissionId: null,
+                InitialAttachments: [],
+                Description: string.Empty),
             ct);
     }
 
-    private async Task<WorkItemResponse> CreateAsync(
+    internal async Task<WorkItemResponse> HandleAsync(
+        IntakeWorkItemCreation creation,
+        CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(creation.OrganizationId)
+            || string.IsNullOrWhiteSpace(creation.SubmissionId))
+        {
+            throw new ValidationException("Intake work creation requires organization and submission scope.");
+        }
+
+        authorizedOrganizationIds[creation.Request.ProjectId] = creation.OrganizationId;
+        var requestedId = IntakeStableIds.WorkItemId(creation.SubmissionId);
+        var existing = await workItems.SelectAsync(x => x.Id == requestedId, ct);
+        if (existing is not null)
+        {
+            if (existing.ProjectId != creation.Request.ProjectId
+                || existing.SourceIntakeSubmissionId != creation.SubmissionId)
+            {
+                throw new ConflictException(
+                    "INTAKE_WORK_ITEM_ID_CONFLICT",
+                    "The intake submission work item id is already in use.");
+            }
+
+            await activityStore.HydrateAsync(existing, creation.OrganizationId, ct);
+            return WorkItemResponseMapper.ToResponse(existing);
+        }
+
+        return await HandleScopedAsync(
+            creation.Request,
+            creation.CorrelationId,
+            new CreateWorkItemContext(
+                creation.OrganizationId,
+                requestedId,
+                currentUser.UserId ?? "intake",
+                creation.SubmissionId,
+                creation.Attachments,
+                creation.Description),
+            ct);
+    }
+
+    internal async Task<WorkItemResponse> HandleScopedAsync(
         CreateWorkItemRequest request,
-        string organizationId,
         string correlationId,
-        string actorUserId,
+        CreateWorkItemContext context,
         CancellationToken ct)
     {
         CreateWorkItemValidator.Validate(request);
@@ -69,14 +115,16 @@ internal sealed class CreateWorkItemSlice(
         var now = clock.UtcNow;
         var workItem = new WorkItemDocument
         {
-            Id = Guid.NewGuid().ToString("N"),
+            Id = string.IsNullOrWhiteSpace(context.RequestedId)
+                ? Guid.NewGuid().ToString("N")
+                : context.RequestedId,
             ProjectId = request.ProjectId,
             BoardId = request.BoardId,
             ParentId = parent?.Id,
             TeamId = teamId,
             ColumnId = placement.ColumnId,
             Title = request.Title.Trim(),
-            Description = string.Empty,
+            Description = context.Description.Trim(),
             Type = type,
             IssueTypeSchemaVersion = shape.SchemaVersion,
             CustomFields = shape.CustomFields.ToList(),
@@ -85,6 +133,7 @@ internal sealed class CreateWorkItemSlice(
             Rank = rank,
             AssigneeUserId = request.AssigneeUserId,
             DueDate = request.DueDate,
+            SourceIntakeSubmissionId = context.IntakeSubmissionId,
             CreatedAt = now,
             UpdatedAt = now,
             ActivityStorageVersion = 1,
@@ -93,10 +142,23 @@ internal sealed class CreateWorkItemSlice(
                 new WorkItemStatusHistoryDocument
                 {
                     ToStatus = placement.Status,
-                    ChangedByUserId = actorUserId,
+                    ChangedByUserId = context.ActorUserId,
                     ChangedAt = now
                 }
-            ]
+            ],
+            Attachments = context.InitialAttachments.Select(stored => new AttachmentDocument
+            {
+                FileName = stored.FileName,
+                ContentType = stored.ContentType,
+                SizeBytes = stored.SizeBytes,
+                StoragePath = stored.StoragePath,
+                ChecksumSha256 = stored.ChecksumSha256,
+                SecurityState = stored.SecurityState,
+                ScanProvider = stored.ScanProvider,
+                ScanDetail = stored.ScanDetail,
+                ScannedAt = stored.ScannedAt,
+                CreatedAt = now
+            }).ToList()
         };
 
         await using (await AcquirePlacementLockAsync(request.BoardId, placement, ct))
@@ -111,7 +173,9 @@ internal sealed class CreateWorkItemSlice(
             }
 
             var initialTimeline = workItem.StatusHistory;
+            var separatedAttachments = workItem.Attachments;
             workItem.StatusHistory = [];
+            workItem.Attachments = [];
             try
             {
                 await workItems.CreateAsync(workItem, ct);
@@ -119,20 +183,38 @@ internal sealed class CreateWorkItemSlice(
             finally
             {
                 workItem.StatusHistory = initialTimeline;
+                workItem.Attachments = separatedAttachments;
             }
 
             await activityStore.CreateTimelineAsync(
-                WorkItemActivityStore.ToActivity(workItem, organizationId, workItem.StatusHistory[0], 0),
+                WorkItemActivityStore.ToActivity(
+                    workItem,
+                    context.OrganizationId,
+                    workItem.StatusHistory[0],
+                    0),
                 ct);
+            foreach (var attachment in workItem.Attachments)
+            {
+                await activityStore.CreateAttachmentAsync(
+                    WorkItemActivityStore.ToActivity(workItem, context.OrganizationId, attachment),
+                    ct);
+            }
         }
 
-        await searchPublisher.IndexAsync(WorkItemPublicationMapper.ToSearchRecord(workItem, organizationId), ct);
+        await searchPublisher.IndexAsync(
+            WorkItemPublicationMapper.ToSearchRecord(workItem, context.OrganizationId),
+            ct);
         await audit.WriteAsync(
             "WorkItemCreated", "WorkItem", workItem.Id, null, workItem.Title, correlationId, ct);
         if (collaborationService is not null)
         {
             await collaborationService.RecordActivityAsync(
-                workItem, organizationId, "WorkItemCreated", "Work item created", correlationId, ct);
+                workItem,
+                context.OrganizationId,
+                "WorkItemCreated",
+                "Work item created",
+                correlationId,
+                ct);
         }
 
         await PublishRealtimeAsync("created", workItem, correlationId, ct);

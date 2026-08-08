@@ -373,6 +373,8 @@ internal static partial class WorkItemEndpoints
         services.AddWorkItemCommentHandlers();
         services.AddWorkItemRelationHandlers();
         services.AddWorkItemAttachmentHandlers();
+        services.AddWorkItemReminderHandlers();
+        services.AddWorkItemReportHandlers();
         services.AddScoped<ClearAssigneeHandler>(provider => new ClearAssigneeHandler(
             provider.GetRequiredService<IDocumentRepository<WorkItemDocument>>(),
             provider.GetRequiredService<IWorkItemAuditPublisher>(),

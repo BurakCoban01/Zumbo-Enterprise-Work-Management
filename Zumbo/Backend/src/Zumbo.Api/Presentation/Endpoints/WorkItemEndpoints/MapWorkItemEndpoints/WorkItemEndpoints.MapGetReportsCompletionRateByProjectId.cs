@@ -11,9 +11,9 @@ private static void MapGetReportsCompletionRateByProjectId(RouteGroupBuilder gro
             string projectId,
             DateOnly? from,
             DateOnly? to,
-            WorkItemService service,
+            CompletionRateHandler handler,
             HttpContext http,
             CancellationToken ct) =>
-            ReportOk(await service.CompletionRateSnapshotAsync(projectId, from, to, ct), http))
+            ReportOk(await handler.HandleAsync(new CompletionRateQuery(projectId, from, to), ct), http))
             .RequireRateLimiting("report");
 }}

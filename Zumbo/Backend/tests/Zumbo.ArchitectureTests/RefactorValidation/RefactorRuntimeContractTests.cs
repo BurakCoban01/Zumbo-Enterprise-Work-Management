@@ -411,6 +411,67 @@ public sealed class RefactorRuntimeContractTests
         + "provider.GetService<IExpectedVersionAccessor>(),"
         + "provider.GetService<WorkItemCollaborationService>(),"
         + "provider.GetService<ILogger<WorkItemService>>()));",
+        "services.AddScoped<SendDueDateRemindersHandler>(provider=>newSendDueDateRemindersHandler("
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemDocument>>(),"
+        + "provider.GetRequiredService<IWorkItemNotificationPublisher>(),"
+        + "provider.GetRequiredService<IClock>(),"
+        + "provider.GetRequiredService<IProjectPermissionChecker>(),"
+        + "provider.GetRequiredService<IDistributedLockProvider>(),"
+        + "provider.GetRequiredService<IOptions<DistributedLockOptions>>(),"
+        + "provider.GetRequiredService<IWorkItemActivityStore>(),"
+        + "provider.GetService<IExpectedVersionAccessor>()));",
+        "services.AddScoped<ProjectSummaryHandler>(provider=>newProjectSummaryHandler("
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemDocument>>(),"
+        + "provider.GetRequiredService<IClock>(),"
+        + "provider.GetRequiredService<ICurrentUser>(),"
+        + "provider.GetRequiredService<IProjectPermissionChecker>(),"
+        + "provider.GetRequiredService<IWorkItemReadModelCache>(),"
+        + "provider.GetRequiredService<IOptions<WorkItemReadModelCacheOptions>>()));",
+        "services.AddScoped<StatusDistributionHandler>(provider=>newStatusDistributionHandler("
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemDocument>>(),"
+        + "provider.GetRequiredService<ICurrentUser>(),"
+        + "provider.GetRequiredService<IProjectPermissionChecker>(),"
+        + "provider.GetRequiredService<IWorkItemReadModelCache>(),"
+        + "provider.GetRequiredService<IOptions<WorkItemReadModelCacheOptions>>()));",
+        "services.AddScoped<UserWorkloadHandler>(provider=>newUserWorkloadHandler("
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemDocument>>(),"
+        + "provider.GetRequiredService<IClock>(),"
+        + "provider.GetRequiredService<ICurrentUser>(),"
+        + "provider.GetRequiredService<IProjectPermissionChecker>(),"
+        + "provider.GetRequiredService<IWorkItemReadModelCache>(),"
+        + "provider.GetRequiredService<IOptions<WorkItemReadModelCacheOptions>>(),"
+        + "provider.GetRequiredService<IWorkItemActivityStore>()));",
+        "services.AddScoped<DueDateRisksHandler>(provider=>newDueDateRisksHandler("
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemDocument>>(),"
+        + "provider.GetRequiredService<IClock>(),"
+        + "provider.GetRequiredService<ICurrentUser>(),"
+        + "provider.GetRequiredService<IProjectPermissionChecker>(),"
+        + "provider.GetRequiredService<IWorkItemReadModelCache>(),"
+        + "provider.GetRequiredService<IOptions<WorkItemReadModelCacheOptions>>()));",
+        "services.AddScoped<FlowTimeHandler>(provider=>newFlowTimeHandler("
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemDocument>>(),"
+        + "provider.GetRequiredService<IClock>(),"
+        + "provider.GetRequiredService<ICurrentUser>(),"
+        + "provider.GetRequiredService<IProjectPermissionChecker>(),"
+        + "provider.GetRequiredService<IWorkItemReadModelCache>(),"
+        + "provider.GetRequiredService<IOptions<WorkItemReadModelCacheOptions>>(),"
+        + "provider.GetRequiredService<IWorkItemActivityStore>()));",
+        "services.AddScoped<CompletionRateHandler>(provider=>newCompletionRateHandler("
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemDocument>>(),"
+        + "provider.GetRequiredService<IClock>(),"
+        + "provider.GetRequiredService<ICurrentUser>(),"
+        + "provider.GetRequiredService<IProjectPermissionChecker>(),"
+        + "provider.GetRequiredService<IWorkItemReadModelCache>(),"
+        + "provider.GetRequiredService<IOptions<WorkItemReadModelCacheOptions>>()));",
+        "services.AddScoped<TeamPerformanceHandler>(provider=>newTeamPerformanceHandler("
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemDocument>>(),"
+        + "provider.GetRequiredService<IClock>(),"
+        + "provider.GetRequiredService<ICurrentUser>(),"
+        + "provider.GetRequiredService<IProjectPermissionChecker>(),"
+        + "provider.GetRequiredService<IWorkItemTeamPolicy>(),"
+        + "provider.GetRequiredService<IWorkItemReadModelCache>(),"
+        + "provider.GetRequiredService<IOptions<WorkItemReadModelCacheOptions>>(),"
+        + "provider.GetRequiredService<IWorkItemActivityStore>()));",
         "services.AddScoped<ClearAssigneeHandler>(provider=>newClearAssigneeHandler("
         + "provider.GetRequiredService<IDocumentRepository<WorkItemDocument>>(),"
         + "provider.GetRequiredService<IWorkItemAuditPublisher>(),"
@@ -787,6 +848,13 @@ public sealed class RefactorRuntimeContractTests
         + ".WithZumboPermission(PermissionCatalog.WorkItemLink);",
         "group.MapPost(\"/{id}/attachments/upload\",async(stringid,IFormFilefile,WorkItemServiceservice,HttpContexthttp,CancellationTokenct)=>{awaitusingvarstream=file.OpenReadStream();returnOk(awaitservice.UploadAttachmentAsync(id,stream,file.FileName,file.ContentType,file.Length,CorrelationId(http),ct),http);}).WithZumboPermission(PermissionCatalog.AttachmentCreate).DisableAntiforgery().RequireRateLimiting(\"upload\");",
         "group.MapDelete(\"/{id}/attachments/{attachmentId}\",async(stringid,stringattachmentId,WorkItemServiceservice,HttpContexthttp,CancellationTokenct)=>Ok(awaitservice.DeleteAttachmentAsync(id,attachmentId,CorrelationId(http),ct),http)).WithZumboPermission(PermissionCatalog.AttachmentDelete);",
+        "group.MapGet(\"/reports/project-summary/{projectId}\",async(stringprojectId,WorkItemServiceservice,HttpContexthttp,CancellationTokenct)=>ReportOk(awaitservice.ProjectSummarySnapshotAsync(projectId,ct),http)).RequireRateLimiting(\"report\");",
+        "group.MapGet(\"/reports/status-distribution/{projectId}\",async(stringprojectId,WorkItemServiceservice,HttpContexthttp,CancellationTokenct)=>ReportOk(awaitservice.StatusDistributionSnapshotAsync(projectId,ct),http)).RequireRateLimiting(\"report\");",
+        "group.MapGet(\"/reports/user-workload/{projectId}\",async(stringprojectId,WorkItemServiceservice,HttpContexthttp,CancellationTokenct)=>ReportOk(awaitservice.UserWorkloadSnapshotAsync(projectId,ct),http)).RequireRateLimiting(\"report\");",
+        "group.MapGet(\"/reports/due-date-risks/{projectId}\",async(stringprojectId,int?days,WorkItemServiceservice,HttpContexthttp,CancellationTokenct)=>ReportOk(awaitservice.DueDateRisksSnapshotAsync(projectId,days??14,ct),http)).RequireRateLimiting(\"report\");",
+        "group.MapGet(\"/reports/flow-time/{projectId}\",async(stringprojectId,DateOnly?from,DateOnly?to,WorkItemServiceservice,HttpContexthttp,CancellationTokenct)=>ReportOk(awaitservice.FlowTimeSnapshotAsync(projectId,from,to,ct),http)).RequireRateLimiting(\"report\");",
+        "group.MapGet(\"/reports/completion-rate/{projectId}\",async(stringprojectId,DateOnly?from,DateOnly?to,WorkItemServiceservice,HttpContexthttp,CancellationTokenct)=>ReportOk(awaitservice.CompletionRateSnapshotAsync(projectId,from,to,ct),http)).RequireRateLimiting(\"report\");",
+        "group.MapGet(\"/reports/team-performance/{projectId}\",async(stringprojectId,DateOnly?from,DateOnly?to,WorkItemServiceservice,HttpContexthttp,CancellationTokenct)=>ReportOk(awaitservice.TeamPerformanceSnapshotAsync(projectId,from,to,ct),http)).RequireRateLimiting(\"report\");",
         "group.MapGet(\"/{id}/attachments/{attachmentId}/preview\",async(stringid,stringattachmentId,WorkItemServiceservice,HttpContexthttp,CancellationTokenct)=>"
         + "{varattachment=awaitservice.OpenAttachmentAsync(id,attachmentId,ct);"
         + "if(!IsPreviewableContentType(attachment.ContentType)){awaitattachment.Content.DisposeAsync();returnResults.StatusCode(StatusCodes.Status415UnsupportedMediaType);}"
@@ -936,6 +1004,13 @@ public sealed class RefactorRuntimeContractTests
         + ".WithZumboPermission(PermissionCatalog.WorkItemLink);",
         "group.MapPost(\"/{id}/attachments/upload\",async(stringid,IFormFilefile,UploadAttachmentHandlerhandler,HttpContexthttp,CancellationTokenct)=>{awaitusingvarstream=file.OpenReadStream();returnOk(awaithandler.HandleAsync(newUploadAttachmentCommand(id,stream,file.FileName,file.ContentType,file.Length,CorrelationId(http)),ct),http);}).WithZumboPermission(PermissionCatalog.AttachmentCreate).DisableAntiforgery().RequireRateLimiting(\"upload\");",
         "group.MapDelete(\"/{id}/attachments/{attachmentId}\",async(stringid,stringattachmentId,DeleteAttachmentHandlerhandler,HttpContexthttp,CancellationTokenct)=>Ok(awaithandler.HandleAsync(newDeleteAttachmentCommand(id,attachmentId,CorrelationId(http)),ct),http)).WithZumboPermission(PermissionCatalog.AttachmentDelete);",
+        "group.MapGet(\"/reports/project-summary/{projectId}\",async(stringprojectId,ProjectSummaryHandlerhandler,HttpContexthttp,CancellationTokenct)=>ReportOk(awaithandler.HandleAsync(newProjectSummaryQuery(projectId),ct),http)).RequireRateLimiting(\"report\");",
+        "group.MapGet(\"/reports/status-distribution/{projectId}\",async(stringprojectId,StatusDistributionHandlerhandler,HttpContexthttp,CancellationTokenct)=>ReportOk(awaithandler.HandleAsync(newStatusDistributionQuery(projectId),ct),http)).RequireRateLimiting(\"report\");",
+        "group.MapGet(\"/reports/user-workload/{projectId}\",async(stringprojectId,UserWorkloadHandlerhandler,HttpContexthttp,CancellationTokenct)=>ReportOk(awaithandler.HandleAsync(newUserWorkloadQuery(projectId),ct),http)).RequireRateLimiting(\"report\");",
+        "group.MapGet(\"/reports/due-date-risks/{projectId}\",async(stringprojectId,int?days,DueDateRisksHandlerhandler,HttpContexthttp,CancellationTokenct)=>ReportOk(awaithandler.HandleAsync(newDueDateRisksQuery(projectId,days??14),ct),http)).RequireRateLimiting(\"report\");",
+        "group.MapGet(\"/reports/flow-time/{projectId}\",async(stringprojectId,DateOnly?from,DateOnly?to,FlowTimeHandlerhandler,HttpContexthttp,CancellationTokenct)=>ReportOk(awaithandler.HandleAsync(newFlowTimeQuery(projectId,from,to),ct),http)).RequireRateLimiting(\"report\");",
+        "group.MapGet(\"/reports/completion-rate/{projectId}\",async(stringprojectId,DateOnly?from,DateOnly?to,CompletionRateHandlerhandler,HttpContexthttp,CancellationTokenct)=>ReportOk(awaithandler.HandleAsync(newCompletionRateQuery(projectId,from,to),ct),http)).RequireRateLimiting(\"report\");",
+        "group.MapGet(\"/reports/team-performance/{projectId}\",async(stringprojectId,DateOnly?from,DateOnly?to,TeamPerformanceHandlerhandler,HttpContexthttp,CancellationTokenct)=>ReportOk(awaithandler.HandleAsync(newTeamPerformanceQuery(projectId,from,to),ct),http)).RequireRateLimiting(\"report\");",
         "group.MapGet(\"/{id}/attachments/{attachmentId}/preview\",async(stringid,stringattachmentId,OpenAttachmentHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
         + "{varattachment=awaithandler.HandleAsync(newOpenAttachmentQuery(id,attachmentId),ct);"
         + "if(!IsPreviewableContentType(attachment.ContentType)){awaitattachment.Content.DisposeAsync();returnResults.StatusCode(StatusCodes.Status415UnsupportedMediaType);}"
@@ -1164,6 +1239,14 @@ public sealed class RefactorRuntimeContractTests
                 "The work-item attachment preview and download routes resolve OpenAttachmentHandler directly; their routes, authorization, active-record and repeated view checks, tenant hydration, legacy embedded fallback, separated attachment lookup, clean-scan gate, checksum-aware storage open, preview MIME rejection and stream disposal, cache, CSP, content disposition, range response behavior, compatibility facade, and scoped registration remain preserved.",
                 "The work-item attachment-upload route resolves UploadAttachmentHandler directly; its route, multipart binding, stream lifetime, authorization, antiforgery and rate metadata, size and filename validation, lock, tenant authorization, legacy activity separation, attachment limit, storage save, exact document projection, separated persistence, storage compensation and logging, audit, watcher activity, response mapping, compatibility facade, and scoped registration remain preserved.",
                 "The work-item attachment-delete route resolves DeleteAttachmentHandler directly; its route, binding, authorization, lock, tenant authorization, legacy activity separation, exact separated attachment lookup and deletion, in-memory projection update, storage deletion, persistence restore compensation and logging, exact document reconstruction, audit, watcher activity, response mapping, compatibility facade, and scoped registration remain preserved.",
+                "The due-date reminder hosted service resolves SendDueDateRemindersHandler directly; enablement, interval, transaction boundary, cancellation and error handling, global and item locking, bounded candidate query, assignee authorization, stale-candidate rechecks, deduplication key, notification order, reminder timestamps, optimistic separated persistence, compatibility facade, and scoped registration remain preserved.",
+                "The project-summary report route resolves ProjectSummaryHandler directly; its route, rate limit, report headers, view authorization, tenant scope, cache key and TTL, clock boundary, total, completed, in-progress and overdue filters, checked integer projection, snapshot mapping, compatibility facades, and scoped registration remain preserved.",
+                "The status-distribution report route resolves StatusDistributionHandler directly; its route, rate limit, report headers, view authorization, active-item filter, cursor paging, cache key and TTL, ordinal status ordering, exact grouping and count projection, snapshot mapping, dashboard compatibility caller, public facades, and scoped registration remain preserved.",
+                "The user-workload report route resolves UserWorkloadHandler directly; its route, rate limit, report headers, view authorization, organization-scoped activity read, active-item cursor paging, cache key and TTL, clock boundary, assignee filtering and ordering, open and overdue counts, activity-storage version fallback, logged-hours aggregation, snapshot mapping, dashboard compatibility caller, public facades, and scoped registration remain preserved.",
+                "The due-date-risks report route resolves DueDateRisksHandler directly; its route, nullable days binding and default, rate limit, report headers, view authorization, days clamp, cache key and TTL, clock boundary, active incomplete due-date filter, cursor paging, due-date and ordinal ID ordering, response and snapshot mapping, dashboard and unit compatibility callers, public facades, and scoped registration remain preserved.",
+                "The flow-time report route resolves FlowTimeHandler directly; its route, nullable date binding, rate limit, report headers, view authorization, default range and exact validation messages, UTC day boundaries, cache key and TTL, completed-item cursor paging, organization-scoped activity timeline and legacy fallback, reopened-work cycle start, lead and cycle samples, average and median rounding, response and snapshot mapping, dashboard and unit compatibility callers, public facades, and scoped registration remain preserved.",
+                "The completion-rate report route resolves CompletionRateHandler directly; its route, nullable date binding, rate limit, report headers, view authorization, default range and exact validation messages, UTC day boundaries, cache key and TTL, created-item cursor paging, completion cutoff, empty-set behavior, two-decimal percentage, response and snapshot mapping, dashboard, API and unit compatibility callers, public facades, and scoped registration remain preserved.",
+                "The team-performance report route resolves TeamPerformanceHandler directly; its route, nullable date binding, rate limit, report headers, view authorization, default range and exact validation messages, UTC day boundaries, cache key and TTL, team-policy call order, explicit team-assignment cursor paging, organization-scoped activity read and legacy fallback, team-name ordering, completion cutoff and percentage, average lead-time rounding, logged-hours aggregation, response and snapshot mapping, dashboard, API and unit compatibility callers, public facades, and scoped registration remain preserved.",
                 "ListNotificationsHandler and MarkNotificationAsReadHandler remain scoped self-services; explicit factories select their port-focused constructors while compatibility constructors remain available.",
                 "WriteAuditLogHandler and QueryAuditLogHandler remain scoped self-services; explicit factories select their port-focused constructors while compatibility constructors remain available.",
                 "The capacity-plan archive route resolves ArchiveCapacityPlanHandler directly; its route, authorization, transaction filter, correlation ID, owner and visibility checks, optimistic concurrency, audit, response mapping, compatibility facade, and scoped registration remain preserved.",
