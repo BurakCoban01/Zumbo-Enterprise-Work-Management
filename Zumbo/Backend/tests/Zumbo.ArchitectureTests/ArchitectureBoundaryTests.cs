@@ -1189,6 +1189,166 @@ public sealed class ArchitectureBoundaryTests
     }
 
     [Fact]
+    public void WorkItemCommentEndpoints_AreIndependentFeatureEndpointClasses()
+    {
+        var commentsDirectory = Path.Combine(
+            SourceDirectory,
+            "Zumbo.Api",
+            "Presentation",
+            "Endpoints",
+            "WorkItems",
+            "Comments");
+        var endpointFiles = new Dictionary<string, string>
+        {
+            ["AddCommentEndpoint.cs"] = "internal static class AddCommentEndpoint",
+            ["EditCommentEndpoint.cs"] = "internal static class EditCommentEndpoint",
+            ["DeleteCommentEndpoint.cs"] = "internal static class DeleteCommentEndpoint",
+            ["ListCommentsEndpoint.cs"] = "internal static class ListCommentsEndpoint",
+            ["ListCommentRevisionsEndpoint.cs"] = "internal static class ListCommentRevisionsEndpoint"
+        };
+
+        foreach (var endpointFile in endpointFiles)
+        {
+            var source = File.ReadAllText(Path.Combine(commentsDirectory, endpointFile.Key));
+            Assert.Contains(
+                "namespace Zumbo.Api.Presentation.Endpoints.WorkItems.Comments;",
+                source,
+                StringComparison.Ordinal);
+            Assert.Contains(endpointFile.Value, source, StringComparison.Ordinal);
+            Assert.Contains("internal static void Map(RouteGroupBuilder group)", source, StringComparison.Ordinal);
+            Assert.DoesNotContain("partial class WorkItemEndpoints", source, StringComparison.Ordinal);
+        }
+
+        var routeHost = File.ReadAllText(Path.Combine(
+            SourceDirectory,
+            "Zumbo.Api",
+            "Presentation",
+            "Endpoints",
+            "WorkItemEndpoints",
+            "WorkItemEndpoints.MapWorkItemEndpoints.cs"));
+        Assert.Contains("AddCommentEndpoint.Map(group);", routeHost, StringComparison.Ordinal);
+        Assert.Contains("ListCommentsEndpoint.Map(group);", routeHost, StringComparison.Ordinal);
+        Assert.Contains("ListCommentRevisionsEndpoint.Map(group);", routeHost, StringComparison.Ordinal);
+        Assert.Contains("EditCommentEndpoint.Map(group);", routeHost, StringComparison.Ordinal);
+        Assert.Contains("DeleteCommentEndpoint.Map(group);", routeHost, StringComparison.Ordinal);
+
+        var compatibility = File.ReadAllText(Path.Combine(
+            SourceDirectory,
+            "Zumbo.Api",
+            "Presentation",
+            "Endpoints",
+            "WorkItemEndpoints",
+            "WorkItemEndpoints.Comments.cs"));
+        Assert.Contains("private static void MapPostByIdComments", compatibility, StringComparison.Ordinal);
+        Assert.Contains("private static void MapGetByIdComments", compatibility, StringComparison.Ordinal);
+        Assert.Contains("private static void MapGetByIdCommentsByCommentIdRevisions", compatibility, StringComparison.Ordinal);
+        Assert.Contains("private static void MapPutByIdCommentsByCommentId", compatibility, StringComparison.Ordinal);
+        Assert.Contains("private static void MapDeleteByIdCommentsByCommentId", compatibility, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void WorkItemLabelEndpoints_AreIndependentFeatureEndpointClasses()
+    {
+        var labelsDirectory = Path.Combine(
+            SourceDirectory,
+            "Zumbo.Api",
+            "Presentation",
+            "Endpoints",
+            "WorkItems",
+            "Labels");
+        var endpointFiles = new Dictionary<string, string>
+        {
+            ["AddLabelEndpoint.cs"] = "internal static class AddLabelEndpoint",
+            ["RemoveLabelEndpoint.cs"] = "internal static class RemoveLabelEndpoint"
+        };
+
+        foreach (var endpointFile in endpointFiles)
+        {
+            var source = File.ReadAllText(Path.Combine(labelsDirectory, endpointFile.Key));
+            Assert.Contains(
+                "namespace Zumbo.Api.Presentation.Endpoints.WorkItems.Labels;",
+                source,
+                StringComparison.Ordinal);
+            Assert.Contains(endpointFile.Value, source, StringComparison.Ordinal);
+            Assert.Contains("internal static void Map(RouteGroupBuilder group)", source, StringComparison.Ordinal);
+            Assert.DoesNotContain("partial class WorkItemEndpoints", source, StringComparison.Ordinal);
+        }
+
+        var routeHost = File.ReadAllText(Path.Combine(
+            SourceDirectory,
+            "Zumbo.Api",
+            "Presentation",
+            "Endpoints",
+            "WorkItemEndpoints",
+            "WorkItemEndpoints.MapWorkItemEndpoints.cs"));
+        Assert.Contains("AddLabelEndpoint.Map(group);", routeHost, StringComparison.Ordinal);
+        Assert.Contains("RemoveLabelEndpoint.Map(group);", routeHost, StringComparison.Ordinal);
+
+        var compatibility = File.ReadAllText(Path.Combine(
+            SourceDirectory,
+            "Zumbo.Api",
+            "Presentation",
+            "Endpoints",
+            "WorkItemEndpoints",
+            "WorkItemEndpoints.Labels.cs"));
+        Assert.Contains("private static void MapPostByIdLabels", compatibility, StringComparison.Ordinal);
+        Assert.Contains("private static void MapDeleteByIdLabelsByLabel", compatibility, StringComparison.Ordinal);
+        Assert.Contains("AddLabelEndpoint.Map(group);", compatibility, StringComparison.Ordinal);
+        Assert.Contains("RemoveLabelEndpoint.Map(group);", compatibility, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void WorkItemChecklistEndpoints_AreIndependentFeatureEndpointClasses()
+    {
+        var checklistDirectory = Path.Combine(
+            SourceDirectory,
+            "Zumbo.Api",
+            "Presentation",
+            "Endpoints",
+            "WorkItems",
+            "Checklist");
+        var endpointFiles = new Dictionary<string, string>
+        {
+            ["AddChecklistItemEndpoint.cs"] = "internal static class AddChecklistItemEndpoint",
+            ["SetChecklistItemCompletionEndpoint.cs"] = "internal static class SetChecklistItemCompletionEndpoint"
+        };
+
+        foreach (var endpointFile in endpointFiles)
+        {
+            var source = File.ReadAllText(Path.Combine(checklistDirectory, endpointFile.Key));
+            Assert.Contains(
+                "namespace Zumbo.Api.Presentation.Endpoints.WorkItems.Checklist;",
+                source,
+                StringComparison.Ordinal);
+            Assert.Contains(endpointFile.Value, source, StringComparison.Ordinal);
+            Assert.Contains("internal static void Map(RouteGroupBuilder group)", source, StringComparison.Ordinal);
+            Assert.DoesNotContain("partial class WorkItemEndpoints", source, StringComparison.Ordinal);
+        }
+
+        var routeHost = File.ReadAllText(Path.Combine(
+            SourceDirectory,
+            "Zumbo.Api",
+            "Presentation",
+            "Endpoints",
+            "WorkItemEndpoints",
+            "WorkItemEndpoints.MapWorkItemEndpoints.cs"));
+        Assert.Contains("AddChecklistItemEndpoint.Map(group);", routeHost, StringComparison.Ordinal);
+        Assert.Contains("SetChecklistItemCompletionEndpoint.Map(group);", routeHost, StringComparison.Ordinal);
+
+        var compatibility = File.ReadAllText(Path.Combine(
+            SourceDirectory,
+            "Zumbo.Api",
+            "Presentation",
+            "Endpoints",
+            "WorkItemEndpoints",
+            "WorkItemEndpoints.Checklist.cs"));
+        Assert.Contains("private static void MapPostByIdChecklist", compatibility, StringComparison.Ordinal);
+        Assert.Contains("private static void MapPatchByIdChecklistByItemId", compatibility, StringComparison.Ordinal);
+        Assert.Contains("AddChecklistItemEndpoint.Map(group);", compatibility, StringComparison.Ordinal);
+        Assert.Contains("SetChecklistItemCompletionEndpoint.Map(group);", compatibility, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void WorkItemBulkOperations_AreFeatureHandlersWithCompatibilityFacades()
     {
         var moduleDirectory = Path.Combine(SourceDirectory, "Zumbo.Modules.WorkItems");

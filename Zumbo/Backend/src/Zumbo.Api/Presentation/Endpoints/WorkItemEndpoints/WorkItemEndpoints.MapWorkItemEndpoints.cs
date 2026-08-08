@@ -2,6 +2,9 @@ using Zumbo.Modules.WorkItems;
 using Zumbo.BuildingBlocks.Application.Messaging;
 using Zumbo.BuildingBlocks.Application.Security;
 using Zumbo.SharedKernel;
+using Zumbo.Api.Presentation.Endpoints.WorkItems.Checklist;
+using Zumbo.Api.Presentation.Endpoints.WorkItems.Comments;
+using Zumbo.Api.Presentation.Endpoints.WorkItems.Labels;
 
 using static ApiEndpointResults;
 
@@ -108,23 +111,23 @@ internal static partial class WorkItemEndpoints
 
         MapPostByIdApprovalsByApprovalIdDecision(group);
 
-        MapPostByIdChecklist(group);
+        AddChecklistItemEndpoint.Map(group);
 
-        MapPatchByIdChecklistByItemId(group);
+        SetChecklistItemCompletionEndpoint.Map(group);
 
-        MapPostByIdLabels(group);
+        AddLabelEndpoint.Map(group);
 
-        MapDeleteByIdLabelsByLabel(group);
+        RemoveLabelEndpoint.Map(group);
 
-        MapPostByIdComments(group);
+        AddCommentEndpoint.Map(group);
 
-        MapGetByIdComments(group);
+        ListCommentsEndpoint.Map(group);
 
-        MapGetByIdCommentsByCommentIdRevisions(group);
+        ListCommentRevisionsEndpoint.Map(group);
 
-        MapPutByIdCommentsByCommentId(group);
+        EditCommentEndpoint.Map(group);
 
-        MapDeleteByIdCommentsByCommentId(group);
+        DeleteCommentEndpoint.Map(group);
 
         MapPostByIdAttachmentsUpload(group);
 
