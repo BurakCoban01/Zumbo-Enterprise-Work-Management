@@ -10,6 +10,7 @@ using Zumbo.Api.Presentation.Endpoints.WorkItems.Labels;
 using Zumbo.Api.Presentation.Endpoints.WorkItems.Planning;
 using Zumbo.Api.Presentation.Endpoints.WorkItems.Relations;
 using Zumbo.Api.Presentation.Endpoints.WorkItems.Worklogs;
+using Zumbo.Api.Presentation.Endpoints.WorkItems.WorkItemsCore;
 
 using static ApiEndpointResults;
 
@@ -36,9 +37,9 @@ internal static partial class WorkItemEndpoints
 
         MapPostSearch(group);
 
-        MapGetRoot(group);
+        SearchWorkItemsEndpoint.Map(group);
 
-        MapGetById(group);
+        GetWorkItemEndpoint.Map(group);
 
         MapGetByIdCollaboration(group);
 
@@ -70,7 +71,7 @@ internal static partial class WorkItemEndpoints
 
         MapPostRecurrencesProcessDue(group);
 
-        MapPostRoot(group);
+        CreateWorkItemEndpoint.Map(group);
 
         MapPostBulkJobsImport(group);
 
@@ -96,11 +97,11 @@ internal static partial class WorkItemEndpoints
 
         MapPostBulkArchive(group);
 
-        MapPutById(group);
+        UpdateWorkItemEndpoint.Map(group);
 
         AssignWorkItemEndpoint.Map(group);
 
-        MapPatchByIdStatus(group);
+        MoveWorkItemEndpoint.Map(group);
 
         ReorderWorkItemEndpoint.Map(group);
 
@@ -156,9 +157,9 @@ internal static partial class WorkItemEndpoints
 
         UnlinkWorkItemEndpoint.Map(group);
 
-        MapDeleteById(group);
+        ArchiveWorkItemEndpoint.Map(group);
 
-        MapPostByIdRestore(group);
+        RestoreWorkItemEndpoint.Map(group);
 
         MapGetReportsProjectSummaryByProjectId(group);
 

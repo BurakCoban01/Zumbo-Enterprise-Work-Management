@@ -5,11 +5,16 @@ using Zumbo.SharedKernel;
 
 using static ApiEndpointResults;
 
-internal static partial class WorkItemEndpoints
+namespace Zumbo.Api.Presentation.Endpoints.WorkItems.WorkItemsCore;
+
+internal static class ArchiveWorkItemEndpoint
 {
-private static void MapDeleteById(RouteGroupBuilder group){group.MapDelete("/{id}", async (string id, ArchiveWorkItemHandler handler, HttpContext http, CancellationToken ct) =>
+    internal static void Map(RouteGroupBuilder group)
+    {
+        group.MapDelete("/{id}", async (string id, ArchiveWorkItemHandler handler, HttpContext http, CancellationToken ct) =>
         {
             await handler.HandleAsync(new ArchiveWorkItemCommand(id, CorrelationId(http)), ct);
             return Ok(new { archived = true }, http);
         }).WithZumboPermission(PermissionCatalog.WorkItemDelete);
-}}
+    }
+}

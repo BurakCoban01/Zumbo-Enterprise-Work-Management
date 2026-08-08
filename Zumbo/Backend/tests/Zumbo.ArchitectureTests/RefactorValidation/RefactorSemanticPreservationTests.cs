@@ -26,7 +26,21 @@ public sealed class RefactorSemanticPreservationTests
             ["Zumbo.Modules.WorkItems|Zumbo.Modules.WorkItems.DashboardRenderer|method:RenderSourceAsync:(stringprojectId,stringtype,DashboardFilterRequestfilter,CancellationTokenct):Task<DashboardWidgetSourceResponse>"] =
                 "The dashboard renderer selects project-summary, status-distribution, user-workload, due-date-risk, flow-time, completion-rate, and team-performance handlers when composed through its new constructor while its preserved constructor retains WorkItemService fallback; query values, filtering, columns, rows, source metadata, cancellation, degradation, and unsupported-widget behavior remain unchanged.",
             ["Zumbo.Api|WorkItemEndpoints|method:MapWorkItemEndpoints:(thisRouteGroupBuilderapi):void"] =
-                "The route host delegates approval, attachment, checklist, comment, label, planning, relation and worklog routes to independent feature endpoint classes while preserving the original private mapping members in responsibility-grouped compatibility partials; all other mappings retain their route-specific partial delegation, and HTTP route, metadata, authorization, request, response, and handler equivalence is verified by the runtime contract audit.",
+                "The route host delegates approval, attachment, checklist, comment, label, planning, relation, work-item core and worklog routes to independent feature endpoint classes while preserving the original private mapping members in responsibility-grouped compatibility partials; all other mappings retain their route-specific partial delegation, and HTTP route, metadata, authorization, request, response, and handler equivalence is verified by the runtime contract audit.",
+            ["Zumbo.Api|WorkItemEndpoints|method:MapDeleteById:(RouteGroupBuildergroup):void"] =
+                "The preserved private compatibility member delegates to ArchiveWorkItemEndpoint while retaining route binding, authorization, correlation, handler, cancellation, archive response, and HTTP behavior.",
+            ["Zumbo.Api|WorkItemEndpoints|method:MapGetById:(RouteGroupBuildergroup):void"] =
+                "The preserved private compatibility member delegates to GetWorkItemEndpoint while retaining route binding, handler, cancellation, query, and response behavior.",
+            ["Zumbo.Api|WorkItemEndpoints|method:MapGetRoot:(RouteGroupBuildergroup):void"] =
+                "The preserved private compatibility member delegates to SearchWorkItemsEndpoint while retaining query binding, defaults, handler, rate limiting, cancellation, and response behavior.",
+            ["Zumbo.Api|WorkItemEndpoints|method:MapPatchByIdStatus:(RouteGroupBuildergroup):void"] =
+                "The preserved private compatibility member delegates to MoveWorkItemEndpoint while retaining route and request binding, authorization, correlation, handler, cancellation, and response behavior.",
+            ["Zumbo.Api|WorkItemEndpoints|method:MapPostByIdRestore:(RouteGroupBuildergroup):void"] =
+                "The preserved private compatibility member delegates to RestoreWorkItemEndpoint while retaining route binding, authorization, correlation, handler, cancellation, and response behavior.",
+            ["Zumbo.Api|WorkItemEndpoints|method:MapPostRoot:(RouteGroupBuildergroup):void"] =
+                "The preserved private compatibility member delegates to CreateWorkItemEndpoint while retaining request binding, authorization, correlation, handler, cancellation, created response, and HTTP behavior.",
+            ["Zumbo.Api|WorkItemEndpoints|method:MapPutById:(RouteGroupBuildergroup):void"] =
+                "The preserved private compatibility member delegates to UpdateWorkItemEndpoint while retaining route and request binding, authorization, correlation, handler, cancellation, and response behavior.",
             ["Zumbo.Api|WorkItemEndpoints|method:MapPatchByIdParent:(RouteGroupBuildergroup):void"] =
                 "The preserved private compatibility member delegates to SetParentEndpoint while retaining route and request binding, authorization, correlation, handler, cancellation, and response behavior.",
             ["Zumbo.Api|WorkItemEndpoints|method:MapPatchByIdAssignee:(RouteGroupBuildergroup):void"] =

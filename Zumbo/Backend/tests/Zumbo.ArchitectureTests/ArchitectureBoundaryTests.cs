@@ -1555,6 +1555,46 @@ public sealed class ArchitectureBoundaryTests
     }
 
     [Fact]
+    public void WorkItemCoreEndpoints_AreIndependentFeatureEndpointClasses()
+    {
+        var directory = Path.Combine(SourceDirectory, "Zumbo.Api", "Presentation", "Endpoints", "WorkItems", "WorkItemsCore");
+        var endpointFiles = new Dictionary<string, string>
+        {
+            ["ArchiveWorkItemEndpoint.cs"] = "ArchiveWorkItemEndpoint",
+            ["CreateWorkItemEndpoint.cs"] = "CreateWorkItemEndpoint",
+            ["GetWorkItemEndpoint.cs"] = "GetWorkItemEndpoint",
+            ["MoveWorkItemEndpoint.cs"] = "MoveWorkItemEndpoint",
+            ["RestoreWorkItemEndpoint.cs"] = "RestoreWorkItemEndpoint",
+            ["SearchWorkItemsEndpoint.cs"] = "SearchWorkItemsEndpoint",
+            ["UpdateWorkItemEndpoint.cs"] = "UpdateWorkItemEndpoint"
+        };
+
+        foreach (var endpointFile in endpointFiles)
+        {
+            var source = File.ReadAllText(Path.Combine(directory, endpointFile.Key));
+            Assert.Contains("namespace Zumbo.Api.Presentation.Endpoints.WorkItems.WorkItemsCore;", source, StringComparison.Ordinal);
+            Assert.Contains($"internal static class {endpointFile.Value}", source, StringComparison.Ordinal);
+            Assert.Contains("internal static void Map(RouteGroupBuilder group)", source, StringComparison.Ordinal);
+            Assert.DoesNotContain("partial class WorkItemEndpoints", source, StringComparison.Ordinal);
+        }
+
+        var routeHost = File.ReadAllText(Path.Combine(SourceDirectory, "Zumbo.Api", "Presentation", "Endpoints", "WorkItemEndpoints", "WorkItemEndpoints.MapWorkItemEndpoints.cs"));
+        foreach (var endpointClass in endpointFiles.Values)
+        {
+            Assert.Contains($"{endpointClass}.Map(group);", routeHost, StringComparison.Ordinal);
+        }
+
+        var compatibility = File.ReadAllText(Path.Combine(SourceDirectory, "Zumbo.Api", "Presentation", "Endpoints", "WorkItemEndpoints", "WorkItemEndpoints.WorkItemsCore.cs"));
+        Assert.Contains("MapDeleteById", compatibility, StringComparison.Ordinal);
+        Assert.Contains("MapGetById", compatibility, StringComparison.Ordinal);
+        Assert.Contains("MapGetRoot", compatibility, StringComparison.Ordinal);
+        Assert.Contains("MapPatchByIdStatus", compatibility, StringComparison.Ordinal);
+        Assert.Contains("MapPostByIdRestore", compatibility, StringComparison.Ordinal);
+        Assert.Contains("MapPostRoot", compatibility, StringComparison.Ordinal);
+        Assert.Contains("MapPutById", compatibility, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void WorkItemBulkOperations_AreFeatureHandlersWithCompatibilityFacades()
     {
         var moduleDirectory = Path.Combine(SourceDirectory, "Zumbo.Modules.WorkItems");

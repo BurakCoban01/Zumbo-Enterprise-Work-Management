@@ -5,9 +5,14 @@ using Zumbo.SharedKernel;
 
 using static ApiEndpointResults;
 
-internal static partial class WorkItemEndpoints
+namespace Zumbo.Api.Presentation.Endpoints.WorkItems.WorkItemsCore;
+
+internal static class RestoreWorkItemEndpoint
 {
-private static void MapPostByIdRestore(RouteGroupBuilder group){group.MapPost("/{id}/restore", async (string id, RestoreWorkItemHandler handler, HttpContext http, CancellationToken ct) =>
+    internal static void Map(RouteGroupBuilder group)
+    {
+        group.MapPost("/{id}/restore", async (string id, RestoreWorkItemHandler handler, HttpContext http, CancellationToken ct) =>
             Ok(await handler.HandleAsync(new RestoreWorkItemCommand(id, CorrelationId(http)), ct), http))
             .WithZumboPermission(PermissionCatalog.WorkItemDelete);
-}}
+    }
+}

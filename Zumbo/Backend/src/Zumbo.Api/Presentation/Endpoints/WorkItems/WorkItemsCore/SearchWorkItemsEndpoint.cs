@@ -5,9 +5,13 @@ using Zumbo.SharedKernel;
 
 using static ApiEndpointResults;
 
-internal static partial class WorkItemEndpoints
+namespace Zumbo.Api.Presentation.Endpoints.WorkItems.WorkItemsCore;
+
+internal static class SearchWorkItemsEndpoint
 {
-private static void MapGetRoot(RouteGroupBuilder group){group.MapGet("/", async (
+    internal static void Map(RouteGroupBuilder group)
+    {
+        group.MapGet("/", async (
             string? projectId,
             string? assigneeUserId,
             string? status,
@@ -35,4 +39,5 @@ private static void MapGetRoot(RouteGroupBuilder group){group.MapGet("/", async 
                     customFieldValue),
                 ct), http))
             .RequireRateLimiting("search");
-}}
+    }
+}
