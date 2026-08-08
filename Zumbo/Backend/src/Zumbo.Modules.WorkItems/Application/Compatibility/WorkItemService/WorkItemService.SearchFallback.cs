@@ -8,22 +8,7 @@ public sealed partial class WorkItemService
         ToSearchRecord(item, CurrentOrganizationId(item.ProjectId));
 
     public static WorkItemSearchRecord ToSearchRecord(WorkItemDocument item, string organizationId = "") =>
-        new(
-            item.Id,
-            item.ProjectId,
-            item.BoardId,
-            item.Title,
-            item.Description,
-            item.Status,
-            item.Priority,
-            item.AssigneeUserId,
-            item.Labels,
-            item.Type,
-            string.Join(' ', item.CustomFields.Where(value => value.Indexed).Select(value => value.SearchValue)),
-            item.CustomFields
-                .Select(value => $"{value.FieldKey}\u001f{value.SearchValue}")
-                .ToList(),
-            organizationId);
+        WorkItemPublicationMapper.ToSearchRecord(item, organizationId);
 
     private async Task<WorkItemSearchPageResponse> SearchDegradedAsync(
         WorkItemSearchRequest request,

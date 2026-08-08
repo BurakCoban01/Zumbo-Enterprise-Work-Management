@@ -84,20 +84,5 @@ public sealed partial class WorkItemService
                 value.OptionKey)).ToList());
 
     internal static WorkItemRealtimeItem ToRealtimeItem(WorkItemDocument item) =>
-        new(
-            item.Id,
-            item.ProjectId,
-            item.BoardId,
-            item.ColumnId,
-            item.Title,
-            item.Type,
-            item.Priority,
-            item.Status,
-            item.AssigneeUserId,
-            item.DueDate,
-            item.SprintId,
-            item.EstimatePoints,
-            item.CompletedAt,
-            item.Rank,
-            item.Version);
+        WorkItemPublicationMapper.ToRealtimeItem(item);
 }

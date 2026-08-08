@@ -6,6 +6,9 @@ using Zumbo.BuildingBlocks.Application.Persistence;
 using Zumbo.BuildingBlocks.Application.Runtime;
 using Zumbo.BuildingBlocks.Application.Search;
 using Zumbo.BuildingBlocks.Application.Security;
+using Zumbo.Modules.WorkItems.Application.Features.BulkOperations.Archive;
+using Zumbo.Modules.WorkItems.Application.Features.BulkOperations.Assign;
+using Zumbo.Modules.WorkItems.Application.Features.BulkOperations.Move;
 using Zumbo.SharedKernel;
 
 namespace Zumbo.Modules.WorkItems;
@@ -19,28 +22,18 @@ public sealed partial class WorkItemService
         => await restoreWorkItemHandler.HandleAsync(new RestoreWorkItemCommand(id, correlationId), ct);
 
     public Task<BulkWorkItemResponse> BulkMoveAsync(BulkMoveWorkItemsRequest request, string correlationId, CancellationToken ct) =>
-        ExecuteBulkAsync(
-            request.WorkItemIds,
-            (id, itemCorrelationId, token) => MoveAsync(id, new MoveWorkItemRequest(request.Status), itemCorrelationId, token),
-            correlationId,
+        new BulkMoveWorkItemsHandler(moveWorkItemHandler).HandleAsync(
+            new BulkMoveWorkItemsCommand(request, correlationId),
             ct);
 
     public Task<BulkWorkItemResponse> BulkAssignAsync(BulkAssignWorkItemsRequest request, string correlationId, CancellationToken ct) =>
-        ExecuteBulkAsync(
-            request.WorkItemIds,
-            (id, itemCorrelationId, token) => AssignAsync(id, new AssignWorkItemRequest(request.AssigneeUserId), itemCorrelationId, token),
-            correlationId,
+        new BulkAssignWorkItemsHandler(assignWorkItemHandler).HandleAsync(
+            new BulkAssignWorkItemsCommand(request, correlationId),
             ct);
 
     public Task<BulkWorkItemResponse> BulkArchiveAsync(BulkArchiveWorkItemsRequest request, string correlationId, CancellationToken ct) =>
-        ExecuteBulkAsync(
-            request.WorkItemIds,
-            async (id, itemCorrelationId, token) =>
-            {
-                await ArchiveAsync(id, itemCorrelationId, token);
-                return true;
-            },
-            correlationId,
+        new BulkArchiveWorkItemsHandler(archiveWorkItemHandler).HandleAsync(
+            new BulkArchiveWorkItemsCommand(request, correlationId),
             ct);
 
     private async Task RecordActivityAndNotifyWatchersAsync(

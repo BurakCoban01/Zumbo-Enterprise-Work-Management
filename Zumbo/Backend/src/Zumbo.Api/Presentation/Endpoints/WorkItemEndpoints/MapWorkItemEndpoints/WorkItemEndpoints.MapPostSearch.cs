@@ -9,9 +9,9 @@ internal static partial class WorkItemEndpoints
 {
 private static void MapPostSearch(RouteGroupBuilder group){group.MapPost("/search", async (
             WorkItemSearchRequest request,
-            WorkItemService service,
+            SearchWorkItemsHandler handler,
             HttpContext http,
             CancellationToken ct) =>
-            Ok(await service.SearchPageAsync(request, ct), http))
+            Ok(await handler.HandlePageAsync(request, ct), http))
             .RequireRateLimiting("search");
 }}

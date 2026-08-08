@@ -31,6 +31,7 @@ using Zumbo.Modules.Organizations;
 using Zumbo.Modules.Projects;
 using Zumbo.Modules.Teams;
 using Zumbo.Modules.WorkItems;
+using Zumbo.Modules.WorkItems.Application.Features.Intake;
 using Zumbo.Modules.Workflows;
 using Zumbo.SharedKernel;
 
@@ -693,7 +694,8 @@ public sealed class DomainRuleTests
     {
         var repository = new InMemoryDocumentRepository<WorkItemDocument>();
         var service = CreateWorkItemService(repository);
-        var creator = Assert.IsAssignableFrom<IIntakeWorkItemCreator>(service);
+        IIntakeWorkItemCreator creator = new CreateIntakeWorkItemHandler(
+            new CreateWorkItemHandler(service));
         var creation = new IntakeWorkItemCreation(
             "org-1",
             "submission-1",

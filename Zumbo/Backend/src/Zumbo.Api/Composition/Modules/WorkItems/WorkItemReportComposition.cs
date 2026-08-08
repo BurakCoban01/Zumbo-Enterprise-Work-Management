@@ -7,6 +7,21 @@ namespace Zumbo.Api.Composition.Modules.WorkItems;
 
 internal static class WorkItemReportComposition
 {
+    internal static IServiceCollection AddWorkItemDashboardRenderer(this IServiceCollection services)
+    {
+        services.AddScoped<DashboardRenderer>(provider => new DashboardRenderer(
+            provider.GetRequiredService<DashboardService>(),
+            provider.GetRequiredService<ProjectSummaryHandler>(),
+            provider.GetRequiredService<StatusDistributionHandler>(),
+            provider.GetRequiredService<UserWorkloadHandler>(),
+            provider.GetRequiredService<DueDateRisksHandler>(),
+            provider.GetRequiredService<FlowTimeHandler>(),
+            provider.GetRequiredService<CompletionRateHandler>(),
+            provider.GetRequiredService<TeamPerformanceHandler>(),
+            provider.GetRequiredService<IClock>()));
+        return services;
+    }
+
     internal static IServiceCollection AddWorkItemReportHandlers(this IServiceCollection services)
     {
         services.AddScoped<ProjectSummaryHandler>(provider => new ProjectSummaryHandler(

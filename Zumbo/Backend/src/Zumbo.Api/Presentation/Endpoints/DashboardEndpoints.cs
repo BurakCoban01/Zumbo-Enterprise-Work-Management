@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
+using Zumbo.Api.Composition.Modules.WorkItems;
 using Zumbo.BuildingBlocks.Application.Security;
 using Zumbo.Modules.WorkItems;
 
@@ -12,7 +13,7 @@ internal static class DashboardEndpoints
         services.AddScoped<IDashboardViewerDirectory, DashboardViewerDirectoryAdapter>();
         services.AddScoped<IDashboardAuditWriter, DashboardAuditWriterAdapter>();
         services.AddScoped<DashboardService>();
-        services.AddScoped<DashboardRenderer>();
+        services.AddWorkItemDashboardRenderer();
         return services;
     }
 

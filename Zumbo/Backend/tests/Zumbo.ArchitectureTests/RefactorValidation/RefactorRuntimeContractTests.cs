@@ -33,7 +33,11 @@ public sealed class RefactorRuntimeContractTests
         "services.AddScoped<UpsertWorkflowHandler>();",
         "services.AddScoped<GetWorkflowHandler>();",
         "services.AddScoped<CreateWorkItemHandler>();",
+        "services.AddScoped<IIntakeWorkItemCreator>(provider=>provider.GetRequiredService<WorkItemService>());",
         "services.AddScoped<SearchWorkItemsHandler>();",
+        "services.AddScoped<WorkItemBulkJobProcessor>();",
+        "services.AddScoped<IAutomationActionExecutor,AutomationWorkItemActionExecutor>();",
+        "services.AddScoped<DashboardRenderer>();",
         "services.AddScoped<ListNotificationsHandler>();",
         "services.AddScoped<MarkNotificationAsReadHandler>();",
         "services.AddScoped<WriteAuditLogHandler>();",
@@ -177,6 +181,8 @@ public sealed class RefactorRuntimeContractTests
         + "provider.GetService<WorkItemCollaborationService>(),"
         + "provider.GetService<IWorkItemAutomationEventPublisher>(),"
         + "provider.GetService<IWorkItemAutomationChainContextAccessor>()));",
+        "services.AddScoped<IIntakeWorkItemCreator>(provider=>"
+        + "newCreateIntakeWorkItemHandler(provider.GetRequiredService<CreateWorkItemHandler>()));",
         "services.AddScoped<SearchWorkItemsHandler>(provider=>newSearchWorkItemsHandler("
         + "provider.GetRequiredService<IDocumentRepository<WorkItemDocument>>(),"
         + "provider.GetRequiredService<ICurrentUser>(),"
@@ -185,6 +191,46 @@ public sealed class RefactorRuntimeContractTests
         + "provider.GetRequiredService<IWorkItemSearchIndex>(),"
         + "provider.GetRequiredService<IWorkItemActivityStore>(),"
         + "provider.GetRequiredService<IOptions<SearchOptions>>()));",
+        "services.AddScoped<BulkMoveWorkItemsHandler>();",
+        "services.AddScoped<BulkAssignWorkItemsHandler>();",
+        "services.AddScoped<BulkArchiveWorkItemsHandler>();",
+        "services.AddScoped<WorkItemBulkJobProcessor>(provider=>newWorkItemBulkJobProcessor("
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemBulkJobDocument>>(),"
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemBulkJobItemDocument>>(),"
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemDocument>>(),"
+        + "provider.GetRequiredService<IProjectPermissionChecker>(),"
+        + "provider.GetRequiredService<IBoardPlacementPolicy>(),"
+        + "provider.GetRequiredService<IWorkItemTeamPolicy>(),"
+        + "provider.GetRequiredService<IWorkItemTypeSchemaPolicy>(),"
+        + "provider.GetRequiredService<IWorkItemBulkJobEventPublisher>(),"
+        + "provider.GetRequiredService<IWorkItemBulkArtifactStorage>(),"
+        + "provider.GetRequiredService<IWorkItemAuditPublisher>(),"
+        + "provider.GetRequiredService<IOptions<WorkItemBulkJobOptions>>(),"
+        + "provider.GetRequiredService<IClock>(),"
+        + "provider.GetRequiredService<ICurrentUser>(),"
+        + "provider.GetRequiredService<CreateWorkItemHandler>(),"
+        + "provider.GetRequiredService<MoveWorkItemHandler>(),"
+        + "provider.GetRequiredService<AssignWorkItemHandler>(),"
+        + "provider.GetRequiredService<ArchiveWorkItemHandler>()));",
+        "services.AddScoped<IAutomationActionExecutor>(provider=>newAutomationWorkItemActionExecutor("
+        + "provider.GetRequiredService<GetWorkItemHandler>(),"
+        + "provider.GetRequiredService<AssignWorkItemHandler>(),"
+        + "provider.GetRequiredService<ClearAssigneeHandler>(),"
+        + "provider.GetRequiredService<AddLabelHandler>(),"
+        + "provider.GetRequiredService<RemoveLabelHandler>(),"
+        + "provider.GetRequiredService<UpdateWorkItemHandler>(),"
+        + "provider.GetRequiredService<AddCommentHandler>(),"
+        + "provider.GetRequiredService<IWorkItemAutomationChainContextAccessor>()));",
+        "services.AddScoped<DashboardRenderer>(provider=>newDashboardRenderer("
+        + "provider.GetRequiredService<DashboardService>(),"
+        + "provider.GetRequiredService<ProjectSummaryHandler>(),"
+        + "provider.GetRequiredService<StatusDistributionHandler>(),"
+        + "provider.GetRequiredService<UserWorkloadHandler>(),"
+        + "provider.GetRequiredService<DueDateRisksHandler>(),"
+        + "provider.GetRequiredService<FlowTimeHandler>(),"
+        + "provider.GetRequiredService<CompletionRateHandler>(),"
+        + "provider.GetRequiredService<TeamPerformanceHandler>(),"
+        + "provider.GetRequiredService<IClock>()));",
         "services.AddScoped<GetWorkItemHandler>(provider=>newGetWorkItemHandler("
         + "provider.GetRequiredService<IDocumentRepository<WorkItemDocument>>(),"
         + "provider.GetRequiredService<ICurrentUser>(),"
@@ -725,6 +771,14 @@ public sealed class RefactorRuntimeContractTests
         + "Ok(awaitservice.GetAsync(id,ct),http));",
         "group.MapGet(\"/{id}\",async(stringid,WorkItemServiceservice,HttpContexthttp,CancellationTokenct)=>"
         + "Ok(awaitservice.GetAsync(id,ct),http));",
+        "group.MapPost(\"/search\",async(WorkItemSearchRequestrequest,WorkItemServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.SearchPageAsync(request,ct),http)).RequireRateLimiting(\"search\");",
+        "group.MapPost(\"/bulk/move\",async(BulkMoveWorkItemsRequestrequest,WorkItemServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.BulkMoveAsync(request,CorrelationId(http),ct),http)).WithZumboPermission(PermissionCatalog.WorkItemMove).RequireRateLimiting(\"bulk\");",
+        "group.MapPost(\"/bulk/assign\",async(BulkAssignWorkItemsRequestrequest,WorkItemServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.BulkAssignAsync(request,CorrelationId(http),ct),http)).WithZumboPermission(PermissionCatalog.WorkItemAssign).RequireRateLimiting(\"bulk\");",
+        "group.MapPost(\"/bulk/archive\",async(BulkArchiveWorkItemsRequestrequest,WorkItemServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.BulkArchiveAsync(request,CorrelationId(http),ct),http)).WithZumboPermission(PermissionCatalog.WorkItemDelete).RequireRateLimiting(\"bulk\");",
         "group.MapPut(\"/{id}\",async(stringid,UpdateWorkItemRequestrequest,WorkItemServiceservice,HttpContexthttp,CancellationTokenct)=>"
         + "Ok(awaitservice.UpdateAsync(id,request,CorrelationId(http),ct),http))"
         + ".WithZumboPermission(PermissionCatalog.WorkItemUpdate);",
@@ -969,6 +1023,14 @@ public sealed class RefactorRuntimeContractTests
         + "Ok(awaithandler.HandleAsync(newGetWebhookSubscriptionQuery(id),ct),http));",
         "group.MapGet(\"/{id}\",async(stringid,GetWorkItemHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
         + "Ok(awaithandler.HandleAsync(newGetWorkItemQuery(id),ct),http));",
+        "group.MapPost(\"/search\",async(WorkItemSearchRequestrequest,SearchWorkItemsHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandlePageAsync(request,ct),http)).RequireRateLimiting(\"search\");",
+        "group.MapPost(\"/bulk/move\",async(BulkMoveWorkItemsRequestrequest,BulkMoveWorkItemsHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newBulkMoveWorkItemsCommand(request,CorrelationId(http)),ct),http)).WithZumboPermission(PermissionCatalog.WorkItemMove).RequireRateLimiting(\"bulk\");",
+        "group.MapPost(\"/bulk/assign\",async(BulkAssignWorkItemsRequestrequest,BulkAssignWorkItemsHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newBulkAssignWorkItemsCommand(request,CorrelationId(http)),ct),http)).WithZumboPermission(PermissionCatalog.WorkItemAssign).RequireRateLimiting(\"bulk\");",
+        "group.MapPost(\"/bulk/archive\",async(BulkArchiveWorkItemsRequestrequest,BulkArchiveWorkItemsHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newBulkArchiveWorkItemsCommand(request,CorrelationId(http)),ct),http)).WithZumboPermission(PermissionCatalog.WorkItemDelete).RequireRateLimiting(\"bulk\");",
         "group.MapPut(\"/{id}\",async(stringid,UpdateWorkItemRequestrequest,UpdateWorkItemHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
         + "Ok(awaithandler.HandleAsync(newUpdateWorkItemCommand(id,request,CorrelationId(http)),ct),http))"
         + ".WithZumboPermission(PermissionCatalog.WorkItemUpdate);",
@@ -1212,6 +1274,12 @@ public sealed class RefactorRuntimeContractTests
                 "CreateBoardHandler and ListBoardsByProjectHandler remain scoped self-services; explicit factories select their port-focused constructors while compatibility constructors remain available.",
                 "UpsertWorkflowHandler and GetWorkflowHandler remain scoped self-services; explicit factories select their port-focused constructors while compatibility constructors remain available.",
                 "CreateWorkItemHandler and SearchWorkItemsHandler remain scoped self-services; explicit factories select their port-focused constructors while compatibility constructors remain available.",
+                "The intake work-item creator port resolves CreateIntakeWorkItemHandler over the port-focused create handler instead of WorkItemService; the explicit compatibility interface implementation remains available without serving the production intake caller.",
+                "The paged work-item search route resolves SearchWorkItemsHandler directly while preserving request binding, rate limiting, response mapping, compatibility facade, and scoped port-focused registration.",
+                "The bulk move, assign, and archive routes resolve feature handlers over their port-focused single-item handlers while preserving sequential execution, validation, item correlation IDs, per-item Zumbo error results, authorization, rate limiting, response mapping, and compatibility facades.",
+                "WorkItemBulkJobProcessor resolves create, move, assign, and archive handlers through its port-focused constructor; its original WorkItemService constructor remains available for compatibility while job ownership, dry-run, idempotency, batching, progress, artifact, audit, retry, and cancellation behavior stays unchanged.",
+                "AutomationWorkItemActionExecutor resolves read, assignment, label, priority, and comment handlers through its port-focused constructor; its original WorkItemService constructor remains available for compatibility while action no-op checks, command values, chain context, correlation and comment idempotency values, cancellation, and unsupported-action behavior stay unchanged.",
+                "DashboardRenderer resolves all seven work-item report handlers through its port-focused constructor; its original WorkItemService constructor remains available for compatibility while dashboard ordering, filtering, source metadata, degradation behavior, formatting, and response aggregation stay unchanged.",
                 "The single work-item read route resolves GetWorkItemHandler directly; its active-record filter, not-found contract, duplicate view-permission checks, organization-scoped activity hydration, response mapping, compatibility facade, and scoped registration remain preserved.",
                 "The work-item archive route resolves ArchiveWorkItemHandler directly; its route, authorization metadata, correlation ID, active-record reads, project-structure lock, active-child rejection, WIP release, optimistic persistence, search deletion, audit, watcher activity, realtime publication, cache invalidation, compatibility facade, and scoped registration remain preserved.",
                 "The work-item restore route resolves RestoreWorkItemHandler directly; its route, authorization metadata, correlation ID, archived-record reads, project-structure and placement locks, board placement, WIP capacity and reservation, rank allocation, optimistic persistence, search indexing, audit, watcher activity, realtime publication, cache invalidation, response mapping, compatibility facade, and scoped registration remain preserved.",

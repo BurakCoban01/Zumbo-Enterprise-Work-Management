@@ -601,12 +601,23 @@ public sealed class ArchitectureBoundaryTests
         Assert.Contains("createOrganizationHandler.HandleAsync", facade, StringComparison.Ordinal);
         Assert.Contains("listOrganizationsHandler.HandleAsync", facade, StringComparison.Ordinal);
 
-        var composition = File.ReadAllText(Path.Combine(
+        var endpointHost = File.ReadAllText(Path.Combine(
             SourceDirectory,
             "Zumbo.Api",
             "Presentation",
             "Endpoints",
             "OrganizationsEndpoints.cs"));
+        Assert.Contains("services.AddOrganizationServices()", endpointHost, StringComparison.Ordinal);
+        Assert.DoesNotContain("IDocumentRepository", endpointHost, StringComparison.Ordinal);
+        Assert.DoesNotContain("OrganizationDocument", endpointHost, StringComparison.Ordinal);
+
+        var composition = File.ReadAllText(Path.Combine(
+            SourceDirectory,
+            "Zumbo.Api",
+            "Composition",
+            "Modules",
+            "Organizations",
+            "OrganizationModuleComposition.cs"));
         Assert.Contains("AddScoped<CreateOrganizationHandler>(provider =>", composition, StringComparison.Ordinal);
         Assert.Contains("AddScoped<ListOrganizationsHandler>(provider =>", composition, StringComparison.Ordinal);
     }
@@ -654,12 +665,26 @@ public sealed class ArchitectureBoundaryTests
         Assert.Contains("createTeamHandler.HandleAsync", facade, StringComparison.Ordinal);
         Assert.Contains("listTeamsHandler.HandleAsync", facade, StringComparison.Ordinal);
 
-        var composition = File.ReadAllText(Path.Combine(
+        var endpointHost = File.ReadAllText(Path.Combine(
             SourceDirectory,
             "Zumbo.Api",
             "Presentation",
             "Endpoints",
             "TeamsEndpoints.cs"));
+        Assert.Contains("services.AddTeamServices()", endpointHost, StringComparison.Ordinal);
+        Assert.DoesNotContain("IDocumentRepository", endpointHost, StringComparison.Ordinal);
+        Assert.DoesNotContain("TeamDocument", endpointHost, StringComparison.Ordinal);
+
+        var composition = File.ReadAllText(Path.Combine(
+            SourceDirectory,
+            "Zumbo.Api",
+            "Composition",
+            "Modules",
+            "Teams",
+            "TeamModuleComposition.cs"));
+        Assert.Contains("AddScoped<DurableTeamInvitationPublisher>()", composition, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<IDurableEventHandler, TeamInvitationNotificationHandler>()", composition, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<TeamTransactionFilter>()", composition, StringComparison.Ordinal);
         Assert.Contains("AddScoped<CreateTeamHandler>(provider =>", composition, StringComparison.Ordinal);
         Assert.Contains("AddScoped<ListTeamsHandler>(provider =>", composition, StringComparison.Ordinal);
     }
@@ -708,12 +733,23 @@ public sealed class ArchitectureBoundaryTests
         Assert.Contains("createProjectHandler.HandleAsync", facade, StringComparison.Ordinal);
         Assert.Contains("listProjectsHandler.HandleAsync", facade, StringComparison.Ordinal);
 
-        var composition = File.ReadAllText(Path.Combine(
+        var endpointHost = File.ReadAllText(Path.Combine(
             SourceDirectory,
             "Zumbo.Api",
             "Presentation",
             "Endpoints",
             "ProjectsEndpoints.cs"));
+        Assert.Contains("services.AddProjectServices()", endpointHost, StringComparison.Ordinal);
+        Assert.DoesNotContain("IDocumentRepository", endpointHost, StringComparison.Ordinal);
+        Assert.DoesNotContain("ProjectDocument", endpointHost, StringComparison.Ordinal);
+
+        var composition = File.ReadAllText(Path.Combine(
+            SourceDirectory,
+            "Zumbo.Api",
+            "Composition",
+            "Modules",
+            "Projects",
+            "ProjectModuleComposition.cs"));
         Assert.Contains("AddScoped<CreateProjectHandler>(provider =>", composition, StringComparison.Ordinal);
         Assert.Contains("AddScoped<ListProjectsHandler>(provider =>", composition, StringComparison.Ordinal);
     }
@@ -809,26 +845,37 @@ public sealed class ArchitectureBoundaryTests
         Assert.Contains("addColumnHandler.HandleAsync", columnsFacade, StringComparison.Ordinal);
         Assert.Contains("updateColumnHandler.HandleAsync", columnsFacade, StringComparison.Ordinal);
 
-        var composition = File.ReadAllText(Path.Combine(
+        var endpointHost = File.ReadAllText(Path.Combine(
             SourceDirectory,
             "Zumbo.Api",
             "Presentation",
             "Endpoints",
             "BoardsEndpoints.cs"));
+        Assert.Contains("services.AddBoardServices()", endpointHost, StringComparison.Ordinal);
+        Assert.DoesNotContain("IDocumentRepository", endpointHost, StringComparison.Ordinal);
+        Assert.DoesNotContain("BoardDocument", endpointHost, StringComparison.Ordinal);
+
+        var composition = File.ReadAllText(Path.Combine(
+            SourceDirectory,
+            "Zumbo.Api",
+            "Composition",
+            "Modules",
+            "Boards",
+            "BoardModuleComposition.cs"));
         Assert.Contains("AddScoped<CreateBoardHandler>(provider =>", composition, StringComparison.Ordinal);
         Assert.Contains("AddScoped<ListBoardsByProjectHandler>(provider =>", composition, StringComparison.Ordinal);
         Assert.Contains("AddScoped<UpdateBoardHandler>()", composition, StringComparison.Ordinal);
-        Assert.Contains("UpdateBoardHandler handler", composition, StringComparison.Ordinal);
+        Assert.Contains("UpdateBoardHandler handler", endpointHost, StringComparison.Ordinal);
         Assert.Contains("AddScoped<ArchiveBoardHandler>()", composition, StringComparison.Ordinal);
-        Assert.Contains("ArchiveBoardHandler handler", composition, StringComparison.Ordinal);
+        Assert.Contains("ArchiveBoardHandler handler", endpointHost, StringComparison.Ordinal);
         Assert.Contains("AddScoped<RestoreBoardHandler>()", composition, StringComparison.Ordinal);
-        Assert.Contains("RestoreBoardHandler handler", composition, StringComparison.Ordinal);
+        Assert.Contains("RestoreBoardHandler handler", endpointHost, StringComparison.Ordinal);
         Assert.Contains("AddScoped<UpdateSwimlaneHandler>()", composition, StringComparison.Ordinal);
-        Assert.Contains("UpdateSwimlaneHandler handler", composition, StringComparison.Ordinal);
+        Assert.Contains("UpdateSwimlaneHandler handler", endpointHost, StringComparison.Ordinal);
         Assert.Contains("AddScoped<AddColumnHandler>()", composition, StringComparison.Ordinal);
-        Assert.Contains("AddColumnHandler handler", composition, StringComparison.Ordinal);
+        Assert.Contains("AddColumnHandler handler", endpointHost, StringComparison.Ordinal);
         Assert.Contains("AddScoped<UpdateColumnHandler>()", composition, StringComparison.Ordinal);
-        Assert.Contains("UpdateColumnHandler handler", composition, StringComparison.Ordinal);
+        Assert.Contains("UpdateColumnHandler handler", endpointHost, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -876,12 +923,23 @@ public sealed class ArchitectureBoundaryTests
         Assert.Contains("upsertWorkflowHandler.HandleAsync", facade, StringComparison.Ordinal);
         Assert.Contains("getWorkflowHandler.HandleAsync", facade, StringComparison.Ordinal);
 
-        var composition = File.ReadAllText(Path.Combine(
+        var endpointHost = File.ReadAllText(Path.Combine(
             SourceDirectory,
             "Zumbo.Api",
             "Presentation",
             "Endpoints",
             "WorkflowEndpoints.cs"));
+        Assert.Contains("services.AddWorkflowServices(configuration)", endpointHost, StringComparison.Ordinal);
+        Assert.DoesNotContain("IDocumentRepository", endpointHost, StringComparison.Ordinal);
+        Assert.DoesNotContain("WorkflowDefinitionDocument", endpointHost, StringComparison.Ordinal);
+
+        var composition = File.ReadAllText(Path.Combine(
+            SourceDirectory,
+            "Zumbo.Api",
+            "Composition",
+            "Modules",
+            "Workflows",
+            "WorkflowModuleComposition.cs"));
         Assert.Contains("AddScoped<UpsertWorkflowHandler>(provider =>", composition, StringComparison.Ordinal);
         Assert.Contains("AddScoped<GetWorkflowHandler>(provider =>", composition, StringComparison.Ordinal);
     }
@@ -903,6 +961,13 @@ public sealed class ArchitectureBoundaryTests
         Assert.True(File.Exists(Path.Combine(createDirectory, "CreateWorkItemValidator.cs")));
         Assert.True(File.Exists(Path.Combine(createDirectory, "CreateWorkItemHandler.cs")));
         Assert.True(File.Exists(Path.Combine(createDirectory, "CreateWorkItemSlice.cs")));
+        var intakeCreatorPath = Path.Combine(
+            moduleDirectory,
+            "Application",
+            "Features",
+            "Intake",
+            "CreateIntakeWorkItemHandler.cs");
+        Assert.True(File.Exists(intakeCreatorPath));
         Assert.True(File.Exists(Path.Combine(searchDirectory, "WorkItemSearchRequest.cs")));
         Assert.True(File.Exists(Path.Combine(searchDirectory, "SearchWorkItemsValidator.cs")));
         Assert.True(File.Exists(Path.Combine(searchDirectory, "SearchWorkItemsHandler.cs")));
@@ -947,6 +1012,10 @@ public sealed class ArchitectureBoundaryTests
         Assert.DoesNotContain("activityStore.CreateTimelineAsync", createFacade, StringComparison.Ordinal);
         Assert.Contains("searchWorkItemsHandler.HandleAsync", searchFacade, StringComparison.Ordinal);
 
+        var intakeCreator = File.ReadAllText(intakeCreatorPath);
+        Assert.Contains(": IIntakeWorkItemCreator", intakeCreator, StringComparison.Ordinal);
+        Assert.Contains("createWorkItemHandler.CreateAsync", intakeCreator, StringComparison.Ordinal);
+
         var composition = File.ReadAllText(Path.Combine(
             SourceDirectory,
             "Zumbo.Api",
@@ -954,8 +1023,432 @@ public sealed class ArchitectureBoundaryTests
             "Endpoints",
             "WorkItemEndpoints",
             "WorkItemEndpoints.AddWorkItemsModule.cs"));
-        Assert.Contains("AddScoped<CreateWorkItemHandler>(provider =>", composition, StringComparison.Ordinal);
-        Assert.Contains("AddScoped<SearchWorkItemsHandler>(provider =>", composition, StringComparison.Ordinal);
+        Assert.Contains("services.AddWorkItemCoreCreateAndReadHandlers();", composition, StringComparison.Ordinal);
+        Assert.Contains(
+            "services.AddWorkItemIntakeServices();",
+            composition,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "provider.GetRequiredService<WorkItemService>()",
+            composition,
+            StringComparison.Ordinal);
+        Assert.Contains("services.AddWorkItemCoreUpdateHandler();", composition, StringComparison.Ordinal);
+
+        var coreComposition = File.ReadAllText(Path.Combine(
+            SourceDirectory,
+            "Zumbo.Api",
+            "Composition",
+            "Modules",
+            "WorkItems",
+            "WorkItemCoreComposition.cs"));
+        Assert.Contains("AddScoped<CreateWorkItemHandler>(provider =>", coreComposition, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<SearchWorkItemsHandler>(provider =>", coreComposition, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<GetWorkItemHandler>(provider =>", coreComposition, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<ArchiveWorkItemHandler>(provider =>", coreComposition, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<RestoreWorkItemHandler>(provider =>", coreComposition, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<AddLabelHandler>(provider =>", coreComposition, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<RemoveLabelHandler>(provider =>", coreComposition, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<UpdateWorkItemHandler>(provider =>", coreComposition, StringComparison.Ordinal);
+        Assert.Contains("services.AddWorkItemPlanningHandlers();", composition, StringComparison.Ordinal);
+
+        var planningComposition = File.ReadAllText(Path.Combine(
+            SourceDirectory,
+            "Zumbo.Api",
+            "Composition",
+            "Modules",
+            "WorkItems",
+            "WorkItemPlanningComposition.cs"));
+        Assert.Contains("AddScoped<SetPlanningHandler>(provider =>", planningComposition, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<MoveWorkItemHandler>(provider =>", planningComposition, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<ReorderWorkItemHandler>(provider =>", planningComposition, StringComparison.Ordinal);
+
+        Assert.Contains("services.AddWorkItemChecklistHandlers();", composition, StringComparison.Ordinal);
+        var checklistComposition = File.ReadAllText(Path.Combine(
+            SourceDirectory,
+            "Zumbo.Api",
+            "Composition",
+            "Modules",
+            "WorkItems",
+            "WorkItemChecklistComposition.cs"));
+        Assert.Contains("AddScoped<AddChecklistItemHandler>(provider =>", checklistComposition, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<CompleteChecklistItemHandler>(provider =>", checklistComposition, StringComparison.Ordinal);
+
+        Assert.Contains("services.AddWorkItemWorklogHandlers();", composition, StringComparison.Ordinal);
+        var worklogComposition = File.ReadAllText(Path.Combine(
+            SourceDirectory,
+            "Zumbo.Api",
+            "Composition",
+            "Modules",
+            "WorkItems",
+            "WorkItemWorklogComposition.cs"));
+        Assert.Contains("AddScoped<AddWorkLogHandler>(provider =>", worklogComposition, StringComparison.Ordinal);
+
+        Assert.Contains("services.AddWorkItemAssignmentHandlers();", composition, StringComparison.Ordinal);
+        var assignmentComposition = File.ReadAllText(Path.Combine(
+            SourceDirectory,
+            "Zumbo.Api",
+            "Composition",
+            "Modules",
+            "WorkItems",
+            "WorkItemAssignmentComposition.cs"));
+        Assert.Contains("AddScoped<ClearAssigneeHandler>(provider =>", assignmentComposition, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<AssignWorkItemHandler>(provider =>", assignmentComposition, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<SetWorkItemTeamHandler>(provider =>", assignmentComposition, StringComparison.Ordinal);
+
+        Assert.Contains("services.AddWorkItemCustomFieldsHandlers();", composition, StringComparison.Ordinal);
+        var customFieldsComposition = File.ReadAllText(Path.Combine(
+            SourceDirectory,
+            "Zumbo.Api",
+            "Composition",
+            "Modules",
+            "WorkItems",
+            "WorkItemCustomFieldsComposition.cs"));
+        Assert.Contains("AddScoped<SetCustomFieldsHandler>(provider =>", customFieldsComposition, StringComparison.Ordinal);
+
+        Assert.Contains("services.AddWorkItemApprovalRequestHandler();", composition, StringComparison.Ordinal);
+        Assert.Contains("services.AddWorkItemApprovalDecisionHandler();", composition, StringComparison.Ordinal);
+        Assert.DoesNotContain("IDocumentRepository", composition, StringComparison.Ordinal);
+        Assert.DoesNotContain("WorkItemDocument", composition, StringComparison.Ordinal);
+        var approvalComposition = File.ReadAllText(Path.Combine(
+            SourceDirectory,
+            "Zumbo.Api",
+            "Composition",
+            "Modules",
+            "WorkItems",
+            "WorkItemApprovalComposition.cs"));
+        Assert.Contains("AddScoped<RequestApprovalHandler>(provider =>", approvalComposition, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<DecideApprovalHandler>(provider =>", approvalComposition, StringComparison.Ordinal);
+
+        var intakeComposition = File.ReadAllText(Path.Combine(
+            SourceDirectory,
+            "Zumbo.Api",
+            "Composition",
+            "Modules",
+            "WorkItems",
+            "WorkItemIntakeComposition.cs"));
+        Assert.Contains(
+            "new CreateIntakeWorkItemHandler(provider.GetRequiredService<CreateWorkItemHandler>())",
+            intakeComposition,
+            StringComparison.Ordinal);
+        Assert.Contains("AddOptions<IntakeOptions>()", intakeComposition, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<IntakeFormService>()", intakeComposition, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<IntakeSubmissionService>()", intakeComposition, StringComparison.Ordinal);
+        Assert.Contains("services.AddWorkItemWebhookServices();", composition, StringComparison.Ordinal);
+
+        var webhookComposition = File.ReadAllText(Path.Combine(
+            SourceDirectory,
+            "Zumbo.Api",
+            "Composition",
+            "Modules",
+            "WorkItems",
+            "WorkItemWebhookComposition.cs"));
+        Assert.Contains("AddOptions<WebhookOptions>()", webhookComposition, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<CreateSubscriptionHandler>()", webhookComposition, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<DispatchDeliveriesHandler>()", webhookComposition, StringComparison.Ordinal);
+        Assert.Contains("provider.GetRequiredService<QueueDeliveryHandler>()", webhookComposition, StringComparison.Ordinal);
+        Assert.Contains("services.AddDevelopmentIntegrationServices();", composition, StringComparison.Ordinal);
+
+        var developmentComposition = File.ReadAllText(Path.Combine(
+            SourceDirectory,
+            "Zumbo.Api",
+            "Composition",
+            "Modules",
+            "WorkItems",
+            "DevelopmentIntegrationComposition.cs"));
+        Assert.Contains("AddOptions<DevelopmentProviderOptions>()", developmentComposition, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<CreateConnectionHandler>()", developmentComposition, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<ProcessWebhookHandler>()", developmentComposition, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<ListRepositoriesHandler>()", developmentComposition, StringComparison.Ordinal);
+        Assert.Contains("services.AddWorkItemPublicationServices();", composition, StringComparison.Ordinal);
+        Assert.Contains("services.AddWorkItemDurableEventHandlers();", composition, StringComparison.Ordinal);
+
+        var messagingComposition = File.ReadAllText(Path.Combine(
+            SourceDirectory,
+            "Zumbo.Api",
+            "Composition",
+            "Modules",
+            "WorkItems",
+            "WorkItemMessagingComposition.cs"));
+        Assert.Contains("AddScoped<DurableWorkItemEventPublisher>()", messagingComposition, StringComparison.Ordinal);
+        Assert.Contains("IWorkItemAuditPublisher", messagingComposition, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<IDurableEventHandler, WorkItemAuditDurableHandler>()", messagingComposition, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<IDurableEventHandler, DevelopmentWebhookProcessingDurableHandler>()", messagingComposition, StringComparison.Ordinal);
+
+        var searchEndpoint = File.ReadAllText(Path.Combine(
+            SourceDirectory,
+            "Zumbo.Api",
+            "Presentation",
+            "Endpoints",
+            "WorkItemEndpoints",
+            "MapWorkItemEndpoints",
+            "WorkItemEndpoints.MapPostSearch.cs"));
+        Assert.Contains("SearchWorkItemsHandler handler", searchEndpoint, StringComparison.Ordinal);
+        Assert.Contains("handler.HandlePageAsync(request, ct)", searchEndpoint, StringComparison.Ordinal);
+        Assert.DoesNotContain("WorkItemService service", searchEndpoint, StringComparison.Ordinal);
+        Assert.DoesNotContain("service.SearchPageAsync", searchEndpoint, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void WorkItemBulkOperations_AreFeatureHandlersWithCompatibilityFacades()
+    {
+        var moduleDirectory = Path.Combine(SourceDirectory, "Zumbo.Modules.WorkItems");
+        var bulkDirectory = Path.Combine(moduleDirectory, "Application", "Features", "BulkOperations");
+        foreach (var feature in new[] { "Move", "Assign", "Archive" })
+        {
+            Assert.True(File.Exists(Path.Combine(bulkDirectory, feature, $"Bulk{feature}WorkItemsCommand.cs")));
+            Assert.True(File.Exists(Path.Combine(bulkDirectory, feature, $"Bulk{feature}WorkItemsHandler.cs")));
+        }
+
+        Assert.True(File.Exists(Path.Combine(bulkDirectory, "BulkWorkItemExecutor.cs")));
+
+        var compatibilityFacade = File.ReadAllText(Path.Combine(
+            moduleDirectory,
+            "Application",
+            "Compatibility",
+            "WorkItemService",
+            "WorkItemService.Lifecycle.cs"));
+        Assert.Contains("new BulkMoveWorkItemsHandler(moveWorkItemHandler)", compatibilityFacade, StringComparison.Ordinal);
+        Assert.Contains("new BulkAssignWorkItemsHandler(assignWorkItemHandler)", compatibilityFacade, StringComparison.Ordinal);
+        Assert.Contains("new BulkArchiveWorkItemsHandler(archiveWorkItemHandler)", compatibilityFacade, StringComparison.Ordinal);
+        Assert.DoesNotContain("ExecuteBulkAsync(", compatibilityFacade, StringComparison.Ordinal);
+
+        var endpointDirectory = Path.Combine(
+            SourceDirectory,
+            "Zumbo.Api",
+            "Presentation",
+            "Endpoints",
+            "WorkItemEndpoints",
+            "MapWorkItemEndpoints");
+        foreach (var feature in new[] { "Move", "Assign", "Archive" })
+        {
+            var endpoint = File.ReadAllText(Path.Combine(
+                endpointDirectory,
+                $"WorkItemEndpoints.MapPostBulk{feature}.cs"));
+            Assert.Contains($"Bulk{feature}WorkItemsHandler handler", endpoint, StringComparison.Ordinal);
+            Assert.Contains($"new Bulk{feature}WorkItemsCommand", endpoint, StringComparison.Ordinal);
+            Assert.DoesNotContain("WorkItemService service", endpoint, StringComparison.Ordinal);
+        }
+
+        var processor = File.ReadAllText(Path.Combine(bulkDirectory, "WorkItemBulkJobProcessor.cs"));
+        Assert.Contains("CreateWorkItemHandler createWorkItemHandler", processor, StringComparison.Ordinal);
+        Assert.Contains("MoveWorkItemHandler moveWorkItemHandler", processor, StringComparison.Ordinal);
+        Assert.Contains("AssignWorkItemHandler assignWorkItemHandler", processor, StringComparison.Ordinal);
+        Assert.Contains("ArchiveWorkItemHandler archiveWorkItemHandler", processor, StringComparison.Ordinal);
+        Assert.Contains("createWorkItemHandler.HandleAsync", processor, StringComparison.Ordinal);
+        Assert.Contains("moveWorkItemHandler.HandleAsync", processor, StringComparison.Ordinal);
+        Assert.Contains("assignWorkItemHandler.HandleAsync", processor, StringComparison.Ordinal);
+        Assert.Contains("archiveWorkItemHandler.HandleAsync", processor, StringComparison.Ordinal);
+        foreach (var exportModel in new[] { "WorkItemExportResultRow.cs", "WorkItemExportCustomFieldValue.cs" })
+        {
+            var exportModelSource = File.ReadAllText(Path.Combine(bulkDirectory, exportModel));
+            Assert.DoesNotContain("Document", exportModelSource, StringComparison.Ordinal);
+            Assert.Contains(
+                "namespace Zumbo.Modules.WorkItems.Application.Features.BulkOperations;",
+                exportModelSource,
+                StringComparison.Ordinal);
+        }
+
+        var customFieldExportModel = File.ReadAllText(Path.Combine(
+            bulkDirectory,
+            "WorkItemExportCustomFieldValue.cs"));
+        foreach (var field in new[]
+                 {
+                     "string FieldKey",
+                     "string Type",
+                     "string? TextValue",
+                     "decimal? NumberValue",
+                     "bool? BooleanValue",
+                     "DateTimeOffset? DateValueUtc",
+                     "string? OptionKey",
+                     "bool Indexed",
+                     "string SearchValue"
+                 })
+        {
+            Assert.Contains(field, customFieldExportModel, StringComparison.Ordinal);
+        }
+
+        var exportRowModel = File.ReadAllText(Path.Combine(bulkDirectory, "WorkItemExportResultRow.cs"));
+        Assert.Contains(
+            "IReadOnlyCollection<WorkItemExportCustomFieldValue> CustomFields",
+            exportRowModel,
+            StringComparison.Ordinal);
+        Assert.Contains("Array.Empty<WorkItemExportResultRow>()", processor, StringComparison.Ordinal);
+        Assert.Contains("new List<WorkItemExportResultRow>", processor, StringComparison.Ordinal);
+        Assert.Contains("page.Items.Select(ToExportResultRow)", processor, StringComparison.Ordinal);
+        Assert.Contains("private static WorkItemExportRow ToExportRow(WorkItemDocument x)", processor, StringComparison.Ordinal);
+        Assert.Contains("private static WorkItemExportResultRow ToExportResultRow(WorkItemDocument x)", processor, StringComparison.Ordinal);
+
+        var moduleComposition = File.ReadAllText(Path.Combine(
+            SourceDirectory,
+            "Zumbo.Api",
+            "Presentation",
+            "Endpoints",
+            "WorkItemEndpoints",
+            "WorkItemEndpoints.AddWorkItemsModule.cs"));
+        Assert.Contains("services.AddWorkItemBulkOperations();", moduleComposition, StringComparison.Ordinal);
+
+        var bulkComposition = File.ReadAllText(Path.Combine(
+            SourceDirectory,
+            "Zumbo.Api",
+            "Composition",
+            "Modules",
+            "WorkItems",
+            "WorkItemBulkOperationComposition.cs"));
+        Assert.Contains("AddScoped<WorkItemBulkJobProcessor>(provider =>", bulkComposition, StringComparison.Ordinal);
+        Assert.DoesNotContain("AddScoped<WorkItemBulkJobProcessor>();", bulkComposition, StringComparison.Ordinal);
+        Assert.Contains("provider.GetRequiredService<CreateWorkItemHandler>()", bulkComposition, StringComparison.Ordinal);
+        Assert.Contains("provider.GetRequiredService<MoveWorkItemHandler>()", bulkComposition, StringComparison.Ordinal);
+        Assert.Contains("provider.GetRequiredService<AssignWorkItemHandler>()", bulkComposition, StringComparison.Ordinal);
+        Assert.Contains("provider.GetRequiredService<ArchiveWorkItemHandler>()", bulkComposition, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AutomationWorkItemActions_UseFeatureHandlersWithCompatibilityFallback()
+    {
+        var executor = File.ReadAllText(Path.Combine(
+            SourceDirectory,
+            "Zumbo.Api",
+            "Infrastructure",
+            "Adapters",
+            "WorkItems",
+            "WorkItemsCore",
+            "AutomationWorkItemActionExecutor.cs"));
+        foreach (var handler in new[]
+                 {
+                     "GetWorkItemHandler",
+                     "AssignWorkItemHandler",
+                     "ClearAssigneeHandler",
+                     "AddLabelHandler",
+                     "RemoveLabelHandler",
+                     "UpdateWorkItemHandler",
+                     "AddCommentHandler"
+                 })
+        {
+            Assert.Contains(handler, executor, StringComparison.Ordinal);
+        }
+
+        Assert.Contains("WorkItemService workItems", executor, StringComparison.Ordinal);
+        Assert.Contains("getWorkItemHandler.HandleAsync", executor, StringComparison.Ordinal);
+        Assert.Contains("assignWorkItemHandler.HandleAsync", executor, StringComparison.Ordinal);
+        Assert.Contains("clearAssigneeHandler.HandleAsync", executor, StringComparison.Ordinal);
+        Assert.Contains("addLabelHandler.HandleAsync", executor, StringComparison.Ordinal);
+        Assert.Contains("removeLabelHandler.HandleAsync", executor, StringComparison.Ordinal);
+        Assert.Contains("updateWorkItemHandler.HandleAsync", executor, StringComparison.Ordinal);
+        Assert.Contains("addCommentHandler.HandleAsync", executor, StringComparison.Ordinal);
+
+        var composition = File.ReadAllText(Path.Combine(
+            SourceDirectory,
+            "Zumbo.Api",
+            "Composition",
+            "Modules",
+            "WorkItems",
+            "WorkItemAutomationComposition.cs"));
+        Assert.Contains(
+            "AddScoped<IAutomationActionExecutor>(provider => new AutomationWorkItemActionExecutor(",
+            composition,
+            StringComparison.Ordinal);
+
+        var endpointHost = File.ReadAllText(Path.Combine(
+            SourceDirectory,
+            "Zumbo.Api",
+            "Presentation",
+            "Endpoints",
+            "AutomationEndpoints.cs"));
+        Assert.Contains("services.AddWorkItemAutomationActionAdapter();", endpointHost, StringComparison.Ordinal);
+        Assert.DoesNotContain("using Zumbo.Modules.WorkItems;", endpointHost, StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "AddScoped<IAutomationActionExecutor, AutomationWorkItemActionExecutor>();",
+            composition,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "provider.GetRequiredService<WorkItemService>()",
+            composition,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void DashboardRenderer_UsesReportHandlersWithCompatibilityFallback()
+    {
+        var renderer = File.ReadAllText(Path.Combine(
+            SourceDirectory,
+            "Zumbo.Modules.WorkItems",
+            "Application",
+            "Features",
+            "Dashboards",
+            "DashboardRenderer.cs"));
+        foreach (var handler in new[]
+                 {
+                     "ProjectSummaryHandler",
+                     "StatusDistributionHandler",
+                     "UserWorkloadHandler",
+                     "DueDateRisksHandler",
+                     "FlowTimeHandler",
+                     "CompletionRateHandler",
+                     "TeamPerformanceHandler"
+                 })
+        {
+            Assert.Contains(handler, renderer, StringComparison.Ordinal);
+        }
+
+        Assert.Contains("WorkItemService reports", renderer, StringComparison.Ordinal);
+        Assert.Equal(7, renderer.Split("Handler.HandleAsync", StringSplitOptions.None).Length - 1);
+
+        var composition = File.ReadAllText(Path.Combine(
+            SourceDirectory,
+            "Zumbo.Api",
+            "Composition",
+            "Modules",
+            "WorkItems",
+            "WorkItemReportComposition.cs"));
+        Assert.Contains("AddScoped<DashboardRenderer>(provider => new DashboardRenderer(", composition, StringComparison.Ordinal);
+        Assert.DoesNotContain("provider.GetRequiredService<WorkItemService>()", composition, StringComparison.Ordinal);
+
+        var endpointHost = File.ReadAllText(Path.Combine(
+            SourceDirectory,
+            "Zumbo.Api",
+            "Presentation",
+            "Endpoints",
+            "DashboardEndpoints.cs"));
+        Assert.Contains("services.AddWorkItemDashboardRenderer();", endpointHost, StringComparison.Ordinal);
+        Assert.DoesNotContain("services.AddScoped<DashboardRenderer>();", endpointHost, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void RecurrencePublication_UsesFeatureOwnedMapperWithCompatibilityDelegation()
+    {
+        var moduleDirectory = Path.Combine(SourceDirectory, "Zumbo.Modules.WorkItems");
+        var generator = File.ReadAllText(Path.Combine(
+            moduleDirectory,
+            "Application",
+            "Features",
+            "Recurrences",
+            "RecurringWorkItemGenerator.cs"));
+        Assert.Contains("WorkItemPublicationMapper.ToSearchRecord", generator, StringComparison.Ordinal);
+        Assert.Contains("WorkItemPublicationMapper.ToRealtimeItem", generator, StringComparison.Ordinal);
+        Assert.DoesNotContain("WorkItemService.ToSearchRecord", generator, StringComparison.Ordinal);
+        Assert.DoesNotContain("WorkItemService.ToRealtimeItem", generator, StringComparison.Ordinal);
+
+        var searchCompatibility = File.ReadAllText(Path.Combine(
+            moduleDirectory,
+            "Application",
+            "Compatibility",
+            "WorkItemService",
+            "WorkItemService.SearchFallback.cs"));
+        Assert.Contains(
+            "WorkItemPublicationMapper.ToSearchRecord(item, organizationId)",
+            searchCompatibility,
+            StringComparison.Ordinal);
+
+        var realtimeCompatibility = File.ReadAllText(Path.Combine(
+            moduleDirectory,
+            "Application",
+            "Compatibility",
+            "WorkItemService",
+            "WorkItemService.Mapping.cs"));
+        Assert.Contains(
+            "WorkItemPublicationMapper.ToRealtimeItem(item)",
+            realtimeCompatibility,
+            StringComparison.Ordinal);
     }
 
     [Fact]
@@ -1007,12 +1500,23 @@ public sealed class ArchitectureBoundaryTests
         Assert.Contains("listNotificationsHandler.HandleAsync", listFacade, StringComparison.Ordinal);
         Assert.Contains("markNotificationAsReadHandler.HandleAsync", markReadFacade, StringComparison.Ordinal);
 
-        var composition = File.ReadAllText(Path.Combine(
+        var endpointHost = File.ReadAllText(Path.Combine(
             SourceDirectory,
             "Zumbo.Api",
             "Presentation",
             "Endpoints",
             "NotificationEndpoints.cs"));
+        Assert.Contains("services.AddNotificationServices(configuration)", endpointHost, StringComparison.Ordinal);
+        Assert.DoesNotContain("IDocumentRepository", endpointHost, StringComparison.Ordinal);
+        Assert.DoesNotContain("NotificationDocument", endpointHost, StringComparison.Ordinal);
+
+        var composition = File.ReadAllText(Path.Combine(
+            SourceDirectory,
+            "Zumbo.Api",
+            "Composition",
+            "Modules",
+            "Notifications",
+            "NotificationModuleComposition.cs"));
         Assert.Contains("AddScoped<ListNotificationsHandler>(provider =>", composition, StringComparison.Ordinal);
         Assert.Contains("AddScoped<MarkNotificationAsReadHandler>(provider =>", composition, StringComparison.Ordinal);
     }
@@ -1061,12 +1565,23 @@ public sealed class ArchitectureBoundaryTests
         Assert.Contains("writeAuditLogHandler.HandleUncheckedAsync", facade, StringComparison.Ordinal);
         Assert.Contains("queryAuditLogHandler.HandleAsync", facade, StringComparison.Ordinal);
 
-        var composition = File.ReadAllText(Path.Combine(
+        var endpointHost = File.ReadAllText(Path.Combine(
             SourceDirectory,
             "Zumbo.Api",
             "Presentation",
             "Endpoints",
             "AuditEndpoints.cs"));
+        Assert.Contains("services.AddAuditServices()", endpointHost, StringComparison.Ordinal);
+        Assert.DoesNotContain("IDocumentRepository", endpointHost, StringComparison.Ordinal);
+        Assert.DoesNotContain("AuditLogDocument", endpointHost, StringComparison.Ordinal);
+
+        var composition = File.ReadAllText(Path.Combine(
+            SourceDirectory,
+            "Zumbo.Api",
+            "Composition",
+            "Modules",
+            "Audit",
+            "AuditModuleComposition.cs"));
         Assert.Contains("AddScoped<WriteAuditLogHandler>(provider =>", composition, StringComparison.Ordinal);
         Assert.Contains("AddScoped<QueryAuditLogHandler>(provider =>", composition, StringComparison.Ordinal);
     }
@@ -1207,8 +1722,17 @@ public sealed class ArchitectureBoundaryTests
             Path.Combine(SourceDirectory, "Zumbo.Api", "Presentation", "Endpoints", "WorkItemEndpoints"));
         var gateway = ReadSourceScope(Path.Combine(SourceDirectory, "Zumbo.Gateway", "GatewayHost"));
         Assert.DoesNotContain("Zumbo.Modules.WorkItems", notificationAdapters, StringComparison.Ordinal);
+        var notificationComposition = ReadSourceScope(
+            Path.Combine(SourceDirectory, "Zumbo.Api", "Composition", "Modules", "Notifications"));
         Assert.DoesNotContain("DueDateReminderHostedService", notificationHost, StringComparison.Ordinal);
-        Assert.Contains("DueDateReminderHostedService", workItemHost, StringComparison.Ordinal);
+        Assert.DoesNotContain("DueDateReminderHostedService", notificationComposition, StringComparison.Ordinal);
+        Assert.Contains("AddWorkItemBackgroundServices(configuration)", workItemHost, StringComparison.Ordinal);
+        var workItemBackgroundComposition = ReadSourceScope(
+            Path.Combine(SourceDirectory, "Zumbo.Api", "Composition", "Modules", "WorkItems"));
+        Assert.Contains("AddHostedService<DueDateReminderHostedService>()", workItemBackgroundComposition, StringComparison.Ordinal);
+        Assert.Contains("AddHostedService<WorkItemRecurrenceSchedulerHostedService>()", workItemBackgroundComposition, StringComparison.Ordinal);
+        Assert.Contains("AddHostedService<WebhookDispatcherHostedService>()", workItemBackgroundComposition, StringComparison.Ordinal);
+        Assert.Contains("AddHostedService<DevelopmentWebhookReceiptRetentionHostedService>()", workItemBackgroundComposition, StringComparison.Ordinal);
         Assert.Contains("/api/notifications/{**catch-all}", gateway, StringComparison.Ordinal);
         Assert.Contains("NotificationExtractionEnabled", gateway, StringComparison.Ordinal);
         Assert.Contains("Order = -100", gateway, StringComparison.Ordinal);

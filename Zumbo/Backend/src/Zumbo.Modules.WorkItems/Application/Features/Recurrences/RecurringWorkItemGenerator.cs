@@ -172,7 +172,7 @@ public sealed class RecurringWorkItemGenerator(
         }
 
         var correlationId = "recurrence:" + occurrence.Id;
-        await search.IndexAsync(WorkItemService.ToSearchRecord(workItem, template.OrganizationId), ct);
+        await search.IndexAsync(WorkItemPublicationMapper.ToSearchRecord(workItem, template.OrganizationId), ct);
         await audit.WriteAsync(
             "RecurringWorkItemGenerated", "WorkItem", workItem.Id, template.Id, occurrence.Id, correlationId, ct);
         await collaboration.RecordActivityAsync(
@@ -196,7 +196,7 @@ public sealed class RecurringWorkItemGenerator(
             workItem.Id,
             workItem.ProjectId,
             workItem.BoardId,
-            WorkItemService.ToRealtimeItem(workItem),
+            WorkItemPublicationMapper.ToRealtimeItem(workItem),
             correlationId,
             now,
             WorkItemRealtimeProtocol.CurrentSchemaVersion,
