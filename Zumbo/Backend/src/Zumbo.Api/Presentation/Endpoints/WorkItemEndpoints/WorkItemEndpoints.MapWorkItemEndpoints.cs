@@ -2,9 +2,12 @@ using Zumbo.Modules.WorkItems;
 using Zumbo.BuildingBlocks.Application.Messaging;
 using Zumbo.BuildingBlocks.Application.Security;
 using Zumbo.SharedKernel;
+using Zumbo.Api.Presentation.Endpoints.WorkItems.Attachments;
 using Zumbo.Api.Presentation.Endpoints.WorkItems.Checklist;
 using Zumbo.Api.Presentation.Endpoints.WorkItems.Comments;
 using Zumbo.Api.Presentation.Endpoints.WorkItems.Labels;
+using Zumbo.Api.Presentation.Endpoints.WorkItems.Relations;
+using Zumbo.Api.Presentation.Endpoints.WorkItems.Worklogs;
 
 using static ApiEndpointResults;
 
@@ -129,27 +132,27 @@ internal static partial class WorkItemEndpoints
 
         DeleteCommentEndpoint.Map(group);
 
-        MapPostByIdAttachmentsUpload(group);
+        UploadAttachmentEndpoint.Map(group);
 
-        MapGetByIdAttachmentsByAttachmentIdDownload(group);
+        DownloadAttachmentEndpoint.Map(group);
 
-        MapGetByIdAttachmentsByAttachmentIdPreview(group);
+        PreviewAttachmentEndpoint.Map(group);
 
-        MapDeleteByIdAttachmentsByAttachmentId(group);
+        DeleteAttachmentEndpoint.Map(group);
 
-        MapGetByIdAttachments(group);
+        ListAttachmentsEndpoint.Map(group);
 
-        MapPostByIdWorklogs(group);
+        AddWorkLogEndpoint.Map(group);
 
-        MapGetByIdWorklogs(group);
+        ListWorkLogsEndpoint.Map(group);
 
         MapGetByIdApprovals(group);
 
         MapGetByIdTimeline(group);
 
-        MapPostByIdRelations(group);
+        LinkWorkItemEndpoint.Map(group);
 
-        MapDeleteByIdRelationsByRelatedWorkItemId(group);
+        UnlinkWorkItemEndpoint.Map(group);
 
         MapDeleteById(group);
 

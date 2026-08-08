@@ -26,7 +26,7 @@ public sealed class RefactorSemanticPreservationTests
             ["Zumbo.Modules.WorkItems|Zumbo.Modules.WorkItems.DashboardRenderer|method:RenderSourceAsync:(stringprojectId,stringtype,DashboardFilterRequestfilter,CancellationTokenct):Task<DashboardWidgetSourceResponse>"] =
                 "The dashboard renderer selects project-summary, status-distribution, user-workload, due-date-risk, flow-time, completion-rate, and team-performance handlers when composed through its new constructor while its preserved constructor retains WorkItemService fallback; query values, filtering, columns, rows, source metadata, cancellation, degradation, and unsupported-widget behavior remain unchanged.",
             ["Zumbo.Api|WorkItemEndpoints|method:MapWorkItemEndpoints:(thisRouteGroupBuilderapi):void"] =
-                "The route host delegates checklist, comment and label routes to independent feature endpoint classes while preserving the original private mapping members in responsibility-grouped compatibility partials; all other mappings retain their route-specific partial delegation, and HTTP route, metadata, authorization, request, response, and handler equivalence is verified by the runtime contract audit.",
+                "The route host delegates attachment, checklist, comment, label, relation and worklog routes to independent feature endpoint classes while preserving the original private mapping members in responsibility-grouped compatibility partials; all other mappings retain their route-specific partial delegation, and HTTP route, metadata, authorization, request, response, and handler equivalence is verified by the runtime contract audit.",
             ["Zumbo.Api|WorkItemEndpoints|method:MapPostByIdComments:(RouteGroupBuildergroup):void"] =
                 "The preserved private compatibility member delegates to AddCommentEndpoint while retaining its signature and exact route, authorization, binding, handler, correlation, cancellation, and response contract.",
             ["Zumbo.Api|WorkItemEndpoints|method:MapGetByIdComments:(RouteGroupBuildergroup):void"] =
@@ -45,6 +45,24 @@ public sealed class RefactorSemanticPreservationTests
                 "The preserved private compatibility member delegates to AddChecklistItemEndpoint while retaining its signature and exact route, authorization, request binding, handler, cancellation, and response contract.",
             ["Zumbo.Api|WorkItemEndpoints|method:MapPatchByIdChecklistByItemId:(RouteGroupBuildergroup):void"] =
                 "The preserved private compatibility member delegates to SetChecklistItemCompletionEndpoint while retaining its signature and exact route, authorization, route and request binding, handler, cancellation, and response contract.",
+            ["Zumbo.Api|WorkItemEndpoints|method:MapPostByIdRelations:(RouteGroupBuildergroup):void"] =
+                "The preserved private compatibility member delegates to LinkWorkItemEndpoint while retaining its signature and exact route, authorization, request binding, handler, correlation, cancellation, and response contract.",
+            ["Zumbo.Api|WorkItemEndpoints|method:MapDeleteByIdRelationsByRelatedWorkItemId:(RouteGroupBuildergroup):void"] =
+                "The preserved private compatibility member delegates to UnlinkWorkItemEndpoint while retaining its signature and exact route, authorization, route and query binding, handler, correlation, cancellation, and response contract.",
+            ["Zumbo.Api|WorkItemEndpoints|method:MapPostByIdWorklogs:(RouteGroupBuildergroup):void"] =
+                "The preserved private compatibility member delegates to AddWorkLogEndpoint while retaining its signature and exact route, authorization, request binding, handler, cancellation, and response contract.",
+            ["Zumbo.Api|WorkItemEndpoints|method:MapGetByIdWorklogs:(RouteGroupBuildergroup):void"] =
+                "The preserved private compatibility member delegates to ListWorkLogsEndpoint while retaining its signature and exact route, paging defaults, binding, query service, cancellation, and response contract.",
+            ["Zumbo.Api|WorkItemEndpoints|method:MapPostByIdAttachmentsUpload:(RouteGroupBuildergroup):void"] =
+                "The preserved private compatibility member delegates to UploadAttachmentEndpoint while retaining upload binding, stream lifetime, authorization, antiforgery, rate limiting, correlation, cancellation, and response behavior.",
+            ["Zumbo.Api|WorkItemEndpoints|method:MapGetByIdAttachments:(RouteGroupBuildergroup):void"] =
+                "The preserved private compatibility member delegates to ListAttachmentsEndpoint while retaining route, paging defaults, query service, cancellation, and response behavior.",
+            ["Zumbo.Api|WorkItemEndpoints|method:MapGetByIdAttachmentsByAttachmentIdDownload:(RouteGroupBuildergroup):void"] =
+                "The preserved private compatibility member delegates to DownloadAttachmentEndpoint while retaining route binding, no-cache headers, file metadata, range processing, cancellation, and stream response behavior.",
+            ["Zumbo.Api|WorkItemEndpoints|method:MapGetByIdAttachmentsByAttachmentIdPreview:(RouteGroupBuildergroup):void"] =
+                "The preserved private compatibility member delegates to PreviewAttachmentEndpoint while retaining preview validation, disposal, security and cache headers, inline disposition, range processing, cancellation, and stream response behavior.",
+            ["Zumbo.Api|WorkItemEndpoints|method:MapDeleteByIdAttachmentsByAttachmentId:(RouteGroupBuildergroup):void"] =
+                "The preserved private compatibility member delegates to DeleteAttachmentEndpoint while retaining route binding, authorization, correlation, handler, cancellation, and response behavior.",
             ["Zumbo.Api|IdentityEndpoints|method:AddIdentityModule:(thisIServiceCollectionservices):IServiceCollection"] =
                 "Identity handler registrations remain scoped but now use explicit factories so the composition root selects port-focused vertical-slice constructors while legacy constructors remain available for source compatibility.",
             ["Zumbo.Api|IdentityEndpoints|method:MapIdentityEndpoints:(thisRouteGroupBuilderapi):void"] =

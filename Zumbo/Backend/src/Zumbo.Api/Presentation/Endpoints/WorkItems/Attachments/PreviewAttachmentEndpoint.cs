@@ -5,9 +5,13 @@ using Zumbo.SharedKernel;
 
 using static ApiEndpointResults;
 
-internal static partial class WorkItemEndpoints
+namespace Zumbo.Api.Presentation.Endpoints.WorkItems.Attachments;
+
+internal static class PreviewAttachmentEndpoint
 {
-private static void MapGetByIdAttachmentsByAttachmentIdPreview(RouteGroupBuilder group){group.MapGet("/{id}/attachments/{attachmentId}/preview", async (
+    internal static void Map(RouteGroupBuilder group)
+    {
+        group.MapGet("/{id}/attachments/{attachmentId}/preview", async (
             string id,
             string attachmentId,
             OpenAttachmentHandler handler,
@@ -32,4 +36,5 @@ private static void MapGetByIdAttachmentsByAttachmentIdPreview(RouteGroupBuilder
                 attachment.ContentType,
                 enableRangeProcessing: true);
         });
-}}
+    }
+}

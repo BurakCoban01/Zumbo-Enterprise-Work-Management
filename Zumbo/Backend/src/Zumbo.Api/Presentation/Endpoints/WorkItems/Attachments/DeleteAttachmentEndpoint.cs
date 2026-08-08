@@ -5,11 +5,16 @@ using Zumbo.SharedKernel;
 
 using static ApiEndpointResults;
 
-internal static partial class WorkItemEndpoints
+namespace Zumbo.Api.Presentation.Endpoints.WorkItems.Attachments;
+
+internal static class DeleteAttachmentEndpoint
 {
-private static void MapDeleteByIdAttachmentsByAttachmentId(RouteGroupBuilder group){group.MapDelete("/{id}/attachments/{attachmentId}", async (string id, string attachmentId, DeleteAttachmentHandler handler, HttpContext http, CancellationToken ct) =>
+    internal static void Map(RouteGroupBuilder group)
+    {
+        group.MapDelete("/{id}/attachments/{attachmentId}", async (string id, string attachmentId, DeleteAttachmentHandler handler, HttpContext http, CancellationToken ct) =>
             Ok(await handler.HandleAsync(
                 new DeleteAttachmentCommand(id, attachmentId, CorrelationId(http)),
                 ct), http))
             .WithZumboPermission(PermissionCatalog.AttachmentDelete);
-}}
+    }
+}

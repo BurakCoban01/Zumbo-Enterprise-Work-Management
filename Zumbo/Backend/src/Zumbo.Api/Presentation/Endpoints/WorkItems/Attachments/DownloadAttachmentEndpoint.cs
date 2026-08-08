@@ -5,9 +5,13 @@ using Zumbo.SharedKernel;
 
 using static ApiEndpointResults;
 
-internal static partial class WorkItemEndpoints
+namespace Zumbo.Api.Presentation.Endpoints.WorkItems.Attachments;
+
+internal static class DownloadAttachmentEndpoint
 {
-private static void MapGetByIdAttachmentsByAttachmentIdDownload(RouteGroupBuilder group){group.MapGet("/{id}/attachments/{attachmentId}/download", async (
+    internal static void Map(RouteGroupBuilder group)
+    {
+        group.MapGet("/{id}/attachments/{attachmentId}/download", async (
             string id,
             string attachmentId,
             OpenAttachmentHandler handler,
@@ -23,4 +27,5 @@ private static void MapGetByIdAttachmentsByAttachmentIdDownload(RouteGroupBuilde
                 attachment.FileName,
                 enableRangeProcessing: true);
         });
-}}
+    }
+}

@@ -1,13 +1,16 @@
-using Zumbo.Modules.WorkItems;
-using Zumbo.BuildingBlocks.Application.Messaging;
 using Zumbo.BuildingBlocks.Application.Security;
+using Zumbo.Modules.WorkItems;
 using Zumbo.SharedKernel;
 
 using static ApiEndpointResults;
 
-internal static partial class WorkItemEndpoints
+namespace Zumbo.Api.Presentation.Endpoints.WorkItems.Relations;
+
+internal static class UnlinkWorkItemEndpoint
 {
-private static void MapDeleteByIdRelationsByRelatedWorkItemId(RouteGroupBuilder group){group.MapDelete("/{id}/relations/{relatedWorkItemId}", async (
+    internal static void Map(RouteGroupBuilder group)
+    {
+        group.MapDelete("/{id}/relations/{relatedWorkItemId}", async (
             string id,
             string relatedWorkItemId,
             string relationType,
@@ -18,4 +21,5 @@ private static void MapDeleteByIdRelationsByRelatedWorkItemId(RouteGroupBuilder 
                 new UnlinkWorkItemCommand(id, relatedWorkItemId, relationType, CorrelationId(http)),
                 ct), http))
             .WithZumboPermission(PermissionCatalog.WorkItemLink);
-}}
+    }
+}

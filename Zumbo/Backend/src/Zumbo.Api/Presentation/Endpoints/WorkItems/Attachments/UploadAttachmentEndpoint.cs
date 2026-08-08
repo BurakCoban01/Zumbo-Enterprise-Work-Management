@@ -5,9 +5,13 @@ using Zumbo.SharedKernel;
 
 using static ApiEndpointResults;
 
-internal static partial class WorkItemEndpoints
+namespace Zumbo.Api.Presentation.Endpoints.WorkItems.Attachments;
+
+internal static class UploadAttachmentEndpoint
 {
-private static void MapPostByIdAttachmentsUpload(RouteGroupBuilder group){group.MapPost("/{id}/attachments/upload", async (string id, IFormFile file, UploadAttachmentHandler handler, HttpContext http, CancellationToken ct) =>
+    internal static void Map(RouteGroupBuilder group)
+    {
+        group.MapPost("/{id}/attachments/upload", async (string id, IFormFile file, UploadAttachmentHandler handler, HttpContext http, CancellationToken ct) =>
         {
             await using var stream = file.OpenReadStream();
             return Ok(await handler.HandleAsync(
@@ -23,4 +27,5 @@ private static void MapPostByIdAttachmentsUpload(RouteGroupBuilder group){group.
         .WithZumboPermission(PermissionCatalog.AttachmentCreate)
         .DisableAntiforgery()
         .RequireRateLimiting("upload");
-}}
+    }
+}
