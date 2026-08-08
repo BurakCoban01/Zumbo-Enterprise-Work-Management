@@ -5,9 +5,14 @@ using Zumbo.SharedKernel;
 
 using static ApiEndpointResults;
 
-internal static partial class WorkItemEndpoints
+namespace Zumbo.Api.Presentation.Endpoints.WorkItems.Planning;
+
+internal static class SetPlanningEndpoint
 {
-private static void MapPatchByIdPlanning(RouteGroupBuilder group){group.MapPatch("/{id}/planning", async (string id, SetWorkItemPlanningRequest request, SetPlanningHandler handler, HttpContext http, CancellationToken ct) =>
+    internal static void Map(RouteGroupBuilder group)
+    {
+        group.MapPatch("/{id}/planning", async (string id, SetWorkItemPlanningRequest request, SetPlanningHandler handler, HttpContext http, CancellationToken ct) =>
             Ok(await handler.HandleAsync(new SetPlanningCommand(id, request), ct), http))
             .WithZumboPermission(PermissionCatalog.WorkItemUpdate);
-}}
+    }
+}

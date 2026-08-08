@@ -5,9 +5,14 @@ using Zumbo.SharedKernel;
 
 using static ApiEndpointResults;
 
-internal static partial class WorkItemEndpoints
+namespace Zumbo.Api.Presentation.Endpoints.WorkItems.Planning;
+
+internal static class ReorderWorkItemEndpoint
 {
-private static void MapPatchByIdRank(RouteGroupBuilder group){group.MapPatch("/{id}/rank", async (string id, ReorderWorkItemRequest request, ReorderWorkItemHandler handler, HttpContext http, CancellationToken ct) =>
+    internal static void Map(RouteGroupBuilder group)
+    {
+        group.MapPatch("/{id}/rank", async (string id, ReorderWorkItemRequest request, ReorderWorkItemHandler handler, HttpContext http, CancellationToken ct) =>
             Ok(await handler.HandleAsync(new ReorderWorkItemCommand(id, request, CorrelationId(http)), ct), http))
             .WithZumboPermission(PermissionCatalog.WorkItemMove);
-}}
+    }
+}

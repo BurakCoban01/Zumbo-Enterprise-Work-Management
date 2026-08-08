@@ -5,9 +5,13 @@ using Zumbo.SharedKernel;
 
 using static ApiEndpointResults;
 
-internal static partial class WorkItemEndpoints
+namespace Zumbo.Api.Presentation.Endpoints.WorkItems.Approvals;
+
+internal static class DecideApprovalEndpoint
 {
-private static void MapPostByIdApprovalsByApprovalIdDecision(RouteGroupBuilder group){group.MapPost("/{id}/approvals/{approvalId}/decision", async (
+    internal static void Map(RouteGroupBuilder group)
+    {
+        group.MapPost("/{id}/approvals/{approvalId}/decision", async (
             string id,
             string approvalId,
             DecideWorkItemApprovalRequest request,
@@ -17,4 +21,5 @@ private static void MapPostByIdApprovalsByApprovalIdDecision(RouteGroupBuilder g
             Ok(await handler.HandleAsync(
                 new DecideApprovalCommand(id, approvalId, request, CorrelationId(http)), ct), http))
             .WithZumboPermission(PermissionCatalog.WorkItemApprove);
-}}
+    }
+}

@@ -3,9 +3,11 @@ using Zumbo.BuildingBlocks.Application.Messaging;
 using Zumbo.BuildingBlocks.Application.Security;
 using Zumbo.SharedKernel;
 using Zumbo.Api.Presentation.Endpoints.WorkItems.Attachments;
+using Zumbo.Api.Presentation.Endpoints.WorkItems.Approvals;
 using Zumbo.Api.Presentation.Endpoints.WorkItems.Checklist;
 using Zumbo.Api.Presentation.Endpoints.WorkItems.Comments;
 using Zumbo.Api.Presentation.Endpoints.WorkItems.Labels;
+using Zumbo.Api.Presentation.Endpoints.WorkItems.Planning;
 using Zumbo.Api.Presentation.Endpoints.WorkItems.Relations;
 using Zumbo.Api.Presentation.Endpoints.WorkItems.Worklogs;
 
@@ -96,23 +98,23 @@ internal static partial class WorkItemEndpoints
 
         MapPutById(group);
 
-        MapPatchByIdAssignee(group);
+        AssignWorkItemEndpoint.Map(group);
 
         MapPatchByIdStatus(group);
 
-        MapPatchByIdRank(group);
+        ReorderWorkItemEndpoint.Map(group);
 
-        MapPatchByIdPlanning(group);
+        SetPlanningEndpoint.Map(group);
 
         MapPutByIdCustomFields(group);
 
-        MapPatchByIdParent(group);
+        SetParentEndpoint.Map(group);
 
-        MapPatchByIdTeam(group);
+        SetTeamEndpoint.Map(group);
 
-        MapPostByIdApprovals(group);
+        RequestApprovalEndpoint.Map(group);
 
-        MapPostByIdApprovalsByApprovalIdDecision(group);
+        DecideApprovalEndpoint.Map(group);
 
         AddChecklistItemEndpoint.Map(group);
 
@@ -146,7 +148,7 @@ internal static partial class WorkItemEndpoints
 
         ListWorkLogsEndpoint.Map(group);
 
-        MapGetByIdApprovals(group);
+        ListApprovalsEndpoint.Map(group);
 
         MapGetByIdTimeline(group);
 
