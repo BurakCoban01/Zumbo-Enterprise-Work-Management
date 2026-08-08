@@ -9,6 +9,35 @@ public sealed class DashboardRenderer(
     WorkItemService reports,
     IClock clock)
 {
+    private readonly ProjectSummaryHandler? projectSummaryHandler;
+    private readonly StatusDistributionHandler? statusDistributionHandler;
+    private readonly UserWorkloadHandler? userWorkloadHandler;
+    private readonly DueDateRisksHandler? dueDateRisksHandler;
+    private readonly FlowTimeHandler? flowTimeHandler;
+    private readonly CompletionRateHandler? completionRateHandler;
+    private readonly TeamPerformanceHandler? teamPerformanceHandler;
+
+    public DashboardRenderer(
+        DashboardService dashboards,
+        ProjectSummaryHandler projectSummaryHandler,
+        StatusDistributionHandler statusDistributionHandler,
+        UserWorkloadHandler userWorkloadHandler,
+        DueDateRisksHandler dueDateRisksHandler,
+        FlowTimeHandler flowTimeHandler,
+        CompletionRateHandler completionRateHandler,
+        TeamPerformanceHandler teamPerformanceHandler,
+        IClock clock)
+        : this(dashboards, null!, clock)
+    {
+        this.projectSummaryHandler = projectSummaryHandler;
+        this.statusDistributionHandler = statusDistributionHandler;
+        this.userWorkloadHandler = userWorkloadHandler;
+        this.dueDateRisksHandler = dueDateRisksHandler;
+        this.flowTimeHandler = flowTimeHandler;
+        this.completionRateHandler = completionRateHandler;
+        this.teamPerformanceHandler = teamPerformanceHandler;
+    }
+
     public async Task<DashboardRenderResponse> RenderAsync(
         string dashboardId,
         CancellationToken ct)
@@ -89,7 +118,9 @@ public sealed class DashboardRenderer(
         {
             DashboardWidgetTypes.ProjectSummary => Source(
                 projectId,
-                await reports.ProjectSummarySnapshotAsync(projectId, ct),
+                projectSummaryHandler is null
+                    ? await reports.ProjectSummarySnapshotAsync(projectId, ct)
+                    : await projectSummaryHandler.HandleAsync(new ProjectSummaryQuery(projectId), ct),
                 [Column("total", "Toplam"), Column("done", "Tamamlanan"),
                     Column("inProgress", "Devam eden"), Column("overdue", "Geciken")],
                 value => [Row(
@@ -99,7 +130,9 @@ public sealed class DashboardRenderer(
                     ("overdue", value.Overdue))]),
             DashboardWidgetTypes.StatusDistribution => Source(
                 projectId,
-                await reports.StatusDistributionSnapshotAsync(projectId, ct),
+                statusDistributionHandler is null
+                    ? await reports.StatusDistributionSnapshotAsync(projectId, ct)
+                    : await statusDistributionHandler.HandleAsync(new StatusDistributionQuery(projectId), ct),
                 [Column("status", "Durum"), Column("count", "İş sayısı")],
                 values => values
                     .Where(value => filter.Statuses is null || filter.Statuses.Count == 0
@@ -108,7 +141,9 @@ public sealed class DashboardRenderer(
                     .ToList()),
             DashboardWidgetTypes.UserWorkload => Source(
                 projectId,
-                await reports.UserWorkloadSnapshotAsync(projectId, ct),
+                userWorkloadHandler is null
+                    ? await reports.UserWorkloadSnapshotAsync(projectId, ct)
+                    : await userWorkloadHandler.HandleAsync(new UserWorkloadQuery(projectId), ct),
                 [Column("userId", "Kullanıcı"), Column("openItems", "Açık iş"),
                     Column("overdueItems", "Geciken"), Column("loggedHours", "Kayıtlı saat")],
                 values => values
@@ -122,7 +157,11 @@ public sealed class DashboardRenderer(
                     .ToList()),
             DashboardWidgetTypes.DueDateRisks => Source(
                 projectId,
-                await reports.DueDateRisksSnapshotAsync(projectId, filter.DueRiskDays, ct),
+                dueDateRisksHandler is null
+                    ? await reports.DueDateRisksSnapshotAsync(projectId, filter.DueRiskDays, ct)
+                    : await dueDateRisksHandler.HandleAsync(
+                        new DueDateRisksQuery(projectId, filter.DueRiskDays),
+                        ct),
                 [Column("title", "İş"), Column("assigneeUserId", "Atanan"),
                     Column("dueDate", "Son tarih"), Column("status", "Durum")],
                 values => values
@@ -138,7 +177,9 @@ public sealed class DashboardRenderer(
                     .ToList()),
             DashboardWidgetTypes.FlowTime => Source(
                 projectId,
-                await reports.FlowTimeSnapshotAsync(projectId, from, to, ct),
+                flowTimeHandler is null
+                    ? await reports.FlowTimeSnapshotAsync(projectId, from, to, ct)
+                    : await flowTimeHandler.HandleAsync(new FlowTimeQuery(projectId, from, to), ct),
                 [Column("completedItems", "Tamamlanan"), Column("cycleTimeSampleSize", "Örnek"),
                     Column("medianLeadTimeHours", "Medyan lead time"),
                     Column("medianCycleTimeHours", "Medyan cycle time")],
@@ -149,7 +190,9 @@ public sealed class DashboardRenderer(
                     ("medianCycleTimeHours", value.MedianCycleTimeHours))]),
             DashboardWidgetTypes.CompletionRate => Source(
                 projectId,
-                await reports.CompletionRateSnapshotAsync(projectId, from, to, ct),
+                completionRateHandler is null
+                    ? await reports.CompletionRateSnapshotAsync(projectId, from, to, ct)
+                    : await completionRateHandler.HandleAsync(new CompletionRateQuery(projectId, from, to), ct),
                 [Column("createdItems", "Oluşturulan"), Column("completedItems", "Tamamlanan"),
                     Column("completionRatePercent", "Tamamlama oranı")],
                 value => [Row(
@@ -158,7 +201,9 @@ public sealed class DashboardRenderer(
                     ("completionRatePercent", value.CompletionRatePercent))]),
             DashboardWidgetTypes.TeamPerformance => Source(
                 projectId,
-                await reports.TeamPerformanceSnapshotAsync(projectId, from, to, ct),
+                teamPerformanceHandler is null
+                    ? await reports.TeamPerformanceSnapshotAsync(projectId, from, to, ct)
+                    : await teamPerformanceHandler.HandleAsync(new TeamPerformanceQuery(projectId, from, to), ct),
                 [Column("teamName", "Ekip"), Column("assignedItems", "Atanan"),
                     Column("completedItems", "Tamamlanan"), Column("completionRatePercent", "Tamamlama oranı"),
                     Column("averageLeadTimeHours", "Ortalama lead time"), Column("loggedHours", "Kayıtlı saat")],

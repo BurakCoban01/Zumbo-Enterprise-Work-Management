@@ -23,6 +23,11 @@ internal sealed class SearchWorkItemsSlice(
         CancellationToken ct) =>
         (await SearchPageAsync(request, ct)).Items;
 
+    internal Task<WorkItemSearchPageResponse> HandlePageAsync(
+        WorkItemSearchRequest request,
+        CancellationToken ct) =>
+        SearchPageAsync(request, ct);
+
     private async Task<WorkItemSearchPageResponse> SearchPageAsync(
         WorkItemSearchRequest request,
         CancellationToken ct)

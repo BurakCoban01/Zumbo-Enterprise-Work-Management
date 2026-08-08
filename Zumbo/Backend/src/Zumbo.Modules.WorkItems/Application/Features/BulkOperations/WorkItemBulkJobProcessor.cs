@@ -3,6 +3,7 @@ using System.Text.Json;
 using Microsoft.Extensions.Options;
 using Zumbo.BuildingBlocks.Application.Persistence;
 using Zumbo.BuildingBlocks.Application.Security;
+using Zumbo.Modules.WorkItems.Application.Features.BulkOperations;
 using Zumbo.SharedKernel;
 
 namespace Zumbo.Modules.WorkItems;
@@ -24,7 +25,51 @@ public sealed class WorkItemBulkJobProcessor(
     ICurrentUser currentUser)
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+    private readonly CreateWorkItemHandler? createWorkItemHandler;
+    private readonly MoveWorkItemHandler? moveWorkItemHandler;
+    private readonly AssignWorkItemHandler? assignWorkItemHandler;
+    private readonly ArchiveWorkItemHandler? archiveWorkItemHandler;
     private WorkItemBulkJobOptions Options => configuredOptions.Value;
+
+    public WorkItemBulkJobProcessor(
+        IDocumentRepository<WorkItemBulkJobDocument> jobs,
+        IDocumentRepository<WorkItemBulkJobItemDocument> items,
+        IDocumentRepository<WorkItemDocument> workItems,
+        IProjectPermissionChecker permissionChecker,
+        IBoardPlacementPolicy boardPolicy,
+        IWorkItemTeamPolicy teamPolicy,
+        IWorkItemTypeSchemaPolicy typeSchemas,
+        IWorkItemBulkJobEventPublisher publisher,
+        IWorkItemBulkArtifactStorage artifacts,
+        IWorkItemAuditPublisher audit,
+        IOptions<WorkItemBulkJobOptions> configuredOptions,
+        IClock clock,
+        ICurrentUser currentUser,
+        CreateWorkItemHandler createWorkItemHandler,
+        MoveWorkItemHandler moveWorkItemHandler,
+        AssignWorkItemHandler assignWorkItemHandler,
+        ArchiveWorkItemHandler archiveWorkItemHandler)
+        : this(
+            jobs,
+            items,
+            workItems,
+            null!,
+            permissionChecker,
+            boardPolicy,
+            teamPolicy,
+            typeSchemas,
+            publisher,
+            artifacts,
+            audit,
+            configuredOptions,
+            clock,
+            currentUser)
+    {
+        this.createWorkItemHandler = createWorkItemHandler;
+        this.moveWorkItemHandler = moveWorkItemHandler;
+        this.assignWorkItemHandler = assignWorkItemHandler;
+        this.archiveWorkItemHandler = archiveWorkItemHandler;
+    }
 
     public async Task ProcessAsync(WorkItemBulkJobDueEvent message, CancellationToken ct)
     {
@@ -134,8 +179,10 @@ public sealed class WorkItemBulkJobProcessor(
                 return existing.Id;
             }
             if (job.DryRun) return "validated";
-            var created = await workItemService.CreateAsync(
-                request, $"bulk-job:{job.Id}:{item.ItemIndex}", ct, targetId);
+            var importCorrelationId = $"bulk-job:{job.Id}:{item.ItemIndex}";
+            var created = createWorkItemHandler is null
+                ? await workItemService.CreateAsync(request, importCorrelationId, ct, targetId)
+                : await createWorkItemHandler.HandleAsync(request, importCorrelationId, ct, targetId);
             return created.Id;
         }
 
@@ -150,14 +197,35 @@ public sealed class WorkItemBulkJobProcessor(
         {
             case WorkItemBulkOperations.Move:
                 if (target.Status != job.OperationValue)
-                    await workItemService.MoveAsync(target.Id, new MoveWorkItemRequest(job.OperationValue!), correlationId, ct);
+                {
+                    var request = new MoveWorkItemRequest(job.OperationValue!);
+                    if (moveWorkItemHandler is null)
+                        await workItemService.MoveAsync(target.Id, request, correlationId, ct);
+                    else
+                        await moveWorkItemHandler.HandleAsync(
+                            new MoveWorkItemCommand(target.Id, request, correlationId), ct);
+                }
                 break;
             case WorkItemBulkOperations.Assign:
                 if (target.AssigneeUserId != job.OperationValue)
-                    await workItemService.AssignAsync(target.Id, new AssignWorkItemRequest(job.OperationValue!), correlationId, ct);
+                {
+                    var request = new AssignWorkItemRequest(job.OperationValue!);
+                    if (assignWorkItemHandler is null)
+                        await workItemService.AssignAsync(target.Id, request, correlationId, ct);
+                    else
+                        await assignWorkItemHandler.HandleAsync(
+                            new AssignWorkItemCommand(target.Id, request, correlationId), ct);
+                }
                 break;
             case WorkItemBulkOperations.Archive:
-                if (!target.Archived) await workItemService.ArchiveAsync(target.Id, correlationId, ct);
+                if (!target.Archived)
+                {
+                    if (archiveWorkItemHandler is null)
+                        await workItemService.ArchiveAsync(target.Id, correlationId, ct);
+                    else
+                        await archiveWorkItemHandler.HandleAsync(
+                            new ArchiveWorkItemCommand(target.Id, correlationId), ct);
+                }
                 break;
             default:
                 throw new ValidationException("Bulk job operation is invalid.");
@@ -186,10 +254,10 @@ public sealed class WorkItemBulkJobProcessor(
         {
             job.ProcessedItems = job.TotalItems;
             job.SucceededItems = job.TotalItems;
-            await CompleteJobAsync(job, Array.Empty<WorkItemExportRow>(), ct);
+            await CompleteJobAsync(job, Array.Empty<WorkItemExportResultRow>(), ct);
             return;
         }
-        var rows = new List<WorkItemExportRow>(job.TotalItems);
+        var rows = new List<WorkItemExportResultRow>(job.TotalItems);
         string? cursor = null;
         do
         {
@@ -201,7 +269,7 @@ public sealed class WorkItemBulkJobProcessor(
             var page = await workItems.ListByCursorAsync(
                 x => x.ProjectId == job.ProjectId && (job.IncludeArchived || !x.Archived),
                 cursor, Math.Min(200, Math.Max(1, Options.MaxExportItems - rows.Count)), ct);
-            rows.AddRange(page.Items.Select(ToExportRow));
+            rows.AddRange(page.Items.Select(ToExportResultRow));
             cursor = page.NextCursor;
             job.ProcessedItems = rows.Count;
             job.SucceededItems = rows.Count;
@@ -321,6 +389,21 @@ public sealed class WorkItemBulkJobProcessor(
     private static WorkItemExportRow ToExportRow(WorkItemDocument x) =>
         new(x.Id, x.BoardId, x.Title, x.Description, x.Type, x.Priority, x.Status,
             x.AssigneeUserId, x.DueDate, x.ParentId, x.TeamId, x.Labels, x.CustomFields, x.Archived, x.Version);
+    private static WorkItemExportResultRow ToExportResultRow(WorkItemDocument x) =>
+        new(x.Id, x.BoardId, x.Title, x.Description, x.Type, x.Priority, x.Status,
+            x.AssigneeUserId, x.DueDate, x.ParentId, x.TeamId, x.Labels,
+            x.CustomFields.Select(value => new WorkItemExportCustomFieldValue(
+                value.FieldKey,
+                value.Type,
+                value.TextValue,
+                value.NumberValue,
+                value.BooleanValue,
+                value.DateValueUtc,
+                value.OptionKey,
+                value.Indexed,
+                value.SearchValue)).ToList(),
+            x.Archived,
+            x.Version);
     private static T Deserialize<T>(string json) => JsonSerializer.Deserialize<T>(json, JsonOptions)
         ?? throw new ValidationException("Bulk job item payload is invalid.");
     private static string Limit(string value, int max) => value.Length <= max ? value : value[..max];

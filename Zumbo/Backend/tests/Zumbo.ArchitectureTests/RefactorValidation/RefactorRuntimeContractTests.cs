@@ -33,7 +33,11 @@ public sealed class RefactorRuntimeContractTests
         "services.AddScoped<UpsertWorkflowHandler>();",
         "services.AddScoped<GetWorkflowHandler>();",
         "services.AddScoped<CreateWorkItemHandler>();",
+        "services.AddScoped<IIntakeWorkItemCreator>(provider=>provider.GetRequiredService<WorkItemService>());",
         "services.AddScoped<SearchWorkItemsHandler>();",
+        "services.AddScoped<WorkItemBulkJobProcessor>();",
+        "services.AddScoped<IAutomationActionExecutor,AutomationWorkItemActionExecutor>();",
+        "services.AddScoped<DashboardRenderer>();",
         "services.AddScoped<ListNotificationsHandler>();",
         "services.AddScoped<MarkNotificationAsReadHandler>();",
         "services.AddScoped<WriteAuditLogHandler>();",
@@ -177,6 +181,8 @@ public sealed class RefactorRuntimeContractTests
         + "provider.GetService<WorkItemCollaborationService>(),"
         + "provider.GetService<IWorkItemAutomationEventPublisher>(),"
         + "provider.GetService<IWorkItemAutomationChainContextAccessor>()));",
+        "services.AddScoped<IIntakeWorkItemCreator>(provider=>"
+        + "newCreateIntakeWorkItemHandler(provider.GetRequiredService<CreateWorkItemHandler>()));",
         "services.AddScoped<SearchWorkItemsHandler>(provider=>newSearchWorkItemsHandler("
         + "provider.GetRequiredService<IDocumentRepository<WorkItemDocument>>(),"
         + "provider.GetRequiredService<ICurrentUser>(),"
@@ -185,6 +191,424 @@ public sealed class RefactorRuntimeContractTests
         + "provider.GetRequiredService<IWorkItemSearchIndex>(),"
         + "provider.GetRequiredService<IWorkItemActivityStore>(),"
         + "provider.GetRequiredService<IOptions<SearchOptions>>()));",
+        "services.AddScoped<BulkMoveWorkItemsHandler>();",
+        "services.AddScoped<BulkAssignWorkItemsHandler>();",
+        "services.AddScoped<BulkArchiveWorkItemsHandler>();",
+        "services.AddScoped<WorkItemBulkJobProcessor>(provider=>newWorkItemBulkJobProcessor("
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemBulkJobDocument>>(),"
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemBulkJobItemDocument>>(),"
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemDocument>>(),"
+        + "provider.GetRequiredService<IProjectPermissionChecker>(),"
+        + "provider.GetRequiredService<IBoardPlacementPolicy>(),"
+        + "provider.GetRequiredService<IWorkItemTeamPolicy>(),"
+        + "provider.GetRequiredService<IWorkItemTypeSchemaPolicy>(),"
+        + "provider.GetRequiredService<IWorkItemBulkJobEventPublisher>(),"
+        + "provider.GetRequiredService<IWorkItemBulkArtifactStorage>(),"
+        + "provider.GetRequiredService<IWorkItemAuditPublisher>(),"
+        + "provider.GetRequiredService<IOptions<WorkItemBulkJobOptions>>(),"
+        + "provider.GetRequiredService<IClock>(),"
+        + "provider.GetRequiredService<ICurrentUser>(),"
+        + "provider.GetRequiredService<CreateWorkItemHandler>(),"
+        + "provider.GetRequiredService<MoveWorkItemHandler>(),"
+        + "provider.GetRequiredService<AssignWorkItemHandler>(),"
+        + "provider.GetRequiredService<ArchiveWorkItemHandler>()));",
+        "services.AddScoped<IAutomationActionExecutor>(provider=>newAutomationWorkItemActionExecutor("
+        + "provider.GetRequiredService<GetWorkItemHandler>(),"
+        + "provider.GetRequiredService<AssignWorkItemHandler>(),"
+        + "provider.GetRequiredService<ClearAssigneeHandler>(),"
+        + "provider.GetRequiredService<AddLabelHandler>(),"
+        + "provider.GetRequiredService<RemoveLabelHandler>(),"
+        + "provider.GetRequiredService<UpdateWorkItemHandler>(),"
+        + "provider.GetRequiredService<AddCommentHandler>(),"
+        + "provider.GetRequiredService<IWorkItemAutomationChainContextAccessor>()));",
+        "services.AddScoped<DashboardRenderer>(provider=>newDashboardRenderer("
+        + "provider.GetRequiredService<DashboardService>(),"
+        + "provider.GetRequiredService<ProjectSummaryHandler>(),"
+        + "provider.GetRequiredService<StatusDistributionHandler>(),"
+        + "provider.GetRequiredService<UserWorkloadHandler>(),"
+        + "provider.GetRequiredService<DueDateRisksHandler>(),"
+        + "provider.GetRequiredService<FlowTimeHandler>(),"
+        + "provider.GetRequiredService<CompletionRateHandler>(),"
+        + "provider.GetRequiredService<TeamPerformanceHandler>(),"
+        + "provider.GetRequiredService<IClock>()));",
+        "services.AddScoped<GetWorkItemHandler>(provider=>newGetWorkItemHandler("
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemDocument>>(),"
+        + "provider.GetRequiredService<ICurrentUser>(),"
+        + "provider.GetRequiredService<IProjectPermissionChecker>(),"
+        + "provider.GetRequiredService<IWorkItemActivityStore>()));",
+        "services.AddScoped<ArchiveWorkItemHandler>(provider=>newArchiveWorkItemHandler("
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemDocument>>(),"
+        + "provider.GetRequiredService<IWorkItemAuditPublisher>(),"
+        + "provider.GetRequiredService<IClock>(),"
+        + "provider.GetRequiredService<ICurrentUser>(),"
+        + "provider.GetRequiredService<IProjectPermissionChecker>(),"
+        + "provider.GetRequiredService<IDistributedLockProvider>(),"
+        + "provider.GetRequiredService<IOptions<DistributedLockOptions>>(),"
+        + "provider.GetRequiredService<IWorkItemSearchPublisher>(),"
+        + "provider.GetRequiredService<IWorkItemRealtimePublisher>(),"
+        + "provider.GetRequiredService<IWorkItemCacheInvalidationPublisher>(),"
+        + "provider.GetRequiredService<IWorkItemActivityStore>(),"
+        + "provider.GetService<IExpectedVersionAccessor>(),"
+        + "provider.GetService<WorkItemWipProjection>(),"
+        + "provider.GetService<WorkItemCollaborationService>()));",
+        "services.AddScoped<RestoreWorkItemHandler>(provider=>newRestoreWorkItemHandler("
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemDocument>>(),"
+        + "provider.GetRequiredService<IWorkItemAuditPublisher>(),"
+        + "provider.GetRequiredService<IClock>(),"
+        + "provider.GetRequiredService<ICurrentUser>(),"
+        + "provider.GetRequiredService<IProjectPermissionChecker>(),"
+        + "provider.GetRequiredService<IBoardPlacementPolicy>(),"
+        + "provider.GetRequiredService<IDistributedLockProvider>(),"
+        + "provider.GetRequiredService<IOptions<DistributedLockOptions>>(),"
+        + "provider.GetRequiredService<IWorkItemSearchPublisher>(),"
+        + "provider.GetRequiredService<IWorkItemRealtimePublisher>(),"
+        + "provider.GetRequiredService<IWorkItemCacheInvalidationPublisher>(),"
+        + "provider.GetRequiredService<IWorkItemActivityStore>(),"
+        + "provider.GetService<IExpectedVersionAccessor>(),"
+        + "provider.GetService<WorkItemWipProjection>(),"
+        + "provider.GetRequiredService<WorkItemRankService>(),"
+        + "provider.GetService<WorkItemCollaborationService>()));",
+        "services.AddScoped<AddLabelHandler>(provider=>newAddLabelHandler("
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemDocument>>(),"
+        + "provider.GetRequiredService<IClock>(),"
+        + "provider.GetRequiredService<ICurrentUser>(),"
+        + "provider.GetRequiredService<IProjectPermissionChecker>(),"
+        + "provider.GetRequiredService<IWorkItemSearchPublisher>(),"
+        + "provider.GetRequiredService<IWorkItemActivityStore>(),"
+        + "provider.GetService<IExpectedVersionAccessor>(),"
+        + "provider.GetService<WorkItemCollaborationService>(),"
+        + "provider.GetService<IWorkItemAutomationEventPublisher>(),"
+        + "provider.GetService<IWorkItemAutomationChainContextAccessor>()));",
+        "services.AddScoped<RemoveLabelHandler>(provider=>newRemoveLabelHandler("
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemDocument>>(),"
+        + "provider.GetRequiredService<IClock>(),"
+        + "provider.GetRequiredService<ICurrentUser>(),"
+        + "provider.GetRequiredService<IProjectPermissionChecker>(),"
+        + "provider.GetRequiredService<IWorkItemSearchPublisher>(),"
+        + "provider.GetRequiredService<IWorkItemActivityStore>(),"
+        + "provider.GetService<IExpectedVersionAccessor>(),"
+        + "provider.GetService<WorkItemCollaborationService>(),"
+        + "provider.GetService<IWorkItemAutomationEventPublisher>(),"
+        + "provider.GetService<IWorkItemAutomationChainContextAccessor>()));",
+        "services.AddScoped<AddChecklistItemHandler>(provider=>newAddChecklistItemHandler("
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemDocument>>(),"
+        + "provider.GetRequiredService<IClock>(),"
+        + "provider.GetRequiredService<ICurrentUser>(),"
+        + "provider.GetRequiredService<IProjectPermissionChecker>(),"
+        + "provider.GetRequiredService<IWorkItemActivityStore>(),"
+        + "provider.GetService<IExpectedVersionAccessor>(),"
+        + "provider.GetService<WorkItemCollaborationService>()));",
+        "services.AddScoped<CompleteChecklistItemHandler>(provider=>newCompleteChecklistItemHandler("
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemDocument>>(),"
+        + "provider.GetRequiredService<IClock>(),"
+        + "provider.GetRequiredService<ICurrentUser>(),"
+        + "provider.GetRequiredService<IProjectPermissionChecker>(),"
+        + "provider.GetRequiredService<IWorkItemActivityStore>(),"
+        + "provider.GetService<IExpectedVersionAccessor>(),"
+        + "provider.GetService<WorkItemCollaborationService>()));",
+        "services.AddScoped<AddWorkLogHandler>(provider=>newAddWorkLogHandler("
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemDocument>>(),"
+        + "provider.GetRequiredService<IClock>(),"
+        + "provider.GetRequiredService<ICurrentUser>(),"
+        + "provider.GetRequiredService<IProjectPermissionChecker>(),"
+        + "provider.GetRequiredService<IWorkItemActivityStore>(),"
+        + "provider.GetService<IExpectedVersionAccessor>(),"
+        + "provider.GetRequiredService<IWorkItemCacheInvalidationPublisher>(),"
+        + "provider.GetService<WorkItemCollaborationService>()));",
+        "services.AddScoped<SetPlanningHandler>(provider=>newSetPlanningHandler("
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemDocument>>(),"
+        + "provider.GetRequiredService<IClock>(),"
+        + "provider.GetRequiredService<ICurrentUser>(),"
+        + "provider.GetRequiredService<IProjectPermissionChecker>(),"
+        + "provider.GetService<IWorkItemSprintPolicy>(),"
+        + "provider.GetRequiredService<IWorkItemSearchPublisher>(),"
+        + "provider.GetRequiredService<IWorkItemActivityStore>(),"
+        + "provider.GetService<IExpectedVersionAccessor>(),"
+        + "provider.GetRequiredService<IWorkItemCacheInvalidationPublisher>(),"
+        + "provider.GetService<WorkItemCollaborationService>()));",
+        "services.AddScoped<MoveWorkItemHandler>(provider=>newMoveWorkItemHandler("
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemDocument>>(),"
+        + "provider.GetRequiredService<IWorkItemAuditPublisher>(),"
+        + "provider.GetRequiredService<IClock>(),"
+        + "provider.GetRequiredService<ICurrentUser>(),"
+        + "provider.GetRequiredService<IProjectPermissionChecker>(),"
+        + "provider.GetRequiredService<IWorkflowPolicy>(),"
+        + "provider.GetRequiredService<IBoardPlacementPolicy>(),"
+        + "provider.GetRequiredService<IDistributedLockProvider>(),"
+        + "provider.GetRequiredService<IOptions<DistributedLockOptions>>(),"
+        + "provider.GetRequiredService<IWorkItemSearchPublisher>(),"
+        + "provider.GetRequiredService<IWorkItemRealtimePublisher>(),"
+        + "provider.GetRequiredService<IWorkItemCacheInvalidationPublisher>(),"
+        + "provider.GetRequiredService<IWorkItemActivityStore>(),"
+        + "provider.GetRequiredService<WorkItemGraphService>(),"
+        + "provider.GetService<IExpectedVersionAccessor>(),"
+        + "provider.GetService<WorkItemWipProjection>(),"
+        + "provider.GetRequiredService<WorkItemRankService>(),"
+        + "provider.GetService<WorkItemCollaborationService>(),"
+        + "provider.GetService<IWorkItemAutomationEventPublisher>(),"
+        + "provider.GetService<IWorkItemAutomationChainContextAccessor>()));",
+        "services.AddScoped<ReorderWorkItemHandler>(provider=>newReorderWorkItemHandler("
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemDocument>>(),"
+        + "provider.GetRequiredService<IWorkItemAuditPublisher>(),"
+        + "provider.GetRequiredService<IClock>(),"
+        + "provider.GetRequiredService<ICurrentUser>(),"
+        + "provider.GetRequiredService<IProjectPermissionChecker>(),"
+        + "provider.GetRequiredService<IDistributedLockProvider>(),"
+        + "provider.GetRequiredService<IOptions<DistributedLockOptions>>(),"
+        + "provider.GetRequiredService<IWorkItemRealtimePublisher>(),"
+        + "provider.GetRequiredService<IWorkItemActivityStore>(),"
+        + "provider.GetService<IExpectedVersionAccessor>(),"
+        + "provider.GetRequiredService<WorkItemRankService>(),"
+        + "provider.GetService<WorkItemCollaborationService>()));",
+        "services.AddScoped<AddCommentHandler>(provider=>newAddCommentHandler("
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemDocument>>(),"
+        + "provider.GetRequiredService<IWorkItemNotificationPublisher>(),"
+        + "provider.GetRequiredService<IWorkItemAuditPublisher>(),"
+        + "provider.GetRequiredService<IClock>(),"
+        + "provider.GetRequiredService<ICurrentUser>(),"
+        + "provider.GetRequiredService<IProjectPermissionChecker>(),"
+        + "provider.GetRequiredService<IWorkItemActivityStore>(),"
+        + "provider.GetService<IExpectedVersionAccessor>(),"
+        + "provider.GetService<WorkItemCollaborationService>(),"
+        + "provider.GetService<IWorkItemAutomationEventPublisher>(),"
+        + "provider.GetService<IWorkItemAutomationChainContextAccessor>()));",
+        "services.AddScoped<EditCommentHandler>(provider=>newEditCommentHandler("
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemDocument>>(),"
+        + "provider.GetRequiredService<IWorkItemAuditPublisher>(),"
+        + "provider.GetRequiredService<IClock>(),"
+        + "provider.GetRequiredService<ICurrentUser>(),"
+        + "provider.GetRequiredService<IProjectPermissionChecker>(),"
+        + "provider.GetRequiredService<IWorkItemActivityStore>(),"
+        + "provider.GetService<IExpectedVersionAccessor>(),"
+        + "provider.GetService<WorkItemCollaborationService>()));",
+        "services.AddScoped<DeleteCommentHandler>(provider=>newDeleteCommentHandler("
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemDocument>>(),"
+        + "provider.GetRequiredService<IWorkItemAuditPublisher>(),"
+        + "provider.GetRequiredService<ICurrentUser>(),"
+        + "provider.GetRequiredService<IProjectPermissionChecker>(),"
+        + "provider.GetRequiredService<IWorkItemActivityStore>(),"
+        + "provider.GetService<IExpectedVersionAccessor>(),"
+        + "provider.GetService<WorkItemCollaborationService>()));",
+        "services.AddScoped<SetParentHandler>(provider=>newSetParentHandler("
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemDocument>>(),"
+        + "provider.GetRequiredService<IWorkItemAuditPublisher>(),"
+        + "provider.GetRequiredService<IClock>(),"
+        + "provider.GetRequiredService<ICurrentUser>(),"
+        + "provider.GetRequiredService<IProjectPermissionChecker>(),"
+        + "provider.GetRequiredService<IWorkItemTypeSchemaPolicy>(),"
+        + "provider.GetRequiredService<IDistributedLockProvider>(),"
+        + "provider.GetRequiredService<IOptions<DistributedLockOptions>>(),"
+        + "provider.GetRequiredService<IWorkItemActivityStore>(),"
+        + "provider.GetRequiredService<WorkItemGraphService>(),"
+        + "provider.GetService<IExpectedVersionAccessor>(),"
+        + "provider.GetService<WorkItemCollaborationService>()));",
+        "services.AddScoped<LinkWorkItemHandler>(provider=>newLinkWorkItemHandler("
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemDocument>>(),"
+        + "provider.GetRequiredService<IWorkItemAuditPublisher>(),"
+        + "provider.GetRequiredService<IClock>(),"
+        + "provider.GetRequiredService<ICurrentUser>(),"
+        + "provider.GetRequiredService<IProjectPermissionChecker>(),"
+        + "provider.GetRequiredService<IDistributedLockProvider>(),"
+        + "provider.GetRequiredService<IOptions<DistributedLockOptions>>(),"
+        + "provider.GetRequiredService<IWorkItemActivityStore>(),"
+        + "provider.GetRequiredService<WorkItemGraphService>(),"
+        + "provider.GetService<IExpectedVersionAccessor>(),"
+        + "provider.GetService<WorkItemCollaborationService>()));",
+        "services.AddScoped<UnlinkWorkItemHandler>(provider=>newUnlinkWorkItemHandler("
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemDocument>>(),"
+        + "provider.GetRequiredService<IWorkItemAuditPublisher>(),"
+        + "provider.GetRequiredService<IClock>(),"
+        + "provider.GetRequiredService<ICurrentUser>(),"
+        + "provider.GetRequiredService<IProjectPermissionChecker>(),"
+        + "provider.GetRequiredService<IDistributedLockProvider>(),"
+        + "provider.GetRequiredService<IOptions<DistributedLockOptions>>(),"
+        + "provider.GetRequiredService<IWorkItemActivityStore>(),"
+        + "provider.GetRequiredService<WorkItemGraphService>(),"
+        + "provider.GetService<IExpectedVersionAccessor>(),"
+        + "provider.GetService<WorkItemCollaborationService>()));",
+        "services.AddScoped<OpenAttachmentHandler>(provider=>newOpenAttachmentHandler("
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemDocument>>(),"
+        + "provider.GetRequiredService<ICurrentUser>(),"
+        + "provider.GetRequiredService<IProjectPermissionChecker>(),"
+        + "provider.GetRequiredService<IWorkItemActivityStore>(),"
+        + "provider.GetRequiredService<IAttachmentStorage>()));",
+        "services.AddScoped<UploadAttachmentHandler>(provider=>newUploadAttachmentHandler("
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemDocument>>(),"
+        + "provider.GetRequiredService<IWorkItemAuditPublisher>(),"
+        + "provider.GetRequiredService<IClock>(),"
+        + "provider.GetRequiredService<ICurrentUser>(),"
+        + "provider.GetRequiredService<IProjectPermissionChecker>(),"
+        + "provider.GetRequiredService<IAttachmentStorage>(),"
+        + "provider.GetRequiredService<IDistributedLockProvider>(),"
+        + "provider.GetRequiredService<IOptions<DistributedLockOptions>>(),"
+        + "provider.GetRequiredService<IWorkItemActivityStore>(),"
+        + "provider.GetService<IExpectedVersionAccessor>(),"
+        + "provider.GetService<WorkItemCollaborationService>(),"
+        + "provider.GetService<ILogger<WorkItemService>>()));",
+        "services.AddScoped<DeleteAttachmentHandler>(provider=>newDeleteAttachmentHandler("
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemDocument>>(),"
+        + "provider.GetRequiredService<IWorkItemAuditPublisher>(),"
+        + "provider.GetRequiredService<ICurrentUser>(),"
+        + "provider.GetRequiredService<IProjectPermissionChecker>(),"
+        + "provider.GetRequiredService<IAttachmentStorage>(),"
+        + "provider.GetRequiredService<IDistributedLockProvider>(),"
+        + "provider.GetRequiredService<IOptions<DistributedLockOptions>>(),"
+        + "provider.GetRequiredService<IWorkItemActivityStore>(),"
+        + "provider.GetService<IExpectedVersionAccessor>(),"
+        + "provider.GetService<WorkItemCollaborationService>(),"
+        + "provider.GetService<ILogger<WorkItemService>>()));",
+        "services.AddScoped<SendDueDateRemindersHandler>(provider=>newSendDueDateRemindersHandler("
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemDocument>>(),"
+        + "provider.GetRequiredService<IWorkItemNotificationPublisher>(),"
+        + "provider.GetRequiredService<IClock>(),"
+        + "provider.GetRequiredService<IProjectPermissionChecker>(),"
+        + "provider.GetRequiredService<IDistributedLockProvider>(),"
+        + "provider.GetRequiredService<IOptions<DistributedLockOptions>>(),"
+        + "provider.GetRequiredService<IWorkItemActivityStore>(),"
+        + "provider.GetService<IExpectedVersionAccessor>()));",
+        "services.AddScoped<ProjectSummaryHandler>(provider=>newProjectSummaryHandler("
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemDocument>>(),"
+        + "provider.GetRequiredService<IClock>(),"
+        + "provider.GetRequiredService<ICurrentUser>(),"
+        + "provider.GetRequiredService<IProjectPermissionChecker>(),"
+        + "provider.GetRequiredService<IWorkItemReadModelCache>(),"
+        + "provider.GetRequiredService<IOptions<WorkItemReadModelCacheOptions>>()));",
+        "services.AddScoped<StatusDistributionHandler>(provider=>newStatusDistributionHandler("
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemDocument>>(),"
+        + "provider.GetRequiredService<ICurrentUser>(),"
+        + "provider.GetRequiredService<IProjectPermissionChecker>(),"
+        + "provider.GetRequiredService<IWorkItemReadModelCache>(),"
+        + "provider.GetRequiredService<IOptions<WorkItemReadModelCacheOptions>>()));",
+        "services.AddScoped<UserWorkloadHandler>(provider=>newUserWorkloadHandler("
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemDocument>>(),"
+        + "provider.GetRequiredService<IClock>(),"
+        + "provider.GetRequiredService<ICurrentUser>(),"
+        + "provider.GetRequiredService<IProjectPermissionChecker>(),"
+        + "provider.GetRequiredService<IWorkItemReadModelCache>(),"
+        + "provider.GetRequiredService<IOptions<WorkItemReadModelCacheOptions>>(),"
+        + "provider.GetRequiredService<IWorkItemActivityStore>()));",
+        "services.AddScoped<DueDateRisksHandler>(provider=>newDueDateRisksHandler("
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemDocument>>(),"
+        + "provider.GetRequiredService<IClock>(),"
+        + "provider.GetRequiredService<ICurrentUser>(),"
+        + "provider.GetRequiredService<IProjectPermissionChecker>(),"
+        + "provider.GetRequiredService<IWorkItemReadModelCache>(),"
+        + "provider.GetRequiredService<IOptions<WorkItemReadModelCacheOptions>>()));",
+        "services.AddScoped<FlowTimeHandler>(provider=>newFlowTimeHandler("
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemDocument>>(),"
+        + "provider.GetRequiredService<IClock>(),"
+        + "provider.GetRequiredService<ICurrentUser>(),"
+        + "provider.GetRequiredService<IProjectPermissionChecker>(),"
+        + "provider.GetRequiredService<IWorkItemReadModelCache>(),"
+        + "provider.GetRequiredService<IOptions<WorkItemReadModelCacheOptions>>(),"
+        + "provider.GetRequiredService<IWorkItemActivityStore>()));",
+        "services.AddScoped<CompletionRateHandler>(provider=>newCompletionRateHandler("
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemDocument>>(),"
+        + "provider.GetRequiredService<IClock>(),"
+        + "provider.GetRequiredService<ICurrentUser>(),"
+        + "provider.GetRequiredService<IProjectPermissionChecker>(),"
+        + "provider.GetRequiredService<IWorkItemReadModelCache>(),"
+        + "provider.GetRequiredService<IOptions<WorkItemReadModelCacheOptions>>()));",
+        "services.AddScoped<TeamPerformanceHandler>(provider=>newTeamPerformanceHandler("
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemDocument>>(),"
+        + "provider.GetRequiredService<IClock>(),"
+        + "provider.GetRequiredService<ICurrentUser>(),"
+        + "provider.GetRequiredService<IProjectPermissionChecker>(),"
+        + "provider.GetRequiredService<IWorkItemTeamPolicy>(),"
+        + "provider.GetRequiredService<IWorkItemReadModelCache>(),"
+        + "provider.GetRequiredService<IOptions<WorkItemReadModelCacheOptions>>(),"
+        + "provider.GetRequiredService<IWorkItemActivityStore>()));",
+        "services.AddScoped<ClearAssigneeHandler>(provider=>newClearAssigneeHandler("
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemDocument>>(),"
+        + "provider.GetRequiredService<IWorkItemAuditPublisher>(),"
+        + "provider.GetRequiredService<IClock>(),"
+        + "provider.GetRequiredService<ICurrentUser>(),"
+        + "provider.GetRequiredService<IProjectPermissionChecker>(),"
+        + "provider.GetRequiredService<IWorkItemSearchPublisher>(),"
+        + "provider.GetRequiredService<IWorkItemRealtimePublisher>(),"
+        + "provider.GetRequiredService<IWorkItemCacheInvalidationPublisher>(),"
+        + "provider.GetRequiredService<IWorkItemActivityStore>(),"
+        + "provider.GetService<IExpectedVersionAccessor>(),"
+        + "provider.GetService<WorkItemCollaborationService>(),"
+        + "provider.GetService<IWorkItemAutomationEventPublisher>(),"
+        + "provider.GetService<IWorkItemAutomationChainContextAccessor>()));",
+        "services.AddScoped<AssignWorkItemHandler>(provider=>newAssignWorkItemHandler("
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemDocument>>(),"
+        + "provider.GetRequiredService<IWorkItemAuditPublisher>(),"
+        + "provider.GetRequiredService<IClock>(),"
+        + "provider.GetRequiredService<ICurrentUser>(),"
+        + "provider.GetRequiredService<IProjectPermissionChecker>(),"
+        + "provider.GetRequiredService<IWorkItemSearchPublisher>(),"
+        + "provider.GetRequiredService<IWorkItemRealtimePublisher>(),"
+        + "provider.GetRequiredService<IWorkItemCacheInvalidationPublisher>(),"
+        + "provider.GetRequiredService<IWorkItemActivityStore>(),"
+        + "provider.GetService<IExpectedVersionAccessor>(),"
+        + "provider.GetService<WorkItemCollaborationService>(),"
+        + "provider.GetRequiredService<IWorkItemTeamPolicy>(),"
+        + "provider.GetRequiredService<IWorkItemNotificationPublisher>()));",
+        "services.AddScoped<SetWorkItemTeamHandler>(provider=>newSetWorkItemTeamHandler("
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemDocument>>(),"
+        + "provider.GetRequiredService<IWorkItemAuditPublisher>(),"
+        + "provider.GetRequiredService<IClock>(),"
+        + "provider.GetRequiredService<ICurrentUser>(),"
+        + "provider.GetRequiredService<IProjectPermissionChecker>(),"
+        + "provider.GetRequiredService<IWorkItemSearchPublisher>(),"
+        + "provider.GetRequiredService<IWorkItemRealtimePublisher>(),"
+        + "provider.GetRequiredService<IWorkItemCacheInvalidationPublisher>(),"
+        + "provider.GetRequiredService<IWorkItemActivityStore>(),"
+        + "provider.GetService<IExpectedVersionAccessor>(),"
+        + "provider.GetService<WorkItemCollaborationService>(),"
+        + "provider.GetRequiredService<IWorkItemTeamPolicy>()));",
+        "services.AddScoped<SetCustomFieldsHandler>(provider=>newSetCustomFieldsHandler("
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemDocument>>(),"
+        + "provider.GetRequiredService<IWorkItemAuditPublisher>(),"
+        + "provider.GetRequiredService<IClock>(),"
+        + "provider.GetRequiredService<ICurrentUser>(),"
+        + "provider.GetRequiredService<IProjectPermissionChecker>(),"
+        + "provider.GetRequiredService<IWorkItemTypeSchemaPolicy>(),"
+        + "provider.GetRequiredService<IWorkItemSearchPublisher>(),"
+        + "provider.GetRequiredService<IWorkItemRealtimePublisher>(),"
+        + "provider.GetRequiredService<IWorkItemCacheInvalidationPublisher>(),"
+        + "provider.GetRequiredService<IWorkItemActivityStore>(),"
+        + "provider.GetService<IExpectedVersionAccessor>(),"
+        + "provider.GetService<WorkItemCollaborationService>(),"
+        + "provider.GetService<IWorkItemAutomationEventPublisher>(),"
+        + "provider.GetService<IWorkItemAutomationChainContextAccessor>()));",
+        "services.AddScoped<RequestApprovalHandler>(provider=>newRequestApprovalHandler("
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemDocument>>(),"
+        + "provider.GetRequiredService<IWorkItemNotificationPublisher>(),"
+        + "provider.GetRequiredService<IWorkItemAuditPublisher>(),"
+        + "provider.GetRequiredService<IClock>(),"
+        + "provider.GetRequiredService<ICurrentUser>(),"
+        + "provider.GetRequiredService<IProjectPermissionChecker>(),"
+        + "provider.GetRequiredService<IWorkflowPolicy>(),"
+        + "provider.GetRequiredService<IWorkItemActivityStore>(),"
+        + "provider.GetService<IExpectedVersionAccessor>(),"
+        + "provider.GetService<WorkItemCollaborationService>()));",
+        "services.AddScoped<UpdateWorkItemHandler>(provider=>newUpdateWorkItemHandler("
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemDocument>>(),"
+        + "provider.GetRequiredService<IWorkItemAuditPublisher>(),"
+        + "provider.GetRequiredService<IClock>(),"
+        + "provider.GetRequiredService<ICurrentUser>(),"
+        + "provider.GetRequiredService<IProjectPermissionChecker>(),"
+        + "provider.GetRequiredService<IWorkItemSearchPublisher>(),"
+        + "provider.GetRequiredService<IWorkItemRealtimePublisher>(),"
+        + "provider.GetRequiredService<IWorkItemCacheInvalidationPublisher>(),"
+        + "provider.GetRequiredService<IWorkItemActivityStore>(),"
+        + "provider.GetService<IExpectedVersionAccessor>(),"
+        + "provider.GetService<WorkItemCollaborationService>(),"
+        + "provider.GetService<IWorkItemAutomationEventPublisher>(),"
+        + "provider.GetService<IWorkItemAutomationChainContextAccessor>()));",
+        "services.AddScoped<DecideApprovalHandler>(provider=>newDecideApprovalHandler("
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemDocument>>(),"
+        + "provider.GetRequiredService<IWorkItemNotificationPublisher>(),"
+        + "provider.GetRequiredService<IWorkItemAuditPublisher>(),"
+        + "provider.GetRequiredService<IClock>(),"
+        + "provider.GetRequiredService<ICurrentUser>(),"
+        + "provider.GetRequiredService<IProjectPermissionChecker>(),"
+        + "provider.GetRequiredService<IWorkItemActivityStore>(),"
+        + "provider.GetService<IExpectedVersionAccessor>(),"
+        + "provider.GetService<WorkItemCollaborationService>()));",
         "services.AddScoped<ListNotificationsHandler>(provider=>newListNotificationsHandler("
         + "provider.GetRequiredService<IDocumentRepository<NotificationDocument>>(),"
         + "provider.GetRequiredService<ICurrentUser>()));",
@@ -345,6 +769,73 @@ public sealed class RefactorRuntimeContractTests
         + "Ok(awaitservice.ListAsync(ct),http));",
         "group.MapGet(\"/{id}\",async(stringid,WorkItemWebhookServiceservice,HttpContexthttp,CancellationTokenct)=>"
         + "Ok(awaitservice.GetAsync(id,ct),http));",
+        "group.MapGet(\"/{id}\",async(stringid,WorkItemServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.GetAsync(id,ct),http));",
+        "group.MapPost(\"/search\",async(WorkItemSearchRequestrequest,WorkItemServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.SearchPageAsync(request,ct),http)).RequireRateLimiting(\"search\");",
+        "group.MapPost(\"/bulk/move\",async(BulkMoveWorkItemsRequestrequest,WorkItemServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.BulkMoveAsync(request,CorrelationId(http),ct),http)).WithZumboPermission(PermissionCatalog.WorkItemMove).RequireRateLimiting(\"bulk\");",
+        "group.MapPost(\"/bulk/assign\",async(BulkAssignWorkItemsRequestrequest,WorkItemServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.BulkAssignAsync(request,CorrelationId(http),ct),http)).WithZumboPermission(PermissionCatalog.WorkItemAssign).RequireRateLimiting(\"bulk\");",
+        "group.MapPost(\"/bulk/archive\",async(BulkArchiveWorkItemsRequestrequest,WorkItemServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.BulkArchiveAsync(request,CorrelationId(http),ct),http)).WithZumboPermission(PermissionCatalog.WorkItemDelete).RequireRateLimiting(\"bulk\");",
+        "group.MapPut(\"/{id}\",async(stringid,UpdateWorkItemRequestrequest,WorkItemServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.UpdateAsync(id,request,CorrelationId(http),ct),http))"
+        + ".WithZumboPermission(PermissionCatalog.WorkItemUpdate);",
+        "group.MapDelete(\"/{id}\",async(stringid,WorkItemServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "{awaitservice.ArchiveAsync(id,CorrelationId(http),ct);returnOk(new{archived=true},http);})"
+        + ".WithZumboPermission(PermissionCatalog.WorkItemDelete);",
+        "group.MapPost(\"/{id}/restore\",async(stringid,WorkItemServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.RestoreAsync(id,CorrelationId(http),ct),http))"
+        + ".WithZumboPermission(PermissionCatalog.WorkItemDelete);",
+        "group.MapPost(\"/{id}/labels\",async(stringid,AddLabelRequestrequest,WorkItemServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.AddLabelAsync(id,request,ct),http))"
+        + ".WithZumboPermission(PermissionCatalog.WorkItemUpdate);",
+        "group.MapDelete(\"/{id}/labels/{label}\",async(stringid,stringlabel,WorkItemServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.RemoveLabelAsync(id,label,ct),http))"
+        + ".WithZumboPermission(PermissionCatalog.WorkItemUpdate);",
+        "group.MapPost(\"/{id}/comments\",async(stringid,AddCommentRequestrequest,WorkItemServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.AddCommentAsync(id,request,CorrelationId(http),ct),http))"
+        + ".WithZumboPermission(PermissionCatalog.CommentCreate);",
+        "group.MapPut(\"/{id}/comments/{commentId}\",async(stringid,stringcommentId,EditCommentRequestrequest,WorkItemServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.EditCommentAsync(id,commentId,request,CorrelationId(http),ct),http))"
+        + ".WithZumboPermission(PermissionCatalog.CommentCreate);",
+        "group.MapDelete(\"/{id}/comments/{commentId}\",async(stringid,stringcommentId,WorkItemServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.DeleteCommentAsync(id,commentId,CorrelationId(http),ct),http))"
+        + ".WithZumboPermission(PermissionCatalog.CommentCreate);",
+        "group.MapPost(\"/{id}/checklist\",async(stringid,AddChecklistItemRequestrequest,WorkItemServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.AddChecklistItemAsync(id,request,ct),http))"
+        + ".WithZumboPermission(PermissionCatalog.WorkItemUpdate);",
+        "group.MapPatch(\"/{id}/checklist/{itemId}\",async(stringid,stringitemId,CompleteChecklistItemRequestrequest,WorkItemServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.CompleteChecklistItemAsync(id,itemId,request,ct),http))"
+        + ".WithZumboPermission(PermissionCatalog.WorkItemUpdate);",
+        "group.MapPost(\"/{id}/worklogs\",async(stringid,AddWorkLogRequestrequest,WorkItemServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.AddWorkLogAsync(id,request,ct),http))"
+        + ".WithZumboPermission(PermissionCatalog.WorkLogCreate);",
+        "group.MapPatch(\"/{id}/planning\",async(stringid,SetWorkItemPlanningRequestrequest,WorkItemServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.SetPlanningAsync(id,request,ct),http))"
+        + ".WithZumboPermission(PermissionCatalog.WorkItemUpdate);",
+        "group.MapPatch(\"/{id}/status\",async(stringid,MoveWorkItemRequestrequest,WorkItemServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.MoveAsync(id,request,CorrelationId(http),ct),http))"
+        + ".WithZumboPermission(PermissionCatalog.WorkItemMove);",
+        "group.MapPatch(\"/{id}/rank\",async(stringid,ReorderWorkItemRequestrequest,WorkItemServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.ReorderAsync(id,request,CorrelationId(http),ct),http))"
+        + ".WithZumboPermission(PermissionCatalog.WorkItemMove);",
+        "group.MapPatch(\"/{id}/assignee\",async(stringid,AssignWorkItemRequestrequest,WorkItemServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.AssignAsync(id,request,CorrelationId(http),ct),http))"
+        + ".WithZumboPermission(PermissionCatalog.WorkItemAssign);",
+        "group.MapPatch(\"/{id}/team\",async(stringid,SetWorkItemTeamRequestrequest,WorkItemServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.SetTeamAsync(id,request,CorrelationId(http),ct),http))"
+        + ".WithZumboPermission(PermissionCatalog.WorkItemUpdate);",
+        "group.MapPut(\"/{id}/custom-fields\",async(stringid,SetWorkItemCustomFieldsRequestrequest,WorkItemServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.SetCustomFieldsAsync(id,request,CorrelationId(http),ct),http))"
+        + ".WithZumboPermission(PermissionCatalog.WorkItemUpdate);",
+        "group.MapPost(\"/{id}/approvals\",async(stringid,RequestWorkItemApprovalRequestrequest,WorkItemServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.RequestApprovalAsync(id,request,CorrelationId(http),ct),http))"
+        + ".WithZumboPermission(PermissionCatalog.WorkItemApprove);",
+        "group.MapPost(\"/{id}/approvals/{approvalId}/decision\",async(stringid,stringapprovalId,DecideWorkItemApprovalRequestrequest,WorkItemServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.DecideApprovalAsync(id,approvalId,request,CorrelationId(http),ct),http))"
+        + ".WithZumboPermission(PermissionCatalog.WorkItemApprove);",
         "group.MapGet(\"/metrics\",async(WorkItemWebhookServiceservice,HttpContexthttp,CancellationTokenct)=>"
         + "Ok(awaitservice.GetMetricsAsync(ct),http));",
         "group.MapGet(\"/{id}/deliveries\",async(stringid,string?cursor,int?pageSize,WorkItemWebhookServiceservice,HttpContexthttp,CancellationTokenct)=>"
@@ -399,7 +890,37 @@ public sealed class RefactorRuntimeContractTests
         + "Created(awaitservice.CreateWorkItemLinkAsync(workItemId,request,CorrelationId(http),ct),http)).WithZumboPermission(PermissionCatalog.WorkItemLink);",
         "workItemLinks.MapDelete(\"/{linkId}\",async(stringworkItemId,stringlinkId,longexpectedVersion,DevelopmentIntegrationServiceservice,HttpContexthttp,CancellationTokenct)=>"
         + "{awaitservice.DeleteWorkItemLinkAsync(workItemId,linkId,expectedVersion,CorrelationId(http),ct);returnResults.NoContent();}).WithZumboPermission(PermissionCatalog.WorkItemLink);",
-        "ingress.MapPost(\"/{connectionId}/webhook\",ReceiveWebhookAsync).AllowAnonymous();"
+        "ingress.MapPost(\"/{connectionId}/webhook\",ReceiveWebhookAsync).AllowAnonymous();",
+        "group.MapPatch(\"/{id}/parent\",async(stringid,SetWorkItemParentRequestrequest,WorkItemServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.SetParentAsync(id,request,CorrelationId(http),ct),http))"
+        + ".WithZumboPermission(PermissionCatalog.WorkItemUpdate);",
+        "group.MapPost(\"/{id}/relations\",async(stringid,LinkWorkItemRequestrequest,WorkItemServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.LinkAsync(id,request,CorrelationId(http),ct),http))"
+        + ".WithZumboPermission(PermissionCatalog.WorkItemLink);",
+        "group.MapDelete(\"/{id}/relations/{relatedWorkItemId}\",async(stringid,stringrelatedWorkItemId,stringrelationType,WorkItemServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.UnlinkAsync(id,relatedWorkItemId,relationType,CorrelationId(http),ct),http))"
+        + ".WithZumboPermission(PermissionCatalog.WorkItemLink);",
+        "group.MapPost(\"/{id}/attachments/upload\",async(stringid,IFormFilefile,WorkItemServiceservice,HttpContexthttp,CancellationTokenct)=>{awaitusingvarstream=file.OpenReadStream();returnOk(awaitservice.UploadAttachmentAsync(id,stream,file.FileName,file.ContentType,file.Length,CorrelationId(http),ct),http);}).WithZumboPermission(PermissionCatalog.AttachmentCreate).DisableAntiforgery().RequireRateLimiting(\"upload\");",
+        "group.MapDelete(\"/{id}/attachments/{attachmentId}\",async(stringid,stringattachmentId,WorkItemServiceservice,HttpContexthttp,CancellationTokenct)=>Ok(awaitservice.DeleteAttachmentAsync(id,attachmentId,CorrelationId(http),ct),http)).WithZumboPermission(PermissionCatalog.AttachmentDelete);",
+        "group.MapGet(\"/reports/project-summary/{projectId}\",async(stringprojectId,WorkItemServiceservice,HttpContexthttp,CancellationTokenct)=>ReportOk(awaitservice.ProjectSummarySnapshotAsync(projectId,ct),http)).RequireRateLimiting(\"report\");",
+        "group.MapGet(\"/reports/status-distribution/{projectId}\",async(stringprojectId,WorkItemServiceservice,HttpContexthttp,CancellationTokenct)=>ReportOk(awaitservice.StatusDistributionSnapshotAsync(projectId,ct),http)).RequireRateLimiting(\"report\");",
+        "group.MapGet(\"/reports/user-workload/{projectId}\",async(stringprojectId,WorkItemServiceservice,HttpContexthttp,CancellationTokenct)=>ReportOk(awaitservice.UserWorkloadSnapshotAsync(projectId,ct),http)).RequireRateLimiting(\"report\");",
+        "group.MapGet(\"/reports/due-date-risks/{projectId}\",async(stringprojectId,int?days,WorkItemServiceservice,HttpContexthttp,CancellationTokenct)=>ReportOk(awaitservice.DueDateRisksSnapshotAsync(projectId,days??14,ct),http)).RequireRateLimiting(\"report\");",
+        "group.MapGet(\"/reports/flow-time/{projectId}\",async(stringprojectId,DateOnly?from,DateOnly?to,WorkItemServiceservice,HttpContexthttp,CancellationTokenct)=>ReportOk(awaitservice.FlowTimeSnapshotAsync(projectId,from,to,ct),http)).RequireRateLimiting(\"report\");",
+        "group.MapGet(\"/reports/completion-rate/{projectId}\",async(stringprojectId,DateOnly?from,DateOnly?to,WorkItemServiceservice,HttpContexthttp,CancellationTokenct)=>ReportOk(awaitservice.CompletionRateSnapshotAsync(projectId,from,to,ct),http)).RequireRateLimiting(\"report\");",
+        "group.MapGet(\"/reports/team-performance/{projectId}\",async(stringprojectId,DateOnly?from,DateOnly?to,WorkItemServiceservice,HttpContexthttp,CancellationTokenct)=>ReportOk(awaitservice.TeamPerformanceSnapshotAsync(projectId,from,to,ct),http)).RequireRateLimiting(\"report\");",
+        "group.MapGet(\"/{id}/attachments/{attachmentId}/preview\",async(stringid,stringattachmentId,WorkItemServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "{varattachment=awaitservice.OpenAttachmentAsync(id,attachmentId,ct);"
+        + "if(!IsPreviewableContentType(attachment.ContentType)){awaitattachment.Content.DisposeAsync();returnResults.StatusCode(StatusCodes.Status415UnsupportedMediaType);}"
+        + "http.Response.Headers.CacheControl=\"private, no-store\";http.Response.Headers.Pragma=\"no-cache\";"
+        + "http.Response.Headers.ContentSecurityPolicy=\"sandbox; default-src 'none'\";"
+        + "http.Response.Headers[\"Cross-Origin-Resource-Policy\"]=\"same-origin\";"
+        + "http.Response.Headers.ContentDisposition=$\"inline; filename*=UTF-8''{Uri.EscapeDataString(attachment.FileName)}\";"
+        + "returnResults.Stream(attachment.Content,attachment.ContentType,enableRangeProcessing:true);});",
+        "group.MapGet(\"/{id}/attachments/{attachmentId}/download\",async(stringid,stringattachmentId,WorkItemServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "{varattachment=awaitservice.OpenAttachmentAsync(id,attachmentId,ct);"
+        + "http.Response.Headers.CacheControl=\"private, no-store\";http.Response.Headers.Pragma=\"no-cache\";"
+        + "returnResults.File(attachment.Content,attachment.ContentType,attachment.FileName,enableRangeProcessing:true);});"
     ];
 
     private static readonly string[] PortFocusedVerticalSliceEndpointMappings =
@@ -500,6 +1021,103 @@ public sealed class RefactorRuntimeContractTests
         + "Ok(awaithandler.HandleAsync(newListWebhookSubscriptionsQuery(),ct),http));",
         "group.MapGet(\"/{id}\",async(stringid,GetWebhookSubscriptionHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
         + "Ok(awaithandler.HandleAsync(newGetWebhookSubscriptionQuery(id),ct),http));",
+        "group.MapGet(\"/{id}\",async(stringid,GetWorkItemHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newGetWorkItemQuery(id),ct),http));",
+        "group.MapPost(\"/search\",async(WorkItemSearchRequestrequest,SearchWorkItemsHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandlePageAsync(request,ct),http)).RequireRateLimiting(\"search\");",
+        "group.MapPost(\"/bulk/move\",async(BulkMoveWorkItemsRequestrequest,BulkMoveWorkItemsHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newBulkMoveWorkItemsCommand(request,CorrelationId(http)),ct),http)).WithZumboPermission(PermissionCatalog.WorkItemMove).RequireRateLimiting(\"bulk\");",
+        "group.MapPost(\"/bulk/assign\",async(BulkAssignWorkItemsRequestrequest,BulkAssignWorkItemsHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newBulkAssignWorkItemsCommand(request,CorrelationId(http)),ct),http)).WithZumboPermission(PermissionCatalog.WorkItemAssign).RequireRateLimiting(\"bulk\");",
+        "group.MapPost(\"/bulk/archive\",async(BulkArchiveWorkItemsRequestrequest,BulkArchiveWorkItemsHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newBulkArchiveWorkItemsCommand(request,CorrelationId(http)),ct),http)).WithZumboPermission(PermissionCatalog.WorkItemDelete).RequireRateLimiting(\"bulk\");",
+        "group.MapPut(\"/{id}\",async(stringid,UpdateWorkItemRequestrequest,UpdateWorkItemHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newUpdateWorkItemCommand(id,request,CorrelationId(http)),ct),http))"
+        + ".WithZumboPermission(PermissionCatalog.WorkItemUpdate);",
+        "group.MapDelete(\"/{id}\",async(stringid,ArchiveWorkItemHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "{awaithandler.HandleAsync(newArchiveWorkItemCommand(id,CorrelationId(http)),ct);returnOk(new{archived=true},http);})"
+        + ".WithZumboPermission(PermissionCatalog.WorkItemDelete);",
+        "group.MapPost(\"/{id}/restore\",async(stringid,RestoreWorkItemHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newRestoreWorkItemCommand(id,CorrelationId(http)),ct),http))"
+        + ".WithZumboPermission(PermissionCatalog.WorkItemDelete);",
+        "group.MapPost(\"/{id}/labels\",async(stringid,AddLabelRequestrequest,AddLabelHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newAddLabelCommand(id,request),ct),http))"
+        + ".WithZumboPermission(PermissionCatalog.WorkItemUpdate);",
+        "group.MapDelete(\"/{id}/labels/{label}\",async(stringid,stringlabel,RemoveLabelHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newRemoveLabelCommand(id,label),ct),http))"
+        + ".WithZumboPermission(PermissionCatalog.WorkItemUpdate);",
+        "group.MapPost(\"/{id}/comments\",async(stringid,AddCommentRequestrequest,AddCommentHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newAddCommentCommand(id,request,CorrelationId(http)),ct),http))"
+        + ".WithZumboPermission(PermissionCatalog.CommentCreate);",
+        "group.MapPut(\"/{id}/comments/{commentId}\",async(stringid,stringcommentId,EditCommentRequestrequest,EditCommentHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newEditCommentCommand(id,commentId,request,CorrelationId(http)),ct),http))"
+        + ".WithZumboPermission(PermissionCatalog.CommentCreate);",
+        "group.MapDelete(\"/{id}/comments/{commentId}\",async(stringid,stringcommentId,DeleteCommentHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newDeleteCommentCommand(id,commentId,CorrelationId(http)),ct),http))"
+        + ".WithZumboPermission(PermissionCatalog.CommentCreate);",
+        "group.MapPatch(\"/{id}/parent\",async(stringid,SetWorkItemParentRequestrequest,SetParentHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newSetParentCommand(id,request,CorrelationId(http)),ct),http))"
+        + ".WithZumboPermission(PermissionCatalog.WorkItemUpdate);",
+        "group.MapPost(\"/{id}/relations\",async(stringid,LinkWorkItemRequestrequest,LinkWorkItemHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newLinkWorkItemCommand(id,request,CorrelationId(http)),ct),http))"
+        + ".WithZumboPermission(PermissionCatalog.WorkItemLink);",
+        "group.MapDelete(\"/{id}/relations/{relatedWorkItemId}\",async(stringid,stringrelatedWorkItemId,stringrelationType,UnlinkWorkItemHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newUnlinkWorkItemCommand(id,relatedWorkItemId,relationType,CorrelationId(http)),ct),http))"
+        + ".WithZumboPermission(PermissionCatalog.WorkItemLink);",
+        "group.MapPost(\"/{id}/attachments/upload\",async(stringid,IFormFilefile,UploadAttachmentHandlerhandler,HttpContexthttp,CancellationTokenct)=>{awaitusingvarstream=file.OpenReadStream();returnOk(awaithandler.HandleAsync(newUploadAttachmentCommand(id,stream,file.FileName,file.ContentType,file.Length,CorrelationId(http)),ct),http);}).WithZumboPermission(PermissionCatalog.AttachmentCreate).DisableAntiforgery().RequireRateLimiting(\"upload\");",
+        "group.MapDelete(\"/{id}/attachments/{attachmentId}\",async(stringid,stringattachmentId,DeleteAttachmentHandlerhandler,HttpContexthttp,CancellationTokenct)=>Ok(awaithandler.HandleAsync(newDeleteAttachmentCommand(id,attachmentId,CorrelationId(http)),ct),http)).WithZumboPermission(PermissionCatalog.AttachmentDelete);",
+        "group.MapGet(\"/reports/project-summary/{projectId}\",async(stringprojectId,ProjectSummaryHandlerhandler,HttpContexthttp,CancellationTokenct)=>ReportOk(awaithandler.HandleAsync(newProjectSummaryQuery(projectId),ct),http)).RequireRateLimiting(\"report\");",
+        "group.MapGet(\"/reports/status-distribution/{projectId}\",async(stringprojectId,StatusDistributionHandlerhandler,HttpContexthttp,CancellationTokenct)=>ReportOk(awaithandler.HandleAsync(newStatusDistributionQuery(projectId),ct),http)).RequireRateLimiting(\"report\");",
+        "group.MapGet(\"/reports/user-workload/{projectId}\",async(stringprojectId,UserWorkloadHandlerhandler,HttpContexthttp,CancellationTokenct)=>ReportOk(awaithandler.HandleAsync(newUserWorkloadQuery(projectId),ct),http)).RequireRateLimiting(\"report\");",
+        "group.MapGet(\"/reports/due-date-risks/{projectId}\",async(stringprojectId,int?days,DueDateRisksHandlerhandler,HttpContexthttp,CancellationTokenct)=>ReportOk(awaithandler.HandleAsync(newDueDateRisksQuery(projectId,days??14),ct),http)).RequireRateLimiting(\"report\");",
+        "group.MapGet(\"/reports/flow-time/{projectId}\",async(stringprojectId,DateOnly?from,DateOnly?to,FlowTimeHandlerhandler,HttpContexthttp,CancellationTokenct)=>ReportOk(awaithandler.HandleAsync(newFlowTimeQuery(projectId,from,to),ct),http)).RequireRateLimiting(\"report\");",
+        "group.MapGet(\"/reports/completion-rate/{projectId}\",async(stringprojectId,DateOnly?from,DateOnly?to,CompletionRateHandlerhandler,HttpContexthttp,CancellationTokenct)=>ReportOk(awaithandler.HandleAsync(newCompletionRateQuery(projectId,from,to),ct),http)).RequireRateLimiting(\"report\");",
+        "group.MapGet(\"/reports/team-performance/{projectId}\",async(stringprojectId,DateOnly?from,DateOnly?to,TeamPerformanceHandlerhandler,HttpContexthttp,CancellationTokenct)=>ReportOk(awaithandler.HandleAsync(newTeamPerformanceQuery(projectId,from,to),ct),http)).RequireRateLimiting(\"report\");",
+        "group.MapGet(\"/{id}/attachments/{attachmentId}/preview\",async(stringid,stringattachmentId,OpenAttachmentHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "{varattachment=awaithandler.HandleAsync(newOpenAttachmentQuery(id,attachmentId),ct);"
+        + "if(!IsPreviewableContentType(attachment.ContentType)){awaitattachment.Content.DisposeAsync();returnResults.StatusCode(StatusCodes.Status415UnsupportedMediaType);}"
+        + "http.Response.Headers.CacheControl=\"private, no-store\";http.Response.Headers.Pragma=\"no-cache\";"
+        + "http.Response.Headers.ContentSecurityPolicy=\"sandbox; default-src 'none'\";"
+        + "http.Response.Headers[\"Cross-Origin-Resource-Policy\"]=\"same-origin\";"
+        + "http.Response.Headers.ContentDisposition=$\"inline; filename*=UTF-8''{Uri.EscapeDataString(attachment.FileName)}\";"
+        + "returnResults.Stream(attachment.Content,attachment.ContentType,enableRangeProcessing:true);});",
+        "group.MapGet(\"/{id}/attachments/{attachmentId}/download\",async(stringid,stringattachmentId,OpenAttachmentHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "{varattachment=awaithandler.HandleAsync(newOpenAttachmentQuery(id,attachmentId),ct);"
+        + "http.Response.Headers.CacheControl=\"private, no-store\";http.Response.Headers.Pragma=\"no-cache\";"
+        + "returnResults.File(attachment.Content,attachment.ContentType,attachment.FileName,enableRangeProcessing:true);});",
+        "group.MapPost(\"/{id}/checklist\",async(stringid,AddChecklistItemRequestrequest,AddChecklistItemHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newAddChecklistItemCommand(id,request),ct),http))"
+        + ".WithZumboPermission(PermissionCatalog.WorkItemUpdate);",
+        "group.MapPatch(\"/{id}/checklist/{itemId}\",async(stringid,stringitemId,CompleteChecklistItemRequestrequest,CompleteChecklistItemHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newCompleteChecklistItemCommand(id,itemId,request),ct),http))"
+        + ".WithZumboPermission(PermissionCatalog.WorkItemUpdate);",
+        "group.MapPost(\"/{id}/worklogs\",async(stringid,AddWorkLogRequestrequest,AddWorkLogHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newAddWorkLogCommand(id,request),ct),http))"
+        + ".WithZumboPermission(PermissionCatalog.WorkLogCreate);",
+        "group.MapPatch(\"/{id}/planning\",async(stringid,SetWorkItemPlanningRequestrequest,SetPlanningHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newSetPlanningCommand(id,request),ct),http))"
+        + ".WithZumboPermission(PermissionCatalog.WorkItemUpdate);",
+        "group.MapPatch(\"/{id}/status\",async(stringid,MoveWorkItemRequestrequest,MoveWorkItemHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newMoveWorkItemCommand(id,request,CorrelationId(http)),ct),http))"
+        + ".WithZumboPermission(PermissionCatalog.WorkItemMove);",
+        "group.MapPatch(\"/{id}/rank\",async(stringid,ReorderWorkItemRequestrequest,ReorderWorkItemHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newReorderWorkItemCommand(id,request,CorrelationId(http)),ct),http))"
+        + ".WithZumboPermission(PermissionCatalog.WorkItemMove);",
+        "group.MapPatch(\"/{id}/assignee\",async(stringid,AssignWorkItemRequestrequest,AssignWorkItemHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newAssignWorkItemCommand(id,request,CorrelationId(http)),ct),http))"
+        + ".WithZumboPermission(PermissionCatalog.WorkItemAssign);",
+        "group.MapPatch(\"/{id}/team\",async(stringid,SetWorkItemTeamRequestrequest,SetWorkItemTeamHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newSetWorkItemTeamCommand(id,request,CorrelationId(http)),ct),http))"
+        + ".WithZumboPermission(PermissionCatalog.WorkItemUpdate);",
+        "group.MapPut(\"/{id}/custom-fields\",async(stringid,SetWorkItemCustomFieldsRequestrequest,SetCustomFieldsHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newSetCustomFieldsCommand(id,request,CorrelationId(http)),ct),http))"
+        + ".WithZumboPermission(PermissionCatalog.WorkItemUpdate);",
+        "group.MapPost(\"/{id}/approvals\",async(stringid,RequestWorkItemApprovalRequestrequest,RequestApprovalHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newRequestApprovalCommand(id,request,CorrelationId(http)),ct),http))"
+        + ".WithZumboPermission(PermissionCatalog.WorkItemApprove);",
+        "group.MapPost(\"/{id}/approvals/{approvalId}/decision\",async(stringid,stringapprovalId,DecideWorkItemApprovalRequestrequest,DecideApprovalHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newDecideApprovalCommand(id,approvalId,request,CorrelationId(http)),ct),http))"
+        + ".WithZumboPermission(PermissionCatalog.WorkItemApprove);",
         "group.MapGet(\"/metrics\",async(GetWebhookDeliveryMetricsHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
         + "Ok(awaithandler.HandleAsync(newGetWebhookDeliveryMetricsQuery(),ct),http));",
         "group.MapGet(\"/{id}/deliveries\",async(stringid,string?cursor,int?pageSize,ListWebhookDeliveriesHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
@@ -656,6 +1274,47 @@ public sealed class RefactorRuntimeContractTests
                 "CreateBoardHandler and ListBoardsByProjectHandler remain scoped self-services; explicit factories select their port-focused constructors while compatibility constructors remain available.",
                 "UpsertWorkflowHandler and GetWorkflowHandler remain scoped self-services; explicit factories select their port-focused constructors while compatibility constructors remain available.",
                 "CreateWorkItemHandler and SearchWorkItemsHandler remain scoped self-services; explicit factories select their port-focused constructors while compatibility constructors remain available.",
+                "The intake work-item creator port resolves CreateIntakeWorkItemHandler over the port-focused create handler instead of WorkItemService; the explicit compatibility interface implementation remains available without serving the production intake caller.",
+                "The paged work-item search route resolves SearchWorkItemsHandler directly while preserving request binding, rate limiting, response mapping, compatibility facade, and scoped port-focused registration.",
+                "The bulk move, assign, and archive routes resolve feature handlers over their port-focused single-item handlers while preserving sequential execution, validation, item correlation IDs, per-item Zumbo error results, authorization, rate limiting, response mapping, and compatibility facades.",
+                "WorkItemBulkJobProcessor resolves create, move, assign, and archive handlers through its port-focused constructor; its original WorkItemService constructor remains available for compatibility while job ownership, dry-run, idempotency, batching, progress, artifact, audit, retry, and cancellation behavior stays unchanged.",
+                "AutomationWorkItemActionExecutor resolves read, assignment, label, priority, and comment handlers through its port-focused constructor; its original WorkItemService constructor remains available for compatibility while action no-op checks, command values, chain context, correlation and comment idempotency values, cancellation, and unsupported-action behavior stay unchanged.",
+                "DashboardRenderer resolves all seven work-item report handlers through its port-focused constructor; its original WorkItemService constructor remains available for compatibility while dashboard ordering, filtering, source metadata, degradation behavior, formatting, and response aggregation stay unchanged.",
+                "The single work-item read route resolves GetWorkItemHandler directly; its active-record filter, not-found contract, duplicate view-permission checks, organization-scoped activity hydration, response mapping, compatibility facade, and scoped registration remain preserved.",
+                "The work-item archive route resolves ArchiveWorkItemHandler directly; its route, authorization metadata, correlation ID, active-record reads, project-structure lock, active-child rejection, WIP release, optimistic persistence, search deletion, audit, watcher activity, realtime publication, cache invalidation, compatibility facade, and scoped registration remain preserved.",
+                "The work-item restore route resolves RestoreWorkItemHandler directly; its route, authorization metadata, correlation ID, archived-record reads, project-structure and placement locks, board placement, WIP capacity and reservation, rank allocation, optimistic persistence, search indexing, audit, watcher activity, realtime publication, cache invalidation, response mapping, compatibility facade, and scoped registration remain preserved.",
+                "The work-item add-label route resolves AddLabelHandler directly; its route, authorization metadata, request binding, label validation and duplicate contract, optimistic persistence, search indexing, collaboration activity, watcher notification, automation event and chain context, response mapping, compatibility facade, automation-executor facade caller, and scoped registration remain preserved.",
+                "The work-item remove-label route resolves RemoveLabelHandler directly; its route, authorization metadata, untrimmed route binding, case-insensitive removal and missing-label contract, optimistic persistence, search indexing, collaboration activity, watcher notification, automation event and chain context, response mapping, compatibility facade, automation-executor facade caller, and scoped registration remain preserved.",
+                "The add-checklist-item route resolves AddChecklistItemHandler directly; its route, authorization metadata, request binding, text trimming behavior, generated checklist identity, optimistic persistence, collaboration activity, watcher notification, response mapping, compatibility facade, and scoped registration remain preserved.",
+                "The complete-checklist-item route resolves CompleteChecklistItemHandler directly; its route, authorization metadata, request binding, exact checklist lookup and missing-item contract, complete-or-reopen detail, timestamp-derived activity identity, optimistic persistence, watcher notification, response mapping, compatibility facade, and scoped registration remain preserved.",
+                "The add-work-log route resolves AddWorkLogHandler directly; its route, authorization metadata, request binding, hours validation, separated activity migration, work-log persistence, cache invalidation, collaboration activity, watcher notification, response mapping, compatibility facade, and scoped registration remain preserved.",
+                "The set-planning route resolves SetPlanningHandler directly; its route, authorization metadata, request binding, sprint policy, aggregate planning rules, optimistic persistence, search indexing, collaboration activity, watcher notification, cache invalidation, response mapping, compatibility facade, and scoped registration remain preserved.",
+                "ClearAssigneeHandler is a scoped self-service selected through an explicit port-focused factory; the automation action adapter retains its compatibility-facade call while the no-op behavior, persistence and all publication side effects remain preserved.",
+                "The work-item assignee route resolves AssignWorkItemHandler directly; its route, authorization metadata, request binding, team eligibility, optimistic persistence, search, audit, assignee notification, watcher exclusion, realtime publication, cache invalidation, response mapping, compatibility facade, bulk and automation facade callers, and scoped registration remain preserved.",
+                "The work-item team route resolves SetWorkItemTeamHandler directly; its route, authorization metadata, request binding, optional team normalization, team and assignee eligibility, unchanged-team conflict, optimistic persistence, audit, watcher activity, realtime publication, cache invalidation, response mapping, compatibility facade, and scoped registration remain preserved.",
+                "The work-item custom-fields route resolves SetCustomFieldsHandler directly; its route, authorization metadata, request binding, type-schema validation, optimistic persistence, search, audit, watcher activity, realtime publication, cache invalidation, automation identity and chain context, response mapping, compatibility facade, and scoped registration remain preserved.",
+                "The work-item approval-request route resolves RequestApprovalHandler directly; its route, authorization metadata, request binding, legacy activity separation, workflow transition and approval policy, active-approval conflict, optimistic and separated persistence, audit, watcher activity, response mapping, compatibility facade, unit-level facade caller, and scoped registration remain preserved.",
+                "The work-item approval-decision route resolves DecideApprovalHandler directly; its route, authorization metadata, request binding, approval lookup and state checks, expiry persistence, self-approval guard, note normalization, optimistic and separated persistence, approval activity update, audit, watcher activity, requester notification, response mapping, compatibility facade, unit-level facade callers, and scoped registration remain preserved.",
+                "The work-item core-update route resolves UpdateWorkItemHandler directly; its route, authorization metadata, request binding, title validation and normalization, optional description and priority handling, due-reminder reset, timestamp, optimistic persistence, search indexing, audit values, watcher activity, realtime publication, cache invalidation, automation identity and chain context, response mapping, compatibility facade, automation-adapter facade caller, unit-level facade callers, and scoped registration remain preserved.",
+                "The work-item status route resolves MoveWorkItemHandler directly; its route, authorization metadata, request binding, double-read project locking, legacy activity separation, aggregate and workflow transition rules, board placement and rank, completion dependency checks, placement lock and WIP reservation, optimistic and separated persistence, approval and timeline activity updates, search, audit and workflow automation audit, watcher status notification, realtime publication, cache invalidation, automation identity and chain context, response mapping, compatibility facade, bulk and automation facade callers, unit-level facade callers, and scoped registration remain preserved.",
+                "The work-item rank route resolves ReorderWorkItemHandler directly; its route, authorization metadata, request binding, double-read project locking, rank resolution and compaction, clock timestamp, optimistic and separated persistence, invariant audit values, watcher activity, realtime publication, response mapping, compatibility facade, unit-level facade caller, and scoped registration remain preserved.",
+                "The work-item add-comment route resolves AddCommentHandler directly; its route, authorization metadata, request normalization, mention validation, legacy activity separation, deterministic idempotency identity and conflict behavior, comment limit, separated persistence, audit, mention and watcher notifications, automation identity and chain context, response mapping, compatibility facade, automation-adapter and unit-level facade callers, and scoped registration remain preserved.",
+                "The work-item edit-comment route resolves EditCommentHandler directly; its route, authorization metadata, request normalization, author ownership, unchanged and revision-limit conflicts, clock-derived revision fields, legacy activity separation, separated revision and comment persistence, audit, watcher activity, response mapping, compatibility facade, unit-level facade caller, and scoped registration remain preserved.",
+                "The work-item delete-comment route resolves DeleteCommentHandler directly; its route, authorization metadata, active-record and exact-comment lookup, author ownership, legacy activity separation, separated comment and revision deletion, in-memory response update, audit, watcher activity, response mapping, compatibility facade, API-flow facade caller, and scoped registration remain preserved.",
+                "The work-item parent route resolves SetParentHandler directly; its route, authorization metadata, request binding, double-read project-structure lock, view and update authorization, hierarchy-level and board policy, completed-parent and cycle guards, unchanged-parent conflict, optimistic and separated persistence, audit, watcher activity, response mapping, compatibility facade, and scoped registration remain preserved.",
+                "The work-item relation-create route resolves LinkWorkItemHandler directly; its route, authorization metadata, request binding, double-read project-structure lock, relation normalization, self-link, project, duplicate and graph-cycle guards, graph-before-document mutation order, optimistic and separated persistence, audit, watcher activity, response mapping, compatibility facade and unit callers, and scoped registration remain preserved.",
+                "The work-item relation-delete route resolves UnlinkWorkItemHandler directly; its route and query binding, authorization metadata, double-read project-structure lock, relation normalization and exact removal, missing-relation contract, graph removal before persistence, optimistic and separated persistence, audit, watcher activity, response mapping, compatibility facade, and scoped registration remain preserved.",
+                "The work-item attachment preview and download routes resolve OpenAttachmentHandler directly; their routes, authorization, active-record and repeated view checks, tenant hydration, legacy embedded fallback, separated attachment lookup, clean-scan gate, checksum-aware storage open, preview MIME rejection and stream disposal, cache, CSP, content disposition, range response behavior, compatibility facade, and scoped registration remain preserved.",
+                "The work-item attachment-upload route resolves UploadAttachmentHandler directly; its route, multipart binding, stream lifetime, authorization, antiforgery and rate metadata, size and filename validation, lock, tenant authorization, legacy activity separation, attachment limit, storage save, exact document projection, separated persistence, storage compensation and logging, audit, watcher activity, response mapping, compatibility facade, and scoped registration remain preserved.",
+                "The work-item attachment-delete route resolves DeleteAttachmentHandler directly; its route, binding, authorization, lock, tenant authorization, legacy activity separation, exact separated attachment lookup and deletion, in-memory projection update, storage deletion, persistence restore compensation and logging, exact document reconstruction, audit, watcher activity, response mapping, compatibility facade, and scoped registration remain preserved.",
+                "The due-date reminder hosted service resolves SendDueDateRemindersHandler directly; enablement, interval, transaction boundary, cancellation and error handling, global and item locking, bounded candidate query, assignee authorization, stale-candidate rechecks, deduplication key, notification order, reminder timestamps, optimistic separated persistence, compatibility facade, and scoped registration remain preserved.",
+                "The project-summary report route resolves ProjectSummaryHandler directly; its route, rate limit, report headers, view authorization, tenant scope, cache key and TTL, clock boundary, total, completed, in-progress and overdue filters, checked integer projection, snapshot mapping, compatibility facades, and scoped registration remain preserved.",
+                "The status-distribution report route resolves StatusDistributionHandler directly; its route, rate limit, report headers, view authorization, active-item filter, cursor paging, cache key and TTL, ordinal status ordering, exact grouping and count projection, snapshot mapping, dashboard compatibility caller, public facades, and scoped registration remain preserved.",
+                "The user-workload report route resolves UserWorkloadHandler directly; its route, rate limit, report headers, view authorization, organization-scoped activity read, active-item cursor paging, cache key and TTL, clock boundary, assignee filtering and ordering, open and overdue counts, activity-storage version fallback, logged-hours aggregation, snapshot mapping, dashboard compatibility caller, public facades, and scoped registration remain preserved.",
+                "The due-date-risks report route resolves DueDateRisksHandler directly; its route, nullable days binding and default, rate limit, report headers, view authorization, days clamp, cache key and TTL, clock boundary, active incomplete due-date filter, cursor paging, due-date and ordinal ID ordering, response and snapshot mapping, dashboard and unit compatibility callers, public facades, and scoped registration remain preserved.",
+                "The flow-time report route resolves FlowTimeHandler directly; its route, nullable date binding, rate limit, report headers, view authorization, default range and exact validation messages, UTC day boundaries, cache key and TTL, completed-item cursor paging, organization-scoped activity timeline and legacy fallback, reopened-work cycle start, lead and cycle samples, average and median rounding, response and snapshot mapping, dashboard and unit compatibility callers, public facades, and scoped registration remain preserved.",
+                "The completion-rate report route resolves CompletionRateHandler directly; its route, nullable date binding, rate limit, report headers, view authorization, default range and exact validation messages, UTC day boundaries, cache key and TTL, created-item cursor paging, completion cutoff, empty-set behavior, two-decimal percentage, response and snapshot mapping, dashboard, API and unit compatibility callers, public facades, and scoped registration remain preserved.",
+                "The team-performance report route resolves TeamPerformanceHandler directly; its route, nullable date binding, rate limit, report headers, view authorization, default range and exact validation messages, UTC day boundaries, cache key and TTL, team-policy call order, explicit team-assignment cursor paging, organization-scoped activity read and legacy fallback, team-name ordering, completion cutoff and percentage, average lead-time rounding, logged-hours aggregation, response and snapshot mapping, dashboard, API and unit compatibility callers, public facades, and scoped registration remain preserved.",
                 "ListNotificationsHandler and MarkNotificationAsReadHandler remain scoped self-services; explicit factories select their port-focused constructors while compatibility constructors remain available.",
                 "WriteAuditLogHandler and QueryAuditLogHandler remain scoped self-services; explicit factories select their port-focused constructors while compatibility constructors remain available.",
                 "The capacity-plan archive route resolves ArchiveCapacityPlanHandler directly; its route, authorization, transaction filter, correlation ID, owner and visibility checks, optimistic concurrency, audit, response mapping, compatibility facade, and scoped registration remain preserved.",

@@ -11,9 +11,9 @@ private static void MapGetReportsTeamPerformanceByProjectId(RouteGroupBuilder gr
             string projectId,
             DateOnly? from,
             DateOnly? to,
-            WorkItemService service,
+            TeamPerformanceHandler handler,
             HttpContext http,
             CancellationToken ct) =>
-            ReportOk(await service.TeamPerformanceSnapshotAsync(projectId, from, to, ct), http))
+            ReportOk(await handler.HandleAsync(new TeamPerformanceQuery(projectId, from, to), ct), http))
             .RequireRateLimiting("report");
 }}

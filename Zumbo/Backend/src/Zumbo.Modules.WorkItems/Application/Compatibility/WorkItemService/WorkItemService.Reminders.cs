@@ -13,69 +13,9 @@ namespace Zumbo.Modules.WorkItems;
 public sealed partial class WorkItemService
 {
     public async Task<int> SendDueDateRemindersAsync(int horizonHours, CancellationToken ct)
-    {
-        await using var dispatcherLock = await AcquireRequiredLockAsync("due-date-reminder-dispatcher", ct);
-        var now = clock.UtcNow;
-        var until = now.AddHours(Math.Clamp(horizonHours, 1, 168));
-        var candidates = await workItems.ListByFilterAsync(
-            x => !x.Archived
-                && x.CompletedAt == null
-                && x.AssigneeUserId != null
-                && x.DueDate != null
-                && x.DueDate > now
-                && x.DueDate <= until
-                && x.DueReminderSentAt == null,
-            x => x.DueDate!,
-            pageSize: 500,
-            cancellationToken: ct);
-        var sent = 0;
-        foreach (var candidate in candidates)
-        {
-            await using var workItemLock = await AcquireRequiredLockAsync("work-item:" + candidate.Id, ct);
-            var workItem = await workItems.SelectAsync(x => x.Id == candidate.Id && !x.Archived, ct);
-            if (workItem?.AssigneeUserId is null)
-            {
-                continue;
-            }
-
-            try
-            {
-                var authorization = await permissionChecker.EnsureCanAsync(
-                    workItem.AssigneeUserId,
-                    workItem.ProjectId,
-                    PermissionCatalog.WorkItemView,
-                    ct);
-                authorizedOrganizationIds[workItem.ProjectId] = authorization.OrganizationId;
-            }
-            catch (Exception exception) when (exception is ForbiddenException or NotFoundException)
-            {
-                continue;
-            }
-
-            if (workItem.CompletedAt is not null
-                || workItem.DueDate is null
-                || workItem.DueDate <= now
-                || workItem.DueDate > until
-                || workItem.DueReminderSentAt is not null)
-            {
-                continue;
-            }
-
-            var deduplicationKey = $"due:{workItem.Id}:{workItem.DueDate.Value.UtcTicks}";
-            await notifications.NotifyAsync(
-                workItem.AssigneeUserId,
-                "DueDateReminder",
-                $"{workItem.Title} is due at {workItem.DueDate:O}.",
-                ct,
-                deduplicationKey);
-            workItem.DueReminderSentAt = clock.UtcNow;
-            workItem.UpdatedAt = clock.UtcNow;
-            await SaveAsync(workItem, ct);
-            sent++;
-        }
-
-        return sent;
-    }
+        => await sendDueDateRemindersHandler.HandleAsync(
+            new SendDueDateRemindersCommand(horizonHours),
+            ct);
 
     private static double? TryCalculateCycleTimeHours(
         WorkItemDocument item,

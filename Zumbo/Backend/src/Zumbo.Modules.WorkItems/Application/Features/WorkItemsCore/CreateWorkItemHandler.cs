@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Options;
 using Zumbo.BuildingBlocks.Application.Concurrency;
 using Zumbo.BuildingBlocks.Application.Persistence;
+using Zumbo.Modules.WorkItems.Application.Features.WorkItemsCore;
 using Zumbo.SharedKernel;
 
 namespace Zumbo.Modules.WorkItems;
@@ -57,7 +58,31 @@ public sealed class CreateWorkItemHandler(WorkItemService service)
             automationChain);
     }
 
-    public Task<WorkItemResponse> HandleAsync(CreateWorkItemRequest request, string correlationId, CancellationToken ct) =>
-        slice?.HandleAsync(request, correlationId, ct)
-        ?? service.CreateAsync(request, correlationId, ct);
+    public Task<WorkItemResponse> HandleAsync(
+        CreateWorkItemRequest request,
+        string correlationId,
+        CancellationToken ct) =>
+        HandleAsync(request, correlationId, ct, requestedId: null);
+
+    internal Task<WorkItemResponse> HandleAsync(
+        CreateWorkItemRequest request,
+        string correlationId,
+        CancellationToken ct,
+        string? requestedId) =>
+        slice?.HandleAsync(request, correlationId, ct, requestedId)
+        ?? service.CreateAsync(request, correlationId, ct, requestedId);
+
+    public Task<WorkItemResponse> CreateAsync(
+        IntakeWorkItemCreation creation,
+        CancellationToken ct) =>
+        slice?.HandleAsync(creation, ct)
+        ?? ((IIntakeWorkItemCreator)service).CreateAsync(creation, ct);
+
+    internal Task<WorkItemResponse> HandleScopedAsync(
+        CreateWorkItemRequest request,
+        string correlationId,
+        CreateWorkItemContext context,
+        CancellationToken ct) =>
+        slice?.HandleScopedAsync(request, correlationId, context, ct)
+        ?? service.CreateAsync(request, correlationId, ct, context.RequestedId);
 }

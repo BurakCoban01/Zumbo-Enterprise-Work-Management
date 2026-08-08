@@ -11,9 +11,9 @@ private static void MapGetReportsFlowTimeByProjectId(RouteGroupBuilder group){gr
             string projectId,
             DateOnly? from,
             DateOnly? to,
-            WorkItemService service,
+            FlowTimeHandler handler,
             HttpContext http,
             CancellationToken ct) =>
-            ReportOk(await service.FlowTimeSnapshotAsync(projectId, from, to, ct), http))
+            ReportOk(await handler.HandleAsync(new FlowTimeQuery(projectId, from, to), ct), http))
             .RequireRateLimiting("report");
 }}

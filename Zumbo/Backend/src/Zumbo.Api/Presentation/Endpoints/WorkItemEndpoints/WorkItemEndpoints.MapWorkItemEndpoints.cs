@@ -2,6 +2,15 @@ using Zumbo.Modules.WorkItems;
 using Zumbo.BuildingBlocks.Application.Messaging;
 using Zumbo.BuildingBlocks.Application.Security;
 using Zumbo.SharedKernel;
+using Zumbo.Api.Presentation.Endpoints.WorkItems.Attachments;
+using Zumbo.Api.Presentation.Endpoints.WorkItems.Approvals;
+using Zumbo.Api.Presentation.Endpoints.WorkItems.Checklist;
+using Zumbo.Api.Presentation.Endpoints.WorkItems.Comments;
+using Zumbo.Api.Presentation.Endpoints.WorkItems.Labels;
+using Zumbo.Api.Presentation.Endpoints.WorkItems.Planning;
+using Zumbo.Api.Presentation.Endpoints.WorkItems.Relations;
+using Zumbo.Api.Presentation.Endpoints.WorkItems.Worklogs;
+using Zumbo.Api.Presentation.Endpoints.WorkItems.WorkItemsCore;
 
 using static ApiEndpointResults;
 
@@ -28,9 +37,9 @@ internal static partial class WorkItemEndpoints
 
         MapPostSearch(group);
 
-        MapGetRoot(group);
+        SearchWorkItemsEndpoint.Map(group);
 
-        MapGetById(group);
+        GetWorkItemEndpoint.Map(group);
 
         MapGetByIdCollaboration(group);
 
@@ -62,7 +71,7 @@ internal static partial class WorkItemEndpoints
 
         MapPostRecurrencesProcessDue(group);
 
-        MapPostRoot(group);
+        CreateWorkItemEndpoint.Map(group);
 
         MapPostBulkJobsImport(group);
 
@@ -88,69 +97,69 @@ internal static partial class WorkItemEndpoints
 
         MapPostBulkArchive(group);
 
-        MapPutById(group);
+        UpdateWorkItemEndpoint.Map(group);
 
-        MapPatchByIdAssignee(group);
+        AssignWorkItemEndpoint.Map(group);
 
-        MapPatchByIdStatus(group);
+        MoveWorkItemEndpoint.Map(group);
 
-        MapPatchByIdRank(group);
+        ReorderWorkItemEndpoint.Map(group);
 
-        MapPatchByIdPlanning(group);
+        SetPlanningEndpoint.Map(group);
 
         MapPutByIdCustomFields(group);
 
-        MapPatchByIdParent(group);
+        SetParentEndpoint.Map(group);
 
-        MapPatchByIdTeam(group);
+        SetTeamEndpoint.Map(group);
 
-        MapPostByIdApprovals(group);
+        RequestApprovalEndpoint.Map(group);
 
-        MapPostByIdApprovalsByApprovalIdDecision(group);
+        DecideApprovalEndpoint.Map(group);
 
-        MapPostByIdChecklist(group);
+        AddChecklistItemEndpoint.Map(group);
 
-        MapPatchByIdChecklistByItemId(group);
+        SetChecklistItemCompletionEndpoint.Map(group);
 
-        MapPostByIdLabels(group);
+        AddLabelEndpoint.Map(group);
 
-        MapDeleteByIdLabelsByLabel(group);
+        RemoveLabelEndpoint.Map(group);
 
-        MapPostByIdComments(group);
+        AddCommentEndpoint.Map(group);
 
-        MapGetByIdComments(group);
+        ListCommentsEndpoint.Map(group);
 
-        MapGetByIdCommentsByCommentIdRevisions(group);
+        ListCommentRevisionsEndpoint.Map(group);
 
-        MapPutByIdCommentsByCommentId(group);
+        EditCommentEndpoint.Map(group);
 
-        MapDeleteByIdCommentsByCommentId(group);
+        DeleteCommentEndpoint.Map(group);
 
-        MapPostByIdAttachmentsUpload(group);
+        UploadAttachmentEndpoint.Map(group);
 
-        MapGetByIdAttachmentsByAttachmentIdDownload(group);
+        DownloadAttachmentEndpoint.Map(group);
 
-        MapGetByIdAttachmentsByAttachmentIdPreview(group);
+        PreviewAttachmentEndpoint.Map(group);
 
-        MapDeleteByIdAttachmentsByAttachmentId(group);
+        DeleteAttachmentEndpoint.Map(group);
 
-        MapGetByIdAttachments(group);
+        ListAttachmentsEndpoint.Map(group);
 
-        MapPostByIdWorklogs(group);
+        AddWorkLogEndpoint.Map(group);
 
-        MapGetByIdWorklogs(group);
+        ListWorkLogsEndpoint.Map(group);
 
-        MapGetByIdApprovals(group);
+        ListApprovalsEndpoint.Map(group);
 
         MapGetByIdTimeline(group);
 
-        MapPostByIdRelations(group);
+        LinkWorkItemEndpoint.Map(group);
 
-        MapDeleteByIdRelationsByRelatedWorkItemId(group);
+        UnlinkWorkItemEndpoint.Map(group);
 
-        MapDeleteById(group);
+        ArchiveWorkItemEndpoint.Map(group);
 
-        MapPostByIdRestore(group);
+        RestoreWorkItemEndpoint.Map(group);
 
         MapGetReportsProjectSummaryByProjectId(group);
 

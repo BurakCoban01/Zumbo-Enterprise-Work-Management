@@ -1,5 +1,6 @@
 using Zumbo.BuildingBlocks.Application.Security;
 using Zumbo.BuildingBlocks.Application.Messaging;
+using Zumbo.Api.Composition.Modules.WorkItems;
 using Zumbo.Modules.Workflows;
 using Zumbo.Modules.Workflows.Application.Features.RunQueries;
 using Zumbo.Modules.Workflows.Application.Features.RunReplay;
@@ -19,7 +20,7 @@ internal static class AutomationEndpoints
     {
         services.AddScoped<IAutomationProjectAccessChecker, AutomationProjectAccessCheckerAdapter>();
         services.AddScoped<IAutomationAuditWriter, AutomationAuditWriterAdapter>();
-        services.AddScoped<IAutomationActionExecutor, AutomationWorkItemActionExecutor>();
+        services.AddWorkItemAutomationActionAdapter();
         services.AddScoped<IAutomationScheduledSourceProvider, AutomationScheduledSourceProvider>();
         services.AddScoped<AutomationActorContextRunner>();
         services.AddScoped<AutomationRuleService>();
