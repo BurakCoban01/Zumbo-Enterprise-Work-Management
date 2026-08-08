@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Options;
+using Zumbo.Api.Composition.Modules.WorkItems;
 using Zumbo.Api.Infrastructure.BackgroundServices.Webhooks;
 using Zumbo.BuildingBlocks.Application.Concurrency;
 using Zumbo.Modules.WorkItems;
@@ -356,6 +357,22 @@ internal static partial class WorkItemEndpoints
             provider.GetService<WorkItemCollaborationService>(),
             provider.GetService<IWorkItemAutomationEventPublisher>(),
             provider.GetService<IWorkItemAutomationChainContextAccessor>()));
+        services.AddScoped<ReorderWorkItemHandler>(provider => new ReorderWorkItemHandler(
+            provider.GetRequiredService<IDocumentRepository<WorkItemDocument>>(),
+            provider.GetRequiredService<IWorkItemAuditPublisher>(),
+            provider.GetRequiredService<IClock>(),
+            provider.GetRequiredService<ICurrentUser>(),
+            provider.GetRequiredService<IProjectPermissionChecker>(),
+            provider.GetRequiredService<IDistributedLockProvider>(),
+            provider.GetRequiredService<IOptions<DistributedLockOptions>>(),
+            provider.GetRequiredService<IWorkItemRealtimePublisher>(),
+            provider.GetRequiredService<IWorkItemActivityStore>(),
+            provider.GetService<IExpectedVersionAccessor>(),
+            provider.GetRequiredService<WorkItemRankService>(),
+            provider.GetService<WorkItemCollaborationService>()));
+        services.AddWorkItemCommentHandlers();
+        services.AddWorkItemRelationHandlers();
+        services.AddWorkItemAttachmentHandlers();
         services.AddScoped<ClearAssigneeHandler>(provider => new ClearAssigneeHandler(
             provider.GetRequiredService<IDocumentRepository<WorkItemDocument>>(),
             provider.GetRequiredService<IWorkItemAuditPublisher>(),

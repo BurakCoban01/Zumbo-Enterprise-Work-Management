@@ -7,7 +7,7 @@ using static ApiEndpointResults;
 
 internal static partial class WorkItemEndpoints
 {
-private static void MapPostByIdComments(RouteGroupBuilder group){group.MapPost("/{id}/comments", async (string id, AddCommentRequest request, WorkItemService service, HttpContext http, CancellationToken ct) =>
-            Ok(await service.AddCommentAsync(id, request, CorrelationId(http), ct), http))
+private static void MapPostByIdComments(RouteGroupBuilder group){group.MapPost("/{id}/comments", async (string id, AddCommentRequest request, AddCommentHandler handler, HttpContext http, CancellationToken ct) =>
+            Ok(await handler.HandleAsync(new AddCommentCommand(id, request, CorrelationId(http)), ct), http))
             .WithZumboPermission(PermissionCatalog.CommentCreate);
 }}

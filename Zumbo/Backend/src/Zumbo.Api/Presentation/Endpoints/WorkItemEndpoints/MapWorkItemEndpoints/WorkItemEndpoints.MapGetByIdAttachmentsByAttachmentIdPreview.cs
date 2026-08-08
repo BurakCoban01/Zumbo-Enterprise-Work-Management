@@ -10,11 +10,11 @@ internal static partial class WorkItemEndpoints
 private static void MapGetByIdAttachmentsByAttachmentIdPreview(RouteGroupBuilder group){group.MapGet("/{id}/attachments/{attachmentId}/preview", async (
             string id,
             string attachmentId,
-            WorkItemService service,
+            OpenAttachmentHandler handler,
             HttpContext http,
             CancellationToken ct) =>
         {
-            var attachment = await service.OpenAttachmentAsync(id, attachmentId, ct);
+            var attachment = await handler.HandleAsync(new OpenAttachmentQuery(id, attachmentId), ct);
             if (!IsPreviewableContentType(attachment.ContentType))
             {
                 await attachment.Content.DisposeAsync();

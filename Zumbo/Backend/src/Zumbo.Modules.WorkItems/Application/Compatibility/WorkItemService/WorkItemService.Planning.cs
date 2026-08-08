@@ -22,30 +22,9 @@ public sealed partial class WorkItemService
         ReorderWorkItemRequest request,
         string correlationId,
         CancellationToken ct)
-    {
-        var initialWorkItem = await GetWorkItem(id, ct);
-        await using var structureLock = await AcquireRequiredLockAsync("project-structure:" + initialWorkItem.ProjectId, ct);
-        var workItem = await GetWorkItem(id, ct);
-        await EnsurePermissionAsync(workItem.ProjectId, "WorkItemMove", ct);
-
-        var rank = await ranks.ResolveReorderRankAsync(workItem, request, ct);
-        var oldRank = workItem.Rank;
-        workItem.Rank = rank;
-        workItem.UpdatedAt = clock.UtcNow;
-        await SaveAsync(workItem, ct);
-        await audit.WriteAsync(
-            "WorkItemReordered",
-            "WorkItem",
-            workItem.Id,
-            oldRank.ToString(System.Globalization.CultureInfo.InvariantCulture),
-            rank.ToString(System.Globalization.CultureInfo.InvariantCulture),
-            correlationId,
+        => await reorderWorkItemHandler.HandleAsync(
+            new ReorderWorkItemCommand(id, request, correlationId),
             ct);
-        await RecordActivityAndNotifyWatchersAsync(
-            workItem, "WorkItemReordered", "Rank changed", correlationId, ct);
-        await PublishRealtimeAsync("reordered", workItem, correlationId, ct);
-        return ToResponse(workItem);
-    }
 
     public async Task<WorkItemResponse> SetPlanningAsync(string id, SetWorkItemPlanningRequest request, CancellationToken ct)
         => await setPlanningHandler.HandleAsync(new SetPlanningCommand(id, request), ct);

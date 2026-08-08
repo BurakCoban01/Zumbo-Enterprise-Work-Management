@@ -7,7 +7,7 @@ using static ApiEndpointResults;
 
 internal static partial class WorkItemEndpoints
 {
-private static void MapDeleteByIdCommentsByCommentId(RouteGroupBuilder group){group.MapDelete("/{id}/comments/{commentId}", async (string id, string commentId, WorkItemService service, HttpContext http, CancellationToken ct) =>
-            Ok(await service.DeleteCommentAsync(id, commentId, CorrelationId(http), ct), http))
+private static void MapDeleteByIdCommentsByCommentId(RouteGroupBuilder group){group.MapDelete("/{id}/comments/{commentId}", async (string id, string commentId, DeleteCommentHandler handler, HttpContext http, CancellationToken ct) =>
+            Ok(await handler.HandleAsync(new DeleteCommentCommand(id, commentId, CorrelationId(http)), ct), http))
             .WithZumboPermission(PermissionCatalog.CommentCreate);
 }}

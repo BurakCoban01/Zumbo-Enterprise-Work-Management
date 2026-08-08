@@ -10,11 +10,11 @@ internal static partial class WorkItemEndpoints
 private static void MapGetByIdAttachmentsByAttachmentIdDownload(RouteGroupBuilder group){group.MapGet("/{id}/attachments/{attachmentId}/download", async (
             string id,
             string attachmentId,
-            WorkItemService service,
+            OpenAttachmentHandler handler,
             HttpContext http,
             CancellationToken ct) =>
         {
-            var attachment = await service.OpenAttachmentAsync(id, attachmentId, ct);
+            var attachment = await handler.HandleAsync(new OpenAttachmentQuery(id, attachmentId), ct);
             http.Response.Headers.CacheControl = "private, no-store";
             http.Response.Headers.Pragma = "no-cache";
             return Results.File(

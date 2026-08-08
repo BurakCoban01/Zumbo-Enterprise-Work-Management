@@ -11,9 +11,11 @@ private static void MapDeleteByIdRelationsByRelatedWorkItemId(RouteGroupBuilder 
             string id,
             string relatedWorkItemId,
             string relationType,
-            WorkItemService service,
+            UnlinkWorkItemHandler handler,
             HttpContext http,
             CancellationToken ct) =>
-            Ok(await service.UnlinkAsync(id, relatedWorkItemId, relationType, CorrelationId(http), ct), http))
+            Ok(await handler.HandleAsync(
+                new UnlinkWorkItemCommand(id, relatedWorkItemId, relationType, CorrelationId(http)),
+                ct), http))
             .WithZumboPermission(PermissionCatalog.WorkItemLink);
 }}

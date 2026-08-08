@@ -194,6 +194,116 @@ public sealed partial class WorkItemService(
         collaborationService,
         automationEvents,
         automationChain);
+    private readonly ReorderWorkItemHandler reorderWorkItemHandler = new(
+        workItems,
+        audit,
+        clock,
+        currentUser,
+        permissionChecker,
+        distributedLockProvider,
+        distributedLockOptions,
+        realtimePublisher,
+        activityStore,
+        expectedVersions,
+        rankService ?? new(workItems, clock, Options.Create(new WorkItemRankOptions())),
+        collaborationService);
+    private readonly AddCommentHandler addCommentHandler = new(
+        workItems,
+        notifications,
+        audit,
+        clock,
+        currentUser,
+        permissionChecker,
+        activityStore,
+        expectedVersions,
+        collaborationService,
+        automationEvents,
+        automationChain);
+    private readonly EditCommentHandler editCommentHandler = new(
+        workItems,
+        audit,
+        clock,
+        currentUser,
+        permissionChecker,
+        activityStore,
+        expectedVersions,
+        collaborationService);
+    private readonly DeleteCommentHandler deleteCommentHandler = new(
+        workItems,
+        audit,
+        currentUser,
+        permissionChecker,
+        activityStore,
+        expectedVersions,
+        collaborationService);
+    private readonly SetParentHandler setParentHandler = new(
+        workItems,
+        audit,
+        clock,
+        currentUser,
+        permissionChecker,
+        typeSchemaPolicy ?? new LegacyWorkItemTypeSchemaPolicy(),
+        distributedLockProvider,
+        distributedLockOptions,
+        activityStore,
+        graph,
+        expectedVersions,
+        collaborationService);
+    private readonly LinkWorkItemHandler linkWorkItemHandler = new(
+        workItems,
+        audit,
+        clock,
+        currentUser,
+        permissionChecker,
+        distributedLockProvider,
+        distributedLockOptions,
+        activityStore,
+        graph,
+        expectedVersions,
+        collaborationService);
+    private readonly UnlinkWorkItemHandler unlinkWorkItemHandler = new(
+        workItems,
+        audit,
+        clock,
+        currentUser,
+        permissionChecker,
+        distributedLockProvider,
+        distributedLockOptions,
+        activityStore,
+        graph,
+        expectedVersions,
+        collaborationService);
+    private readonly OpenAttachmentHandler openAttachmentHandler = new(
+        workItems,
+        currentUser,
+        permissionChecker,
+        activityStore,
+        attachmentStorage);
+    private readonly UploadAttachmentHandler uploadAttachmentHandler = new(
+        workItems,
+        audit,
+        clock,
+        currentUser,
+        permissionChecker,
+        attachmentStorage,
+        distributedLockProvider,
+        distributedLockOptions,
+        activityStore,
+        expectedVersions,
+        collaborationService,
+        logger);
+    private readonly DeleteAttachmentHandler deleteAttachmentHandler = new(
+        workItems,
+        audit,
+        currentUser,
+        permissionChecker,
+        attachmentStorage,
+        distributedLockProvider,
+        distributedLockOptions,
+        activityStore,
+        expectedVersions,
+        collaborationService,
+        logger);
     private readonly ClearAssigneeHandler clearAssigneeHandler = new(
         workItems,
         audit,
