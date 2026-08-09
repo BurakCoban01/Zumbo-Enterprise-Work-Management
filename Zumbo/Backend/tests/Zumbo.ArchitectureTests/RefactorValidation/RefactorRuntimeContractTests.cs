@@ -49,6 +49,82 @@ public sealed class RefactorRuntimeContractTests
 
     private static readonly string[] PortFocusedVerticalSliceDiRegistrations =
     [
+        "services.AddScoped<ListPortfoliosHandler>(provider=>newListPortfoliosHandler("
+        + "provider.GetRequiredService<IDocumentRepository<PortfolioDocument>>(),"
+        + "provider.GetRequiredService<ICurrentUser>()));",
+        "services.AddScoped<GetPortfolioHandler>(provider=>newGetPortfolioHandler("
+        + "provider.GetRequiredService<IDocumentRepository<PortfolioDocument>>(),"
+        + "provider.GetRequiredService<ICurrentUser>()));",
+        "services.AddScoped<GetPortfolioRoadmapHandler>(provider=>newGetPortfolioRoadmapHandler("
+        + "provider.GetRequiredService<IDocumentRepository<PortfolioDocument>>(),"
+        + "provider.GetRequiredService<IPortfolioDirectory>(),"
+        + "provider.GetRequiredService<ICurrentUser>(),"
+        + "provider.GetRequiredService<IClock>()));",
+        "services.AddScoped<SavePortfolioHandler>(provider=>newSavePortfolioHandler("
+        + "provider.GetRequiredService<IDocumentRepository<PortfolioDocument>>(),"
+        + "provider.GetRequiredService<IPortfolioDirectory>(),"
+        + "provider.GetRequiredService<IPortfolioAuditWriter>(),"
+        + "provider.GetRequiredService<ICurrentUser>(),"
+        + "provider.GetRequiredService<IClock>(),"
+        + "provider.GetService<IExpectedVersionAccessor>()));",
+        "services.AddScoped<ArchivePortfolioHandler>(provider=>newArchivePortfolioHandler("
+        + "provider.GetRequiredService<IDocumentRepository<PortfolioDocument>>(),"
+        + "provider.GetRequiredService<IPortfolioAuditWriter>(),"
+        + "provider.GetRequiredService<ICurrentUser>(),"
+        + "provider.GetRequiredService<IClock>(),"
+        + "provider.GetService<IExpectedVersionAccessor>()));",
+        "services.AddScoped<SaveInitiativeHandler>(provider=>newSaveInitiativeHandler("
+        + "provider.GetRequiredService<IDocumentRepository<PortfolioDocument>>(),"
+        + "provider.GetRequiredService<IPortfolioDirectory>(),"
+        + "provider.GetRequiredService<IPortfolioAuditWriter>(),"
+        + "provider.GetRequiredService<ICurrentUser>(),"
+        + "provider.GetRequiredService<IClock>(),"
+        + "provider.GetService<IExpectedVersionAccessor>()));",
+        "services.AddScoped<AddInitiativeStatusUpdateHandler>(provider=>newAddInitiativeStatusUpdateHandler("
+        + "provider.GetRequiredService<IDocumentRepository<PortfolioDocument>>(),"
+        + "provider.GetRequiredService<IPortfolioAuditWriter>(),"
+        + "provider.GetRequiredService<ICurrentUser>(),"
+        + "provider.GetRequiredService<IClock>(),"
+        + "provider.GetService<IExpectedVersionAccessor>()));",
+        "services.AddScoped<SavePortfolioDependencyHandler>(provider=>newSavePortfolioDependencyHandler("
+        + "provider.GetRequiredService<IDocumentRepository<PortfolioDocument>>(),"
+        + "provider.GetRequiredService<IPortfolioDirectory>(),"
+        + "provider.GetRequiredService<IPortfolioAuditWriter>(),"
+        + "provider.GetRequiredService<ICurrentUser>(),"
+        + "provider.GetRequiredService<IClock>(),"
+        + "provider.GetService<IExpectedVersionAccessor>()));",
+        "services.AddScoped<ArchiveGoalHandler>(provider=>newArchiveGoalHandler("
+        + "provider.GetRequiredService<IDocumentRepository<GoalDocument>>(),"
+        + "provider.GetRequiredService<IGoalAuditWriter>(),"
+        + "provider.GetRequiredService<ICurrentUser>(),"
+        + "provider.GetRequiredService<IClock>(),"
+        + "provider.GetService<IExpectedVersionAccessor>()));",
+        "services.AddScoped<SaveGoalHandler>(provider=>newSaveGoalHandler("
+        + "provider.GetRequiredService<IDocumentRepository<GoalDocument>>(),"
+        + "provider.GetRequiredService<IGoalDirectory>(),"
+        + "provider.GetRequiredService<IGoalAuditWriter>(),"
+        + "provider.GetRequiredService<ICurrentUser>(),"
+        + "provider.GetRequiredService<IClock>(),"
+        + "provider.GetService<IExpectedVersionAccessor>()));",
+        "services.AddScoped<SaveKeyResultHandler>(provider=>newSaveKeyResultHandler("
+        + "provider.GetRequiredService<IDocumentRepository<GoalDocument>>(),"
+        + "provider.GetRequiredService<IGoalDirectory>(),"
+        + "provider.GetRequiredService<IGoalAuditWriter>(),"
+        + "provider.GetRequiredService<ICurrentUser>(),"
+        + "provider.GetRequiredService<IClock>(),"
+        + "provider.GetService<IExpectedVersionAccessor>()));",
+        "services.AddScoped<AddGoalStatusUpdateHandler>(provider=>newAddGoalStatusUpdateHandler("
+        + "provider.GetRequiredService<IDocumentRepository<GoalDocument>>(),"
+        + "provider.GetRequiredService<IGoalAuditWriter>(),"
+        + "provider.GetRequiredService<ICurrentUser>(),"
+        + "provider.GetRequiredService<IClock>(),"
+        + "provider.GetService<IExpectedVersionAccessor>()));",
+        "services.AddScoped<AddKeyResultProgressHandler>(provider=>newAddKeyResultProgressHandler("
+        + "provider.GetRequiredService<IDocumentRepository<GoalDocument>>(),"
+        + "provider.GetRequiredService<IGoalAuditWriter>(),"
+        + "provider.GetRequiredService<ICurrentUser>(),"
+        + "provider.GetRequiredService<IClock>(),"
+        + "provider.GetService<IExpectedVersionAccessor>()));",
         "services.AddScoped<CompleteSprintHandler>(provider=>newCompleteSprintHandler("
         + "provider.GetRequiredService<IDocumentRepository<SprintDocument>>(),"
         + "provider.GetRequiredService<IDocumentRepository<SprintScopeSnapshotDocument>>(),"
@@ -78,6 +154,14 @@ public sealed class RefactorRuntimeContractTests
         + "provider.GetRequiredService<IProjectPermissionChecker>(),"
         + "provider.GetRequiredService<ICurrentUser>(),"
         + "provider.GetRequiredService<IOptions<WorkItemTypeSchemaOptions>>(),"
+        + "provider.GetRequiredService<IClock>()));",
+        "services.AddScoped<GetGoalHandler>(provider=>newGetGoalHandler("
+        + "provider.GetRequiredService<IDocumentRepository<GoalDocument>>(),"
+        + "provider.GetRequiredService<ICurrentUser>()));",
+        "services.AddScoped<GetGoalRollupHandler>(provider=>newGetGoalRollupHandler("
+        + "provider.GetRequiredService<IDocumentRepository<GoalDocument>>(),"
+        + "provider.GetRequiredService<IGoalDirectory>(),"
+        + "provider.GetRequiredService<ICurrentUser>(),"
         + "provider.GetRequiredService<IClock>()));",
         "services.AddScoped<GetIssueTypeDistributionHandler>(provider=>newGetIssueTypeDistributionHandler("
         + "provider.GetRequiredService<IDocumentRepository<WorkItemTypeSchemaDocument>>(),"
@@ -122,6 +206,9 @@ public sealed class RefactorRuntimeContractTests
         + "provider.GetRequiredService<IDocumentRepository<SprintDocument>>(),"
         + "provider.GetRequiredService<IDocumentRepository<WorkItemDocument>>(),"
         + "provider.GetRequiredService<IProjectPermissionChecker>(),"
+        + "provider.GetRequiredService<ICurrentUser>()));",
+        "services.AddScoped<ListGoalsHandler>(provider=>newListGoalsHandler("
+        + "provider.GetRequiredService<IDocumentRepository<GoalDocument>>(),"
         + "provider.GetRequiredService<ICurrentUser>()));",
         "services.AddScoped<ListSprintsHandler>(provider=>newListSprintsHandler("
         + "provider.GetRequiredService<IDocumentRepository<SprintDocument>>(),"
@@ -947,6 +1034,48 @@ public sealed class RefactorRuntimeContractTests
 
     private static readonly string[] ReplacedVerticalSliceEndpointMappings =
     [
+        "group.MapPost(\"/{portfolioId}/dependencies\",async(stringportfolioId,SavePortfolioDependencyRequestrequest,[FromServices]PortfolioServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.SaveDependencyAsync(portfolioId,null,request,CorrelationId(http),ct),http));",
+        "group.MapPut(\"/{portfolioId}/dependencies/{dependencyId}\",async(stringportfolioId,stringdependencyId,SavePortfolioDependencyRequestrequest,[FromServices]PortfolioServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.SaveDependencyAsync(portfolioId,dependencyId,request,CorrelationId(http),ct),http));",
+        "group.MapPost(\"/{portfolioId}/initiatives\",async(stringportfolioId,SaveInitiativeRequestrequest,[FromServices]PortfolioServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.SaveInitiativeAsync(portfolioId,null,request,CorrelationId(http),ct),http));",
+        "group.MapPut(\"/{portfolioId}/initiatives/{initiativeId}\",async(stringportfolioId,stringinitiativeId,SaveInitiativeRequestrequest,[FromServices]PortfolioServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.SaveInitiativeAsync(portfolioId,initiativeId,request,CorrelationId(http),ct),http));",
+        "group.MapPost(\"/{portfolioId}/initiatives/{initiativeId}/status-updates\",async(stringportfolioId,stringinitiativeId,AddInitiativeStatusUpdateRequestrequest,[FromServices]PortfolioServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.AddStatusUpdateAsync(portfolioId,initiativeId,request,CorrelationId(http),ct),http));",
+        "group.MapPost(\"\",async(SavePortfolioRequestrequest,[FromServices]PortfolioServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.SaveAsync(null,request,CorrelationId(http),ct),http));",
+        "group.MapPut(\"/{portfolioId}\",async(stringportfolioId,SavePortfolioRequestrequest,[FromServices]PortfolioServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.SaveAsync(portfolioId,request,CorrelationId(http),ct),http));",
+        "group.MapDelete(\"/{portfolioId}\",async(stringportfolioId,[FromServices]PortfolioServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "{awaitservice.ArchiveAsync(portfolioId,CorrelationId(http),ct);returnOk(new{archived=true},http);});",
+        "group.MapGet(\"\",async(bool?includeArchived,int?page,int?pageSize,[FromServices]PortfolioServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.ListAsync(includeArchived??false,page??1,pageSize??50,ct),http));",
+        "group.MapGet(\"/{portfolioId}\",async(stringportfolioId,bool?includeArchived,[FromServices]PortfolioServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.GetAsync(portfolioId,includeArchived??false,ct),http));",
+        "group.MapGet(\"/{portfolioId}/roadmap\",async(stringportfolioId,[FromServices]PortfolioServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.GetRoadmapAsync(portfolioId,ct),http));",
+        "group.MapPost(\"\",async(SaveGoalRequestrequest,[FromServices]GoalServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.SaveAsync(null,request,CorrelationId(http),ct),http));",
+        "group.MapPut(\"/{goalId}\",async(stringgoalId,SaveGoalRequestrequest,[FromServices]GoalServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.SaveAsync(goalId,request,CorrelationId(http),ct),http));",
+        "group.MapPost(\"/{goalId}/key-results\",async(stringgoalId,SaveKeyResultRequestrequest,[FromServices]GoalServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.SaveKeyResultAsync(goalId,null,request,CorrelationId(http),ct),http));",
+        "group.MapPut(\"/{goalId}/key-results/{keyResultId}\",async(stringgoalId,stringkeyResultId,SaveKeyResultRequestrequest,[FromServices]GoalServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.SaveKeyResultAsync(goalId,keyResultId,request,CorrelationId(http),ct),http));",
+        "group.MapDelete(\"/{goalId}\",async(stringgoalId,[FromServices]GoalServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "{awaitservice.ArchiveAsync(goalId,CorrelationId(http),ct);returnOk(new{archived=true},http);});",
+        "group.MapPost(\"/{goalId}/key-results/{keyResultId}/progress-updates\",async(stringgoalId,stringkeyResultId,AddKeyResultProgressRequestrequest,[FromServices]GoalServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.AddKeyResultProgressAsync(goalId,keyResultId,request,CorrelationId(http),ct),http));",
+        "group.MapPost(\"/{goalId}/status-updates\",async(stringgoalId,AddGoalStatusUpdateRequestrequest,[FromServices]GoalServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.AddStatusUpdateAsync(goalId,request,CorrelationId(http),ct),http));",
+        "group.MapGet(\"\",async(bool?includeArchived,int?page,int?pageSize,[FromServices]GoalServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.ListAsync(includeArchived??false,page??1,pageSize??50,ct),http));",
+        "group.MapGet(\"/{goalId}\",async(stringgoalId,bool?includeArchived,[FromServices]GoalServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.GetAsync(goalId,includeArchived??false,ct),http));",
+        "group.MapGet(\"/{goalId}/rollup\",async(stringgoalId,[FromServices]GoalServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.GetRollupAsync(goalId,ct),http));",
         "group.MapDelete(\"/{sprintId}/items/{workItemId}\",async(stringsprintId,stringworkItemId,SprintServiceservice,HttpContexthttp,CancellationTokenct)=>"
         + "Ok(awaitservice.UnplanAsync(sprintId,workItemId,CorrelationId(http),ct),http)).WithZumboPermission(PermissionCatalog.WorkItemUpdate);",
         "group.MapGet(\"/projects/{projectId}\",async(stringprojectId,string?after,int?pageSize,SprintServiceservice,HttpContexthttp,CancellationTokenct)=>"
@@ -1271,6 +1400,48 @@ public sealed class RefactorRuntimeContractTests
 
     private static readonly string[] PortFocusedVerticalSliceEndpointMappings =
     [
+        "group.MapPost(\"/{portfolioId}/dependencies\",async(stringportfolioId,SavePortfolioDependencyRequestrequest,[FromServices]SavePortfolioDependencyHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newSavePortfolioDependencyCommand(portfolioId,null,request,CorrelationId(http)),ct),http));",
+        "group.MapPut(\"/{portfolioId}/dependencies/{dependencyId}\",async(stringportfolioId,stringdependencyId,SavePortfolioDependencyRequestrequest,[FromServices]SavePortfolioDependencyHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newSavePortfolioDependencyCommand(portfolioId,dependencyId,request,CorrelationId(http)),ct),http));",
+        "group.MapPost(\"/{portfolioId}/initiatives\",async(stringportfolioId,SaveInitiativeRequestrequest,[FromServices]SaveInitiativeHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newSaveInitiativeCommand(portfolioId,null,request,CorrelationId(http)),ct),http));",
+        "group.MapPut(\"/{portfolioId}/initiatives/{initiativeId}\",async(stringportfolioId,stringinitiativeId,SaveInitiativeRequestrequest,[FromServices]SaveInitiativeHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newSaveInitiativeCommand(portfolioId,initiativeId,request,CorrelationId(http)),ct),http));",
+        "group.MapPost(\"/{portfolioId}/initiatives/{initiativeId}/status-updates\",async(stringportfolioId,stringinitiativeId,AddInitiativeStatusUpdateRequestrequest,[FromServices]AddInitiativeStatusUpdateHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newAddInitiativeStatusUpdateCommand(portfolioId,initiativeId,request,CorrelationId(http)),ct),http));",
+        "group.MapPost(\"\",async(SavePortfolioRequestrequest,[FromServices]SavePortfolioHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newSavePortfolioCommand(null,request,CorrelationId(http)),ct),http));",
+        "group.MapPut(\"/{portfolioId}\",async(stringportfolioId,SavePortfolioRequestrequest,[FromServices]SavePortfolioHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newSavePortfolioCommand(portfolioId,request,CorrelationId(http)),ct),http));",
+        "group.MapDelete(\"/{portfolioId}\",async(stringportfolioId,[FromServices]ArchivePortfolioHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "{awaithandler.HandleAsync(newArchivePortfolioCommand(portfolioId,CorrelationId(http)),ct);returnOk(new{archived=true},http);});",
+        "group.MapGet(\"\",async(bool?includeArchived,int?page,int?pageSize,[FromServices]ListPortfoliosHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newListPortfoliosQuery(includeArchived??false,page??1,pageSize??50),ct),http));",
+        "group.MapGet(\"/{portfolioId}\",async(stringportfolioId,bool?includeArchived,[FromServices]GetPortfolioHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newGetPortfolioQuery(portfolioId,includeArchived??false),ct),http));",
+        "group.MapGet(\"/{portfolioId}/roadmap\",async(stringportfolioId,[FromServices]GetPortfolioRoadmapHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newGetPortfolioRoadmapQuery(portfolioId),ct),http));",
+        "group.MapPost(\"\",async(SaveGoalRequestrequest,[FromServices]SaveGoalHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newSaveGoalCommand(null,request,CorrelationId(http)),ct),http));",
+        "group.MapPut(\"/{goalId}\",async(stringgoalId,SaveGoalRequestrequest,[FromServices]SaveGoalHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newSaveGoalCommand(goalId,request,CorrelationId(http)),ct),http));",
+        "group.MapPost(\"/{goalId}/key-results\",async(stringgoalId,SaveKeyResultRequestrequest,[FromServices]SaveKeyResultHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newSaveKeyResultCommand(goalId,null,request,CorrelationId(http)),ct),http));",
+        "group.MapPut(\"/{goalId}/key-results/{keyResultId}\",async(stringgoalId,stringkeyResultId,SaveKeyResultRequestrequest,[FromServices]SaveKeyResultHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newSaveKeyResultCommand(goalId,keyResultId,request,CorrelationId(http)),ct),http));",
+        "group.MapDelete(\"/{goalId}\",async(stringgoalId,[FromServices]ArchiveGoalHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "{awaithandler.HandleAsync(newArchiveGoalCommand(goalId,CorrelationId(http)),ct);returnOk(new{archived=true},http);});",
+        "group.MapPost(\"/{goalId}/key-results/{keyResultId}/progress-updates\",async(stringgoalId,stringkeyResultId,AddKeyResultProgressRequestrequest,[FromServices]AddKeyResultProgressHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newAddKeyResultProgressCommand(goalId,keyResultId,request,CorrelationId(http)),ct),http));",
+        "group.MapPost(\"/{goalId}/status-updates\",async(stringgoalId,AddGoalStatusUpdateRequestrequest,[FromServices]AddGoalStatusUpdateHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newAddGoalStatusUpdateCommand(goalId,request,CorrelationId(http)),ct),http));",
+        "group.MapGet(\"\",async(bool?includeArchived,int?page,int?pageSize,[FromServices]ListGoalsHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newListGoalsQuery(includeArchived??false,page??1,pageSize??50),ct),http));",
+        "group.MapGet(\"/{goalId}\",async(stringgoalId,bool?includeArchived,[FromServices]GetGoalHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newGetGoalQuery(goalId,includeArchived??false),ct),http));",
+        "group.MapGet(\"/{goalId}/rollup\",async(stringgoalId,[FromServices]GetGoalRollupHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newGetGoalRollupQuery(goalId),ct),http));",
         "group.MapDelete(\"/{sprintId}/items/{workItemId}\",async(stringsprintId,stringworkItemId,UnplanSprintWorkItemHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
         + "Ok(awaithandler.HandleAsync(newUnplanSprintWorkItemCommand(sprintId,workItemId,CorrelationId(http)),ct),http)).WithZumboPermission(PermissionCatalog.WorkItemUpdate);",
         "group.MapGet(\"/projects/{projectId}\",async(stringprojectId,string?after,int?pageSize,ListSprintsHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
@@ -1691,6 +1862,8 @@ public sealed class RefactorRuntimeContractTests
                 "CreateTeamHandler and ListTeamsHandler remain scoped self-services; explicit factories select their port-focused constructors while compatibility constructors remain available.",
                 "CreateProjectHandler and ListProjectsHandler remain scoped self-services; explicit factories select their port-focused constructors while compatibility constructors remain available.",
                 "All nine Knowledge handlers are scoped through port-focused constructors; their routes resolve them directly while the corresponding KnowledgeService methods remain responsibility-grouped compatibility facades preserving their original public contracts.",
+                "All eight Goal handlers are scoped through port-focused constructors; all ten Goal routes resolve them directly while the corresponding GoalService methods remain compatibility facades preserving their original public contracts.",
+                "All eight Portfolio handlers are scoped through port-focused constructors; all eleven Portfolio routes resolve them directly while the corresponding PortfolioService methods remain compatibility facades preserving their original public contracts.",
                 "CreateBoardHandler and ListBoardsByProjectHandler remain scoped self-services; explicit factories select their port-focused constructors while compatibility constructors remain available.",
                 "UpsertWorkflowHandler and GetWorkflowHandler remain scoped self-services; explicit factories select their port-focused constructors while compatibility constructors remain available.",
                 "CreateWorkItemHandler and SearchWorkItemsHandler remain scoped self-services; explicit factories select their port-focused constructors while compatibility constructors remain available.",

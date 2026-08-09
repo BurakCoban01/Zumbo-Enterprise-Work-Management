@@ -1580,6 +1580,208 @@ public sealed class ArchitectureBoundaryTests
     }
 
     [Fact]
+    public void PortfolioUseCases_ArePortFocusedVerticalSlicesWithCompatibilityFacade()
+    {
+        var moduleDirectory = Path.Combine(SourceDirectory, "Zumbo.Modules.Projects");
+        var featureDirectory = Path.Combine(moduleDirectory, "Application", "Features", "Portfolio");
+        foreach (var file in new[]
+        {
+            "ListPortfoliosQuery.cs",
+            "ListPortfoliosHandler.cs",
+            "ListPortfoliosSlice.cs",
+            "GetPortfolioQuery.cs",
+            "GetPortfolioHandler.cs",
+            "GetPortfolioSlice.cs",
+            "GetPortfolioRoadmapQuery.cs",
+            "GetPortfolioRoadmapHandler.cs",
+            "GetPortfolioRoadmapSlice.cs",
+            "PortfolioReadAccess.cs",
+            "PortfolioResponseMapper.cs",
+            "PortfolioMutationPersistence.cs",
+            "PortfolioValidation.cs",
+            "PortfolioMutationMapper.cs",
+            "SavePortfolioCommand.cs",
+            "SavePortfolioHandler.cs",
+            "SavePortfolioSlice.cs",
+            "ArchivePortfolioCommand.cs",
+            "ArchivePortfolioHandler.cs",
+            "ArchivePortfolioSlice.cs",
+            "SaveInitiativeCommand.cs",
+            "SaveInitiativeHandler.cs",
+            "SaveInitiativeSlice.cs",
+            "AddInitiativeStatusUpdateCommand.cs",
+            "AddInitiativeStatusUpdateHandler.cs",
+            "AddInitiativeStatusUpdateSlice.cs",
+            "SavePortfolioDependencyCommand.cs",
+            "SavePortfolioDependencyHandler.cs",
+            "SavePortfolioDependencySlice.cs"
+        })
+        {
+            Assert.True(File.Exists(Path.Combine(featureDirectory, file)), $"Missing portfolio read file: {file}");
+        }
+
+        var facadeDirectory = Path.Combine(
+            moduleDirectory,
+            "Application",
+            "Compatibility",
+            "Portfolio",
+            "PortfolioService");
+        Assert.Equal(7, Directory.GetFiles(facadeDirectory, "*.cs").Length);
+        foreach (var (file, delegation) in new[]
+        {
+            ("ReadsFacade.cs", "new ListPortfoliosHandler(portfolios, currentUser).HandleAsync"),
+            ("ReadsFacade.cs", "new GetPortfolioHandler(portfolios, currentUser).HandleAsync"),
+            ("ReadsFacade.cs", "new GetPortfolioRoadmapHandler("),
+            ("LifecycleFacade.cs", "new SavePortfolioHandler("),
+            ("LifecycleFacade.cs", "new ArchivePortfolioHandler("),
+            ("InitiativesFacade.cs", "new SaveInitiativeHandler("),
+            ("InitiativesFacade.cs", "new AddInitiativeStatusUpdateHandler("),
+            ("DependenciesFacade.cs", "new SavePortfolioDependencyHandler(")
+        })
+        {
+            Assert.Contains(
+                delegation,
+                File.ReadAllText(Path.Combine(facadeDirectory, file)),
+                StringComparison.Ordinal);
+        }
+
+        var endpoint = File.ReadAllText(Path.Combine(
+            SourceDirectory,
+            "Zumbo.Api",
+            "Presentation",
+            "Endpoints",
+            "Projects",
+            "Portfolio",
+            "PortfolioEndpoints.cs"));
+        Assert.Contains("ListPortfoliosHandler handler", endpoint, StringComparison.Ordinal);
+        Assert.Contains("GetPortfolioHandler handler", endpoint, StringComparison.Ordinal);
+        Assert.Contains("GetPortfolioRoadmapHandler handler", endpoint, StringComparison.Ordinal);
+        Assert.Contains("SavePortfolioHandler handler", endpoint, StringComparison.Ordinal);
+        Assert.Contains("ArchivePortfolioHandler handler", endpoint, StringComparison.Ordinal);
+        Assert.Contains("SaveInitiativeHandler handler", endpoint, StringComparison.Ordinal);
+        Assert.Contains("AddInitiativeStatusUpdateHandler handler", endpoint, StringComparison.Ordinal);
+        Assert.Contains("SavePortfolioDependencyHandler handler", endpoint, StringComparison.Ordinal);
+        Assert.DoesNotContain("service.ListAsync(", endpoint, StringComparison.Ordinal);
+        Assert.DoesNotContain("service.GetAsync(", endpoint, StringComparison.Ordinal);
+        Assert.DoesNotContain("service.GetRoadmapAsync(", endpoint, StringComparison.Ordinal);
+        Assert.DoesNotContain("service.SaveAsync(", endpoint, StringComparison.Ordinal);
+        Assert.DoesNotContain("service.ArchiveAsync(", endpoint, StringComparison.Ordinal);
+        Assert.DoesNotContain("service.SaveInitiativeAsync(", endpoint, StringComparison.Ordinal);
+        Assert.DoesNotContain("service.AddStatusUpdateAsync(", endpoint, StringComparison.Ordinal);
+        Assert.DoesNotContain("service.SaveDependencyAsync(", endpoint, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<ListPortfoliosHandler>(provider =>", endpoint, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<GetPortfolioHandler>(provider =>", endpoint, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<GetPortfolioRoadmapHandler>(provider =>", endpoint, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<SavePortfolioHandler>(provider =>", endpoint, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<ArchivePortfolioHandler>(provider =>", endpoint, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<SaveInitiativeHandler>(provider =>", endpoint, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<AddInitiativeStatusUpdateHandler>(provider =>", endpoint, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<SavePortfolioDependencyHandler>(provider =>", endpoint, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void GoalUseCases_ArePortFocusedVerticalSlicesWithCompatibilityFacade()
+    {
+        var moduleDirectory = Path.Combine(SourceDirectory, "Zumbo.Modules.Projects");
+        var featureDirectory = Path.Combine(moduleDirectory, "Application", "Features", "Goals");
+        foreach (var file in new[]
+        {
+            "GetGoalQuery.cs",
+            "GetGoalHandler.cs",
+            "GetGoalSlice.cs",
+            "ListGoalsQuery.cs",
+            "ListGoalsHandler.cs",
+            "ListGoalsSlice.cs",
+            "GetGoalRollupQuery.cs",
+            "GetGoalRollupHandler.cs",
+            "GetGoalRollupSlice.cs",
+            "GoalReadAccess.cs",
+            "GoalResponseMapper.cs",
+            "GoalMutationPersistence.cs",
+            "GoalValidation.cs",
+            "AddKeyResultProgressCommand.cs",
+            "AddKeyResultProgressHandler.cs",
+            "AddKeyResultProgressSlice.cs",
+            "AddGoalStatusUpdateCommand.cs",
+            "AddGoalStatusUpdateHandler.cs",
+            "AddGoalStatusUpdateSlice.cs",
+            "GoalRequestNormalizer.cs",
+            "NormalizedGoalRequest.cs",
+            "GoalMutationMapper.cs",
+            "SaveGoalCommand.cs",
+            "SaveGoalHandler.cs",
+            "SaveGoalSlice.cs",
+            "SaveKeyResultCommand.cs",
+            "SaveKeyResultHandler.cs",
+            "SaveKeyResultSlice.cs",
+            "ArchiveGoalCommand.cs",
+            "ArchiveGoalHandler.cs",
+            "ArchiveGoalSlice.cs"
+        })
+        {
+            Assert.True(File.Exists(Path.Combine(featureDirectory, file)), $"Missing goal read file: {file}");
+        }
+
+        var facadeDirectory = Path.Combine(
+            moduleDirectory,
+            "Application",
+            "Compatibility",
+            "Goals",
+            "GoalService");
+        Assert.Equal(7, Directory.GetFiles(facadeDirectory, "*.cs").Length);
+        foreach (var (file, delegation) in new[]
+        {
+            ("ReadsFacade.cs", "new GetGoalHandler(goals, currentUser).HandleAsync"),
+            ("ReadsFacade.cs", "new ListGoalsHandler(goals, currentUser).HandleAsync"),
+            ("ReadsFacade.cs", "new GetGoalRollupHandler(goals, directory, currentUser, clock).HandleAsync"),
+            ("UpdatesFacade.cs", "new AddKeyResultProgressHandler("),
+            ("UpdatesFacade.cs", "new AddGoalStatusUpdateHandler("),
+            ("LifecycleFacade.cs", "new SaveGoalHandler("),
+            ("LifecycleFacade.cs", "new SaveKeyResultHandler("),
+            ("LifecycleFacade.cs", "new ArchiveGoalHandler(")
+        })
+        {
+            Assert.Contains(
+                delegation,
+                File.ReadAllText(Path.Combine(facadeDirectory, file)),
+                StringComparison.Ordinal);
+        }
+
+        var endpoint = File.ReadAllText(Path.Combine(
+            SourceDirectory,
+            "Zumbo.Api",
+            "Presentation",
+            "Endpoints",
+            "Projects",
+            "Goals",
+            "GoalEndpoints.cs"));
+        Assert.Contains("ListGoalsHandler handler", endpoint, StringComparison.Ordinal);
+        Assert.Contains("GetGoalHandler handler", endpoint, StringComparison.Ordinal);
+        Assert.Contains("GetGoalRollupHandler handler", endpoint, StringComparison.Ordinal);
+        Assert.Contains("AddKeyResultProgressHandler handler", endpoint, StringComparison.Ordinal);
+        Assert.Contains("AddGoalStatusUpdateHandler handler", endpoint, StringComparison.Ordinal);
+        Assert.Contains("SaveGoalHandler handler", endpoint, StringComparison.Ordinal);
+        Assert.Contains("SaveKeyResultHandler handler", endpoint, StringComparison.Ordinal);
+        Assert.Contains("ArchiveGoalHandler handler", endpoint, StringComparison.Ordinal);
+        Assert.DoesNotContain("service.ListAsync(", endpoint, StringComparison.Ordinal);
+        Assert.DoesNotContain("service.GetAsync(", endpoint, StringComparison.Ordinal);
+        Assert.DoesNotContain("service.GetRollupAsync(", endpoint, StringComparison.Ordinal);
+        Assert.DoesNotContain("service.AddKeyResultProgressAsync(", endpoint, StringComparison.Ordinal);
+        Assert.DoesNotContain("service.AddStatusUpdateAsync(", endpoint, StringComparison.Ordinal);
+        Assert.DoesNotContain("service.SaveAsync(", endpoint, StringComparison.Ordinal);
+        Assert.DoesNotContain("service.SaveKeyResultAsync(", endpoint, StringComparison.Ordinal);
+        Assert.DoesNotContain("service.ArchiveAsync(", endpoint, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<ListGoalsHandler>(provider =>", endpoint, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<GetGoalHandler>(provider =>", endpoint, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<GetGoalRollupHandler>(provider =>", endpoint, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<AddKeyResultProgressHandler>(provider =>", endpoint, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<AddGoalStatusUpdateHandler>(provider =>", endpoint, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<SaveGoalHandler>(provider =>", endpoint, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<SaveKeyResultHandler>(provider =>", endpoint, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<ArchiveGoalHandler>(provider =>", endpoint, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void SprintUseCases_ArePortFocusedVerticalSlicesWithCompatibilityFacade()
     {
         var moduleDirectory = Path.Combine(SourceDirectory, "Zumbo.Modules.WorkItems");

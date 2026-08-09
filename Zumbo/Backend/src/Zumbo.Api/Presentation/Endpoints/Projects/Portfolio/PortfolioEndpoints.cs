@@ -1,6 +1,10 @@
 using Microsoft.AspNetCore.Mvc;
+using Zumbo.BuildingBlocks.Application.Concurrency;
 using Zumbo.BuildingBlocks.Application.Security;
 using Zumbo.Modules.Projects;
+using Zumbo.Modules.Projects.Application.Features.Portfolio;
+using Zumbo.BuildingBlocks.Application.Persistence;
+using Zumbo.SharedKernel;
 
 using static ApiEndpointResults;
 
@@ -11,6 +15,52 @@ internal static class PortfolioEndpoints
         services.AddScoped<IPortfolioDirectory, PortfolioDirectoryAdapter>();
         services.AddScoped<IPortfolioAuditWriter, PortfolioAuditWriterAdapter>();
         services.AddScoped<PortfolioService>();
+        services.AddScoped<ListPortfoliosHandler>(provider => new ListPortfoliosHandler(
+            provider.GetRequiredService<IDocumentRepository<PortfolioDocument>>(),
+            provider.GetRequiredService<ICurrentUser>()));
+        services.AddScoped<GetPortfolioHandler>(provider => new GetPortfolioHandler(
+            provider.GetRequiredService<IDocumentRepository<PortfolioDocument>>(),
+            provider.GetRequiredService<ICurrentUser>()));
+        services.AddScoped<GetPortfolioRoadmapHandler>(provider => new GetPortfolioRoadmapHandler(
+            provider.GetRequiredService<IDocumentRepository<PortfolioDocument>>(),
+            provider.GetRequiredService<IPortfolioDirectory>(),
+            provider.GetRequiredService<ICurrentUser>(),
+            provider.GetRequiredService<IClock>()));
+        services.AddScoped<SavePortfolioHandler>(provider => new SavePortfolioHandler(
+            provider.GetRequiredService<IDocumentRepository<PortfolioDocument>>(),
+            provider.GetRequiredService<IPortfolioDirectory>(),
+            provider.GetRequiredService<IPortfolioAuditWriter>(),
+            provider.GetRequiredService<ICurrentUser>(),
+            provider.GetRequiredService<IClock>(),
+            provider.GetService<IExpectedVersionAccessor>()));
+        services.AddScoped<ArchivePortfolioHandler>(provider => new ArchivePortfolioHandler(
+            provider.GetRequiredService<IDocumentRepository<PortfolioDocument>>(),
+            provider.GetRequiredService<IPortfolioAuditWriter>(),
+            provider.GetRequiredService<ICurrentUser>(),
+            provider.GetRequiredService<IClock>(),
+            provider.GetService<IExpectedVersionAccessor>()));
+        services.AddScoped<SaveInitiativeHandler>(provider => new SaveInitiativeHandler(
+            provider.GetRequiredService<IDocumentRepository<PortfolioDocument>>(),
+            provider.GetRequiredService<IPortfolioDirectory>(),
+            provider.GetRequiredService<IPortfolioAuditWriter>(),
+            provider.GetRequiredService<ICurrentUser>(),
+            provider.GetRequiredService<IClock>(),
+            provider.GetService<IExpectedVersionAccessor>()));
+        services.AddScoped<AddInitiativeStatusUpdateHandler>(provider =>
+            new AddInitiativeStatusUpdateHandler(
+                provider.GetRequiredService<IDocumentRepository<PortfolioDocument>>(),
+                provider.GetRequiredService<IPortfolioAuditWriter>(),
+                provider.GetRequiredService<ICurrentUser>(),
+                provider.GetRequiredService<IClock>(),
+                provider.GetService<IExpectedVersionAccessor>()));
+        services.AddScoped<SavePortfolioDependencyHandler>(provider =>
+            new SavePortfolioDependencyHandler(
+                provider.GetRequiredService<IDocumentRepository<PortfolioDocument>>(),
+                provider.GetRequiredService<IPortfolioDirectory>(),
+                provider.GetRequiredService<IPortfolioAuditWriter>(),
+                provider.GetRequiredService<ICurrentUser>(),
+                provider.GetRequiredService<IClock>(),
+                provider.GetService<IExpectedVersionAccessor>()));
         return services;
     }
 
@@ -25,100 +75,119 @@ internal static class PortfolioEndpoints
             bool? includeArchived,
             int? page,
             int? pageSize,
-            [FromServices] PortfolioService service,
+            [FromServices] ListPortfoliosHandler handler,
             HttpContext http,
             CancellationToken ct) =>
-            Ok(await service.ListAsync(
-                includeArchived ?? false,
-                page ?? 1,
-                pageSize ?? 50,
+            Ok(await handler.HandleAsync(
+                new ListPortfoliosQuery(
+                    includeArchived ?? false,
+                    page ?? 1,
+                    pageSize ?? 50),
                 ct), http));
 
         group.MapGet("/{portfolioId}", async (
             string portfolioId,
             bool? includeArchived,
-            [FromServices] PortfolioService service,
+            [FromServices] GetPortfolioHandler handler,
             HttpContext http,
             CancellationToken ct) =>
-            Ok(await service.GetAsync(portfolioId, includeArchived ?? false, ct), http));
+            Ok(await handler.HandleAsync(
+                new GetPortfolioQuery(portfolioId, includeArchived ?? false), ct), http));
 
         group.MapPost("", async (
             SavePortfolioRequest request,
-            [FromServices] PortfolioService service,
+            [FromServices] SavePortfolioHandler handler,
             HttpContext http,
             CancellationToken ct) =>
-            Ok(await service.SaveAsync(null, request, CorrelationId(http), ct), http));
+            Ok(await handler.HandleAsync(
+                new SavePortfolioCommand(null, request, CorrelationId(http)), ct), http));
 
         group.MapPut("/{portfolioId}", async (
             string portfolioId,
             SavePortfolioRequest request,
-            [FromServices] PortfolioService service,
+            [FromServices] SavePortfolioHandler handler,
             HttpContext http,
             CancellationToken ct) =>
-            Ok(await service.SaveAsync(portfolioId, request, CorrelationId(http), ct), http));
+            Ok(await handler.HandleAsync(
+                new SavePortfolioCommand(portfolioId, request, CorrelationId(http)), ct), http));
 
         group.MapPost("/{portfolioId}/initiatives", async (
             string portfolioId,
             SaveInitiativeRequest request,
-            [FromServices] PortfolioService service,
+            [FromServices] SaveInitiativeHandler handler,
             HttpContext http,
             CancellationToken ct) =>
-            Ok(await service.SaveInitiativeAsync(
-                portfolioId, null, request, CorrelationId(http), ct), http));
+            Ok(await handler.HandleAsync(
+                new SaveInitiativeCommand(
+                    portfolioId, null, request, CorrelationId(http)), ct), http));
 
         group.MapPut("/{portfolioId}/initiatives/{initiativeId}", async (
             string portfolioId,
             string initiativeId,
             SaveInitiativeRequest request,
-            [FromServices] PortfolioService service,
+            [FromServices] SaveInitiativeHandler handler,
             HttpContext http,
             CancellationToken ct) =>
-            Ok(await service.SaveInitiativeAsync(
-                portfolioId, initiativeId, request, CorrelationId(http), ct), http));
+            Ok(await handler.HandleAsync(
+                new SaveInitiativeCommand(
+                    portfolioId, initiativeId, request, CorrelationId(http)), ct), http));
 
         group.MapPost("/{portfolioId}/initiatives/{initiativeId}/status-updates", async (
             string portfolioId,
             string initiativeId,
             AddInitiativeStatusUpdateRequest request,
-            [FromServices] PortfolioService service,
+            [FromServices] AddInitiativeStatusUpdateHandler handler,
             HttpContext http,
             CancellationToken ct) =>
-            Ok(await service.AddStatusUpdateAsync(
-                portfolioId, initiativeId, request, CorrelationId(http), ct), http));
+            Ok(await handler.HandleAsync(
+                new AddInitiativeStatusUpdateCommand(
+                    portfolioId,
+                    initiativeId,
+                    request,
+                    CorrelationId(http)),
+                ct), http));
 
         group.MapPost("/{portfolioId}/dependencies", async (
             string portfolioId,
             SavePortfolioDependencyRequest request,
-            [FromServices] PortfolioService service,
+            [FromServices] SavePortfolioDependencyHandler handler,
             HttpContext http,
             CancellationToken ct) =>
-            Ok(await service.SaveDependencyAsync(
-                portfolioId, null, request, CorrelationId(http), ct), http));
+            Ok(await handler.HandleAsync(
+                new SavePortfolioDependencyCommand(
+                    portfolioId, null, request, CorrelationId(http)), ct), http));
 
         group.MapPut("/{portfolioId}/dependencies/{dependencyId}", async (
             string portfolioId,
             string dependencyId,
             SavePortfolioDependencyRequest request,
-            [FromServices] PortfolioService service,
+            [FromServices] SavePortfolioDependencyHandler handler,
             HttpContext http,
             CancellationToken ct) =>
-            Ok(await service.SaveDependencyAsync(
-                portfolioId, dependencyId, request, CorrelationId(http), ct), http));
+            Ok(await handler.HandleAsync(
+                new SavePortfolioDependencyCommand(
+                    portfolioId,
+                    dependencyId,
+                    request,
+                    CorrelationId(http)),
+                ct), http));
 
         group.MapGet("/{portfolioId}/roadmap", async (
             string portfolioId,
-            [FromServices] PortfolioService service,
+            [FromServices] GetPortfolioRoadmapHandler handler,
             HttpContext http,
             CancellationToken ct) =>
-            Ok(await service.GetRoadmapAsync(portfolioId, ct), http));
+            Ok(await handler.HandleAsync(
+                new GetPortfolioRoadmapQuery(portfolioId), ct), http));
 
         group.MapDelete("/{portfolioId}", async (
             string portfolioId,
-            [FromServices] PortfolioService service,
+            [FromServices] ArchivePortfolioHandler handler,
             HttpContext http,
             CancellationToken ct) =>
         {
-            await service.ArchiveAsync(portfolioId, CorrelationId(http), ct);
+            await handler.HandleAsync(
+                new ArchivePortfolioCommand(portfolioId, CorrelationId(http)), ct);
             return Ok(new { archived = true }, http);
         });
     }
