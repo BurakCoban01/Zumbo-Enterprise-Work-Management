@@ -1,21 +1,20 @@
-using Microsoft.Extensions.Options;
-using Zumbo.BuildingBlocks.Application.Concurrency;
-using Zumbo.BuildingBlocks.Application.Messaging;
 using Zumbo.BuildingBlocks.Application.Persistence;
 using Zumbo.SharedKernel;
 
 namespace Zumbo.Modules.Notifications;
 
-public sealed partial class NotificationService{
-
-    public async Task<bool> ReplayDeadLetterAsync(
-        string organizationId,
-        string notificationId,
+internal sealed class ReplayNotificationDeadLetterSlice(
+    IDocumentRepository<NotificationDocument> notifications,
+    IClock clock)
+{
+    internal async Task<bool> HandleAsync(
+        ReplayNotificationDeadLetterCommand command,
         CancellationToken ct)
     {
-        organizationId = RequireOrganizationId(organizationId);
+        var organizationId = NotificationDeliveryPolicy.RequireOrganizationId(
+            command.OrganizationId);
         var notification = await notifications.SelectAsync(
-            x => x.Id == notificationId
+            x => x.Id == command.NotificationId
                 && x.OrganizationId == organizationId
                 && x.EmailStatus == NotificationEmailStatuses.DeadLetter,
             ct);
@@ -25,9 +24,9 @@ public sealed partial class NotificationService{
         notification.EmailNextAttemptAt = clock.UtcNow;
         notification.EmailDeadLetteredAt = null;
         notification.EmailLastError = null;
-        ClearLease(notification);
+        NotificationDeliveryPolicy.ClearLease(notification);
         var result = await notifications.ReplaceByFilterAsync(
-            x => x.Id == notificationId
+            x => x.Id == command.NotificationId
                 && x.OrganizationId == organizationId
                 && x.EmailStatus == NotificationEmailStatuses.DeadLetter,
             notification,

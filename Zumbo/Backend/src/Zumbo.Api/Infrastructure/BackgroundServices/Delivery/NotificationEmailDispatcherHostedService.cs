@@ -28,11 +28,13 @@ public sealed class NotificationEmailDispatcherHostedService(
             try
             {
                 await using var scope = scopeFactory.CreateAsyncScope();
-                var service = scope.ServiceProvider.GetRequiredService<NotificationService>();
-                await service.DispatchPendingEmailsAsync(
-                    Math.Clamp(options.Value.DispatchBatchSize, 1, 100),
-                    stoppingToken,
-                    workerId);
+                var handler = scope.ServiceProvider
+                    .GetRequiredService<DispatchNotificationEmailsHandler>();
+                await handler.HandleAsync(
+                    new DispatchNotificationEmailsCommand(
+                        Math.Clamp(options.Value.DispatchBatchSize, 1, 100),
+                        workerId),
+                    stoppingToken);
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {

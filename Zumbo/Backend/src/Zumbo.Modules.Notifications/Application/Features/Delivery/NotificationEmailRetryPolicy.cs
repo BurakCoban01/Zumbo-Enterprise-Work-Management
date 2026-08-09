@@ -1,14 +1,14 @@
-using Microsoft.Extensions.Options;
-using Zumbo.BuildingBlocks.Application.Concurrency;
 using Zumbo.BuildingBlocks.Application.Messaging;
-using Zumbo.BuildingBlocks.Application.Persistence;
-using Zumbo.SharedKernel;
 
 namespace Zumbo.Modules.Notifications;
 
-public sealed partial class NotificationService{
-
-    private TimeSpan RetryDelay(int attempt, int baseSeconds, int maximumSeconds, double jitterRatio)
+internal sealed class NotificationEmailRetryPolicy(IDurableMessageJitter? retryJitter)
+{
+    internal TimeSpan Delay(
+        int attempt,
+        int baseSeconds,
+        int maximumSeconds,
+        double jitterRatio)
     {
         var boundedBase = TimeSpan.FromSeconds(Math.Clamp(baseSeconds, 1, 3600));
         var boundedMaximum = TimeSpan.FromSeconds(Math.Clamp(maximumSeconds, 1, 86_400));

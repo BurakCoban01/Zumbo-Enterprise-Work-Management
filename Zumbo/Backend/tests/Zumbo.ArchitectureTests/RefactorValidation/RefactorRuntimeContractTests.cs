@@ -976,6 +976,39 @@ public sealed class RefactorRuntimeContractTests
         "services.AddScoped<MarkNotificationAsReadHandler>(provider=>newMarkNotificationAsReadHandler("
         + "provider.GetRequiredService<IDocumentRepository<NotificationDocument>>(),"
         + "provider.GetRequiredService<ICurrentUser>()));",
+        "services.AddScoped<GetNotificationPreferencesHandler>(provider=>newGetNotificationPreferencesHandler("
+        + "provider.GetRequiredService<IDocumentRepository<NotificationPreferenceDocument>>(),"
+        + "provider.GetRequiredService<IDistributedLockProvider>(),"
+        + "provider.GetRequiredService<IOptions<DistributedLockOptions>>(),"
+        + "provider.GetRequiredService<ICurrentUser>()));",
+        "services.AddScoped<UpdateNotificationPreferencesHandler>(provider=>newUpdateNotificationPreferencesHandler("
+        + "provider.GetRequiredService<IDocumentRepository<NotificationPreferenceDocument>>(),"
+        + "provider.GetRequiredService<IDistributedLockProvider>(),"
+        + "provider.GetRequiredService<IOptions<DistributedLockOptions>>(),"
+        + "provider.GetRequiredService<IClock>(),"
+        + "provider.GetRequiredService<ICurrentUser>()));",
+        "services.AddScoped<GetNotificationDeliveryMetricsHandler>(provider=>newGetNotificationDeliveryMetricsHandler("
+        + "provider.GetRequiredService<IDocumentRepository<NotificationDocument>>(),"
+        + "provider.GetRequiredService<IClock>()));",
+        "services.AddScoped<ListNotificationDeadLettersHandler>(provider=>newListNotificationDeadLettersHandler("
+        + "provider.GetRequiredService<IDocumentRepository<NotificationDocument>>()));",
+        "services.AddScoped<ReplayNotificationDeadLetterHandler>(provider=>newReplayNotificationDeadLetterHandler("
+        + "provider.GetRequiredService<IDocumentRepository<NotificationDocument>>(),"
+        + "provider.GetRequiredService<IClock>()));",
+        "services.AddScoped<CreateNotificationHandler>(provider=>newCreateNotificationHandler("
+        + "provider.GetRequiredService<IDocumentRepository<NotificationDocument>>(),"
+        + "provider.GetRequiredService<IDocumentRepository<NotificationPreferenceDocument>>(),"
+        + "provider.GetRequiredService<INotificationUserDirectory>(),"
+        + "provider.GetRequiredService<IOptions<EmailNotificationOptions>>(),"
+        + "provider.GetRequiredService<IDistributedLockProvider>(),"
+        + "provider.GetRequiredService<IOptions<DistributedLockOptions>>(),"
+        + "provider.GetRequiredService<IClock>()));",
+        "services.AddScoped<DispatchNotificationEmailsHandler>(provider=>newDispatchNotificationEmailsHandler("
+        + "provider.GetRequiredService<IDocumentRepository<NotificationDocument>>(),"
+        + "provider.GetRequiredService<IEmailNotificationSender>(),"
+        + "provider.GetRequiredService<IOptions<EmailNotificationOptions>>(),"
+        + "provider.GetRequiredService<IClock>(),"
+        + "provider.GetService<IDurableMessageJitter>()));",
         "services.AddScoped<WriteAuditLogHandler>(provider=>newWriteAuditLogHandler("
         + "provider.GetRequiredService<IDocumentRepository<AuditLogDocument>>(),"
         + "provider.GetRequiredService<IClock>(),"
@@ -1034,6 +1067,15 @@ public sealed class RefactorRuntimeContractTests
 
     private static readonly string[] ReplacedVerticalSliceEndpointMappings =
     [
+        "group.MapGet(\"/delivery/status\",async(stringorganizationId,NotificationServiceservice,CancellationTokenct)=>"
+        + "Results.Ok(awaitservice.GetDeliveryMetricsAsync(organizationId,ct))).WithZumboPermission(PermissionCatalog.OperationsManage,isGlobal:true).RequireRateLimiting(\"report\");",
+        "group.MapGet(\"/delivery/dead-letters\",async(stringorganizationId,int?pageSize,NotificationServiceservice,CancellationTokenct)=>"
+        + "Results.Ok(awaitservice.ListDeadLettersAsync(organizationId,Math.Clamp(pageSize??20,1,50),ct))).WithZumboPermission(PermissionCatalog.OperationsManage,isGlobal:true).RequireRateLimiting(\"report\");",
+        "group.MapPost(\"/delivery/{notificationId}/replay\",async(stringnotificationId,stringorganizationId,NotificationServiceservice,INotificationAuditWriteraudit,HttpContexthttp,CancellationTokenct)=>"
+        + "{if(!awaitservice.ReplayDeadLetterAsync(organizationId,notificationId,ct)){returnResults.NotFound();}awaitaudit.WriteAsync(\"NotificationDeliveryReplayed\",notificationId,\"DeadLetter\",\"Pending\",CorrelationId(http),ct);returnResults.Ok();}).WithZumboPermission(PermissionCatalog.OperationsManage,isGlobal:true).RequireRateLimiting(\"bulk\");",
+        "group.MapGet(\"/preferences/me\",async(NotificationServiceservice,HttpContexthttp,CancellationTokenct)=>Ok(awaitservice.GetPreferencesAsync(ct),http));",
+        "group.MapPut(\"/preferences/me\",async(UpdateNotificationPreferencesRequestrequest,NotificationServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.UpdatePreferencesAsync(request,ct),http)).WithZumboPermission(PermissionCatalog.NotificationManage);",
         "group.MapPost(\"/{portfolioId}/dependencies\",async(stringportfolioId,SavePortfolioDependencyRequestrequest,[FromServices]PortfolioServiceservice,HttpContexthttp,CancellationTokenct)=>"
         + "Ok(awaitservice.SaveDependencyAsync(portfolioId,null,request,CorrelationId(http),ct),http));",
         "group.MapPut(\"/{portfolioId}/dependencies/{dependencyId}\",async(stringportfolioId,stringdependencyId,SavePortfolioDependencyRequestrequest,[FromServices]PortfolioServiceservice,HttpContexthttp,CancellationTokenct)=>"
@@ -1400,6 +1442,16 @@ public sealed class RefactorRuntimeContractTests
 
     private static readonly string[] PortFocusedVerticalSliceEndpointMappings =
     [
+        "group.MapGet(\"/delivery/status\",async(stringorganizationId,GetNotificationDeliveryMetricsHandlerhandler,CancellationTokenct)=>"
+        + "Results.Ok(awaithandler.HandleAsync(newGetNotificationDeliveryMetricsQuery(organizationId),ct))).WithZumboPermission(PermissionCatalog.OperationsManage,isGlobal:true).RequireRateLimiting(\"report\");",
+        "group.MapGet(\"/delivery/dead-letters\",async(stringorganizationId,int?pageSize,ListNotificationDeadLettersHandlerhandler,CancellationTokenct)=>"
+        + "Results.Ok(awaithandler.HandleAsync(newListNotificationDeadLettersQuery(organizationId,Math.Clamp(pageSize??20,1,50)),ct))).WithZumboPermission(PermissionCatalog.OperationsManage,isGlobal:true).RequireRateLimiting(\"report\");",
+        "group.MapPost(\"/delivery/{notificationId}/replay\",async(stringnotificationId,stringorganizationId,ReplayNotificationDeadLetterHandlerhandler,INotificationAuditWriteraudit,HttpContexthttp,CancellationTokenct)=>"
+        + "{if(!awaithandler.HandleAsync(newReplayNotificationDeadLetterCommand(organizationId,notificationId),ct)){returnResults.NotFound();}awaitaudit.WriteAsync(\"NotificationDeliveryReplayed\",notificationId,\"DeadLetter\",\"Pending\",CorrelationId(http),ct);returnResults.Ok();}).WithZumboPermission(PermissionCatalog.OperationsManage,isGlobal:true).RequireRateLimiting(\"bulk\");",
+        "group.MapGet(\"/preferences/me\",async(GetNotificationPreferencesHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newGetNotificationPreferencesQuery(),ct),http));",
+        "group.MapPut(\"/preferences/me\",async(UpdateNotificationPreferencesRequestrequest,UpdateNotificationPreferencesHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newUpdateNotificationPreferencesCommand(request),ct),http)).WithZumboPermission(PermissionCatalog.NotificationManage);",
         "group.MapPost(\"/{portfolioId}/dependencies\",async(stringportfolioId,SavePortfolioDependencyRequestrequest,[FromServices]SavePortfolioDependencyHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
         + "Ok(awaithandler.HandleAsync(newSavePortfolioDependencyCommand(portfolioId,null,request,CorrelationId(http)),ct),http));",
         "group.MapPut(\"/{portfolioId}/dependencies/{dependencyId}\",async(stringportfolioId,stringdependencyId,SavePortfolioDependencyRequestrequest,[FromServices]SavePortfolioDependencyHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
@@ -1908,7 +1960,7 @@ public sealed class RefactorRuntimeContractTests
                 "The flow-time report route resolves FlowTimeHandler directly; its route, nullable date binding, rate limit, report headers, view authorization, default range and exact validation messages, UTC day boundaries, cache key and TTL, completed-item cursor paging, organization-scoped activity timeline and legacy fallback, reopened-work cycle start, lead and cycle samples, average and median rounding, response and snapshot mapping, dashboard and unit compatibility callers, public facades, and scoped registration remain preserved.",
                 "The completion-rate report route resolves CompletionRateHandler directly; its route, nullable date binding, rate limit, report headers, view authorization, default range and exact validation messages, UTC day boundaries, cache key and TTL, created-item cursor paging, completion cutoff, empty-set behavior, two-decimal percentage, response and snapshot mapping, dashboard, API and unit compatibility callers, public facades, and scoped registration remain preserved.",
                 "The team-performance report route resolves TeamPerformanceHandler directly; its route, nullable date binding, rate limit, report headers, view authorization, default range and exact validation messages, UTC day boundaries, cache key and TTL, team-policy call order, explicit team-assignment cursor paging, organization-scoped activity read and legacy fallback, team-name ordering, completion cutoff and percentage, average lead-time rounding, logged-hours aggregation, response and snapshot mapping, dashboard, API and unit compatibility callers, public facades, and scoped registration remain preserved.",
-                "ListNotificationsHandler and MarkNotificationAsReadHandler remain scoped self-services; explicit factories select their port-focused constructors while compatibility constructors remain available.",
+                "The notification list, read-state, preference, creation, delivery-metrics, dead-letter list, dead-letter replay, and email dispatch handlers remain scoped self-services; explicit factories select their port-focused constructors while compatibility constructors remain available, and the hosted dispatcher resolves the dispatch handler directly.",
                 "WriteAuditLogHandler and QueryAuditLogHandler remain scoped self-services; explicit factories select their port-focused constructors while compatibility constructors remain available.",
                 "The capacity-plan archive route resolves ArchiveCapacityPlanHandler directly; its route, authorization, transaction filter, correlation ID, owner and visibility checks, optimistic concurrency, audit, response mapping, compatibility facade, and scoped registration remain preserved.",
                 "The capacity-plan read route resolves GetCapacityPlanHandler directly; its route, authorization, transaction filter, archived binding, tenant and viewer masking, project visibility, response mapping, compatibility facade, and scoped registration remain preserved.",
@@ -2061,11 +2113,14 @@ public sealed class RefactorRuntimeContractTests
     private static IReadOnlyList<string> MessagingContracts(
         IReadOnlyList<RefactorSourceReader.SourceFile> files) =>
         Parsed(files, _ => true)
-            .SelectMany(source => source.Root.DescendantNodes().OfType<TypeDeclarationSyntax>())
-            .Where(type => MessagingType(type.Identifier.ValueText))
-            .SelectMany(type => type.Members
+            .SelectMany(source => source.Root.DescendantNodes()
+                .OfType<TypeDeclarationSyntax>()
+                .Select(type => (source.File.Path, Type: type)))
+            .Where(item => MessagingType(item.Type.Identifier.ValueText)
+                && !ApplicationFeatureUseCaseType(item.Path, item.Type))
+            .SelectMany(item => item.Type.Members
                 .Where(member => member is not BaseTypeDeclarationSyntax)
-                .Select(member => $"{QualifiedTypeName(type)}|{Normalize(member)}"))
+                .Select(member => $"{QualifiedTypeName(item.Type)}|{Normalize(member)}"))
             .Order(StringComparer.Ordinal)
             .ToArray();
 
@@ -2076,6 +2131,22 @@ public sealed class RefactorRuntimeContractTests
             || name.Contains("Inbox", StringComparison.Ordinal)
             || name.Contains("Outbox", StringComparison.Ordinal)
             || name.Contains("DeadLetter", StringComparison.Ordinal));
+
+    private static bool ApplicationFeatureUseCaseType(string path, TypeDeclarationSyntax type)
+    {
+        var normalizedPath = path.Replace('\\', '/');
+        if (!normalizedPath.Contains("/Application/Features/", StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        var name = type.Identifier.ValueText;
+        return name.EndsWith("Handler", StringComparison.Ordinal)
+            || name.EndsWith("Command", StringComparison.Ordinal)
+            || name.EndsWith("Query", StringComparison.Ordinal)
+            || name.EndsWith("Slice", StringComparison.Ordinal)
+            || name.EndsWith("Policy", StringComparison.Ordinal);
+    }
 
     private static string QualifiedTypeName(TypeDeclarationSyntax type)
     {

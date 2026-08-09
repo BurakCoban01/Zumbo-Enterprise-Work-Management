@@ -2940,11 +2940,14 @@ public sealed class ArchitectureBoundaryTests
     }
 
     [Fact]
-    public void NotificationListAndMarkRead_ArePortFocusedVerticalSlicesWithCompatibilityFacades()
+    public void NotificationCorePreferencesDeliveryAndCreation_ArePortFocusedVerticalSlicesWithCompatibilityFacades()
     {
         var moduleDirectory = Path.Combine(SourceDirectory, "Zumbo.Modules.Notifications");
         var listDirectory = Path.Combine(moduleDirectory, "Application", "Features", "NotificationsCore");
         var markReadDirectory = Path.Combine(moduleDirectory, "Application", "Features", "ReadState");
+        var preferencesDirectory = Path.Combine(moduleDirectory, "Application", "Features", "Preferences");
+        var deliveryDirectory = Path.Combine(moduleDirectory, "Application", "Features", "Delivery");
+        var creationDirectory = Path.Combine(moduleDirectory, "Application", "Features", "Creation");
         var representativeDirectory = Path.Combine(
             moduleDirectory,
             "Application",
@@ -2959,6 +2962,53 @@ public sealed class ArchitectureBoundaryTests
         Assert.True(File.Exists(Path.Combine(markReadDirectory, "MarkNotificationAsReadValidator.cs")));
         Assert.True(File.Exists(Path.Combine(markReadDirectory, "MarkNotificationAsReadHandler.cs")));
         Assert.True(File.Exists(Path.Combine(markReadDirectory, "MarkNotificationAsReadSlice.cs")));
+        foreach (var file in new[]
+        {
+            "GetNotificationPreferencesQuery.cs",
+            "GetNotificationPreferencesHandler.cs",
+            "GetNotificationPreferencesSlice.cs",
+            "UpdateNotificationPreferencesCommand.cs",
+            "UpdateNotificationPreferencesHandler.cs",
+            "UpdateNotificationPreferencesSlice.cs",
+            "NotificationPreferenceAccess.cs",
+            "NotificationPreferenceValidation.cs",
+            "NotificationPreferenceMapper.cs"
+        })
+        {
+            Assert.True(File.Exists(Path.Combine(preferencesDirectory, file)), $"Missing preference file: {file}");
+        }
+        foreach (var file in new[]
+        {
+            "GetNotificationDeliveryMetricsQuery.cs",
+            "GetNotificationDeliveryMetricsHandler.cs",
+            "GetNotificationDeliveryMetricsSlice.cs",
+            "ListNotificationDeadLettersQuery.cs",
+            "ListNotificationDeadLettersHandler.cs",
+            "ListNotificationDeadLettersSlice.cs",
+            "ReplayNotificationDeadLetterCommand.cs",
+            "ReplayNotificationDeadLetterHandler.cs",
+            "ReplayNotificationDeadLetterSlice.cs",
+            "NotificationDeliveryPolicy.cs",
+            "DispatchNotificationEmailsCommand.cs",
+            "DispatchNotificationEmailsHandler.cs",
+            "DispatchNotificationEmailsSlice.cs",
+            "NotificationEmailRetryPolicy.cs"
+        })
+        {
+            Assert.True(File.Exists(Path.Combine(deliveryDirectory, file)), $"Missing delivery file: {file}");
+        }
+        foreach (var file in new[]
+        {
+            "CreateNotificationCommand.cs",
+            "CreateNotificationHandler.cs",
+            "CreateNotificationSlice.cs",
+            "NotificationCreationPolicy.cs",
+            "NotificationCreationLockAccess.cs",
+            "NotificationDigestSchedule.cs"
+        })
+        {
+            Assert.True(File.Exists(Path.Combine(creationDirectory, file)), $"Missing creation file: {file}");
+        }
         Assert.Empty(
             Directory.Exists(representativeDirectory)
                 ? Directory.GetFiles(representativeDirectory, "*.cs", SearchOption.AllDirectories)
@@ -2978,20 +3028,70 @@ public sealed class ArchitectureBoundaryTests
             "Application",
             "Compatibility",
             "NotificationService",
-            "NotificationService.ListAsync.cs"));
-        var markReadFacade = File.ReadAllText(Path.Combine(
+            "NotificationService.Inbox.cs"));
+        Assert.Contains("listNotificationsHandler.HandleAsync", listFacade, StringComparison.Ordinal);
+        Assert.Contains("markNotificationAsReadHandler.HandleAsync", listFacade, StringComparison.Ordinal);
+        var creationSlice = File.ReadAllText(Path.Combine(creationDirectory, "CreateNotificationSlice.cs"));
+        var creationFacade = File.ReadAllText(Path.Combine(
             moduleDirectory,
             "Application",
             "Compatibility",
             "NotificationService",
-            "NotificationService.MarkAsReadAsync.cs"));
-        Assert.Contains("listNotificationsHandler.HandleAsync", listFacade, StringComparison.Ordinal);
-        Assert.Contains("markNotificationAsReadHandler.HandleAsync", markReadFacade, StringComparison.Ordinal);
+            "NotificationService.Creation.cs"));
+        Assert.DoesNotContain("NotificationService", creationSlice, StringComparison.Ordinal);
+        Assert.Contains("CreateNotificationHandler", creationFacade, StringComparison.Ordinal);
+        Assert.Contains("CreateNotificationCommand", creationFacade, StringComparison.Ordinal);
+        var dispatchFacade = File.ReadAllText(Path.Combine(
+            moduleDirectory,
+            "Application",
+            "Compatibility",
+            "NotificationService",
+            "NotificationService.Delivery.cs"));
+        Assert.Contains("DispatchNotificationEmailsHandler", dispatchFacade, StringComparison.Ordinal);
+        Assert.Contains("DispatchNotificationEmailsCommand", dispatchFacade, StringComparison.Ordinal);
+
+        var dispatcherHost = File.ReadAllText(Path.Combine(
+            SourceDirectory,
+            "Zumbo.Api",
+            "Infrastructure",
+            "BackgroundServices",
+            "Delivery",
+            "NotificationEmailDispatcherHostedService.cs"));
+        Assert.Contains("GetRequiredService<DispatchNotificationEmailsHandler>", dispatcherHost, StringComparison.Ordinal);
+        Assert.DoesNotContain("GetRequiredService<NotificationService>", dispatcherHost, StringComparison.Ordinal);
+
+        var facadeFiles = Directory.GetFiles(
+            Path.Combine(moduleDirectory, "Application", "Compatibility", "NotificationService"),
+            "*.cs",
+            SearchOption.TopDirectoryOnly);
+        Assert.Equal(4, facadeFiles.Length);
+        Assert.Equal(
+            [
+                "NotificationService.Creation.cs",
+                "NotificationService.Delivery.cs",
+                "NotificationService.Inbox.cs",
+                "NotificationService.Preferences.cs"
+            ],
+            facadeFiles
+                .Select(path => Path.GetFileName(path)!)
+                .Order(StringComparer.Ordinal)
+                .ToArray());
 
         var endpointHost = File.ReadAllText(EndpointHostPath("NotificationEndpoints.cs"));
         Assert.Contains("services.AddNotificationServices(configuration)", endpointHost, StringComparison.Ordinal);
         Assert.DoesNotContain("IDocumentRepository", endpointHost, StringComparison.Ordinal);
         Assert.DoesNotContain("NotificationDocument", endpointHost, StringComparison.Ordinal);
+        Assert.Contains("GetNotificationPreferencesHandler handler", endpointHost, StringComparison.Ordinal);
+        Assert.Contains("UpdateNotificationPreferencesHandler handler", endpointHost, StringComparison.Ordinal);
+        Assert.DoesNotContain("service.GetPreferencesAsync(", endpointHost, StringComparison.Ordinal);
+        Assert.DoesNotContain("service.UpdatePreferencesAsync(", endpointHost, StringComparison.Ordinal);
+        Assert.Contains("GetNotificationDeliveryMetricsHandler handler", endpointHost, StringComparison.Ordinal);
+        Assert.Contains("ListNotificationDeadLettersHandler handler", endpointHost, StringComparison.Ordinal);
+        Assert.Contains("ReplayNotificationDeadLetterHandler handler", endpointHost, StringComparison.Ordinal);
+        Assert.DoesNotContain("service.GetDeliveryMetricsAsync(", endpointHost, StringComparison.Ordinal);
+        Assert.DoesNotContain("service.ListDeadLettersAsync(", endpointHost, StringComparison.Ordinal);
+        Assert.DoesNotContain("service.ReplayDeadLetterAsync(", endpointHost, StringComparison.Ordinal);
+        Assert.Contains("NotificationDeliveryReplayed", endpointHost, StringComparison.Ordinal);
 
         var composition = File.ReadAllText(Path.Combine(
             SourceDirectory,
@@ -3002,6 +3102,13 @@ public sealed class ArchitectureBoundaryTests
             "NotificationModuleComposition.cs"));
         Assert.Contains("AddScoped<ListNotificationsHandler>(provider =>", composition, StringComparison.Ordinal);
         Assert.Contains("AddScoped<MarkNotificationAsReadHandler>(provider =>", composition, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<GetNotificationPreferencesHandler>(provider =>", composition, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<UpdateNotificationPreferencesHandler>(provider =>", composition, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<GetNotificationDeliveryMetricsHandler>(provider =>", composition, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<ListNotificationDeadLettersHandler>(provider =>", composition, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<ReplayNotificationDeadLetterHandler>(provider =>", composition, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<CreateNotificationHandler>(provider =>", composition, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<DispatchNotificationEmailsHandler>(provider =>", composition, StringComparison.Ordinal);
     }
 
     [Fact]

@@ -43,15 +43,19 @@ internal static class NotificationEndpoints
             CancellationToken ct) =>
             Ok(await handler.HandleAsync(new ListNotificationsQuery(userId, page ?? 1, pageSize ?? 50, unreadOnly ?? false), ct), http));
 
-        group.MapGet("/preferences/me", async (NotificationService service, HttpContext http, CancellationToken ct) =>
-            Ok(await service.GetPreferencesAsync(ct), http));
+        group.MapGet("/preferences/me", async (
+            GetNotificationPreferencesHandler handler,
+            HttpContext http,
+            CancellationToken ct) =>
+            Ok(await handler.HandleAsync(new GetNotificationPreferencesQuery(), ct), http));
 
         group.MapPut("/preferences/me", async (
             UpdateNotificationPreferencesRequest request,
-            NotificationService service,
+            UpdateNotificationPreferencesHandler handler,
             HttpContext http,
             CancellationToken ct) =>
-            Ok(await service.UpdatePreferencesAsync(request, ct), http))
+            Ok(await handler.HandleAsync(
+                new UpdateNotificationPreferencesCommand(request), ct), http))
             .WithZumboPermission(PermissionCatalog.NotificationManage);
 
         group.MapPatch("/{notificationId}/read", async (string notificationId, MarkNotificationAsReadHandler handler, HttpContext http, CancellationToken ct) =>
@@ -60,20 +64,22 @@ internal static class NotificationEndpoints
 
         group.MapGet("/delivery/status", async (
             string organizationId,
-            NotificationService service,
+            GetNotificationDeliveryMetricsHandler handler,
             CancellationToken ct) =>
-            Results.Ok(await service.GetDeliveryMetricsAsync(organizationId, ct)))
+            Results.Ok(await handler.HandleAsync(
+                new GetNotificationDeliveryMetricsQuery(organizationId), ct)))
             .WithZumboPermission(PermissionCatalog.OperationsManage, isGlobal: true)
             .RequireRateLimiting("report");
 
         group.MapGet("/delivery/dead-letters", async (
             string organizationId,
             int? pageSize,
-            NotificationService service,
+            ListNotificationDeadLettersHandler handler,
             CancellationToken ct) =>
-            Results.Ok(await service.ListDeadLettersAsync(
-                organizationId,
-                Math.Clamp(pageSize ?? 20, 1, 50),
+            Results.Ok(await handler.HandleAsync(
+                new ListNotificationDeadLettersQuery(
+                    organizationId,
+                    Math.Clamp(pageSize ?? 20, 1, 50)),
                 ct)))
             .WithZumboPermission(PermissionCatalog.OperationsManage, isGlobal: true)
             .RequireRateLimiting("report");
@@ -81,12 +87,14 @@ internal static class NotificationEndpoints
         group.MapPost("/delivery/{notificationId}/replay", async (
             string notificationId,
             string organizationId,
-            NotificationService service,
+            ReplayNotificationDeadLetterHandler handler,
             INotificationAuditWriter audit,
             HttpContext http,
             CancellationToken ct) =>
         {
-            if (!await service.ReplayDeadLetterAsync(organizationId, notificationId, ct))
+            if (!await handler.HandleAsync(
+                    new ReplayNotificationDeadLetterCommand(organizationId, notificationId),
+                    ct))
             {
                 return Results.NotFound();
             }

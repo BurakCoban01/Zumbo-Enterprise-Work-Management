@@ -6,7 +6,24 @@ using Zumbo.SharedKernel;
 
 namespace Zumbo.Modules.Notifications;
 
-public sealed partial class NotificationService{
+public sealed partial class NotificationService
+{
+    public async Task<IReadOnlyList<NotificationResponse>> ListAsync(
+        string userId,
+        CancellationToken ct,
+        int page = 1,
+        int pageSize = 50,
+        bool unreadOnly = false)
+        => await listNotificationsHandler.HandleAsync(
+            new ListNotificationsQuery(userId, page, pageSize, unreadOnly),
+            ct);
+
+    public async Task MarkAsReadAsync(string notificationId, CancellationToken ct)
+    {
+        await markNotificationAsReadHandler.HandleAsync(
+            new MarkNotificationAsReadCommand(notificationId),
+            ct);
+    }
 
     private static NotificationResponse ToResponse(NotificationDocument notification) =>
         new(

@@ -1,48 +1,50 @@
-using Microsoft.Extensions.Options;
-using Zumbo.BuildingBlocks.Application.Concurrency;
-using Zumbo.BuildingBlocks.Application.Messaging;
 using Zumbo.BuildingBlocks.Application.Persistence;
 using Zumbo.SharedKernel;
 
 namespace Zumbo.Modules.Notifications;
 
-public sealed partial class NotificationService{
-
-    public async Task<NotificationPreferenceResponse> UpdatePreferencesAsync(
-        UpdateNotificationPreferencesRequest request,
+internal sealed class UpdateNotificationPreferencesSlice(
+    IDocumentRepository<NotificationPreferenceDocument> preferences,
+    NotificationPreferenceAccess access,
+    IClock clock)
+{
+    internal async Task<NotificationPreferenceResponse> HandleAsync(
+        UpdateNotificationPreferencesCommand command,
         CancellationToken ct)
     {
-        var userId = RequireCurrentUser();
+        var request = command.Request;
+        var userId = access.RequireCurrentUser();
         var mutedTypes = (request.MutedTypes ?? [])
-            .Select(NormalizeType)
+            .Select(NotificationPreferenceValidation.NormalizeType)
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
         if (mutedTypes.Count > 20)
-        {
             throw new ValidationException("At most 20 notification types can be muted.");
-        }
 
         var typeSettings = (request.TypeSettings ?? [])
             .Select(setting => new NotificationTypePreferenceDocument
             {
-                Type = NormalizeType(setting.Type),
+                Type = NotificationPreferenceValidation.NormalizeType(setting.Type),
                 InAppEnabled = setting.InAppEnabled,
                 EmailEnabled = setting.EmailEnabled
             })
             .ToList();
         if (typeSettings.Count > 20
-            || typeSettings.Select(setting => setting.Type).Distinct(StringComparer.OrdinalIgnoreCase).Count()
-                != typeSettings.Count)
+            || typeSettings.Select(setting => setting.Type)
+                .Distinct(StringComparer.OrdinalIgnoreCase).Count() != typeSettings.Count)
         {
             throw new ValidationException(
                 "Notification type settings must contain at most 20 unique types.");
         }
-        var deliveryMode = NormalizeDeliveryMode(request.DeliveryMode);
-        var timeZoneId = NormalizeTimeZone(request.TimeZoneId);
+        var deliveryMode = NotificationPreferenceValidation.NormalizeDeliveryMode(
+            request.DeliveryMode);
+        var timeZoneId = NotificationPreferenceValidation.NormalizeTimeZone(request.TimeZoneId);
         if (request.DigestHourLocal is < 0 or > 23)
             throw new ValidationException("Notification digest hour must be between 0 and 23.");
 
-        await using var preferenceLock = await AcquireLockAsync("notification-preference:" + userId, ct);
+        await using var preferenceLock = await access.AcquireLockAsync(
+            "notification-preference:" + userId,
+            ct);
         var existing = await preferences.SelectAsync(x => x.UserId == userId, ct);
         var preference = existing ?? new NotificationPreferenceDocument
         {
@@ -76,7 +78,6 @@ public sealed partial class NotificationService{
             }
             preference.Version = result.Version!.Value;
         }
-
-        return ToResponse(preference);
+        return NotificationPreferenceMapper.ToResponse(preference);
     }
 }
