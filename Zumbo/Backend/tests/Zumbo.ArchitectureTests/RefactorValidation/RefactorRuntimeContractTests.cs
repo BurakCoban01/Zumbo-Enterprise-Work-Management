@@ -48,6 +48,55 @@ public sealed class RefactorRuntimeContractTests
 
     private static readonly string[] PortFocusedVerticalSliceDiRegistrations =
     [
+        "services.AddScoped<GetKnowledgeDocumentHandler>(provider=>newGetKnowledgeDocumentHandler("
+        + "provider.GetRequiredService<IDocumentRepository<KnowledgeDocument>>(),"
+        + "provider.GetRequiredService<IKnowledgeDirectory>(),"
+        + "provider.GetRequiredService<ICurrentUser>()));",
+        "services.AddScoped<GetKnowledgeVersionHandler>(provider=>newGetKnowledgeVersionHandler("
+        + "provider.GetRequiredService<IDocumentRepository<KnowledgeDocument>>(),"
+        + "provider.GetRequiredService<IKnowledgeDirectory>(),"
+        + "provider.GetRequiredService<ICurrentUser>()));",
+        "services.AddScoped<GetKnowledgeLinkOptionsHandler>(provider=>newGetKnowledgeLinkOptionsHandler("
+        + "provider.GetRequiredService<IKnowledgeDirectory>(),"
+        + "provider.GetRequiredService<ICurrentUser>()));",
+        "services.AddScoped<SearchKnowledgeDocumentsHandler>(provider=>newSearchKnowledgeDocumentsHandler("
+        + "provider.GetRequiredService<IDocumentRepository<KnowledgeDocument>>(),"
+        + "provider.GetRequiredService<IKnowledgeDirectory>(),"
+        + "provider.GetRequiredService<ICurrentUser>()));",
+        "services.AddScoped<AddKnowledgeCommentHandler>(provider=>newAddKnowledgeCommentHandler("
+        + "provider.GetRequiredService<IDocumentRepository<KnowledgeDocument>>(),"
+        + "provider.GetRequiredService<IKnowledgeDirectory>(),"
+        + "provider.GetRequiredService<IKnowledgeAuditWriter>(),"
+        + "provider.GetRequiredService<ICurrentUser>(),"
+        + "provider.GetRequiredService<IClock>(),"
+        + "provider.GetService<IExpectedVersionAccessor>()));",
+        "services.AddScoped<ResolveKnowledgeCommentHandler>(provider=>newResolveKnowledgeCommentHandler("
+        + "provider.GetRequiredService<IDocumentRepository<KnowledgeDocument>>(),"
+        + "provider.GetRequiredService<IKnowledgeDirectory>(),"
+        + "provider.GetRequiredService<IKnowledgeAuditWriter>(),"
+        + "provider.GetRequiredService<ICurrentUser>(),"
+        + "provider.GetRequiredService<IClock>(),"
+        + "provider.GetService<IExpectedVersionAccessor>()));",
+        "services.AddScoped<CreateKnowledgeDocumentHandler>(provider=>newCreateKnowledgeDocumentHandler("
+        + "provider.GetRequiredService<IDocumentRepository<KnowledgeDocument>>(),"
+        + "provider.GetRequiredService<IKnowledgeDirectory>(),"
+        + "provider.GetRequiredService<IKnowledgeAuditWriter>(),"
+        + "provider.GetRequiredService<ICurrentUser>(),"
+        + "provider.GetRequiredService<IClock>()));",
+        "services.AddScoped<AddKnowledgeVersionHandler>(provider=>newAddKnowledgeVersionHandler("
+        + "provider.GetRequiredService<IDocumentRepository<KnowledgeDocument>>(),"
+        + "provider.GetRequiredService<IKnowledgeDirectory>(),"
+        + "provider.GetRequiredService<IKnowledgeAuditWriter>(),"
+        + "provider.GetRequiredService<ICurrentUser>(),"
+        + "provider.GetRequiredService<IClock>(),"
+        + "provider.GetService<IExpectedVersionAccessor>()));",
+        "services.AddScoped<ArchiveKnowledgeDocumentHandler>(provider=>newArchiveKnowledgeDocumentHandler("
+        + "provider.GetRequiredService<IDocumentRepository<KnowledgeDocument>>(),"
+        + "provider.GetRequiredService<IKnowledgeDirectory>(),"
+        + "provider.GetRequiredService<IKnowledgeAuditWriter>(),"
+        + "provider.GetRequiredService<ICurrentUser>(),"
+        + "provider.GetRequiredService<IClock>(),"
+        + "provider.GetService<IExpectedVersionAccessor>()));",
         "services.AddScoped<RegisterUserHandler>(provider=>newRegisterUserHandler("
         + "provider.GetRequiredService<IUserRepository>(),"
         + "provider.GetRequiredService<IRefreshSessionStore>(),"
@@ -673,6 +722,24 @@ public sealed class RefactorRuntimeContractTests
 
     private static readonly string[] ReplacedVerticalSliceEndpointMappings =
     [
+        "group.MapGet(\"/{documentId}\",async(stringdocumentId,bool?includeArchived,[FromServices]KnowledgeServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.GetAsync(documentId,includeArchived??false,ct),http));",
+        "group.MapGet(\"\",async(string?query,string?scopeType,string?scopeId,bool?includeArchived,int?page,int?pageSize,[FromServices]KnowledgeServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.SearchAsync(query,scopeType,scopeId,includeArchived??false,page??1,pageSize??50,ct),http)).RequireRateLimiting(\"search\");",
+        "group.MapGet(\"/scope-link-options\",async(stringscopeType,stringscopeId,string?query,[FromServices]KnowledgeServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.GetLinkOptionsAsync(scopeType,scopeId,query,ct),http)).RequireRateLimiting(\"search\");",
+        "group.MapGet(\"/{documentId}/versions/{number:int}\",async(stringdocumentId,intnumber,[FromServices]KnowledgeServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.GetVersionAsync(documentId,number,ct),http));",
+        "group.MapPost(\"/{documentId}/comments\",async(stringdocumentId,AddKnowledgeCommentRequestrequest,[FromServices]KnowledgeServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.AddCommentAsync(documentId,request,CorrelationId(http),ct),http));",
+        "group.MapPatch(\"/{documentId}/comments/{commentId}/resolve\",async(stringdocumentId,stringcommentId,[FromServices]KnowledgeServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.ResolveCommentAsync(documentId,commentId,CorrelationId(http),ct),http));",
+        "group.MapPost(\"\",async(CreateKnowledgeDocumentRequestrequest,[FromServices]KnowledgeServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.CreateAsync(request,CorrelationId(http),ct),http));",
+        "group.MapPut(\"/{documentId}\",async(stringdocumentId,CreateKnowledgeVersionRequestrequest,[FromServices]KnowledgeServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.AddVersionAsync(documentId,request,CorrelationId(http),ct),http));",
+        "group.MapDelete(\"/{documentId}\",async(stringdocumentId,[FromServices]KnowledgeServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "{awaitservice.ArchiveAsync(documentId,CorrelationId(http),ct);returnOk(new{archived=true},http);});",
         "group.MapPost(\"/login\",async(LoginRequestrequest,IdentityServiceservice,HttpContexthttp,CancellationTokenct)=>"
         + "Ok(awaitservice.LoginAsync(request,ct),http)).RequireRateLimiting(\"login\");",
         "group.MapPost(\"/logout\",async(LogoutRequestrequest,IdentityServiceservice,HttpContexthttp,CancellationTokenct)=>"
@@ -925,6 +992,24 @@ public sealed class RefactorRuntimeContractTests
 
     private static readonly string[] PortFocusedVerticalSliceEndpointMappings =
     [
+        "group.MapGet(\"/{documentId}\",async(stringdocumentId,bool?includeArchived,[FromServices]GetKnowledgeDocumentHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newGetKnowledgeDocumentQuery(documentId,includeArchived??false),ct),http));",
+        "group.MapGet(\"\",async(string?query,string?scopeType,string?scopeId,bool?includeArchived,int?page,int?pageSize,[FromServices]SearchKnowledgeDocumentsHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newSearchKnowledgeDocumentsQuery(query,scopeType,scopeId,includeArchived??false,page??1,pageSize??50),ct),http)).RequireRateLimiting(\"search\");",
+        "group.MapGet(\"/scope-link-options\",async(stringscopeType,stringscopeId,string?query,[FromServices]GetKnowledgeLinkOptionsHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newGetKnowledgeLinkOptionsQuery(scopeType,scopeId,query),ct),http)).RequireRateLimiting(\"search\");",
+        "group.MapGet(\"/{documentId}/versions/{number:int}\",async(stringdocumentId,intnumber,[FromServices]GetKnowledgeVersionHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newGetKnowledgeVersionQuery(documentId,number),ct),http));",
+        "group.MapPost(\"/{documentId}/comments\",async(stringdocumentId,AddKnowledgeCommentRequestrequest,[FromServices]AddKnowledgeCommentHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newAddKnowledgeCommentCommand(documentId,request,CorrelationId(http)),ct),http));",
+        "group.MapPatch(\"/{documentId}/comments/{commentId}/resolve\",async(stringdocumentId,stringcommentId,[FromServices]ResolveKnowledgeCommentHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newResolveKnowledgeCommentCommand(documentId,commentId,CorrelationId(http)),ct),http));",
+        "group.MapPost(\"\",async(CreateKnowledgeDocumentRequestrequest,[FromServices]CreateKnowledgeDocumentHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newCreateKnowledgeDocumentCommand(request,CorrelationId(http)),ct),http));",
+        "group.MapPut(\"/{documentId}\",async(stringdocumentId,CreateKnowledgeVersionRequestrequest,[FromServices]AddKnowledgeVersionHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newAddKnowledgeVersionCommand(documentId,request,CorrelationId(http)),ct),http));",
+        "group.MapDelete(\"/{documentId}\",async(stringdocumentId,[FromServices]ArchiveKnowledgeDocumentHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "{awaithandler.HandleAsync(newArchiveKnowledgeDocumentCommand(documentId,CorrelationId(http)),ct);returnOk(new{archived=true},http);});",
         "group.MapPost(\"/login\",async(LoginRequestrequest,LoginHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
         + "Ok(awaithandler.HandleAsync(request,ct),http)).RequireRateLimiting(\"login\");",
         "group.MapPost(\"/logout\",async(LogoutRequestrequest,LogoutHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
@@ -1271,6 +1356,7 @@ public sealed class RefactorRuntimeContractTests
                 "CreateOrganizationHandler and ListOrganizationsHandler remain scoped self-services; explicit factories select their port-focused constructors while compatibility constructors remain available.",
                 "CreateTeamHandler and ListTeamsHandler remain scoped self-services; explicit factories select their port-focused constructors while compatibility constructors remain available.",
                 "CreateProjectHandler and ListProjectsHandler remain scoped self-services; explicit factories select their port-focused constructors while compatibility constructors remain available.",
+                "All nine Knowledge handlers are scoped through port-focused constructors; their routes resolve them directly while the corresponding KnowledgeService methods remain responsibility-grouped compatibility facades preserving their original public contracts.",
                 "CreateBoardHandler and ListBoardsByProjectHandler remain scoped self-services; explicit factories select their port-focused constructors while compatibility constructors remain available.",
                 "UpsertWorkflowHandler and GetWorkflowHandler remain scoped self-services; explicit factories select their port-focused constructors while compatibility constructors remain available.",
                 "CreateWorkItemHandler and SearchWorkItemsHandler remain scoped self-services; explicit factories select their port-focused constructors while compatibility constructors remain available.",

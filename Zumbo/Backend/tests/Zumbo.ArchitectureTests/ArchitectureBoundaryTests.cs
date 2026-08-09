@@ -739,6 +739,116 @@ public sealed class ArchitectureBoundaryTests
     }
 
     [Fact]
+    public void KnowledgeDocumentRead_IsAPortFocusedVerticalSliceWithCompatibilityFacade()
+    {
+        var moduleDirectory = Path.Combine(SourceDirectory, "Zumbo.Modules.Projects");
+        var featureDirectory = Path.Combine(moduleDirectory, "Application", "Features", "Knowledge");
+        Assert.True(File.Exists(Path.Combine(featureDirectory, "GetKnowledgeDocumentQuery.cs")));
+        Assert.True(File.Exists(Path.Combine(featureDirectory, "GetKnowledgeDocumentHandler.cs")));
+        Assert.True(File.Exists(Path.Combine(featureDirectory, "GetKnowledgeDocumentSlice.cs")));
+        foreach (var file in new[]
+        {
+            "GetKnowledgeVersionQuery.cs",
+            "GetKnowledgeVersionHandler.cs",
+            "GetKnowledgeVersionSlice.cs",
+            "GetKnowledgeLinkOptionsQuery.cs",
+            "GetKnowledgeLinkOptionsHandler.cs",
+            "GetKnowledgeLinkOptionsSlice.cs",
+            "SearchKnowledgeDocumentsQuery.cs",
+            "SearchKnowledgeDocumentsHandler.cs",
+            "SearchKnowledgeDocumentsSlice.cs",
+            "KnowledgeReadAccess.cs",
+            "KnowledgeQueryInput.cs",
+            "KnowledgeResponseMapper.cs",
+            "KnowledgeMutationPersistence.cs",
+            "AddKnowledgeCommentCommand.cs",
+            "AddKnowledgeCommentHandler.cs",
+            "AddKnowledgeCommentSlice.cs",
+            "ResolveKnowledgeCommentCommand.cs",
+            "ResolveKnowledgeCommentHandler.cs",
+            "ResolveKnowledgeCommentSlice.cs",
+            "KnowledgeVersionPolicy.cs",
+            "CreateKnowledgeDocumentCommand.cs",
+            "CreateKnowledgeDocumentHandler.cs",
+            "CreateKnowledgeDocumentSlice.cs",
+            "AddKnowledgeVersionCommand.cs",
+            "AddKnowledgeVersionHandler.cs",
+            "AddKnowledgeVersionSlice.cs",
+            "ArchiveKnowledgeDocumentCommand.cs",
+            "ArchiveKnowledgeDocumentHandler.cs",
+            "ArchiveKnowledgeDocumentSlice.cs"
+        })
+        {
+            Assert.True(File.Exists(Path.Combine(featureDirectory, file)), $"Missing Knowledge slice file: {file}");
+        }
+
+        var slice = File.ReadAllText(Path.Combine(featureDirectory, "GetKnowledgeDocumentSlice.cs"));
+        Assert.Contains("KnowledgeReadAccess", slice, StringComparison.Ordinal);
+        Assert.Contains("KnowledgeResponseMapper.ToDocument", slice, StringComparison.Ordinal);
+
+        var access = File.ReadAllText(Path.Combine(featureDirectory, "KnowledgeReadAccess.cs"));
+        Assert.Contains("IDocumentRepository<KnowledgeDocument>", access, StringComparison.Ordinal);
+        Assert.Contains("IKnowledgeDirectory", access, StringComparison.Ordinal);
+        Assert.Contains("ICurrentUser", access, StringComparison.Ordinal);
+        Assert.Contains("KNOWLEDGE_DOCUMENT_NOT_FOUND", access, StringComparison.Ordinal);
+
+        var facadeDirectory = Path.Combine(
+            moduleDirectory,
+            "Application",
+            "Compatibility",
+            "Knowledge",
+            "KnowledgeService");
+        var facadeDelegations = new (string File, string Delegation)[]
+        {
+            ("KnowledgeService.Reads.cs", "getKnowledgeDocumentHandler.HandleAsync"),
+            ("KnowledgeService.Reads.cs", "getKnowledgeVersionHandler.HandleAsync"),
+            ("KnowledgeService.Reads.cs", "getKnowledgeLinkOptionsHandler.HandleAsync"),
+            ("KnowledgeService.Reads.cs", "searchKnowledgeDocumentsHandler.HandleAsync"),
+            ("KnowledgeService.Comments.cs", "addKnowledgeCommentHandler.HandleAsync"),
+            ("KnowledgeService.Comments.cs", "resolveKnowledgeCommentHandler.HandleAsync"),
+            ("KnowledgeService.Lifecycle.cs", "createKnowledgeDocumentHandler.HandleAsync"),
+            ("KnowledgeService.Lifecycle.cs", "addKnowledgeVersionHandler.HandleAsync"),
+            ("KnowledgeService.Lifecycle.cs", "archiveKnowledgeDocumentHandler.HandleAsync")
+        };
+        foreach (var (file, delegation) in facadeDelegations)
+        {
+            var facade = File.ReadAllText(Path.Combine(facadeDirectory, file));
+            Assert.Contains(delegation, facade, StringComparison.Ordinal);
+        }
+        Assert.InRange(Directory.GetFiles(facadeDirectory, "*.cs").Length, 1, 6);
+
+        var endpointHost = File.ReadAllText(EndpointHostPath("KnowledgeEndpoints.cs"));
+        Assert.Contains("AddScoped<GetKnowledgeDocumentHandler>(provider =>", endpointHost, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<GetKnowledgeVersionHandler>(provider =>", endpointHost, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<GetKnowledgeLinkOptionsHandler>(provider =>", endpointHost, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<SearchKnowledgeDocumentsHandler>(provider =>", endpointHost, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<AddKnowledgeCommentHandler>(provider =>", endpointHost, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<ResolveKnowledgeCommentHandler>(provider =>", endpointHost, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<CreateKnowledgeDocumentHandler>(provider =>", endpointHost, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<AddKnowledgeVersionHandler>(provider =>", endpointHost, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<ArchiveKnowledgeDocumentHandler>(provider =>", endpointHost, StringComparison.Ordinal);
+        Assert.Contains("[FromServices] GetKnowledgeDocumentHandler handler", endpointHost, StringComparison.Ordinal);
+        Assert.Contains("[FromServices] GetKnowledgeVersionHandler handler", endpointHost, StringComparison.Ordinal);
+        Assert.Contains("[FromServices] GetKnowledgeLinkOptionsHandler handler", endpointHost, StringComparison.Ordinal);
+        Assert.Contains("[FromServices] SearchKnowledgeDocumentsHandler handler", endpointHost, StringComparison.Ordinal);
+        Assert.Contains("[FromServices] AddKnowledgeCommentHandler handler", endpointHost, StringComparison.Ordinal);
+        Assert.Contains("[FromServices] ResolveKnowledgeCommentHandler handler", endpointHost, StringComparison.Ordinal);
+        Assert.Contains("[FromServices] CreateKnowledgeDocumentHandler handler", endpointHost, StringComparison.Ordinal);
+        Assert.Contains("[FromServices] AddKnowledgeVersionHandler handler", endpointHost, StringComparison.Ordinal);
+        Assert.Contains("[FromServices] ArchiveKnowledgeDocumentHandler handler", endpointHost, StringComparison.Ordinal);
+        Assert.Contains("handler.HandleAsync", endpointHost, StringComparison.Ordinal);
+        Assert.DoesNotContain("service.GetAsync(", endpointHost, StringComparison.Ordinal);
+        Assert.DoesNotContain("service.GetVersionAsync(", endpointHost, StringComparison.Ordinal);
+        Assert.DoesNotContain("service.GetLinkOptionsAsync(", endpointHost, StringComparison.Ordinal);
+        Assert.DoesNotContain("service.SearchAsync(", endpointHost, StringComparison.Ordinal);
+        Assert.DoesNotContain("service.AddCommentAsync(", endpointHost, StringComparison.Ordinal);
+        Assert.DoesNotContain("service.ResolveCommentAsync(", endpointHost, StringComparison.Ordinal);
+        Assert.DoesNotContain("service.CreateAsync(", endpointHost, StringComparison.Ordinal);
+        Assert.DoesNotContain("service.AddVersionAsync(", endpointHost, StringComparison.Ordinal);
+        Assert.DoesNotContain("service.ArchiveAsync(", endpointHost, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void BoardCreateAndProjectList_ArePortFocusedVerticalSlicesWithCompatibilityFacades()
     {
         var moduleDirectory = Path.Combine(SourceDirectory, "Zumbo.Modules.Boards");
