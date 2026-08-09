@@ -1477,11 +1477,12 @@ public sealed class RefactorRuntimeContractTests
             .ToArray();
 
     private static bool MessagingType(string name) =>
-        name.Contains("Event", StringComparison.Ordinal)
-        || name.Contains("Message", StringComparison.Ordinal)
-        || name.Contains("Inbox", StringComparison.Ordinal)
-        || name.Contains("Outbox", StringComparison.Ordinal)
-        || name.Contains("DeadLetter", StringComparison.Ordinal);
+        !name.EndsWith("Endpoint", StringComparison.Ordinal)
+        && (name.Contains("Event", StringComparison.Ordinal)
+            || name.Contains("Message", StringComparison.Ordinal)
+            || name.Contains("Inbox", StringComparison.Ordinal)
+            || name.Contains("Outbox", StringComparison.Ordinal)
+            || name.Contains("DeadLetter", StringComparison.Ordinal));
 
     private static string QualifiedTypeName(TypeDeclarationSyntax type)
     {
