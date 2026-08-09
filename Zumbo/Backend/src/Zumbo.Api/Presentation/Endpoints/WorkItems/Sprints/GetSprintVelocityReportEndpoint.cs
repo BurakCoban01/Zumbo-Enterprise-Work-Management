@@ -1,4 +1,5 @@
 using Zumbo.Modules.WorkItems;
+using Zumbo.Modules.WorkItems.Application.Features.Sprints;
 using Zumbo.BuildingBlocks.Application.Messaging;
 using Zumbo.BuildingBlocks.Application.Security;
 using Zumbo.SharedKernel;
@@ -15,10 +16,12 @@ internal static class GetSprintVelocityReportEndpoint
         group.MapGet("/reports/sprint-velocity/{projectId}", async (
             string projectId,
             int? sprintCount,
-            SprintService service,
+            GetSprintVelocityHandler handler,
             HttpContext http,
             CancellationToken ct) =>
-            ReportOk(await service.VelocitySnapshotAsync(projectId, sprintCount ?? 6, ct), http))
+            ReportOk(await handler.HandleAsync(
+                new GetSprintVelocityQuery(projectId, sprintCount ?? 6),
+                ct), http))
             .RequireRateLimiting("report");
     }
 

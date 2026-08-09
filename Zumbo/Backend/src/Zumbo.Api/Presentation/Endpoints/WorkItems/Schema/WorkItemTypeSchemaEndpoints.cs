@@ -1,5 +1,6 @@
 using Zumbo.BuildingBlocks.Application.Security;
 using Zumbo.Modules.WorkItems;
+using Zumbo.Modules.WorkItems.Application.Features.Schema;
 
 using static ApiEndpointResults;
 
@@ -15,33 +16,37 @@ internal static class WorkItemTypeSchemaEndpoints
 
         group.MapGet("/{projectId}", async (
                 string projectId,
-                WorkItemTypeSchemaService service,
+                GetWorkItemTypeSchemaHandler handler,
                 HttpContext http,
                 CancellationToken ct) =>
-            Ok(await service.GetAsync(projectId, ct), http));
+            Ok(await handler.HandleAsync(new GetWorkItemTypeSchemaQuery(projectId), ct), http));
 
         group.MapPut("/{projectId}", async (
                 string projectId,
                 UpsertWorkItemTypeSchemaRequest request,
-                WorkItemTypeSchemaService service,
+                UpsertWorkItemTypeSchemaHandler handler,
                 HttpContext http,
                 CancellationToken ct) =>
-            Ok(await service.UpsertAsync(projectId, request, CorrelationId(http), ct), http))
+            Ok(await handler.HandleAsync(
+                new UpsertWorkItemTypeSchemaCommand(projectId, request, CorrelationId(http)),
+                ct), http))
             .WithZumboPermission(PermissionCatalog.WorkItemUpdate);
 
         group.MapGet("/{projectId}/reports/issue-types", async (
                 string projectId,
-                WorkItemTypeSchemaService service,
+                GetIssueTypeDistributionHandler handler,
                 HttpContext http,
                 CancellationToken ct) =>
-            Ok(await service.GetIssueTypeDistributionAsync(projectId, ct), http));
+            Ok(await handler.HandleAsync(new GetIssueTypeDistributionQuery(projectId), ct), http));
 
         group.MapGet("/{projectId}/reports/custom-fields/{fieldKey}", async (
                 string projectId,
                 string fieldKey,
-                WorkItemTypeSchemaService service,
+                GetCustomFieldDistributionHandler handler,
                 HttpContext http,
                 CancellationToken ct) =>
-            Ok(await service.GetCustomFieldDistributionAsync(projectId, fieldKey, ct), http));
+            Ok(await handler.HandleAsync(
+                new GetCustomFieldDistributionQuery(projectId, fieldKey),
+                ct), http));
     }
 }

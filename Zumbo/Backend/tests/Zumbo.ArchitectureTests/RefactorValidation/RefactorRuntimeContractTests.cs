@@ -20,6 +20,7 @@ public sealed class RefactorRuntimeContractTests
 
     private static readonly string[] ReplacedVerticalSliceDiRegistrations =
     [
+        "services.AddScoped<IWorkItemTypeSchemaPolicy>(provider=>provider.GetRequiredService<WorkItemTypeSchemaService>());",
         "services.AddScoped<RegisterUserHandler>();",
         "services.AddScoped<SearchUsersHandler>();",
         "services.AddScoped<CreateOrganizationHandler>();",
@@ -48,6 +49,137 @@ public sealed class RefactorRuntimeContractTests
 
     private static readonly string[] PortFocusedVerticalSliceDiRegistrations =
     [
+        "services.AddScoped<CompleteSprintHandler>(provider=>newCompleteSprintHandler("
+        + "provider.GetRequiredService<IDocumentRepository<SprintDocument>>(),"
+        + "provider.GetRequiredService<IDocumentRepository<SprintScopeSnapshotDocument>>(),"
+        + "provider.GetRequiredService<IDocumentRepository<SprintCompletionSnapshotDocument>>(),"
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemDocument>>(),"
+        + "provider.GetRequiredService<IProjectPermissionChecker>(),"
+        + "provider.GetRequiredService<IWorkItemAuditPublisher>(),"
+        + "provider.GetRequiredService<IDistributedLockProvider>(),"
+        + "provider.GetRequiredService<IOptions<DistributedLockOptions>>(),"
+        + "provider.GetRequiredService<IOptions<SprintOptions>>(),"
+        + "provider.GetRequiredService<IClock>(),"
+        + "provider.GetRequiredService<ICurrentUser>(),"
+        + "provider.GetRequiredService<IWorkItemCacheInvalidationPublisher>(),"
+        + "provider.GetService<IExpectedVersionAccessor>()));",
+        "services.AddScoped<CreateSprintHandler>(provider=>newCreateSprintHandler("
+        + "provider.GetRequiredService<IDocumentRepository<SprintDocument>>(),"
+        + "provider.GetRequiredService<IProjectPermissionChecker>(),"
+        + "provider.GetRequiredService<IWorkItemAuditPublisher>(),"
+        + "provider.GetRequiredService<IDistributedLockProvider>(),"
+        + "provider.GetRequiredService<IOptions<DistributedLockOptions>>(),"
+        + "provider.GetRequiredService<IClock>(),"
+        + "provider.GetRequiredService<ICurrentUser>(),"
+        + "provider.GetRequiredService<IWorkItemCacheInvalidationPublisher>()));",
+        "services.AddScoped<GetCustomFieldDistributionHandler>(provider=>newGetCustomFieldDistributionHandler("
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemTypeSchemaDocument>>(),"
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemDocument>>(),"
+        + "provider.GetRequiredService<IProjectPermissionChecker>(),"
+        + "provider.GetRequiredService<ICurrentUser>(),"
+        + "provider.GetRequiredService<IOptions<WorkItemTypeSchemaOptions>>(),"
+        + "provider.GetRequiredService<IClock>()));",
+        "services.AddScoped<GetIssueTypeDistributionHandler>(provider=>newGetIssueTypeDistributionHandler("
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemTypeSchemaDocument>>(),"
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemDocument>>(),"
+        + "provider.GetRequiredService<IProjectPermissionChecker>(),"
+        + "provider.GetRequiredService<ICurrentUser>(),"
+        + "provider.GetRequiredService<IOptions<WorkItemTypeSchemaOptions>>(),"
+        + "provider.GetRequiredService<IClock>()));",
+        "services.AddScoped<GetIssueTypeHierarchyHandler>(provider=>newGetIssueTypeHierarchyHandler("
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemTypeSchemaDocument>>(),"
+        + "provider.GetRequiredService<IClock>()));",
+        "services.AddScoped<GetSprintBurndownHandler>(provider=>newGetSprintBurndownHandler("
+        + "provider.GetRequiredService<IDocumentRepository<SprintDocument>>(),"
+        + "provider.GetRequiredService<IDocumentRepository<SprintScopeSnapshotDocument>>(),"
+        + "provider.GetRequiredService<IDocumentRepository<SprintCompletionSnapshotDocument>>(),"
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemDocument>>(),"
+        + "provider.GetRequiredService<IProjectPermissionChecker>(),"
+        + "provider.GetRequiredService<ICurrentUser>(),"
+        + "provider.GetRequiredService<IOptions<SprintOptions>>(),"
+        + "provider.GetRequiredService<IWorkItemReadModelCache>(),"
+        + "provider.GetRequiredService<IOptions<WorkItemReadModelCacheOptions>>()));",
+        "services.AddScoped<GetSprintHandler>(provider=>newGetSprintHandler("
+        + "provider.GetRequiredService<IDocumentRepository<SprintDocument>>(),"
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemDocument>>(),"
+        + "provider.GetRequiredService<IProjectPermissionChecker>(),"
+        + "provider.GetRequiredService<ICurrentUser>()));",
+        "services.AddScoped<GetSprintVelocityHandler>(provider=>newGetSprintVelocityHandler("
+        + "provider.GetRequiredService<IDocumentRepository<SprintDocument>>(),"
+        + "provider.GetRequiredService<IProjectPermissionChecker>(),"
+        + "provider.GetRequiredService<ICurrentUser>(),"
+        + "provider.GetRequiredService<IWorkItemReadModelCache>(),"
+        + "provider.GetRequiredService<IOptions<WorkItemReadModelCacheOptions>>()));",
+        "services.AddScoped<GetWorkItemTypeSchemaHandler>(provider=>newGetWorkItemTypeSchemaHandler("
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemTypeSchemaDocument>>(),"
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemDocument>>(),"
+        + "provider.GetRequiredService<IProjectPermissionChecker>(),"
+        + "provider.GetRequiredService<ICurrentUser>(),"
+        + "provider.GetRequiredService<IOptions<WorkItemTypeSchemaOptions>>(),"
+        + "provider.GetRequiredService<IClock>()));",
+        "services.AddScoped<IWorkItemTypeSchemaPolicy,WorkItemTypeSchemaPolicyAdapter>();",
+        "services.AddScoped<ListSprintBacklogHandler>(provider=>newListSprintBacklogHandler("
+        + "provider.GetRequiredService<IDocumentRepository<SprintDocument>>(),"
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemDocument>>(),"
+        + "provider.GetRequiredService<IProjectPermissionChecker>(),"
+        + "provider.GetRequiredService<ICurrentUser>()));",
+        "services.AddScoped<ListSprintsHandler>(provider=>newListSprintsHandler("
+        + "provider.GetRequiredService<IDocumentRepository<SprintDocument>>(),"
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemDocument>>(),"
+        + "provider.GetRequiredService<IProjectPermissionChecker>(),"
+        + "provider.GetRequiredService<ICurrentUser>()));",
+        "services.AddScoped<PlanSprintWorkItemHandler>(provider=>newPlanSprintWorkItemHandler("
+        + "provider.GetRequiredService<IDocumentRepository<SprintDocument>>(),"
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemDocument>>(),"
+        + "provider.GetRequiredService<IProjectPermissionChecker>(),"
+        + "provider.GetRequiredService<IWorkItemAuditPublisher>(),"
+        + "provider.GetRequiredService<IDistributedLockProvider>(),"
+        + "provider.GetRequiredService<IOptions<DistributedLockOptions>>(),"
+        + "provider.GetRequiredService<IClock>(),"
+        + "provider.GetRequiredService<ICurrentUser>(),"
+        + "provider.GetRequiredService<IWorkItemCacheInvalidationPublisher>(),"
+        + "provider.GetService<IExpectedVersionAccessor>()));",
+        "services.AddScoped<StartSprintHandler>(provider=>newStartSprintHandler("
+        + "provider.GetRequiredService<IDocumentRepository<SprintDocument>>(),"
+        + "provider.GetRequiredService<IDocumentRepository<SprintScopeSnapshotDocument>>(),"
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemDocument>>(),"
+        + "provider.GetRequiredService<IProjectPermissionChecker>(),"
+        + "provider.GetRequiredService<IWorkItemAuditPublisher>(),"
+        + "provider.GetRequiredService<IDistributedLockProvider>(),"
+        + "provider.GetRequiredService<IOptions<DistributedLockOptions>>(),"
+        + "provider.GetRequiredService<IOptions<SprintOptions>>(),"
+        + "provider.GetRequiredService<IClock>(),"
+        + "provider.GetRequiredService<ICurrentUser>(),"
+        + "provider.GetRequiredService<IWorkItemCacheInvalidationPublisher>(),"
+        + "provider.GetService<IExpectedVersionAccessor>()));",
+        "services.AddScoped<UpsertWorkItemTypeSchemaHandler>(provider=>newUpsertWorkItemTypeSchemaHandler("
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemTypeSchemaDocument>>(),"
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemDocument>>(),"
+        + "provider.GetRequiredService<IProjectPermissionChecker>(),"
+        + "provider.GetRequiredService<IWorkItemAuditPublisher>(),"
+        + "provider.GetRequiredService<IDistributedLockProvider>(),"
+        + "provider.GetRequiredService<IOptions<DistributedLockOptions>>(),"
+        + "provider.GetRequiredService<IOptions<WorkItemTypeSchemaOptions>>(),"
+        + "provider.GetRequiredService<IClock>(),"
+        + "provider.GetRequiredService<ICurrentUser>(),"
+        + "provider.GetService<IExpectedVersionAccessor>()));",
+        "services.AddScoped<UnplanSprintWorkItemHandler>(provider=>newUnplanSprintWorkItemHandler("
+        + "provider.GetRequiredService<IDocumentRepository<SprintDocument>>(),"
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemDocument>>(),"
+        + "provider.GetRequiredService<IProjectPermissionChecker>(),"
+        + "provider.GetRequiredService<IWorkItemAuditPublisher>(),"
+        + "provider.GetRequiredService<IDistributedLockProvider>(),"
+        + "provider.GetRequiredService<IOptions<DistributedLockOptions>>(),"
+        + "provider.GetRequiredService<IClock>(),"
+        + "provider.GetRequiredService<ICurrentUser>(),"
+        + "provider.GetRequiredService<IWorkItemCacheInvalidationPublisher>(),"
+        + "provider.GetService<IExpectedVersionAccessor>()));",
+        "services.AddScoped<ValidateWorkItemSearchFilterHandler>(provider=>newValidateWorkItemSearchFilterHandler("
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemTypeSchemaDocument>>(),"
+        + "provider.GetRequiredService<IClock>()));",
+        "services.AddScoped<ValidateWorkItemShapeHandler>(provider=>newValidateWorkItemShapeHandler("
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemTypeSchemaDocument>>(),"
+        + "provider.GetRequiredService<IClock>()));",
         "services.AddScoped<ListWorkItemTemplatesHandler>(provider=>newListWorkItemTemplatesHandler("
         + "provider.GetRequiredService<IDocumentRepository<WorkItemTemplateDocument>>(),"
         + "provider.GetRequiredService<IProjectPermissionChecker>(),"
@@ -815,6 +947,38 @@ public sealed class RefactorRuntimeContractTests
 
     private static readonly string[] ReplacedVerticalSliceEndpointMappings =
     [
+        "group.MapDelete(\"/{sprintId}/items/{workItemId}\",async(stringsprintId,stringworkItemId,SprintServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.UnplanAsync(sprintId,workItemId,CorrelationId(http),ct),http)).WithZumboPermission(PermissionCatalog.WorkItemUpdate);",
+        "group.MapGet(\"/projects/{projectId}\",async(stringprojectId,string?after,int?pageSize,SprintServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.ListAsync(projectId,after,pageSize??50,ct),http));",
+        "group.MapGet(\"/projects/{projectId}/backlog\",async(stringprojectId,string?after,int?pageSize,SprintServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.BacklogAsync(projectId,after,pageSize??50,ct),http));",
+        "group.MapGet(\"/projects/{projectId}/velocity\",async(stringprojectId,int?sprintCount,SprintServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.VelocityAsync(projectId,sprintCount??6,ct),http));",
+        "group.MapGet(\"/reports/sprint-burndown/{projectId}/{sprintId}\",async(stringprojectId,stringsprintId,DateOnlystartDate,DateOnlyendDate,SprintServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "ReportOk(awaitservice.BurndownSnapshotAsync(projectId,sprintId,startDate,endDate,ct),http)).RequireRateLimiting(\"report\");",
+        "group.MapGet(\"/reports/sprint-velocity/{projectId}\",async(stringprojectId,int?sprintCount,SprintServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "ReportOk(awaitservice.VelocitySnapshotAsync(projectId,sprintCount??6,ct),http)).RequireRateLimiting(\"report\");",
+        "group.MapGet(\"/{projectId}\",async(stringprojectId,WorkItemTypeSchemaServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.GetAsync(projectId,ct),http));",
+        "group.MapGet(\"/{projectId}/reports/custom-fields/{fieldKey}\",async(stringprojectId,stringfieldKey,WorkItemTypeSchemaServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.GetCustomFieldDistributionAsync(projectId,fieldKey,ct),http));",
+        "group.MapGet(\"/{projectId}/reports/issue-types\",async(stringprojectId,WorkItemTypeSchemaServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.GetIssueTypeDistributionAsync(projectId,ct),http));",
+        "group.MapGet(\"/{sprintId}\",async(stringsprintId,SprintServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.GetAsync(sprintId,ct),http));",
+        "group.MapGet(\"/{sprintId}/burndown\",async(stringsprintId,DateOnly?startDate,DateOnly?endDate,SprintServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "{varsprint=awaitservice.GetAsync(sprintId,ct);returnOk(awaitservice.BurndownAsync(sprint.ProjectId,sprintId,startDate,endDate,ct),http);});",
+        "group.MapPost(\"\",async(CreateSprintRequestrequest,SprintServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Created(awaitservice.CreateAsync(request,CorrelationId(http),ct),http)).WithZumboPermission(PermissionCatalog.WorkItemUpdate);",
+        "group.MapPost(\"/{sprintId}/complete\",async(stringsprintId,CompleteSprintRequestrequest,SprintServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.CompleteAsync(sprintId,request,CorrelationId(http),ct),http)).WithZumboPermission(PermissionCatalog.WorkItemUpdate);",
+        "group.MapPost(\"/{sprintId}/start\",async(stringsprintId,SprintServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.StartAsync(sprintId,CorrelationId(http),ct),http)).WithZumboPermission(PermissionCatalog.WorkItemUpdate);",
+        "group.MapPut(\"/{projectId}\",async(stringprojectId,UpsertWorkItemTypeSchemaRequestrequest,WorkItemTypeSchemaServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.UpsertAsync(projectId,request,CorrelationId(http),ct),http)).WithZumboPermission(PermissionCatalog.WorkItemUpdate);",
+        "group.MapPut(\"/{sprintId}/items/{workItemId}\",async(stringsprintId,stringworkItemId,PlanSprintWorkItemRequestrequest,SprintServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.PlanAsync(sprintId,workItemId,request,CorrelationId(http),ct),http)).WithZumboPermission(PermissionCatalog.WorkItemUpdate);",
         "group.MapGet(\"/templates\",async(stringprojectId,int?page,int?pageSize,bool?includeArchived,WorkItemTemplateRecurrenceServiceservice,HttpContexthttp,CancellationTokenct)=>"
         + "Ok(awaitservice.ListTemplatesAsync(projectId,page??1,pageSize??50,includeArchived??false,ct),http));",
         "group.MapGet(\"/recurrences\",async(stringprojectId,int?page,int?pageSize,bool?includeArchived,WorkItemTemplateRecurrenceServiceservice,HttpContexthttp,CancellationTokenct)=>"
@@ -1107,6 +1271,38 @@ public sealed class RefactorRuntimeContractTests
 
     private static readonly string[] PortFocusedVerticalSliceEndpointMappings =
     [
+        "group.MapDelete(\"/{sprintId}/items/{workItemId}\",async(stringsprintId,stringworkItemId,UnplanSprintWorkItemHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newUnplanSprintWorkItemCommand(sprintId,workItemId,CorrelationId(http)),ct),http)).WithZumboPermission(PermissionCatalog.WorkItemUpdate);",
+        "group.MapGet(\"/projects/{projectId}\",async(stringprojectId,string?after,int?pageSize,ListSprintsHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newListSprintsQuery(projectId,after,pageSize??50),ct),http));",
+        "group.MapGet(\"/projects/{projectId}/backlog\",async(stringprojectId,string?after,int?pageSize,ListSprintBacklogHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newListSprintBacklogQuery(projectId,after,pageSize??50),ct),http));",
+        "group.MapGet(\"/projects/{projectId}/velocity\",async(stringprojectId,int?sprintCount,GetSprintVelocityHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok((awaithandler.HandleAsync(newGetSprintVelocityQuery(projectId,sprintCount??6),ct)).Data,http));",
+        "group.MapGet(\"/reports/sprint-burndown/{projectId}/{sprintId}\",async(stringprojectId,stringsprintId,DateOnlystartDate,DateOnlyendDate,GetSprintBurndownHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "ReportOk(awaithandler.HandleAsync(newGetSprintBurndownQuery(projectId,sprintId,startDate,endDate),ct),http)).RequireRateLimiting(\"report\");",
+        "group.MapGet(\"/reports/sprint-velocity/{projectId}\",async(stringprojectId,int?sprintCount,GetSprintVelocityHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "ReportOk(awaithandler.HandleAsync(newGetSprintVelocityQuery(projectId,sprintCount??6),ct),http)).RequireRateLimiting(\"report\");",
+        "group.MapGet(\"/{projectId}\",async(stringprojectId,GetWorkItemTypeSchemaHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newGetWorkItemTypeSchemaQuery(projectId),ct),http));",
+        "group.MapGet(\"/{projectId}/reports/custom-fields/{fieldKey}\",async(stringprojectId,stringfieldKey,GetCustomFieldDistributionHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newGetCustomFieldDistributionQuery(projectId,fieldKey),ct),http));",
+        "group.MapGet(\"/{projectId}/reports/issue-types\",async(stringprojectId,GetIssueTypeDistributionHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newGetIssueTypeDistributionQuery(projectId),ct),http));",
+        "group.MapGet(\"/{sprintId}\",async(stringsprintId,GetSprintHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newGetSprintQuery(sprintId),ct),http));",
+        "group.MapGet(\"/{sprintId}/burndown\",async(stringsprintId,DateOnly?startDate,DateOnly?endDate,GetSprintHandlergetSprint,GetSprintBurndownHandlerburndown,HttpContexthttp,CancellationTokenct)=>"
+        + "{varsprint=awaitgetSprint.HandleAsync(newGetSprintQuery(sprintId),ct);varsnapshot=awaitburndown.HandleAsync(newGetSprintBurndownQuery(sprint.ProjectId,sprintId,startDate,endDate),ct);returnOk(snapshot.Data,http);});",
+        "group.MapPost(\"\",async(CreateSprintRequestrequest,CreateSprintHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Created(awaithandler.HandleAsync(newCreateSprintCommand(request,CorrelationId(http)),ct),http)).WithZumboPermission(PermissionCatalog.WorkItemUpdate);",
+        "group.MapPost(\"/{sprintId}/complete\",async(stringsprintId,CompleteSprintRequestrequest,CompleteSprintHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newCompleteSprintCommand(sprintId,request,CorrelationId(http)),ct),http)).WithZumboPermission(PermissionCatalog.WorkItemUpdate);",
+        "group.MapPost(\"/{sprintId}/start\",async(stringsprintId,StartSprintHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newStartSprintCommand(sprintId,CorrelationId(http)),ct),http)).WithZumboPermission(PermissionCatalog.WorkItemUpdate);",
+        "group.MapPut(\"/{projectId}\",async(stringprojectId,UpsertWorkItemTypeSchemaRequestrequest,UpsertWorkItemTypeSchemaHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newUpsertWorkItemTypeSchemaCommand(projectId,request,CorrelationId(http)),ct),http)).WithZumboPermission(PermissionCatalog.WorkItemUpdate);",
+        "group.MapPut(\"/{sprintId}/items/{workItemId}\",async(stringsprintId,stringworkItemId,PlanSprintWorkItemRequestrequest,PlanSprintWorkItemHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newPlanSprintWorkItemCommand(sprintId,workItemId,request,CorrelationId(http)),ct),http)).WithZumboPermission(PermissionCatalog.WorkItemUpdate);",
         "group.MapGet(\"/templates\",async(stringprojectId,int?page,int?pageSize,bool?includeArchived,ListWorkItemTemplatesHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
         + "Ok(awaithandler.HandleAsync(newListWorkItemTemplatesQuery(projectId,page??1,pageSize??50,includeArchived??false),ct),http));",
         "group.MapGet(\"/recurrences\",async(stringprojectId,int?page,int?pageSize,bool?includeArchived,ListWorkItemRecurrencesHandlerhandler,HttpContexthttp,CancellationTokenct)=>"

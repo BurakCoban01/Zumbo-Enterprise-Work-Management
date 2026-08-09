@@ -1,5 +1,10 @@
+using Microsoft.Extensions.Options;
+using Zumbo.BuildingBlocks.Application.Concurrency;
+using Zumbo.BuildingBlocks.Application.Persistence;
 using Zumbo.BuildingBlocks.Application.Security;
 using Zumbo.Modules.WorkItems;
+using Zumbo.Modules.WorkItems.Application.Features.Sprints;
+using Zumbo.SharedKernel;
 
 using static ApiEndpointResults;
 
@@ -16,6 +21,95 @@ internal static class SprintEndpoints
             .ValidateOnStart();
         services.AddScoped<IWorkItemSprintPolicy, WorkItemSprintPolicyAdapter>();
         services.AddScoped<SprintService>();
+        services.AddScoped<GetSprintHandler>(provider => new GetSprintHandler(
+            provider.GetRequiredService<IDocumentRepository<SprintDocument>>(),
+            provider.GetRequiredService<IDocumentRepository<WorkItemDocument>>(),
+            provider.GetRequiredService<IProjectPermissionChecker>(),
+            provider.GetRequiredService<ICurrentUser>()));
+        services.AddScoped<ListSprintsHandler>(provider => new ListSprintsHandler(
+            provider.GetRequiredService<IDocumentRepository<SprintDocument>>(),
+            provider.GetRequiredService<IDocumentRepository<WorkItemDocument>>(),
+            provider.GetRequiredService<IProjectPermissionChecker>(),
+            provider.GetRequiredService<ICurrentUser>()));
+        services.AddScoped<ListSprintBacklogHandler>(provider => new ListSprintBacklogHandler(
+            provider.GetRequiredService<IDocumentRepository<SprintDocument>>(),
+            provider.GetRequiredService<IDocumentRepository<WorkItemDocument>>(),
+            provider.GetRequiredService<IProjectPermissionChecker>(),
+            provider.GetRequiredService<ICurrentUser>()));
+        services.AddScoped<GetSprintBurndownHandler>(provider => new GetSprintBurndownHandler(
+            provider.GetRequiredService<IDocumentRepository<SprintDocument>>(),
+            provider.GetRequiredService<IDocumentRepository<SprintScopeSnapshotDocument>>(),
+            provider.GetRequiredService<IDocumentRepository<SprintCompletionSnapshotDocument>>(),
+            provider.GetRequiredService<IDocumentRepository<WorkItemDocument>>(),
+            provider.GetRequiredService<IProjectPermissionChecker>(),
+            provider.GetRequiredService<ICurrentUser>(),
+            provider.GetRequiredService<IOptions<SprintOptions>>(),
+            provider.GetRequiredService<IWorkItemReadModelCache>(),
+            provider.GetRequiredService<IOptions<WorkItemReadModelCacheOptions>>()));
+        services.AddScoped<GetSprintVelocityHandler>(provider => new GetSprintVelocityHandler(
+            provider.GetRequiredService<IDocumentRepository<SprintDocument>>(),
+            provider.GetRequiredService<IProjectPermissionChecker>(),
+            provider.GetRequiredService<ICurrentUser>(),
+            provider.GetRequiredService<IWorkItemReadModelCache>(),
+            provider.GetRequiredService<IOptions<WorkItemReadModelCacheOptions>>()));
+        services.AddScoped<CreateSprintHandler>(provider => new CreateSprintHandler(
+            provider.GetRequiredService<IDocumentRepository<SprintDocument>>(),
+            provider.GetRequiredService<IProjectPermissionChecker>(),
+            provider.GetRequiredService<IWorkItemAuditPublisher>(),
+            provider.GetRequiredService<IDistributedLockProvider>(),
+            provider.GetRequiredService<IOptions<DistributedLockOptions>>(),
+            provider.GetRequiredService<IClock>(),
+            provider.GetRequiredService<ICurrentUser>(),
+            provider.GetRequiredService<IWorkItemCacheInvalidationPublisher>()));
+        services.AddScoped<StartSprintHandler>(provider => new StartSprintHandler(
+            provider.GetRequiredService<IDocumentRepository<SprintDocument>>(),
+            provider.GetRequiredService<IDocumentRepository<SprintScopeSnapshotDocument>>(),
+            provider.GetRequiredService<IDocumentRepository<WorkItemDocument>>(),
+            provider.GetRequiredService<IProjectPermissionChecker>(),
+            provider.GetRequiredService<IWorkItemAuditPublisher>(),
+            provider.GetRequiredService<IDistributedLockProvider>(),
+            provider.GetRequiredService<IOptions<DistributedLockOptions>>(),
+            provider.GetRequiredService<IOptions<SprintOptions>>(),
+            provider.GetRequiredService<IClock>(),
+            provider.GetRequiredService<ICurrentUser>(),
+            provider.GetRequiredService<IWorkItemCacheInvalidationPublisher>(),
+            provider.GetService<IExpectedVersionAccessor>()));
+        services.AddScoped<CompleteSprintHandler>(provider => new CompleteSprintHandler(
+            provider.GetRequiredService<IDocumentRepository<SprintDocument>>(),
+            provider.GetRequiredService<IDocumentRepository<SprintScopeSnapshotDocument>>(),
+            provider.GetRequiredService<IDocumentRepository<SprintCompletionSnapshotDocument>>(),
+            provider.GetRequiredService<IDocumentRepository<WorkItemDocument>>(),
+            provider.GetRequiredService<IProjectPermissionChecker>(),
+            provider.GetRequiredService<IWorkItemAuditPublisher>(),
+            provider.GetRequiredService<IDistributedLockProvider>(),
+            provider.GetRequiredService<IOptions<DistributedLockOptions>>(),
+            provider.GetRequiredService<IOptions<SprintOptions>>(),
+            provider.GetRequiredService<IClock>(),
+            provider.GetRequiredService<ICurrentUser>(),
+            provider.GetRequiredService<IWorkItemCacheInvalidationPublisher>(),
+            provider.GetService<IExpectedVersionAccessor>()));
+        services.AddScoped<PlanSprintWorkItemHandler>(provider => new PlanSprintWorkItemHandler(
+            provider.GetRequiredService<IDocumentRepository<SprintDocument>>(),
+            provider.GetRequiredService<IDocumentRepository<WorkItemDocument>>(),
+            provider.GetRequiredService<IProjectPermissionChecker>(),
+            provider.GetRequiredService<IWorkItemAuditPublisher>(),
+            provider.GetRequiredService<IDistributedLockProvider>(),
+            provider.GetRequiredService<IOptions<DistributedLockOptions>>(),
+            provider.GetRequiredService<IClock>(),
+            provider.GetRequiredService<ICurrentUser>(),
+            provider.GetRequiredService<IWorkItemCacheInvalidationPublisher>(),
+            provider.GetService<IExpectedVersionAccessor>()));
+        services.AddScoped<UnplanSprintWorkItemHandler>(provider => new UnplanSprintWorkItemHandler(
+            provider.GetRequiredService<IDocumentRepository<SprintDocument>>(),
+            provider.GetRequiredService<IDocumentRepository<WorkItemDocument>>(),
+            provider.GetRequiredService<IProjectPermissionChecker>(),
+            provider.GetRequiredService<IWorkItemAuditPublisher>(),
+            provider.GetRequiredService<IDistributedLockProvider>(),
+            provider.GetRequiredService<IOptions<DistributedLockOptions>>(),
+            provider.GetRequiredService<IClock>(),
+            provider.GetRequiredService<ICurrentUser>(),
+            provider.GetRequiredService<IWorkItemCacheInvalidationPublisher>(),
+            provider.GetService<IExpectedVersionAccessor>()));
         return services;
     }
 
@@ -29,92 +123,105 @@ internal static class SprintEndpoints
 
         group.MapPost("", async (
                 CreateSprintRequest request,
-                SprintService service,
+                CreateSprintHandler handler,
                 HttpContext http,
                 CancellationToken ct) =>
-            Created(await service.CreateAsync(request, CorrelationId(http), ct), http))
+            Created(await handler.HandleAsync(new CreateSprintCommand(request, CorrelationId(http)), ct), http))
             .WithZumboPermission(PermissionCatalog.WorkItemUpdate);
 
         group.MapGet("/{sprintId}", async (
                 string sprintId,
-                SprintService service,
+                GetSprintHandler handler,
                 HttpContext http,
                 CancellationToken ct) =>
-            Ok(await service.GetAsync(sprintId, ct), http));
+            Ok(await handler.HandleAsync(new GetSprintQuery(sprintId), ct), http));
 
         group.MapGet("/projects/{projectId}", async (
                 string projectId,
                 string? after,
                 int? pageSize,
-                SprintService service,
+                ListSprintsHandler handler,
                 HttpContext http,
                 CancellationToken ct) =>
-            Ok(await service.ListAsync(projectId, after, pageSize ?? 50, ct), http));
+            Ok(await handler.HandleAsync(
+                new ListSprintsQuery(projectId, after, pageSize ?? 50),
+                ct), http));
 
         group.MapGet("/projects/{projectId}/backlog", async (
                 string projectId,
                 string? after,
                 int? pageSize,
-                SprintService service,
+                ListSprintBacklogHandler handler,
                 HttpContext http,
                 CancellationToken ct) =>
-            Ok(await service.BacklogAsync(projectId, after, pageSize ?? 50, ct), http));
+            Ok(await handler.HandleAsync(
+                new ListSprintBacklogQuery(projectId, after, pageSize ?? 50),
+                ct), http));
 
         group.MapPut("/{sprintId}/items/{workItemId}", async (
                 string sprintId,
                 string workItemId,
                 PlanSprintWorkItemRequest request,
-                SprintService service,
+                PlanSprintWorkItemHandler handler,
                 HttpContext http,
                 CancellationToken ct) =>
-            Ok(await service.PlanAsync(sprintId, workItemId, request, CorrelationId(http), ct), http))
+            Ok(await handler.HandleAsync(
+                new PlanSprintWorkItemCommand(sprintId, workItemId, request, CorrelationId(http)), ct), http))
             .WithZumboPermission(PermissionCatalog.WorkItemUpdate);
 
         group.MapDelete("/{sprintId}/items/{workItemId}", async (
                 string sprintId,
                 string workItemId,
-                SprintService service,
+                UnplanSprintWorkItemHandler handler,
                 HttpContext http,
                 CancellationToken ct) =>
-            Ok(await service.UnplanAsync(sprintId, workItemId, CorrelationId(http), ct), http))
+            Ok(await handler.HandleAsync(
+                new UnplanSprintWorkItemCommand(sprintId, workItemId, CorrelationId(http)), ct), http))
             .WithZumboPermission(PermissionCatalog.WorkItemUpdate);
 
         group.MapPost("/{sprintId}/start", async (
                 string sprintId,
-                SprintService service,
+                StartSprintHandler handler,
                 HttpContext http,
                 CancellationToken ct) =>
-            Ok(await service.StartAsync(sprintId, CorrelationId(http), ct), http))
+            Ok(await handler.HandleAsync(new StartSprintCommand(sprintId, CorrelationId(http)), ct), http))
             .WithZumboPermission(PermissionCatalog.WorkItemUpdate);
 
         group.MapPost("/{sprintId}/complete", async (
                 string sprintId,
                 CompleteSprintRequest request,
-                SprintService service,
+                CompleteSprintHandler handler,
                 HttpContext http,
                 CancellationToken ct) =>
-            Ok(await service.CompleteAsync(sprintId, request, CorrelationId(http), ct), http))
+            Ok(await handler.HandleAsync(
+                new CompleteSprintCommand(sprintId, request, CorrelationId(http)), ct), http))
             .WithZumboPermission(PermissionCatalog.WorkItemUpdate);
 
         group.MapGet("/{sprintId}/burndown", async (
                 string sprintId,
                 DateOnly? startDate,
                 DateOnly? endDate,
-                SprintService service,
+                GetSprintHandler getSprint,
+                GetSprintBurndownHandler burndown,
                 HttpContext http,
                 CancellationToken ct) =>
         {
-            var sprint = await service.GetAsync(sprintId, ct);
-            return Ok(await service.BurndownAsync(sprint.ProjectId, sprintId, startDate, endDate, ct), http);
+            var sprint = await getSprint.HandleAsync(new GetSprintQuery(sprintId), ct);
+            var snapshot = await burndown.HandleAsync(
+                new GetSprintBurndownQuery(sprint.ProjectId, sprintId, startDate, endDate),
+                ct);
+            return Ok(snapshot.Data, http);
         });
 
         group.MapGet("/projects/{projectId}/velocity", async (
                 string projectId,
                 int? sprintCount,
-                SprintService service,
+                GetSprintVelocityHandler handler,
                 HttpContext http,
                 CancellationToken ct) =>
-            Ok(await service.VelocityAsync(projectId, sprintCount ?? 6, ct), http));
+            Ok((await handler.HandleAsync(
+                new GetSprintVelocityQuery(projectId, sprintCount ?? 6),
+                ct)).Data, http));
     }
 
 }

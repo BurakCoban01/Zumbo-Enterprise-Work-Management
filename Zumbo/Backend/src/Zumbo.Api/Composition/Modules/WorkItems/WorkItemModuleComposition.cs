@@ -5,6 +5,7 @@ using Zumbo.BuildingBlocks.Application.Search;
 using Zumbo.BuildingBlocks.Application.Security;
 using Zumbo.Modules.WorkItems;
 using Zumbo.Modules.WorkItems.Application.Features.Recurrences;
+using Zumbo.Modules.WorkItems.Application.Features.Schema;
 using Zumbo.SharedKernel;
 
 namespace Zumbo.Api.Composition.Modules.WorkItems;
@@ -155,8 +156,49 @@ internal static class WorkItemModuleComposition
                 "WorkItemTypeSchema batch settings are outside the supported bounds.")
             .ValidateOnStart();
         services.AddScoped<WorkItemTypeSchemaService>();
-        services.AddScoped<IWorkItemTypeSchemaPolicy>(provider =>
-            provider.GetRequiredService<WorkItemTypeSchemaService>());
+        services.AddScoped<GetWorkItemTypeSchemaHandler>(provider => new GetWorkItemTypeSchemaHandler(
+            provider.GetRequiredService<IDocumentRepository<WorkItemTypeSchemaDocument>>(),
+            provider.GetRequiredService<IDocumentRepository<WorkItemDocument>>(),
+            provider.GetRequiredService<IProjectPermissionChecker>(),
+            provider.GetRequiredService<ICurrentUser>(),
+            provider.GetRequiredService<IOptions<WorkItemTypeSchemaOptions>>(),
+            provider.GetRequiredService<IClock>()));
+        services.AddScoped<GetIssueTypeDistributionHandler>(provider => new GetIssueTypeDistributionHandler(
+            provider.GetRequiredService<IDocumentRepository<WorkItemTypeSchemaDocument>>(),
+            provider.GetRequiredService<IDocumentRepository<WorkItemDocument>>(),
+            provider.GetRequiredService<IProjectPermissionChecker>(),
+            provider.GetRequiredService<ICurrentUser>(),
+            provider.GetRequiredService<IOptions<WorkItemTypeSchemaOptions>>(),
+            provider.GetRequiredService<IClock>()));
+        services.AddScoped<GetCustomFieldDistributionHandler>(provider => new GetCustomFieldDistributionHandler(
+            provider.GetRequiredService<IDocumentRepository<WorkItemTypeSchemaDocument>>(),
+            provider.GetRequiredService<IDocumentRepository<WorkItemDocument>>(),
+            provider.GetRequiredService<IProjectPermissionChecker>(),
+            provider.GetRequiredService<ICurrentUser>(),
+            provider.GetRequiredService<IOptions<WorkItemTypeSchemaOptions>>(),
+            provider.GetRequiredService<IClock>()));
+        services.AddScoped<UpsertWorkItemTypeSchemaHandler>(provider => new UpsertWorkItemTypeSchemaHandler(
+            provider.GetRequiredService<IDocumentRepository<WorkItemTypeSchemaDocument>>(),
+            provider.GetRequiredService<IDocumentRepository<WorkItemDocument>>(),
+            provider.GetRequiredService<IProjectPermissionChecker>(),
+            provider.GetRequiredService<IWorkItemAuditPublisher>(),
+            provider.GetRequiredService<IDistributedLockProvider>(),
+            provider.GetRequiredService<IOptions<DistributedLockOptions>>(),
+            provider.GetRequiredService<IOptions<WorkItemTypeSchemaOptions>>(),
+            provider.GetRequiredService<IClock>(),
+            provider.GetRequiredService<ICurrentUser>(),
+            provider.GetService<IExpectedVersionAccessor>()));
+        services.AddScoped<ValidateWorkItemShapeHandler>(provider => new ValidateWorkItemShapeHandler(
+            provider.GetRequiredService<IDocumentRepository<WorkItemTypeSchemaDocument>>(),
+            provider.GetRequiredService<IClock>()));
+        services.AddScoped<GetIssueTypeHierarchyHandler>(provider => new GetIssueTypeHierarchyHandler(
+            provider.GetRequiredService<IDocumentRepository<WorkItemTypeSchemaDocument>>(),
+            provider.GetRequiredService<IClock>()));
+        services.AddScoped<ValidateWorkItemSearchFilterHandler>(provider =>
+            new ValidateWorkItemSearchFilterHandler(
+                provider.GetRequiredService<IDocumentRepository<WorkItemTypeSchemaDocument>>(),
+                provider.GetRequiredService<IClock>()));
+        services.AddScoped<IWorkItemTypeSchemaPolicy, WorkItemTypeSchemaPolicyAdapter>();
         services.AddScoped<IAttachmentStorage, AttachmentStorageAdapter>();
         services.AddScoped<AttachmentSecurityMaintenanceService>();
         services.AddScoped<OperationsStorageSecurityCoordinator>();

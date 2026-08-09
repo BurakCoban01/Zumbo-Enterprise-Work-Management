@@ -1,4 +1,5 @@
 using Zumbo.Modules.WorkItems;
+using Zumbo.Modules.WorkItems.Application.Features.Sprints;
 using Zumbo.BuildingBlocks.Application.Messaging;
 using Zumbo.BuildingBlocks.Application.Security;
 using Zumbo.SharedKernel;
@@ -17,10 +18,12 @@ internal static class GetSprintBurndownReportEndpoint
             string sprintId,
             DateOnly startDate,
             DateOnly endDate,
-            SprintService service,
+            GetSprintBurndownHandler handler,
             HttpContext http,
             CancellationToken ct) =>
-            ReportOk(await service.BurndownSnapshotAsync(projectId, sprintId, startDate, endDate, ct), http))
+            ReportOk(await handler.HandleAsync(
+                new GetSprintBurndownQuery(projectId, sprintId, startDate, endDate),
+                ct), http))
             .RequireRateLimiting("report");
     }
 

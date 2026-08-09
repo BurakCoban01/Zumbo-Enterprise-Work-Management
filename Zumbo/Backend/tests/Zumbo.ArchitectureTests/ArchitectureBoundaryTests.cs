@@ -1471,6 +1471,241 @@ public sealed class ArchitectureBoundaryTests
     }
 
     [Fact]
+    public void WorkItemSchemaUseCases_ArePortFocusedVerticalSlicesWithCompatibilityFacade()
+    {
+        var moduleDirectory = Path.Combine(SourceDirectory, "Zumbo.Modules.WorkItems");
+        var featureDirectory = Path.Combine(moduleDirectory, "Application", "Features", "Schema");
+        foreach (var file in new[]
+        {
+            "GetWorkItemTypeSchemaQuery.cs",
+            "GetWorkItemTypeSchemaHandler.cs",
+            "GetWorkItemTypeSchemaSlice.cs",
+            "GetIssueTypeDistributionQuery.cs",
+            "GetIssueTypeDistributionHandler.cs",
+            "GetIssueTypeDistributionSlice.cs",
+            "GetCustomFieldDistributionQuery.cs",
+            "GetCustomFieldDistributionHandler.cs",
+            "GetCustomFieldDistributionSlice.cs",
+            "WorkItemTypeSchemaReadAccess.cs",
+            "WorkItemTypeSchemaResponseMapper.cs",
+            "UpsertWorkItemTypeSchemaCommand.cs",
+            "UpsertWorkItemTypeSchemaHandler.cs",
+            "UpsertWorkItemTypeSchemaSlice.cs",
+            "WorkItemTypeSchemaDefinitionPolicy.cs",
+            "ValidateWorkItemShapeQuery.cs",
+            "ValidateWorkItemShapeHandler.cs",
+            "ValidateWorkItemShapeSlice.cs",
+            "GetIssueTypeHierarchyQuery.cs",
+            "GetIssueTypeHierarchyHandler.cs",
+            "GetIssueTypeHierarchySlice.cs",
+            "ValidateWorkItemSearchFilterQuery.cs",
+            "ValidateWorkItemSearchFilterHandler.cs",
+            "ValidateWorkItemSearchFilterSlice.cs",
+            "WorkItemTypeSchemaPolicyAccess.cs",
+            "WorkItemTypeSchemaPolicyAdapter.cs"
+        })
+        {
+            Assert.True(File.Exists(Path.Combine(featureDirectory, file)), $"Missing schema read file: {file}");
+        }
+
+        var facadeDirectory = Path.Combine(
+            moduleDirectory,
+            "Application",
+            "Compatibility",
+            "Schema",
+            "WorkItemTypeSchemaService");
+        var facadeFiles = Directory.GetFiles(facadeDirectory, "*.cs", SearchOption.TopDirectoryOnly);
+        Assert.Equal(5, facadeFiles.Length);
+        AssertExactSet(
+            new[]
+            {
+                "Facade.cs",
+                "PersistenceSupport.cs",
+                "DefinitionSupport.cs",
+                "ValidationSupport.cs",
+                "MappingSupport.cs"
+            },
+            facadeFiles.Select(Path.GetFileName)!);
+        var facade = string.Join(Environment.NewLine, facadeFiles.Select(File.ReadAllText));
+        foreach (var delegation in new[]
+        {
+            "getWorkItemTypeSchemaHandler.HandleAsync",
+            "getIssueTypeDistributionHandler.HandleAsync",
+            "getCustomFieldDistributionHandler.HandleAsync",
+            "upsertWorkItemTypeSchemaHandler.HandleAsync",
+            "validateWorkItemShapeHandler.HandleAsync",
+            "getIssueTypeHierarchyHandler.HandleAsync",
+            "validateWorkItemSearchFilterHandler.HandleAsync"
+        })
+        {
+            Assert.Contains(delegation, facade, StringComparison.Ordinal);
+        }
+
+        var endpoint = File.ReadAllText(Path.Combine(
+            SourceDirectory,
+            "Zumbo.Api",
+            "Presentation",
+            "Endpoints",
+            "WorkItems",
+            "Schema",
+            "WorkItemTypeSchemaEndpoints.cs"));
+        Assert.Contains("GetWorkItemTypeSchemaHandler handler", endpoint, StringComparison.Ordinal);
+        Assert.Contains("GetIssueTypeDistributionHandler handler", endpoint, StringComparison.Ordinal);
+        Assert.Contains("GetCustomFieldDistributionHandler handler", endpoint, StringComparison.Ordinal);
+        Assert.Contains("UpsertWorkItemTypeSchemaHandler handler", endpoint, StringComparison.Ordinal);
+        Assert.DoesNotContain("service.GetAsync(projectId", endpoint, StringComparison.Ordinal);
+        Assert.DoesNotContain("service.GetIssueTypeDistributionAsync", endpoint, StringComparison.Ordinal);
+        Assert.DoesNotContain("service.GetCustomFieldDistributionAsync", endpoint, StringComparison.Ordinal);
+        Assert.DoesNotContain("service.UpsertAsync", endpoint, StringComparison.Ordinal);
+
+        var composition = File.ReadAllText(Path.Combine(
+            SourceDirectory,
+            "Zumbo.Api",
+            "Composition",
+            "Modules",
+            "WorkItems",
+            "WorkItemModuleComposition.cs"));
+        Assert.Contains("AddScoped<GetWorkItemTypeSchemaHandler>(provider =>", composition, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<GetIssueTypeDistributionHandler>(provider =>", composition, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<GetCustomFieldDistributionHandler>(provider =>", composition, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<UpsertWorkItemTypeSchemaHandler>(provider =>", composition, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<ValidateWorkItemShapeHandler>(provider =>", composition, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<GetIssueTypeHierarchyHandler>(provider =>", composition, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<ValidateWorkItemSearchFilterHandler>(provider =>", composition, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<IWorkItemTypeSchemaPolicy, WorkItemTypeSchemaPolicyAdapter>()", composition, StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "provider.GetRequiredService<WorkItemTypeSchemaService>()",
+            composition,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void SprintUseCases_ArePortFocusedVerticalSlicesWithCompatibilityFacade()
+    {
+        var moduleDirectory = Path.Combine(SourceDirectory, "Zumbo.Modules.WorkItems");
+        var featureDirectory = Path.Combine(moduleDirectory, "Application", "Features", "Sprints");
+        foreach (var file in new[]
+        {
+            "GetSprintQuery.cs",
+            "GetSprintHandler.cs",
+            "GetSprintSlice.cs",
+            "ListSprintsQuery.cs",
+            "ListSprintsHandler.cs",
+            "ListSprintsSlice.cs",
+            "ListSprintBacklogQuery.cs",
+            "ListSprintBacklogHandler.cs",
+            "ListSprintBacklogSlice.cs",
+            "SprintReadAccess.cs",
+            "SprintResponseMapper.cs",
+            "GetSprintBurndownQuery.cs",
+            "GetSprintBurndownHandler.cs",
+            "GetSprintBurndownSlice.cs",
+            "GetSprintVelocityQuery.cs",
+            "GetSprintVelocityHandler.cs",
+            "GetSprintVelocitySlice.cs",
+            "CreateSprintCommand.cs",
+            "CreateSprintHandler.cs",
+            "CreateSprintSlice.cs",
+            "StartSprintCommand.cs",
+            "StartSprintHandler.cs",
+            "StartSprintSlice.cs",
+            "CompleteSprintCommand.cs",
+            "CompleteSprintHandler.cs",
+            "CompleteSprintSlice.cs",
+            "PlanSprintWorkItemCommand.cs",
+            "PlanSprintWorkItemHandler.cs",
+            "PlanSprintWorkItemSlice.cs",
+            "UnplanSprintWorkItemCommand.cs",
+            "UnplanSprintWorkItemHandler.cs",
+            "UnplanSprintWorkItemSlice.cs"
+        })
+        {
+            Assert.True(File.Exists(Path.Combine(featureDirectory, file)), $"Missing sprint read file: {file}");
+        }
+
+        var facadeDirectory = Path.Combine(
+            moduleDirectory,
+            "Application",
+            "Compatibility",
+            "Sprints",
+            "SprintService");
+        Assert.Equal(7, Directory.GetFiles(facadeDirectory, "*.cs").Length);
+        foreach (var (file, delegation) in new[]
+        {
+            ("ReadsFacade.cs", "getSprintHandler.HandleAsync"),
+            ("ReadsFacade.cs", "listSprintsHandler.HandleAsync"),
+            ("ReadsFacade.cs", "listSprintBacklogHandler.HandleAsync"),
+            ("ReportsFacade.cs", "getSprintBurndownHandler.HandleAsync"),
+            ("ReportsFacade.cs", "getSprintVelocityHandler.HandleAsync"),
+            ("LifecycleFacade.cs", "createSprintHandler.HandleAsync"),
+            ("LifecycleFacade.cs", "startSprintHandler.HandleAsync"),
+            ("LifecycleFacade.cs", "completeSprintHandler.HandleAsync"),
+            ("AssignmentFacade.cs", "planSprintWorkItemHandler.HandleAsync"),
+            ("AssignmentFacade.cs", "unplanSprintWorkItemHandler.HandleAsync")
+        })
+        {
+            Assert.Contains(
+                delegation,
+                File.ReadAllText(Path.Combine(facadeDirectory, file)),
+                StringComparison.Ordinal);
+        }
+
+        var endpoint = File.ReadAllText(Path.Combine(
+            SourceDirectory,
+            "Zumbo.Api",
+            "Presentation",
+            "Endpoints",
+            "WorkItems",
+            "PlatformCore",
+            "SprintEndpoints.cs"));
+        Assert.Contains("GetSprintHandler handler", endpoint, StringComparison.Ordinal);
+        Assert.Contains("ListSprintsHandler handler", endpoint, StringComparison.Ordinal);
+        Assert.Contains("ListSprintBacklogHandler handler", endpoint, StringComparison.Ordinal);
+        Assert.Contains("GetSprintBurndownHandler burndown", endpoint, StringComparison.Ordinal);
+        Assert.Contains("GetSprintVelocityHandler handler", endpoint, StringComparison.Ordinal);
+        Assert.Contains("CreateSprintHandler handler", endpoint, StringComparison.Ordinal);
+        Assert.Contains("StartSprintHandler handler", endpoint, StringComparison.Ordinal);
+        Assert.Contains("CompleteSprintHandler handler", endpoint, StringComparison.Ordinal);
+        Assert.Contains("PlanSprintWorkItemHandler handler", endpoint, StringComparison.Ordinal);
+        Assert.Contains("UnplanSprintWorkItemHandler handler", endpoint, StringComparison.Ordinal);
+        Assert.DoesNotContain("service.ListAsync(projectId", endpoint, StringComparison.Ordinal);
+        Assert.DoesNotContain("service.BacklogAsync(projectId", endpoint, StringComparison.Ordinal);
+        Assert.DoesNotContain("service.CreateAsync(request", endpoint, StringComparison.Ordinal);
+        Assert.DoesNotContain("service.StartAsync(sprintId", endpoint, StringComparison.Ordinal);
+        Assert.DoesNotContain("service.CompleteAsync(sprintId", endpoint, StringComparison.Ordinal);
+        Assert.DoesNotContain("service.PlanAsync(sprintId", endpoint, StringComparison.Ordinal);
+        Assert.DoesNotContain("service.UnplanAsync(sprintId", endpoint, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<GetSprintHandler>(provider =>", endpoint, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<ListSprintsHandler>(provider =>", endpoint, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<ListSprintBacklogHandler>(provider =>", endpoint, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<GetSprintBurndownHandler>(provider =>", endpoint, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<GetSprintVelocityHandler>(provider =>", endpoint, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<CreateSprintHandler>(provider =>", endpoint, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<StartSprintHandler>(provider =>", endpoint, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<CompleteSprintHandler>(provider =>", endpoint, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<PlanSprintWorkItemHandler>(provider =>", endpoint, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<UnplanSprintWorkItemHandler>(provider =>", endpoint, StringComparison.Ordinal);
+
+        var reportDirectory = Path.Combine(
+            SourceDirectory,
+            "Zumbo.Api",
+            "Presentation",
+            "Endpoints",
+            "WorkItems",
+            "Sprints");
+        var burndownReport = File.ReadAllText(Path.Combine(
+            reportDirectory,
+            "GetSprintBurndownReportEndpoint.cs"));
+        Assert.Contains("GetSprintBurndownHandler handler", burndownReport, StringComparison.Ordinal);
+        Assert.DoesNotContain("SprintService service", burndownReport, StringComparison.Ordinal);
+        var velocityReport = File.ReadAllText(Path.Combine(
+            reportDirectory,
+            "GetSprintVelocityReportEndpoint.cs"));
+        Assert.Contains("GetSprintVelocityHandler handler", velocityReport, StringComparison.Ordinal);
+        Assert.DoesNotContain("SprintService service", velocityReport, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void WorkItemCommentEndpoints_AreIndependentFeatureEndpointClasses()
     {
         var commentsDirectory = Path.Combine(
