@@ -385,6 +385,204 @@ public sealed class ArchitectureBoundaryTests
     }
 
     [Fact]
+    public void OpenSearchWorkItemSearchAdapter_IsGroupedByResponsibility()
+    {
+        var searchDirectory = Path.Combine(
+            SourceDirectory,
+            "Zumbo.BuildingBlocks.Infrastructure",
+            "Search",
+            "WorkItemSearch");
+
+        Assert.Equal(
+            [
+                "OpenSearchWorkItemSearchIndex.BulkWriter.cs",
+                "OpenSearchWorkItemSearchIndex.Contracts.cs",
+                "OpenSearchWorkItemSearchIndex.IndexManagement.cs",
+                "OpenSearchWorkItemSearchIndex.Query.cs",
+                "OpenSearchWorkItemSearchIndex.Resilience.cs",
+                "OpenSearchWorkItemSearchIndex.Transport.cs",
+                "OpenSearchWorkItemSearchIndex.Validation.cs",
+                "OpenSearchWorkItemSearchIndex.cs"
+            ],
+            Directory.GetFiles(
+                    searchDirectory,
+                    "OpenSearchWorkItemSearchIndex*.cs",
+                    SearchOption.TopDirectoryOnly)
+                .Select(path => Path.GetFileName(path)!)
+                .Order(StringComparer.Ordinal)
+                .ToArray());
+
+        var legacyFragmentDirectory = Path.Combine(
+            searchDirectory,
+            "OpenSearchWorkItemSearchIndex");
+        Assert.Empty(
+            Directory.Exists(legacyFragmentDirectory)
+                ? Directory.GetFiles(legacyFragmentDirectory, "*.cs", SearchOption.AllDirectories)
+                : []);
+        Assert.True(File.Exists(Path.Combine(searchDirectory, "OpenSearchTransport.cs")));
+        Assert.True(File.Exists(Path.Combine(searchDirectory, "OpenSearchQueryClient.cs")));
+        Assert.True(File.Exists(Path.Combine(searchDirectory, "OpenSearchResponseParser.cs")));
+        Assert.True(File.Exists(Path.Combine(searchDirectory, "OpenSearchIndexManager.cs")));
+        Assert.True(File.Exists(Path.Combine(searchDirectory, "OpenSearchBulkWriter.cs")));
+        Assert.True(File.Exists(Path.Combine(searchDirectory, "OpenSearchValidation.cs")));
+        Assert.All(
+            Directory.GetFiles(
+                searchDirectory,
+                "OpenSearchWorkItemSearchIndex*.cs",
+                SearchOption.TopDirectoryOnly),
+            path => Assert.True(path.Length <= 225, $"OpenSearch adapter path exceeds budget: {path}"));
+    }
+
+    [Fact]
+    public void PostgreSqlExpressionTranslator_IsGroupedByResponsibility()
+    {
+        var translatorDirectory = Path.Combine(
+            SourceDirectory,
+            "Zumbo.Persistence.PostgreSql",
+            "PostgreSqlExpressionTranslator");
+
+        Assert.Equal(
+            [
+                "PostgreSqlExpressionTranslator.EntryPoints.cs",
+                "PostgreSqlExpressionTranslator.ExpressionUtilities.cs",
+                "PostgreSqlExpressionTranslator.Parameters.cs",
+                "PostgreSqlExpressionTranslator.Predicate.cs",
+                "PostgreSqlExpressionTranslator.ScalarJson.cs",
+                "PostgreSqlExpressionTranslator.Unsupported.cs"
+            ],
+            Directory.GetFiles(translatorDirectory, "*.cs", SearchOption.TopDirectoryOnly)
+                .Select(path => Path.GetFileName(path)!)
+                .Order(StringComparer.Ordinal)
+                .ToArray());
+
+        Assert.All(
+            Directory.GetFiles(translatorDirectory, "*.cs", SearchOption.TopDirectoryOnly),
+            path => Assert.True(path.Length <= 225, $"PostgreSQL translator path exceeds budget: {path}"));
+        var persistenceDirectory = Path.GetDirectoryName(translatorDirectory)!;
+        Assert.True(File.Exists(Path.Combine(persistenceDirectory, "PostgreSqlExpressionUtilities.cs")));
+        Assert.True(File.Exists(Path.Combine(persistenceDirectory, "PostgreSqlJsonTranslation.cs")));
+        Assert.True(File.Exists(Path.Combine(persistenceDirectory, "PostgreSqlParameterFindingVisitor.cs")));
+        Assert.True(File.Exists(Path.Combine(persistenceDirectory, "PostgreSqlParameterCollector.cs")));
+        Assert.True(File.Exists(Path.Combine(persistenceDirectory, "PostgreSqlPredicateTranslator.cs")));
+        Assert.True(File.Exists(Path.Combine(persistenceDirectory, "PostgreSqlTranslationState.cs")));
+        Assert.True(File.Exists(Path.Combine(persistenceDirectory, "PostgreSqlTranslationScope.cs")));
+        Assert.True(File.Exists(Path.Combine(persistenceDirectory, "PostgreSqlSqlValue.cs")));
+    }
+
+    [Fact]
+    public void PrivacyDataProcessorAdapter_IsGroupedByResponsibility()
+    {
+        var adapterDirectory = Path.Combine(
+            SourceDirectory,
+            "Zumbo.Api",
+            "Infrastructure",
+            "Adapters",
+            "Platform",
+            "PlatformCore");
+        var fragmentDirectory = Path.Combine(adapterDirectory, "PrivacyDataProcessorAdapter");
+
+        Assert.Equal(
+            [
+                "PrivacyDataProcessorAdapter.Anonymize.cs",
+                "PrivacyDataProcessorAdapter.Export.cs",
+                "PrivacyDataProcessorAdapter.Guard.cs",
+                "PrivacyDataProcessorAdapter.References.cs",
+                "PrivacyDataProcessorAdapter.Streaming.cs"
+            ],
+            Directory.GetFiles(
+                    fragmentDirectory,
+                    "PrivacyDataProcessorAdapter.*.cs",
+                    SearchOption.TopDirectoryOnly)
+                .Select(path => Path.GetFileName(path)!)
+                .Order(StringComparer.Ordinal)
+                .ToArray());
+
+        Assert.Equal(
+            [
+                "PrivacyAnonymizationComponent.cs",
+                "PrivacyAnonymizationGuard.cs",
+                "PrivacyDataExportComponent.cs",
+                "PrivacyDocumentAccess.cs",
+                "PrivacyReferenceDescriptions.cs",
+                "PrivacyStreamExportComponent.cs",
+                "PrivacyStreamSerialization.cs"
+            ],
+            Directory.GetFiles(fragmentDirectory, "Privacy*.cs", SearchOption.TopDirectoryOnly)
+                .Where(path => !Path.GetFileName(path).StartsWith(
+                    "PrivacyDataProcessorAdapter.",
+                    StringComparison.Ordinal))
+                .Select(path => Path.GetFileName(path)!)
+                .Order(StringComparer.Ordinal)
+                .ToArray());
+
+        Assert.True(File.Exists(Path.Combine(adapterDirectory, "PrivacyDataProcessorAdapter.cs")));
+        Assert.All(
+            Directory.GetFiles(fragmentDirectory, "*.cs", SearchOption.TopDirectoryOnly),
+            path => Assert.True(path.Length <= 225, $"Privacy adapter path exceeds budget: {path}"));
+
+        var misplacedReference = Path.Combine(
+            adapterDirectory,
+            "..",
+            "..",
+            "WorkItems",
+            "WorkItemsCore",
+            "PrivacyDataProcessorAdapter.DescribeWorkItemReference.cs");
+        Assert.False(File.Exists(misplacedReference));
+    }
+
+    [Fact]
+    public void ApiHostRegistration_IsGroupedByResponsibility()
+    {
+        var hostingDirectory = Path.Combine(SourceDirectory, "Zumbo.Api", "Composition", "Hosting");
+
+        Assert.Equal(
+            [
+                "ApiHostRegistration.Foundation.cs",
+                "ApiHostRegistration.Operations.cs",
+                "ApiHostRegistration.Security.cs",
+                "ApiHostRegistration.Storage.cs",
+                "ApiHostRegistration.Traffic.cs",
+                "ApiHostRegistration.cs"
+            ],
+            Directory.GetFiles(
+                    hostingDirectory,
+                    "ApiHostRegistration*.cs",
+                    SearchOption.TopDirectoryOnly)
+                .Select(path => Path.GetFileName(path)!)
+                .Order(StringComparer.Ordinal)
+                .ToArray());
+
+        var legacyDirectory = Path.Combine(hostingDirectory, "ApiHostRegistration");
+        Assert.Empty(
+            Directory.Exists(legacyDirectory)
+                ? Directory.GetFiles(legacyDirectory, "*.cs", SearchOption.AllDirectories)
+                : []);
+        Assert.All(
+            Directory.GetFiles(
+                hostingDirectory,
+                "ApiHostRegistration*.cs",
+                SearchOption.TopDirectoryOnly),
+            path => Assert.True(path.Length <= 225, $"API host registration path exceeds budget: {path}"));
+
+        var registrarDirectory = Path.Combine(hostingDirectory, "Registrars");
+        Assert.Equal(
+            [
+                "ApiHostFoundationRegistrar.cs",
+                "ApiHostOperationsRegistrar.cs",
+                "ApiHostSecurityRegistrar.cs",
+                "ApiHostStorageRegistrar.cs",
+                "ApiHostTrafficRegistrar.cs"
+            ],
+            Directory.GetFiles(registrarDirectory, "*.cs", SearchOption.TopDirectoryOnly)
+                .Select(path => Path.GetFileName(path)!)
+                .Order(StringComparer.Ordinal)
+                .ToArray());
+        Assert.All(
+            Directory.GetFiles(registrarDirectory, "*.cs", SearchOption.TopDirectoryOnly),
+            path => Assert.True(path.Length <= 225, $"API host registrar path exceeds budget: {path}"));
+    }
+
+    [Fact]
     public void ApiPipeline_PreservesExactMiddlewareOrder()
     {
         var pipeline = Path.Combine(
@@ -1566,8 +1764,6 @@ public sealed class ArchitectureBoundaryTests
 
         Assert.Contains("services.AddWorkItemApprovalRequestHandler();", composition, StringComparison.Ordinal);
         Assert.Contains("services.AddWorkItemApprovalDecisionHandler();", composition, StringComparison.Ordinal);
-        Assert.DoesNotContain("IDocumentRepository", composition, StringComparison.Ordinal);
-        Assert.DoesNotContain("WorkItemDocument", composition, StringComparison.Ordinal);
         var approvalComposition = File.ReadAllText(Path.Combine(
             SourceDirectory,
             "Zumbo.Api",

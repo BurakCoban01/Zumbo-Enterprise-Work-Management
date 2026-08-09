@@ -19,8 +19,14 @@ public sealed partial class OpenSearchWorkItemSearchIndex : IWorkItemSearchIndex
     private readonly IExternalDependencyPolicy? resiliencePolicy;
     private readonly object circuitGate = new();
     private readonly SemaphoreSlim rebuildGate = new(1, 1);
+#pragma warning disable CS0169 // Preserved compatibility fields; active state belongs to OpenSearchTransport.
     private int consecutiveFailures;
     private DateTimeOffset circuitOpenUntil;
+#pragma warning restore CS0169
+    private readonly OpenSearchTransport transport;
+    private readonly OpenSearchQueryClient queryClient;
+    private readonly OpenSearchIndexManager indexManager;
+    private readonly OpenSearchBulkWriter bulkWriter;
 
     public OpenSearchWorkItemSearchIndex(HttpClient httpClient, IOptions<OpenSearchOptions> options)
         : this(httpClient, options, null)
@@ -35,6 +41,11 @@ public sealed partial class OpenSearchWorkItemSearchIndex : IWorkItemSearchIndex
         this.httpClient = httpClient;
         this.options = options.Value;
         resiliencePolicy = policyProvider?.Get(ExternalDependencyNames.OpenSearch);
+        transport = new OpenSearchTransport(httpClient, this.options, resiliencePolicy);
+        indexManager = new OpenSearchIndexManager(transport, this.options, rebuildGate);
+        bulkWriter = new OpenSearchBulkWriter(transport, this.options, indexManager, rebuildGate);
+        var responseParser = new OpenSearchResponseParser();
+        queryClient = new OpenSearchQueryClient(transport, this.options, responseParser);
     }
 
     private string AliasName => options.IndexName.Trim();

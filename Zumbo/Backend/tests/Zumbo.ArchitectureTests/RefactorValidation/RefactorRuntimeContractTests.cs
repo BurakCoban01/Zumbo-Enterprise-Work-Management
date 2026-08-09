@@ -1822,6 +1822,26 @@ public sealed class RefactorRuntimeContractTests
     private static string RepositoryDirectory => Directory.GetParent(ProjectDirectory)!.FullName;
 
     [Fact]
+    public void RefactorSnapshot_PreservesDiRegistrationContracts()
+    {
+        var baselineFiles = RefactorSourceReader.ReadGit(
+            RepositoryDirectory,
+            RefactorSemanticInventory.BaselineCommit);
+        var targetFiles = RefactorSourceReader.ReadWorkingTree(ProjectDirectory);
+        var baselineRegistrations = DiContracts(baselineFiles);
+        var targetRegistrations = DiContracts(targetFiles);
+
+        Assert.Equal(274, baselineRegistrations.Count);
+
+        AssertExactWithAllowedReplacements(
+            "DI registrations",
+            baselineRegistrations,
+            targetRegistrations,
+            ReplacedVerticalSliceDiRegistrations,
+            PortFocusedVerticalSliceDiRegistrations);
+    }
+
+    [Fact]
     public void RefactorSnapshot_PreservesRuntimeContractsAndSeparatesIntentionalTimeoutChanges()
     {
         var baselineFiles = RefactorSourceReader.ReadGit(

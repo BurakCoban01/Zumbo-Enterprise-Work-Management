@@ -12,5 +12,13 @@ namespace Zumbo.Persistence.PostgreSql;
 
 internal sealed partial class PostgreSqlExpressionTranslator{
 
-    private static DocumentQueryException Unsupported(Expression expression) => PostgreSqlExpressionUtilities.Unsupported(expression);
+    public string TranslatePredicate<TDocument>(Expression<Func<TDocument, bool>> expression)
+    {
+        return predicateTranslator.TranslatePredicate(expression);
+    }
+
+    public string TranslateOrder<TDocument>(Expression<Func<TDocument, object>> expression)
+    {
+        return predicateTranslator.TranslateOrder(expression);
+    }
 }

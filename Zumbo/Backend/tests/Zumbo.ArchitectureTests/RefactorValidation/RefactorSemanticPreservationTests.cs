@@ -7,6 +7,32 @@ public sealed class RefactorSemanticPreservationTests
         {
             ["Zumbo.Api|ApiHostRegistration|method:AddZumboHost:(thisWebApplicationBuilderbuilder):WebApplicationBuilder"] =
                 "The composition root now delegates, in original order, to responsibility-specific Configure* partial methods; the local dependency-health timeout hardening is classified separately in the runtime contract audit.",
+            ["Zumbo.Api|ApiHostRegistration|method:ValidateRegistrationProvisioning:(WebApplicationBuilderbuilder):void"] =
+                "The compatibility helper delegates to ApiHostFoundationRegistrar while preserving mode defaults, Development-only LocalDemo enforcement, ProductionLike validation, exact exceptions/messages and signature.",
+            ["Zumbo.Api|PrivacyDataProcessorAdapter|method:AnonymizeReferencesAsync:(stringuserId,stringorganizationId,stringpseudonym,stringusername,stringemail,CancellationTokenct):Task"] =
+                "The compatibility adapter delegates to PrivacyAnonymizationComponent while preserving reference selection, mutation order, pseudonymization, artifact cleanup, immutable audit handling, cancellation, and signature.",
+            ["Zumbo.Api|PrivacyDataProcessorAdapter|method:EnsureCanAnonymizeAsync:(stringuserId,stringorganizationId,CancellationTokenct):Task"] =
+                "The compatibility adapter delegates to PrivacyAnonymizationGuard while preserving organization, team and project ownership checks, exception codes/messages, cancellation, and signature.",
+            ["Zumbo.Api|PrivacyDataProcessorAdapter|method:ExportAsync:(stringuserId,stringorganizationId,CancellationTokenct):Task<IReadOnlyCollection<PrivacyDataGroup>>"] =
+                "The compatibility adapter delegates to PrivacyDataExportComponent while preserving filters, reference categories/order/details, cursor loading, export limits, cancellation, and signature.",
+            ["Zumbo.Api|PrivacyDataProcessorAdapter|method:WriteExportAsync:(stringuserId,stringorganizationId,UserProfileResponseprofile,Streamdestination,CancellationTokenct):Task<long>"] =
+                "The compatibility adapter delegates to PrivacyStreamExportComponent while preserving filters, reference order, UTF-8 stream settings, JSON shape, counts, flush, cancellation, and signature.",
+            ["Zumbo.Api|PrivacyDataProcessorAdapter|method:DescribeActivityReference:(WorkItemUserActivityReferenceactivity):string"] =
+                "The compatibility helper delegates to PrivacyReferenceDescriptions with the unchanged activity labels and ordinal output order.",
+            ["Zumbo.Api|PrivacyDataProcessorAdapter|method:DescribeWorkItemReference:(WorkItemDocumentitem,stringuserId,WorkItemUserActivityReference?activity):string"] =
+                "The compatibility helper delegates to PrivacyReferenceDescriptions with the unchanged work-item reference predicates, labels and order.",
+            ["Zumbo.Api|PrivacyDataProcessorAdapter|method:Group:(stringcategory,IEnumerable<PrivacyDataReference>source):PrivacyDataGroup"] =
+                "The compatibility helper delegates to PrivacyDataExportComponent with the unchanged limit-plus-one truncation and overflow flag behavior.",
+            ["Zumbo.Api|PrivacyDataProcessorAdapter|method:LoadAllAsync<TDocument>:(IDocumentRepository<TDocument>repository,Expression<Func<TDocument,bool>>filter,CancellationTokenct):Task<IReadOnlyList<TDocument>>"] =
+                "The compatibility helper delegates to PrivacyDocumentAccess with the unchanged cursor traversal, page size, item order and cancellation.",
+            ["Zumbo.Api|PrivacyDataProcessorAdapter|method:Scrub:(string?value,stringusername,stringemail):string?"] =
+                "The compatibility helper delegates to PrivacyAnonymizationComponent with unchanged null and ordinal-ignore-case replacement behavior.",
+            ["Zumbo.Api|PrivacyDataProcessorAdapter|method:WriteDocumentsAsync<TDocument>:(IDocumentRepository<TDocument>repository,Expression<Func<TDocument,bool>>filter,stringcategory,Func<TDocument,IEnumerable<PrivacyDataReference>>select,StreamWriterwriter,CancellationTokenct):Task<long>"] =
+                "The compatibility helper delegates cursor traversal to PrivacyDocumentAccess while preserving page size, document/reference order, category serialization, count and cancellation.",
+            ["Zumbo.Api|PrivacyDataProcessorAdapter|method:WriteLineAsync:(StreamWriterwriter,PrivacyStreamLineline,CancellationTokenct):Task"] =
+                "The compatibility helper delegates to PrivacyStreamSerialization with the unchanged web-default JSON options, line format and cancellation.",
+            ["Zumbo.Api|PrivacyDataProcessorAdapter|method:WriteReferenceAsync:(StreamWriterwriter,stringcategory,PrivacyDataReferencereference,CancellationTokenct):Task"] =
+                "The compatibility helper delegates to PrivacyStreamSerialization with the unchanged reference kind, category, resource, detail, null profile and field order.",
             ["Zumbo.Api|AutomationEndpoints|method:AddAutomationEngine:(thisIServiceCollectionservices,IConfiguration?configuration=null):IServiceCollection"] =
                 "Automation run query, replay, retry, resume, execution, action-execution, and schedule-claim handlers remain registered; the work-item action adapter registration delegates to WorkItems composition while its original constructor, hosted service, and other automation registrations remain preserved under the exact runtime contract audit.",
             ["Zumbo.Api|AutomationWorkItemActionExecutor|method:ExecuteAsync:(AutomationActionExecutionexecution,CancellationTokenct):Task"] =
@@ -187,8 +213,136 @@ public sealed class RefactorSemanticPreservationTests
                 "The login route now resolves the independent Login handler while preserving its HTTP route, rate limiting, request binding, and response mapping through the exact runtime contract audit.",
             ["Zumbo.Persistence.PostgreSql|Zumbo.Persistence.PostgreSql.PostgreSqlMigrationRunner|method:BuildMigrations:():IReadOnlyList<Migration>"] =
                 "The ordered registry retains all 37 explicit Migration.Create calls while immutable definition types own each migration's exact Up and Down SQL; the first three catalog-derived definitions preserve their existing generation order, and the runtime audit verifies IDs, names, SQL, order, and checksum inputs.",
+            ["Zumbo.Persistence.PostgreSql|Zumbo.Persistence.PostgreSql.PostgreSqlExpressionTranslator|method:StripConvert:(Expressionexpression):Expression"] =
+                "The compatibility helper delegates to PostgreSqlExpressionUtilities while preserving iterative convert, checked-convert and quote stripping.",
+            ["Zumbo.Persistence.PostgreSql|Zumbo.Persistence.PostgreSql.PostgreSqlExpressionTranslator|method:Evaluate:(Expressionexpression):object?"] =
+                "The compatibility helper delegates to PostgreSqlExpressionUtilities while preserving dependency rejection, compiled captured-value evaluation and exact DocumentQueryException wrapping.",
+            ["Zumbo.Persistence.PostgreSql|Zumbo.Persistence.PostgreSql.PostgreSqlExpressionTranslator|method:DependsOnParameter:(Expressionexpression):bool"] =
+                "The compatibility helper delegates to PostgreSqlExpressionUtilities and its top-level parameter visitor while preserving traversal and first-parameter detection semantics.",
+            ["Zumbo.Persistence.PostgreSql|Zumbo.Persistence.PostgreSql.PostgreSqlExpressionTranslator|method:GetMemberPath:(MemberExpressionmember,ParameterExpressionroot):IReadOnlyList<string>"] =
+                "The compatibility helper delegates to PostgreSqlExpressionUtilities while preserving nullable Value skipping, JSON member names, root validation, path order and exception text.",
+            ["Zumbo.Persistence.PostgreSql|Zumbo.Persistence.PostgreSql.PostgreSqlExpressionTranslator|method:UnwrapLambda:(Expressionexpression):LambdaExpression"] =
+                "The compatibility helper delegates to PostgreSqlExpressionUtilities while preserving conversion/quote handling and the exact unsupported-predicate exception.",
+            ["Zumbo.Persistence.PostgreSql|Zumbo.Persistence.PostgreSql.PostgreSqlExpressionTranslator|method:Unsupported:(Expressionexpression):DocumentQueryException"] =
+                "The compatibility helper delegates to PostgreSqlExpressionUtilities while preserving expression text, node type and DocumentQueryException contract.",
+            ["Zumbo.Persistence.PostgreSql|Zumbo.Persistence.PostgreSql.PostgreSqlExpressionTranslator|method:IsAny:(MethodCallExpressioncall):bool"] =
+                "The compatibility helper delegates to PostgreSqlExpressionUtilities while preserving Enumerable.Any declaration and argument-count classification.",
+            ["Zumbo.Persistence.PostgreSql|Zumbo.Persistence.PostgreSql.PostgreSqlExpressionTranslator|method:IsContains:(MethodCallExpressioncall):bool"] =
+                "The compatibility helper delegates to PostgreSqlExpressionUtilities while preserving Enumerable/IList Contains classification and string exclusion.",
+            ["Zumbo.Persistence.PostgreSql|Zumbo.Persistence.PostgreSql.PostgreSqlExpressionTranslator|method:IsComparison:(ExpressionTypetype):bool"] =
+                "The compatibility helper delegates to PostgreSqlExpressionUtilities while preserving the exact supported comparison node set.",
+            ["Zumbo.Persistence.PostgreSql|Zumbo.Persistence.PostgreSql.PostgreSqlExpressionTranslator|method:IsNull:(Expressionexpression):bool"] =
+                "The compatibility helper delegates to PostgreSqlExpressionUtilities while preserving dependency short-circuiting and captured null evaluation.",
+            ["Zumbo.Persistence.PostgreSql|Zumbo.Persistence.PostgreSql.PostgreSqlExpressionTranslator|method:NonNullable:(Typetype):Type"] =
+                "The compatibility helper delegates to PostgreSqlExpressionUtilities while preserving nullable underlying-type resolution.",
+            ["Zumbo.Persistence.PostgreSql|Zumbo.Persistence.PostgreSql.PostgreSqlExpressionTranslator|method:CastJsonText:(stringsql,Typetype):string"] =
+                "The compatibility helper delegates to PostgreSqlJsonTranslation while preserving scalar type selection, timestamp parser use, enum casts and unsupported-member exceptions.",
+            ["Zumbo.Persistence.PostgreSql|Zumbo.Persistence.PostgreSql.PostgreSqlExpressionTranslator|method:JsonName:(MemberInfomember):string"] =
+                "The compatibility helper delegates to PostgreSqlJsonTranslation while preserving JsonPropertyName precedence and member-name fallback.",
+            ["Zumbo.Persistence.PostgreSql|Zumbo.Persistence.PostgreSql.PostgreSqlExpressionTranslator|method:JsonText:(stringroot,IReadOnlyList<string>path):string"] =
+                "The compatibility helper delegates to PostgreSqlJsonTranslation while preserving the PostgreSQL JSON text-path operator and path-array formatting.",
+            ["Zumbo.Persistence.PostgreSql|Zumbo.Persistence.PostgreSql.PostgreSqlExpressionTranslator|method:JsonValue:(stringroot,IReadOnlyList<string>path):string"] =
+                "The compatibility helper delegates to PostgreSqlJsonTranslation while preserving the PostgreSQL JSON value-path operator and path-array formatting.",
+            ["Zumbo.Persistence.PostgreSql|Zumbo.Persistence.PostgreSql.PostgreSqlExpressionTranslator|method:PathArray:(IEnumerable<string>path):string"] =
+                "The compatibility helper delegates to PostgreSqlJsonTranslation while preserving path order, quoting and ordinal apostrophe escaping.",
+            ["Zumbo.Persistence.PostgreSql|Zumbo.Persistence.PostgreSql.PostgreSqlExpressionTranslator|property:Parameters:IReadOnlyList<NpgsqlParameter>"] =
+                "The compatibility property delegates to the lifetime-scoped PostgreSqlParameterCollector while preserving ordinal order and the read-only list contract.",
+            ["Zumbo.Persistence.PostgreSql|Zumbo.Persistence.PostgreSql.PostgreSqlExpressionTranslator|method:AddParameter:(object?value,TypeexpectedType):string"] =
+                "The compatibility helper delegates to PostgreSqlParameterCollector while preserving pN naming, normalization, null-to-DBNull behavior, NpgsqlParameter construction and insertion order.",
+            ["Zumbo.Persistence.PostgreSql|Zumbo.Persistence.PostgreSql.PostgreSqlExpressionTranslator|method:AddJsonParameter:(stringjson):string"] =
+                "The compatibility helper delegates to PostgreSqlParameterCollector while preserving pN naming, Jsonb type, exact JSON value, NpgsqlParameter construction and insertion order.",
+            ["Zumbo.Persistence.PostgreSql|Zumbo.Persistence.PostgreSql.PostgreSqlExpressionTranslator|method:AddParameters:(NpgsqlCommandcommand):void"] =
+                "The compatibility method delegates to PostgreSqlParameterCollector while preserving parameter object identity and ordinal command attachment.",
+            ["Zumbo.Persistence.PostgreSql|Zumbo.Persistence.PostgreSql.PostgreSqlExpressionTranslator|method:NormalizeParameter:(object?value,Typetype):object?"] =
+                "The compatibility helper delegates to PostgreSqlParameterCollector while preserving null, enum, DateTime kind, Guid, Uri and passthrough normalization behavior.",
+            ["Zumbo.Persistence.PostgreSql|Zumbo.Persistence.PostgreSql.PostgreSqlExpressionTranslator|method:TranslatePredicate<TDocument>:(Expression<Func<TDocument,bool>>expression):string"] =
+                "The public compatibility entry delegates to PostgreSqlPredicateTranslator while preserving null validation, document-column scope, traversal, SQL and parameter order.",
+            ["Zumbo.Persistence.PostgreSql|Zumbo.Persistence.PostgreSql.PostgreSqlExpressionTranslator|method:TranslateOrder<TDocument>:(Expression<Func<TDocument,object>>expression):string"] =
+                "The public compatibility entry delegates to PostgreSqlPredicateTranslator while preserving null validation, conversion stripping, document-column scope and scalar SQL.",
+            ["Zumbo.Persistence.PostgreSql|Zumbo.Persistence.PostgreSql.PostgreSqlExpressionTranslator|method:VisitPredicate:(Expressionexpression,Scopescope):string"] =
+                "The compatibility helper delegates to PostgreSqlPredicateTranslator while preserving dependency evaluation, boolean recursion, method dispatch, SQL parentheses and unsupported behavior.",
+            ["Zumbo.Persistence.PostgreSql|Zumbo.Persistence.PostgreSql.PostgreSqlExpressionTranslator|method:VisitComparison:(BinaryExpressionexpression,Scopescope):string"] =
+                "The compatibility helper delegates to PostgreSqlPredicateTranslator while preserving null handling, scalar preference, operators, SQL and exceptions.",
+            ["Zumbo.Persistence.PostgreSql|Zumbo.Persistence.PostgreSql.PostgreSqlExpressionTranslator|method:VisitBooleanMethod:(MethodCallExpressioncall,Scopescope):string"] =
+                "The compatibility helper delegates to PostgreSqlPredicateTranslator while preserving Any/string/Contains/object-equality dispatch order and SQL.",
+            ["Zumbo.Persistence.PostgreSql|Zumbo.Persistence.PostgreSql.PostgreSqlExpressionTranslator|method:VisitStringEquals:(MethodCallExpressioncall,Scopescope):string"] =
+                "The compatibility helper delegates to PostgreSqlPredicateTranslator while preserving ordinal and ordinal-ignore-case SQL plus unsupported comparison exceptions.",
+            ["Zumbo.Persistence.PostgreSql|Zumbo.Persistence.PostgreSql.PostgreSqlExpressionTranslator|method:VisitContains:(MethodCallExpressioncall,Scopescope):string"] =
+                "The compatibility helper delegates to PostgreSqlPredicateTranslator while preserving captured-list and document-JSON collection behavior, parameter order and exact failures.",
+            ["Zumbo.Persistence.PostgreSql|Zumbo.Persistence.PostgreSql.PostgreSqlExpressionTranslator|method:VisitAny:(MethodCallExpressioncall,Scopescope):string"] =
+                "The compatibility helper delegates to PostgreSqlPredicateTranslator with shared lifetime state while preserving JSON alias consumption, EXISTS SQL and nested predicate traversal.",
+            ["Zumbo.Persistence.PostgreSql|Zumbo.Persistence.PostgreSql.PostgreSqlExpressionTranslator|method:VisitScalar:(Expressionexpression,Scopescope,Type?preferredType=null):SqlValue"] =
+                "The compatibility helper delegates to PostgreSqlPredicateTranslator while preserving captured parameters, document columns, JSON casts, nullable handling, string methods and scalar result type.",
+            ["Zumbo.Persistence.PostgreSql|Zumbo.Persistence.PostgreSql.PostgreSqlExpressionTranslator|method:VisitJson:(Expressionexpression,Scopescope):string"] =
+                "The compatibility helper delegates to PostgreSqlPredicateTranslator while preserving convert stripping, element scope, member-path JSON SQL and unsupported behavior.",
+            ["Zumbo.Persistence.PostgreSql|Zumbo.Persistence.PostgreSql.PostgreSqlExpressionTranslator|field:jsonAliasIndex:int"] =
+                "The preserved compatibility field now states its CLR-default zero initializer explicitly and is read by a compatibility accessor solely to retain the baseline member without compiler warnings; active aliases use equivalent zero-based lifetime state.",
             ["Zumbo.BuildingBlocks.Infrastructure|Zumbo.BuildingBlocks.Infrastructure.Search.OpenSearchWorkItemSearchIndex|method:InitializeAsync:(CancellationTokencancellationToken=default):Task"] =
-                "Initialization now detects the pre-alias concrete index layout and delegates to a lossless, count-verified reindex migration before atomically installing the write alias; unit and live runtime checks cover both success and fail-closed behavior.",
+                "The public compatibility method delegates to OpenSearchIndexManager, which preserves configuration validation, versioned-index creation, pre-alias concrete-index detection, lossless count-verified migration, atomic write-alias installation, cancellation, and failure behavior.",
+            ["Zumbo.BuildingBlocks.Infrastructure|Zumbo.BuildingBlocks.Infrastructure.Search.OpenSearchWorkItemSearchIndex|ctor:(HttpClienthttpClient,IOptions<OpenSearchOptions>options,IExternalDependencyPolicyProvider?policyProvider)"] =
+                "The preserved constructor resolves the same OpenSearch policy and creates independent transport, index-manager, bulk-writer, query and response-parser components while retaining all baseline fields, options, signatures, constructor chaining, and the exact rebuild semaphore shared by migration and public rebuild.",
+            ["Zumbo.BuildingBlocks.Infrastructure|Zumbo.BuildingBlocks.Infrastructure.Search.OpenSearchWorkItemSearchIndex|method:CreateBulkPayload:(IEnumerable<WorkItemSearchRecord>records):string"] =
+                "The compatibility helper delegates to OpenSearchBulkWriter's unchanged ordinal record ordering, web-default action/document JSON serialization, identifiers, line order, and trailing newlines.",
+            ["Zumbo.BuildingBlocks.Infrastructure|Zumbo.BuildingBlocks.Infrastructure.Search.OpenSearchWorkItemSearchIndex|method:DeleteAsync:(stringid,CancellationTokencancellationToken=default):Task"] =
+                "The public compatibility method delegates to OpenSearchBulkWriter while preserving alias targeting, identifier escaping, not-found handling, transport, cancellation, response disposal, and signature.",
+            ["Zumbo.BuildingBlocks.Infrastructure|Zumbo.BuildingBlocks.Infrastructure.Search.OpenSearchWorkItemSearchIndex|method:IndexAsync:(WorkItemSearchRecordrecord,CancellationTokencancellationToken=default):Task"] =
+                "The public compatibility method delegates to OpenSearchBulkWriter while preserving scope validation order and message, alias targeting, identifier escaping, record serialization, transport, cancellation, response disposal, and signature.",
+            ["Zumbo.BuildingBlocks.Infrastructure|Zumbo.BuildingBlocks.Infrastructure.Search.OpenSearchWorkItemSearchIndex|method:RebuildAsync:(IReadOnlyCollection<WorkItemSearchRecord>records,CancellationTokencancellationToken=default):Task<WorkItemSearchRebuildResult>"] =
+                "The public compatibility method delegates to OpenSearchBulkWriter using the adapter's exact rebuild semaphore and index manager while preserving validation order, revision naming, deterministic NDJSON, bulk and count checks, alias replacement, removed-count clamp, cleanup, cancellation, disposal, exception behavior, semaphore release, and signature.",
+            ["Zumbo.BuildingBlocks.Infrastructure|Zumbo.BuildingBlocks.Infrastructure.Search.OpenSearchWorkItemSearchIndex|method:ValidateConfiguration:(OpenSearchOptionsoptions):void"] =
+                "The public compatibility method delegates to OpenSearchValidation while preserving URI parsing, scheme and insecure-HTTP rules, index-name checks, mapping/shard/replica bounds, credential pairing, timeout/circuit/reindex bounds, exception types, exact messages, and signature.",
+            ["Zumbo.BuildingBlocks.Infrastructure|Zumbo.BuildingBlocks.Infrastructure.Search.OpenSearchWorkItemSearchIndex|method:ValidateScope:(stringorganizationId,stringprojectId):void"] =
+                "The private compatibility helper delegates to OpenSearchValidation while preserving whitespace handling, validation order, ArgumentException type, exact message, and signature.",
+            ["Zumbo.BuildingBlocks.Infrastructure|Zumbo.BuildingBlocks.Infrastructure.Search.OpenSearchWorkItemSearchIndex|method:ChangeAliasAsync:(IReadOnlyCollection<string>oldIndexes,stringnewIndex,CancellationTokencancellationToken):Task"] =
+                "The compatibility helper delegates to OpenSearchIndexManager while preserving old-index filtering, ordered remove/add actions, write-index selection, URL, transport, cancellation, and response disposal.",
+            ["Zumbo.BuildingBlocks.Infrastructure|Zumbo.BuildingBlocks.Infrastructure.Search.OpenSearchWorkItemSearchIndex|method:CountAsync:(stringindexName,CancellationTokencancellationToken):Task<long>"] =
+                "The compatibility helper delegates to OpenSearchIndexManager while preserving the count URL, transport, web-default response projection, null fallback, cancellation, and response disposal.",
+            ["Zumbo.BuildingBlocks.Infrastructure|Zumbo.BuildingBlocks.Infrastructure.Search.OpenSearchWorkItemSearchIndex|method:EnsureIndexAsync:(stringindexName,CancellationTokencancellationToken):Task"] =
+                "The compatibility helper delegates to OpenSearchIndexManager while preserving the HEAD/create/confirm sequence, mapping body, race recovery, cancellation, exception behavior, and response disposal.",
+            ["Zumbo.BuildingBlocks.Infrastructure|Zumbo.BuildingBlocks.Infrastructure.Search.OpenSearchWorkItemSearchIndex|method:GetAliasIndexesAsync:(CancellationTokencancellationToken):Task<IReadOnlyList<string>>"] =
+                "The compatibility helper delegates to OpenSearchIndexManager while preserving alias lookup, not-found empty result, JSON parsing, ordinal ordering, cancellation, and disposal.",
+            ["Zumbo.BuildingBlocks.Infrastructure|Zumbo.BuildingBlocks.Infrastructure.Search.OpenSearchWorkItemSearchIndex|method:IndexDefinition:():object"] =
+                "The compatibility helper delegates to OpenSearchIndexManager's unchanged shard, replica, strict mapping, mapping-version metadata, field definitions, and property order.",
+            ["Zumbo.BuildingBlocks.Infrastructure|Zumbo.BuildingBlocks.Infrastructure.Search.OpenSearchWorkItemSearchIndex|method:MigrateLegacyConcreteIndexAsync:(CancellationTokencancellationToken):Task"] =
+                "The compatibility helper delegates to OpenSearchIndexManager using the adapter's exact rebuild semaphore while preserving migration naming, reindex request, before/after counts, atomic replacement, cleanup, timeout, cancellation, exception behavior, and semaphore release.",
+            ["Zumbo.BuildingBlocks.Infrastructure|Zumbo.BuildingBlocks.Infrastructure.Search.OpenSearchWorkItemSearchIndex|method:BuildLegacyMigrationIndexName:():string"] =
+                "The compatibility helper delegates to OpenSearchIndexManager's unchanged version, UTC timestamp, GUID, legacy suffix, and 255-character clamp.",
+            ["Zumbo.BuildingBlocks.Infrastructure|Zumbo.BuildingBlocks.Infrastructure.Search.OpenSearchWorkItemSearchIndex|method:ReadReindexTaskIdAsync:(HttpResponseMessageresponse,CancellationTokencancellationToken):Task<string>"] =
+                "The compatibility helper delegates to OpenSearchIndexManager's unchanged response parsing, task validation, cancellation, disposal, and exception contract.",
+            ["Zumbo.BuildingBlocks.Infrastructure|Zumbo.BuildingBlocks.Infrastructure.Search.OpenSearchWorkItemSearchIndex|method:WaitForReindexAsync:(stringtaskId,CancellationTokencancellationToken):Task"] =
+                "The compatibility helper delegates to OpenSearchIndexManager's unchanged ten-minute timeout, escaped task polling, unavailable retry, incomplete delay, task validation, cancellation, disposal, and timeout translation.",
+            ["Zumbo.BuildingBlocks.Infrastructure|Zumbo.BuildingBlocks.Infrastructure.Search.OpenSearchWorkItemSearchIndex|method:EnsureReindexTaskSucceeded:(JsonElementtask):void"] =
+                "The compatibility helper delegates to OpenSearchIndexManager's unchanged task-error and item-failure validation with exact exception contracts.",
+            ["Zumbo.BuildingBlocks.Infrastructure|Zumbo.BuildingBlocks.Infrastructure.Search.OpenSearchWorkItemSearchIndex|method:ReplaceLegacyConcreteIndexWithAliasAsync:(stringmigrationIndex,CancellationTokencancellationToken):Task"] =
+                "The compatibility helper delegates to OpenSearchIndexManager while preserving ordered remove-index/add-alias actions, write-index selection, URL, transport, cancellation, and disposal.",
+            ["Zumbo.BuildingBlocks.Infrastructure|Zumbo.BuildingBlocks.Infrastructure.Search.OpenSearchWorkItemSearchIndex|method:TryDeleteIndexAsync:(stringindexName,CancellationTokencancellationToken):Task"] =
+                "The compatibility helper delegates to OpenSearchIndexManager while preserving best-effort deletion, not-found handling, cancellation propagation, non-cancellation suppression, and disposal.",
+            ["Zumbo.BuildingBlocks.Infrastructure|Zumbo.BuildingBlocks.Infrastructure.Search.OpenSearchWorkItemSearchIndex|method:KeywordField:():object"] =
+                "The compatibility helper delegates to OpenSearchIndexManager's unchanged keyword type and ignore-above mapping.",
+            ["Zumbo.BuildingBlocks.Infrastructure|Zumbo.BuildingBlocks.Infrastructure.Search.OpenSearchWorkItemSearchIndex|method:SearchableKeywordField:():object"] =
+                "The compatibility helper delegates to OpenSearchIndexManager's unchanged text field with nested keyword mapping.",
+            ["Zumbo.BuildingBlocks.Infrastructure|Zumbo.BuildingBlocks.Infrastructure.Search.OpenSearchWorkItemSearchIndex|method:CloneAsync:(HttpRequestMessagesource,CancellationTokencancellationToken):Task<HttpRequestMessage>"] =
+                "The compatibility helper delegates to OpenSearchTransport while preserving request method, URI, version, policy, headers, content bytes, cancellation, and async signature.",
+            ["Zumbo.BuildingBlocks.Infrastructure|Zumbo.BuildingBlocks.Infrastructure.Search.OpenSearchWorkItemSearchIndex|method:JsonRequest:(HttpMethodmethod,stringurl,objectbody):HttpRequestMessage"] =
+                "The compatibility helper delegates to OpenSearchTransport's unchanged web-default JSON request construction.",
+            ["Zumbo.BuildingBlocks.Infrastructure|Zumbo.BuildingBlocks.Infrastructure.Search.OpenSearchWorkItemSearchIndex|method:SendAsync:(HttpRequestMessagerequest,boolallowNotFound=false,CancellationTokencancellationToken=default):Task<HttpResponseMessage>"] =
+                "The compatibility helper delegates to OpenSearchTransport while preserving policy selection, retry execution, exception translation, local-circuit fallback, cancellation, and response ownership.",
+            ["Zumbo.BuildingBlocks.Infrastructure|Zumbo.BuildingBlocks.Infrastructure.Search.OpenSearchWorkItemSearchIndex|method:SendAttemptAsync:(HttpRequestMessagerequest,boolallowNotFound,booluseLocalCircuit,CancellationTokencancellationToken):Task<HttpResponseMessage>"] =
+                "The compatibility helper delegates to OpenSearchTransport while preserving authentication, timeout, transient handling, not-found behavior, circuit updates, exception translation, cancellation, and response ownership.",
+            ["Zumbo.BuildingBlocks.Infrastructure|Zumbo.BuildingBlocks.Infrastructure.Search.OpenSearchWorkItemSearchIndex|method:IsTransient:(HttpStatusCodestatusCode):bool"] =
+                "The compatibility helper delegates to OpenSearchTransport's unchanged request-timeout, rate-limit, and server-error classification.",
+            ["Zumbo.BuildingBlocks.Infrastructure|Zumbo.BuildingBlocks.Infrastructure.Search.OpenSearchWorkItemSearchIndex|method:RegisterFailure:():void"] =
+                "The compatibility helper delegates to the transport-owned circuit state while preserving threshold and open-until timing behavior.",
+            ["Zumbo.BuildingBlocks.Infrastructure|Zumbo.BuildingBlocks.Infrastructure.Search.OpenSearchWorkItemSearchIndex|method:ResetCircuit:():void"] =
+                "The compatibility helper delegates to the transport-owned circuit state while preserving atomic failure-count and open-time reset behavior.",
+            ["Zumbo.BuildingBlocks.Infrastructure|Zumbo.BuildingBlocks.Infrastructure.Search.OpenSearchWorkItemSearchIndex|method:ThrowIfCircuitOpen:():void"] =
+                "The compatibility helper delegates to the transport-owned circuit state while preserving open rejection and elapsed-circuit reset behavior.",
+            ["Zumbo.BuildingBlocks.Infrastructure|Zumbo.BuildingBlocks.Infrastructure.Search.OpenSearchWorkItemSearchIndex|method:AddTermFilter:(List<object>filters,stringfield,string?value):void"] =
+                "The compatibility helper delegates to OpenSearchQueryClient's unchanged non-empty exact-term filter projection.",
+            ["Zumbo.BuildingBlocks.Infrastructure|Zumbo.BuildingBlocks.Infrastructure.Search.OpenSearchWorkItemSearchIndex|method:ExactCustomFieldValue:(stringkey,stringvalue):string"] =
+                "The compatibility helper delegates to OpenSearchQueryClient's unchanged trimmed unit-separator exact custom-field encoding.",
+            ["Zumbo.BuildingBlocks.Infrastructure|Zumbo.BuildingBlocks.Infrastructure.Search.OpenSearchWorkItemSearchIndex|method:SearchAsync:(WorkItemSearchQueryquery,CancellationTokencancellationToken=default):Task<WorkItemSearchResult>"] =
+                "The public compatibility method delegates to the query client and response parser while preserving scope validation, DSL field and filter order, text matching, paging clamps, transport cancellation, hit order, total count, and result contract.",
             ["Zumbo.Api|MongoMigrationRunner|method:ApplyIndexesAsync:(stringmigrationId,IReadOnlyList<MongoIndexSpecification>indexes,CancellationTokencancellationToken):Task<MongoMigrationOutcome>"] =
                 "Index application preserves catalog checksums while accepting semantically equivalent legacy names and skipping superseded identity and notification definitions whose dedicated later migrations own the valid replacements.",
             ["Zumbo.Api|MongoMigrationRunner|method:RunAsync:(CancellationTokencancellationToken=default):Task<MongoMigrationRunReport>"] =
