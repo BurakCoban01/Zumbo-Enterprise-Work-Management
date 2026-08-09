@@ -1,4 +1,5 @@
 using Zumbo.Modules.WorkItems;
+using Zumbo.Modules.WorkItems.Application.Features.Recurrences;
 using Zumbo.BuildingBlocks.Application.Messaging;
 using Zumbo.BuildingBlocks.Application.Security;
 using Zumbo.SharedKernel;
@@ -13,10 +14,10 @@ internal static class PreviewRecurrenceEndpoint
     {
         group.MapPost("/recurrences/preview", async (
             PreviewWorkItemRecurrenceRequest request,
-            WorkItemTemplateRecurrenceService service,
+            PreviewWorkItemRecurrenceHandler handler,
             HttpContext http,
             CancellationToken ct) =>
-            Ok(await service.PreviewRecurrenceAsync(request, ct), http))
+            Ok(await handler.HandleAsync(new PreviewWorkItemRecurrenceQuery(request), ct), http))
             .WithZumboPermission(PermissionCatalog.WorkItemCreate);
     }
 }

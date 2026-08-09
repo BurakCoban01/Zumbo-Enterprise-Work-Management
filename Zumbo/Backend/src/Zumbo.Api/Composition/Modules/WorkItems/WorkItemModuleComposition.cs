@@ -4,6 +4,7 @@ using Zumbo.BuildingBlocks.Application.Persistence;
 using Zumbo.BuildingBlocks.Application.Search;
 using Zumbo.BuildingBlocks.Application.Security;
 using Zumbo.Modules.WorkItems;
+using Zumbo.Modules.WorkItems.Application.Features.Recurrences;
 using Zumbo.SharedKernel;
 
 namespace Zumbo.Api.Composition.Modules.WorkItems;
@@ -50,6 +51,99 @@ internal static class WorkItemModuleComposition
                 "Work-item recurrence settings are outside the supported bounds.")
             .ValidateOnStart();
         services.AddScoped<WorkItemTemplateRecurrenceService>();
+        services.AddScoped<ListWorkItemTemplatesHandler>(provider => new ListWorkItemTemplatesHandler(
+            provider.GetRequiredService<IDocumentRepository<WorkItemTemplateDocument>>(),
+            provider.GetRequiredService<IProjectPermissionChecker>(),
+            provider.GetRequiredService<ICurrentUser>()));
+        services.AddScoped<ListWorkItemRecurrencesHandler>(provider => new ListWorkItemRecurrencesHandler(
+            provider.GetRequiredService<IDocumentRepository<WorkItemRecurrenceDocument>>(),
+            provider.GetRequiredService<IDocumentRepository<WorkItemRecurrenceOccurrenceDocument>>(),
+            provider.GetRequiredService<IProjectPermissionChecker>(),
+            provider.GetRequiredService<ICurrentUser>()));
+        services.AddScoped<ListRecurrenceOccurrencesHandler>(provider => new ListRecurrenceOccurrencesHandler(
+            provider.GetRequiredService<IDocumentRepository<WorkItemRecurrenceDocument>>(),
+            provider.GetRequiredService<IDocumentRepository<WorkItemRecurrenceOccurrenceDocument>>(),
+            provider.GetRequiredService<IProjectPermissionChecker>(),
+            provider.GetRequiredService<ICurrentUser>()));
+        services.AddScoped<PreviewWorkItemRecurrenceHandler>(provider => new PreviewWorkItemRecurrenceHandler(
+            provider.GetRequiredService<IDocumentRepository<WorkItemTemplateDocument>>(),
+            provider.GetRequiredService<IProjectPermissionChecker>(),
+            provider.GetRequiredService<ICurrentUser>(),
+            provider.GetRequiredService<IOptions<WorkItemRecurrenceOptions>>(),
+            provider.GetRequiredService<IClock>()));
+        services.AddScoped<CreateWorkItemRecurrenceHandler>(provider => new CreateWorkItemRecurrenceHandler(
+            provider.GetRequiredService<IDocumentRepository<WorkItemTemplateDocument>>(),
+            provider.GetRequiredService<IDocumentRepository<WorkItemRecurrenceDocument>>(),
+            provider.GetRequiredService<IDocumentRepository<WorkItemRecurrenceOccurrenceDocument>>(),
+            provider.GetRequiredService<IProjectPermissionChecker>(),
+            provider.GetRequiredService<ICurrentUser>(),
+            provider.GetRequiredService<IOptions<WorkItemRecurrenceOptions>>(),
+            provider.GetRequiredService<IClock>(),
+            provider.GetRequiredService<IWorkItemAuditPublisher>()));
+        services.AddScoped<SetWorkItemRecurrenceStateHandler>(provider => new SetWorkItemRecurrenceStateHandler(
+            provider.GetRequiredService<IDocumentRepository<WorkItemRecurrenceDocument>>(),
+            provider.GetRequiredService<IDocumentRepository<WorkItemRecurrenceOccurrenceDocument>>(),
+            provider.GetRequiredService<IProjectPermissionChecker>(),
+            provider.GetRequiredService<ICurrentUser>(),
+            provider.GetRequiredService<IDistributedLockProvider>(),
+            provider.GetRequiredService<IOptions<DistributedLockOptions>>(),
+            provider.GetRequiredService<IClock>(),
+            provider.GetRequiredService<IWorkItemAuditPublisher>(),
+            provider.GetService<IExpectedVersionAccessor>()));
+        services.AddScoped<ArchiveWorkItemRecurrenceHandler>(provider => new ArchiveWorkItemRecurrenceHandler(
+            provider.GetRequiredService<IDocumentRepository<WorkItemRecurrenceDocument>>(),
+            provider.GetRequiredService<IProjectPermissionChecker>(),
+            provider.GetRequiredService<ICurrentUser>(),
+            provider.GetRequiredService<IDistributedLockProvider>(),
+            provider.GetRequiredService<IOptions<DistributedLockOptions>>(),
+            provider.GetRequiredService<IClock>(),
+            provider.GetRequiredService<IWorkItemAuditPublisher>(),
+            provider.GetService<IExpectedVersionAccessor>()));
+        services.AddScoped<CreateWorkItemTemplateHandler>(provider => new CreateWorkItemTemplateHandler(
+            provider.GetRequiredService<IDocumentRepository<WorkItemTemplateDocument>>(),
+            provider.GetRequiredService<IProjectPermissionChecker>(),
+            provider.GetRequiredService<ICurrentUser>(),
+            provider.GetRequiredService<IWorkItemTeamPolicy>(),
+            provider.GetRequiredService<IWorkItemCollaboratorDirectory>(),
+            provider.GetRequiredService<IBoardPlacementPolicy>(),
+            provider.GetRequiredService<IWorkItemTypeSchemaPolicy>(),
+            provider.GetRequiredService<IDistributedLockProvider>(),
+            provider.GetRequiredService<IOptions<DistributedLockOptions>>(),
+            provider.GetRequiredService<IClock>(),
+            provider.GetRequiredService<IWorkItemAuditPublisher>()));
+        services.AddScoped<UpdateWorkItemTemplateHandler>(provider => new UpdateWorkItemTemplateHandler(
+            provider.GetRequiredService<IDocumentRepository<WorkItemTemplateDocument>>(),
+            provider.GetRequiredService<IDocumentRepository<WorkItemRecurrenceDocument>>(),
+            provider.GetRequiredService<IProjectPermissionChecker>(),
+            provider.GetRequiredService<ICurrentUser>(),
+            provider.GetRequiredService<IWorkItemTeamPolicy>(),
+            provider.GetRequiredService<IWorkItemCollaboratorDirectory>(),
+            provider.GetRequiredService<IBoardPlacementPolicy>(),
+            provider.GetRequiredService<IWorkItemTypeSchemaPolicy>(),
+            provider.GetRequiredService<IDistributedLockProvider>(),
+            provider.GetRequiredService<IOptions<DistributedLockOptions>>(),
+            provider.GetRequiredService<IClock>(),
+            provider.GetRequiredService<IWorkItemAuditPublisher>(),
+            provider.GetService<IExpectedVersionAccessor>()));
+        services.AddScoped<ArchiveWorkItemTemplateHandler>(provider => new ArchiveWorkItemTemplateHandler(
+            provider.GetRequiredService<IDocumentRepository<WorkItemTemplateDocument>>(),
+            provider.GetRequiredService<IDocumentRepository<WorkItemRecurrenceDocument>>(),
+            provider.GetRequiredService<IProjectPermissionChecker>(),
+            provider.GetRequiredService<ICurrentUser>(),
+            provider.GetRequiredService<IDistributedLockProvider>(),
+            provider.GetRequiredService<IOptions<DistributedLockOptions>>(),
+            provider.GetRequiredService<IClock>(),
+            provider.GetRequiredService<IWorkItemAuditPublisher>(),
+            provider.GetService<IExpectedVersionAccessor>()));
+        services.AddScoped<ScheduleDueRecurrencesHandler>(provider => new ScheduleDueRecurrencesHandler(
+            provider.GetRequiredService<IDocumentRepository<WorkItemTemplateDocument>>(),
+            provider.GetRequiredService<IDocumentRepository<WorkItemRecurrenceDocument>>(),
+            provider.GetRequiredService<IDocumentRepository<WorkItemRecurrenceOccurrenceDocument>>(),
+            provider.GetRequiredService<IWorkItemRecurrenceEventPublisher>(),
+            provider.GetRequiredService<IDistributedLockProvider>(),
+            provider.GetRequiredService<IOptions<DistributedLockOptions>>(),
+            provider.GetRequiredService<IOptions<WorkItemRecurrenceOptions>>(),
+            provider.GetRequiredService<IClock>()));
         services.AddScoped<RecurringWorkItemGenerator>();
         services.AddWorkItemBulkOperations();
         services.AddScoped<SearchMaintenanceService>();

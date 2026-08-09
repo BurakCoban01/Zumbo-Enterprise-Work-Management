@@ -1,4 +1,5 @@
 using Zumbo.Modules.WorkItems;
+using Zumbo.Modules.WorkItems.Application.Features.Recurrences;
 using Zumbo.BuildingBlocks.Application.Messaging;
 using Zumbo.BuildingBlocks.Application.Security;
 using Zumbo.SharedKernel;
@@ -16,10 +17,15 @@ internal static class ListTemplatesEndpoint
             int? page,
             int? pageSize,
             bool? includeArchived,
-            WorkItemTemplateRecurrenceService service,
+            ListWorkItemTemplatesHandler handler,
             HttpContext http,
             CancellationToken ct) =>
-            Ok(await service.ListTemplatesAsync(
-                projectId, page ?? 1, pageSize ?? 50, includeArchived ?? false, ct), http));
+            Ok(await handler.HandleAsync(
+                new ListWorkItemTemplatesQuery(
+                    projectId,
+                    page ?? 1,
+                    pageSize ?? 50,
+                    includeArchived ?? false),
+                ct), http));
     }
 }

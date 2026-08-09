@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Options;
 using Zumbo.BuildingBlocks.Application.Messaging;
 using Zumbo.Modules.WorkItems;
+using Zumbo.Modules.WorkItems.Application.Features.Recurrences;
 
 public sealed class WorkItemRecurrenceSchedulerHostedService(
     IServiceScopeFactory scopeFactory,
@@ -21,11 +22,11 @@ public sealed class WorkItemRecurrenceSchedulerHostedService(
             try
             {
                 await using var scope = scopeFactory.CreateAsyncScope();
-                var service = scope.ServiceProvider.GetRequiredService<WorkItemTemplateRecurrenceService>();
+                var handler = scope.ServiceProvider.GetRequiredService<ScheduleDueRecurrencesHandler>();
                 var transactions = scope.ServiceProvider.GetRequiredService<IDurableTransactionRunner>();
                 await transactions.ExecuteAsync(
                     "WorkItems",
-                    service.ScheduleDueAsync,
+                    ct => handler.HandleAsync(new ScheduleDueRecurrencesCommand(), ct),
                     stoppingToken);
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)

@@ -1,4 +1,5 @@
 using Zumbo.Modules.WorkItems;
+using Zumbo.Modules.WorkItems.Application.Features.Recurrences;
 using Zumbo.BuildingBlocks.Application.Messaging;
 using Zumbo.BuildingBlocks.Application.Security;
 using Zumbo.SharedKernel;
@@ -13,11 +14,13 @@ internal static class DeleteRecurrenceEndpoint
     {
         group.MapDelete("/recurrences/{recurrenceId}", async (
             string recurrenceId,
-            WorkItemTemplateRecurrenceService service,
+            ArchiveWorkItemRecurrenceHandler handler,
             HttpContext http,
             CancellationToken ct) =>
         {
-            await service.ArchiveRecurrenceAsync(recurrenceId, CorrelationId(http), ct);
+            await handler.HandleAsync(
+                new ArchiveWorkItemRecurrenceCommand(recurrenceId, CorrelationId(http)),
+                ct);
             return Results.NoContent();
         }).WithZumboPermission(PermissionCatalog.WorkItemUpdate);
     }

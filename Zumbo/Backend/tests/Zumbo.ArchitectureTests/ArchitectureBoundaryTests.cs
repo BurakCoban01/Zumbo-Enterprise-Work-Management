@@ -849,6 +849,204 @@ public sealed class ArchitectureBoundaryTests
     }
 
     [Fact]
+    public void WorkItemTemplateList_IsAPortFocusedVerticalSliceWithCompatibilityFacade()
+    {
+        var moduleDirectory = Path.Combine(SourceDirectory, "Zumbo.Modules.WorkItems");
+        var featureDirectory = Path.Combine(moduleDirectory, "Application", "Features", "Recurrences");
+        Assert.True(File.Exists(Path.Combine(featureDirectory, "ListWorkItemTemplatesQuery.cs")));
+        Assert.True(File.Exists(Path.Combine(featureDirectory, "ListWorkItemTemplatesHandler.cs")));
+        Assert.True(File.Exists(Path.Combine(featureDirectory, "ListWorkItemTemplatesSlice.cs")));
+        Assert.True(File.Exists(Path.Combine(featureDirectory, "WorkItemTemplateResponseMapper.cs")));
+        foreach (var file in new[]
+        {
+            "RecurrenceReadAccess.cs",
+            "RecurrenceResponseMapper.cs",
+            "ListWorkItemRecurrencesQuery.cs",
+            "ListWorkItemRecurrencesHandler.cs",
+            "ListWorkItemRecurrencesSlice.cs",
+            "ListRecurrenceOccurrencesQuery.cs",
+            "ListRecurrenceOccurrencesHandler.cs",
+            "ListRecurrenceOccurrencesSlice.cs",
+            "PreviewWorkItemRecurrenceQuery.cs",
+            "PreviewWorkItemRecurrenceHandler.cs",
+            "PreviewWorkItemRecurrenceSlice.cs",
+            "WorkItemTemplateReadAccess.cs",
+            "ValidatedRecurrenceSchedule.cs",
+            "RecurrenceSchedulePolicy.cs",
+            "CreateWorkItemRecurrenceCommand.cs",
+            "CreateWorkItemRecurrenceHandler.cs",
+            "CreateWorkItemRecurrenceSlice.cs",
+            "RecurrenceMutationAccess.cs",
+            "SetWorkItemRecurrenceStateCommand.cs",
+            "SetWorkItemRecurrenceStateHandler.cs",
+            "SetWorkItemRecurrenceStateSlice.cs",
+            "ArchiveWorkItemRecurrenceCommand.cs",
+            "ArchiveWorkItemRecurrenceHandler.cs",
+            "ArchiveWorkItemRecurrenceSlice.cs",
+            "NormalizedWorkItemTemplate.cs",
+            "WorkItemTemplateNormalizationPolicy.cs",
+            "WorkItemTemplateMutationAccess.cs",
+            "CreateWorkItemTemplateCommand.cs",
+            "CreateWorkItemTemplateHandler.cs",
+            "CreateWorkItemTemplateSlice.cs",
+            "WorkItemTemplateUpdateAccess.cs",
+            "UpdateWorkItemTemplateCommand.cs",
+            "UpdateWorkItemTemplateHandler.cs",
+            "UpdateWorkItemTemplateSlice.cs",
+            "ArchiveWorkItemTemplateCommand.cs",
+            "ArchiveWorkItemTemplateHandler.cs",
+            "ArchiveWorkItemTemplateSlice.cs",
+            "ScheduleDueRecurrencesCommand.cs",
+            "RecurrenceOccurrenceIdentity.cs",
+            "RecurrenceSchedulerAccess.cs",
+            "ScheduleDueRecurrencesHandler.cs",
+            "ScheduleDueRecurrencesSlice.cs"
+        })
+        {
+            Assert.True(File.Exists(Path.Combine(featureDirectory, file)), $"Missing recurrence feature file: {file}");
+        }
+
+        var facadeDirectory = Path.Combine(
+            moduleDirectory,
+            "Application",
+            "Compatibility",
+            "Recurrences",
+            "WorkItemTemplateRecurrenceService");
+        var facadeFiles = Directory.GetFiles(facadeDirectory, "*.cs", SearchOption.TopDirectoryOnly);
+        Assert.Equal(6, facadeFiles.Length);
+        Assert.All(facadeFiles, file => Assert.Contains(
+            Path.GetFileName(file),
+            new[]
+            {
+                "TemplateFacade.cs",
+                "RecurrenceFacade.cs",
+                "SchedulerFacade.cs",
+                "SharedSupport.cs",
+                "TemplateSupport.cs",
+                "RecurrenceSupport.cs"
+            }));
+        var facade = string.Join(
+            Environment.NewLine,
+            facadeFiles.Select(File.ReadAllText));
+        foreach (var delegation in new[]
+        {
+            "listWorkItemTemplatesHandler.HandleAsync",
+            "listWorkItemRecurrencesHandler.HandleAsync",
+            "listRecurrenceOccurrencesHandler.HandleAsync",
+            "previewWorkItemRecurrenceHandler.HandleAsync",
+            "createWorkItemRecurrenceHandler.HandleAsync",
+            "setWorkItemRecurrenceStateHandler.HandleAsync",
+            "archiveWorkItemRecurrenceHandler.HandleAsync",
+            "createWorkItemTemplateHandler.HandleAsync",
+            "updateWorkItemTemplateHandler.HandleAsync",
+            "archiveWorkItemTemplateHandler.HandleAsync",
+            "scheduleDueRecurrencesHandler.HandleAsync"
+        })
+        {
+            Assert.Contains(delegation, facade, StringComparison.Ordinal);
+        }
+
+        var endpoint = File.ReadAllText(Path.Combine(
+            SourceDirectory,
+            "Zumbo.Api",
+            "Presentation",
+            "Endpoints",
+            "WorkItems",
+            "Recurrences",
+            "ListTemplatesEndpoint.cs"));
+        Assert.Contains("ListWorkItemTemplatesHandler handler", endpoint, StringComparison.Ordinal);
+        Assert.DoesNotContain("service.ListTemplatesAsync(", endpoint, StringComparison.Ordinal);
+
+        var recurrenceEndpointDirectory = Path.GetDirectoryName(Path.Combine(
+            SourceDirectory,
+            "Zumbo.Api",
+            "Presentation",
+            "Endpoints",
+            "WorkItems",
+            "Recurrences",
+            "ListTemplatesEndpoint.cs"))!;
+        var recurrenceEndpoint = File.ReadAllText(Path.Combine(
+            recurrenceEndpointDirectory,
+            "ListRecurrencesEndpoint.cs"));
+        Assert.Contains("ListWorkItemRecurrencesHandler handler", recurrenceEndpoint, StringComparison.Ordinal);
+        Assert.DoesNotContain("service.ListRecurrencesAsync(", recurrenceEndpoint, StringComparison.Ordinal);
+        var occurrenceEndpoint = File.ReadAllText(Path.Combine(
+            recurrenceEndpointDirectory,
+            "ListRecurrenceOccurrencesEndpoint.cs"));
+        Assert.Contains("ListRecurrenceOccurrencesHandler handler", occurrenceEndpoint, StringComparison.Ordinal);
+        Assert.DoesNotContain("service.ListOccurrencesAsync(", occurrenceEndpoint, StringComparison.Ordinal);
+        var previewEndpoint = File.ReadAllText(Path.Combine(
+            recurrenceEndpointDirectory,
+            "PreviewRecurrenceEndpoint.cs"));
+        Assert.Contains("PreviewWorkItemRecurrenceHandler handler", previewEndpoint, StringComparison.Ordinal);
+        Assert.DoesNotContain("service.PreviewRecurrenceAsync(", previewEndpoint, StringComparison.Ordinal);
+        var createRecurrenceEndpoint = File.ReadAllText(Path.Combine(
+            recurrenceEndpointDirectory,
+            "CreateRecurrenceEndpoint.cs"));
+        Assert.Contains("CreateWorkItemRecurrenceHandler handler", createRecurrenceEndpoint, StringComparison.Ordinal);
+        Assert.DoesNotContain("service.CreateRecurrenceAsync(", createRecurrenceEndpoint, StringComparison.Ordinal);
+        var createTemplateEndpoint = File.ReadAllText(Path.Combine(
+            recurrenceEndpointDirectory,
+            "CreateTemplateEndpoint.cs"));
+        Assert.Contains("CreateWorkItemTemplateHandler handler", createTemplateEndpoint, StringComparison.Ordinal);
+        Assert.DoesNotContain("service.CreateTemplateAsync(", createTemplateEndpoint, StringComparison.Ordinal);
+        var updateTemplateEndpoint = File.ReadAllText(Path.Combine(
+            recurrenceEndpointDirectory,
+            "UpdateTemplateEndpoint.cs"));
+        Assert.Contains("UpdateWorkItemTemplateHandler handler", updateTemplateEndpoint, StringComparison.Ordinal);
+        Assert.DoesNotContain("service.UpdateTemplateAsync(", updateTemplateEndpoint, StringComparison.Ordinal);
+        var archiveTemplateEndpoint = File.ReadAllText(Path.Combine(
+            recurrenceEndpointDirectory,
+            "DeleteTemplateEndpoint.cs"));
+        Assert.Contains("ArchiveWorkItemTemplateHandler handler", archiveTemplateEndpoint, StringComparison.Ordinal);
+        Assert.DoesNotContain("service.ArchiveTemplateAsync(", archiveTemplateEndpoint, StringComparison.Ordinal);
+        var schedulerEndpoint = File.ReadAllText(Path.Combine(
+            recurrenceEndpointDirectory,
+            "ProcessDueRecurrencesEndpoint.cs"));
+        Assert.Contains("ScheduleDueRecurrencesHandler handler", schedulerEndpoint, StringComparison.Ordinal);
+        Assert.DoesNotContain("service.ScheduleDueAsync(", schedulerEndpoint, StringComparison.Ordinal);
+
+        var schedulerHostedService = File.ReadAllText(Path.Combine(
+            SourceDirectory,
+            "Zumbo.Api",
+            "Infrastructure",
+            "BackgroundServices",
+            "Recurrences",
+            "WorkItemRecurrenceSchedulerHostedService.cs"));
+        Assert.Contains("GetRequiredService<ScheduleDueRecurrencesHandler>()", schedulerHostedService, StringComparison.Ordinal);
+        Assert.DoesNotContain("GetRequiredService<WorkItemTemplateRecurrenceService>()", schedulerHostedService, StringComparison.Ordinal);
+        var stateEndpoint = File.ReadAllText(Path.Combine(
+            recurrenceEndpointDirectory,
+            "SetRecurrenceStateEndpoint.cs"));
+        Assert.Contains("SetWorkItemRecurrenceStateHandler handler", stateEndpoint, StringComparison.Ordinal);
+        Assert.DoesNotContain("service.SetRecurrenceStateAsync(", stateEndpoint, StringComparison.Ordinal);
+        var archiveEndpoint = File.ReadAllText(Path.Combine(
+            recurrenceEndpointDirectory,
+            "DeleteRecurrenceEndpoint.cs"));
+        Assert.Contains("ArchiveWorkItemRecurrenceHandler handler", archiveEndpoint, StringComparison.Ordinal);
+        Assert.DoesNotContain("service.ArchiveRecurrenceAsync(", archiveEndpoint, StringComparison.Ordinal);
+
+        var composition = File.ReadAllText(Path.Combine(
+            SourceDirectory,
+            "Zumbo.Api",
+            "Composition",
+            "Modules",
+            "WorkItems",
+            "WorkItemModuleComposition.cs"));
+        Assert.Contains("AddScoped<ListWorkItemTemplatesHandler>(provider =>", composition, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<ListWorkItemRecurrencesHandler>(provider =>", composition, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<ListRecurrenceOccurrencesHandler>(provider =>", composition, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<PreviewWorkItemRecurrenceHandler>(provider =>", composition, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<CreateWorkItemRecurrenceHandler>(provider =>", composition, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<SetWorkItemRecurrenceStateHandler>(provider =>", composition, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<ArchiveWorkItemRecurrenceHandler>(provider =>", composition, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<CreateWorkItemTemplateHandler>(provider =>", composition, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<UpdateWorkItemTemplateHandler>(provider =>", composition, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<ArchiveWorkItemTemplateHandler>(provider =>", composition, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<ScheduleDueRecurrencesHandler>(provider =>", composition, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void BoardCreateAndProjectList_ArePortFocusedVerticalSlicesWithCompatibilityFacades()
     {
         var moduleDirectory = Path.Combine(SourceDirectory, "Zumbo.Modules.Boards");

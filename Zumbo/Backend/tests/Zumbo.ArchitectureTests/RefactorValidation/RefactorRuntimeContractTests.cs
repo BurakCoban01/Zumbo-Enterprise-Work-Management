@@ -48,6 +48,99 @@ public sealed class RefactorRuntimeContractTests
 
     private static readonly string[] PortFocusedVerticalSliceDiRegistrations =
     [
+        "services.AddScoped<ListWorkItemTemplatesHandler>(provider=>newListWorkItemTemplatesHandler("
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemTemplateDocument>>(),"
+        + "provider.GetRequiredService<IProjectPermissionChecker>(),"
+        + "provider.GetRequiredService<ICurrentUser>()));",
+        "services.AddScoped<ListWorkItemRecurrencesHandler>(provider=>newListWorkItemRecurrencesHandler("
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemRecurrenceDocument>>(),"
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemRecurrenceOccurrenceDocument>>(),"
+        + "provider.GetRequiredService<IProjectPermissionChecker>(),"
+        + "provider.GetRequiredService<ICurrentUser>()));",
+        "services.AddScoped<ListRecurrenceOccurrencesHandler>(provider=>newListRecurrenceOccurrencesHandler("
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemRecurrenceDocument>>(),"
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemRecurrenceOccurrenceDocument>>(),"
+        + "provider.GetRequiredService<IProjectPermissionChecker>(),"
+        + "provider.GetRequiredService<ICurrentUser>()));",
+        "services.AddScoped<PreviewWorkItemRecurrenceHandler>(provider=>newPreviewWorkItemRecurrenceHandler("
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemTemplateDocument>>(),"
+        + "provider.GetRequiredService<IProjectPermissionChecker>(),"
+        + "provider.GetRequiredService<ICurrentUser>(),"
+        + "provider.GetRequiredService<IOptions<WorkItemRecurrenceOptions>>(),"
+        + "provider.GetRequiredService<IClock>()));",
+        "services.AddScoped<CreateWorkItemRecurrenceHandler>(provider=>newCreateWorkItemRecurrenceHandler("
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemTemplateDocument>>(),"
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemRecurrenceDocument>>(),"
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemRecurrenceOccurrenceDocument>>(),"
+        + "provider.GetRequiredService<IProjectPermissionChecker>(),"
+        + "provider.GetRequiredService<ICurrentUser>(),"
+        + "provider.GetRequiredService<IOptions<WorkItemRecurrenceOptions>>(),"
+        + "provider.GetRequiredService<IClock>(),"
+        + "provider.GetRequiredService<IWorkItemAuditPublisher>()));",
+        "services.AddScoped<SetWorkItemRecurrenceStateHandler>(provider=>newSetWorkItemRecurrenceStateHandler("
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemRecurrenceDocument>>(),"
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemRecurrenceOccurrenceDocument>>(),"
+        + "provider.GetRequiredService<IProjectPermissionChecker>(),"
+        + "provider.GetRequiredService<ICurrentUser>(),"
+        + "provider.GetRequiredService<IDistributedLockProvider>(),"
+        + "provider.GetRequiredService<IOptions<DistributedLockOptions>>(),"
+        + "provider.GetRequiredService<IClock>(),"
+        + "provider.GetRequiredService<IWorkItemAuditPublisher>(),"
+        + "provider.GetService<IExpectedVersionAccessor>()));",
+        "services.AddScoped<ArchiveWorkItemRecurrenceHandler>(provider=>newArchiveWorkItemRecurrenceHandler("
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemRecurrenceDocument>>(),"
+        + "provider.GetRequiredService<IProjectPermissionChecker>(),"
+        + "provider.GetRequiredService<ICurrentUser>(),"
+        + "provider.GetRequiredService<IDistributedLockProvider>(),"
+        + "provider.GetRequiredService<IOptions<DistributedLockOptions>>(),"
+        + "provider.GetRequiredService<IClock>(),"
+        + "provider.GetRequiredService<IWorkItemAuditPublisher>(),"
+        + "provider.GetService<IExpectedVersionAccessor>()));",
+        "services.AddScoped<CreateWorkItemTemplateHandler>(provider=>newCreateWorkItemTemplateHandler("
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemTemplateDocument>>(),"
+        + "provider.GetRequiredService<IProjectPermissionChecker>(),"
+        + "provider.GetRequiredService<ICurrentUser>(),"
+        + "provider.GetRequiredService<IWorkItemTeamPolicy>(),"
+        + "provider.GetRequiredService<IWorkItemCollaboratorDirectory>(),"
+        + "provider.GetRequiredService<IBoardPlacementPolicy>(),"
+        + "provider.GetRequiredService<IWorkItemTypeSchemaPolicy>(),"
+        + "provider.GetRequiredService<IDistributedLockProvider>(),"
+        + "provider.GetRequiredService<IOptions<DistributedLockOptions>>(),"
+        + "provider.GetRequiredService<IClock>(),"
+        + "provider.GetRequiredService<IWorkItemAuditPublisher>()));",
+        "services.AddScoped<UpdateWorkItemTemplateHandler>(provider=>newUpdateWorkItemTemplateHandler("
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemTemplateDocument>>(),"
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemRecurrenceDocument>>(),"
+        + "provider.GetRequiredService<IProjectPermissionChecker>(),"
+        + "provider.GetRequiredService<ICurrentUser>(),"
+        + "provider.GetRequiredService<IWorkItemTeamPolicy>(),"
+        + "provider.GetRequiredService<IWorkItemCollaboratorDirectory>(),"
+        + "provider.GetRequiredService<IBoardPlacementPolicy>(),"
+        + "provider.GetRequiredService<IWorkItemTypeSchemaPolicy>(),"
+        + "provider.GetRequiredService<IDistributedLockProvider>(),"
+        + "provider.GetRequiredService<IOptions<DistributedLockOptions>>(),"
+        + "provider.GetRequiredService<IClock>(),"
+        + "provider.GetRequiredService<IWorkItemAuditPublisher>(),"
+        + "provider.GetService<IExpectedVersionAccessor>()));",
+        "services.AddScoped<ArchiveWorkItemTemplateHandler>(provider=>newArchiveWorkItemTemplateHandler("
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemTemplateDocument>>(),"
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemRecurrenceDocument>>(),"
+        + "provider.GetRequiredService<IProjectPermissionChecker>(),"
+        + "provider.GetRequiredService<ICurrentUser>(),"
+        + "provider.GetRequiredService<IDistributedLockProvider>(),"
+        + "provider.GetRequiredService<IOptions<DistributedLockOptions>>(),"
+        + "provider.GetRequiredService<IClock>(),"
+        + "provider.GetRequiredService<IWorkItemAuditPublisher>(),"
+        + "provider.GetService<IExpectedVersionAccessor>()));",
+        "services.AddScoped<ScheduleDueRecurrencesHandler>(provider=>newScheduleDueRecurrencesHandler("
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemTemplateDocument>>(),"
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemRecurrenceDocument>>(),"
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemRecurrenceOccurrenceDocument>>(),"
+        + "provider.GetRequiredService<IWorkItemRecurrenceEventPublisher>(),"
+        + "provider.GetRequiredService<IDistributedLockProvider>(),"
+        + "provider.GetRequiredService<IOptions<DistributedLockOptions>>(),"
+        + "provider.GetRequiredService<IOptions<WorkItemRecurrenceOptions>>(),"
+        + "provider.GetRequiredService<IClock>()));",
         "services.AddScoped<GetKnowledgeDocumentHandler>(provider=>newGetKnowledgeDocumentHandler("
         + "provider.GetRequiredService<IDocumentRepository<KnowledgeDocument>>(),"
         + "provider.GetRequiredService<IKnowledgeDirectory>(),"
@@ -722,6 +815,28 @@ public sealed class RefactorRuntimeContractTests
 
     private static readonly string[] ReplacedVerticalSliceEndpointMappings =
     [
+        "group.MapGet(\"/templates\",async(stringprojectId,int?page,int?pageSize,bool?includeArchived,WorkItemTemplateRecurrenceServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.ListTemplatesAsync(projectId,page??1,pageSize??50,includeArchived??false,ct),http));",
+        "group.MapGet(\"/recurrences\",async(stringprojectId,int?page,int?pageSize,bool?includeArchived,WorkItemTemplateRecurrenceServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.ListRecurrencesAsync(projectId,page??1,pageSize??50,includeArchived??false,ct),http));",
+        "group.MapGet(\"/recurrences/{recurrenceId}/occurrences\",async(stringrecurrenceId,int?page,int?pageSize,WorkItemTemplateRecurrenceServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.ListOccurrencesAsync(recurrenceId,page??1,pageSize??50,ct),http));",
+        "group.MapPost(\"/recurrences/preview\",async(PreviewWorkItemRecurrenceRequestrequest,WorkItemTemplateRecurrenceServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.PreviewRecurrenceAsync(request,ct),http)).WithZumboPermission(PermissionCatalog.WorkItemCreate);",
+        "group.MapPost(\"/recurrences\",async(CreateWorkItemRecurrenceRequestrequest,WorkItemTemplateRecurrenceServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Created(awaitservice.CreateRecurrenceAsync(request,CorrelationId(http),ct),http)).WithZumboPermission(PermissionCatalog.WorkItemCreate);",
+        "group.MapPatch(\"/recurrences/{recurrenceId}/state\",async(stringrecurrenceId,SetWorkItemRecurrenceStateRequestrequest,WorkItemTemplateRecurrenceServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.SetRecurrenceStateAsync(recurrenceId,request.Active,CorrelationId(http),ct),http)).WithZumboPermission(PermissionCatalog.WorkItemUpdate);",
+        "group.MapDelete(\"/recurrences/{recurrenceId}\",async(stringrecurrenceId,WorkItemTemplateRecurrenceServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "{awaitservice.ArchiveRecurrenceAsync(recurrenceId,CorrelationId(http),ct);returnResults.NoContent();}).WithZumboPermission(PermissionCatalog.WorkItemUpdate);",
+        "group.MapPost(\"/templates\",async(CreateWorkItemTemplateRequestrequest,WorkItemTemplateRecurrenceServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Created(awaitservice.CreateTemplateAsync(request,CorrelationId(http),ct),http)).WithZumboPermission(PermissionCatalog.WorkItemCreate);",
+        "group.MapPut(\"/templates/{templateId}\",async(stringtemplateId,UpdateWorkItemTemplateRequestrequest,WorkItemTemplateRecurrenceServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.UpdateTemplateAsync(templateId,request,CorrelationId(http),ct),http)).WithZumboPermission(PermissionCatalog.WorkItemUpdate);",
+        "group.MapDelete(\"/templates/{templateId}\",async(stringtemplateId,WorkItemTemplateRecurrenceServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "{awaitservice.ArchiveTemplateAsync(templateId,CorrelationId(http),ct);returnResults.NoContent();}).WithZumboPermission(PermissionCatalog.WorkItemUpdate);",
+        "group.MapPost(\"/recurrences/process-due\",async(WorkItemTemplateRecurrenceServiceservice,CancellationTokenct)=>"
+        + "Results.Ok(new{scheduled=awaitservice.ScheduleDueAsync(ct)})).WithZumboPermission(PermissionCatalog.OperationsManage,isGlobal:true);",
         "group.MapGet(\"/{documentId}\",async(stringdocumentId,bool?includeArchived,[FromServices]KnowledgeServiceservice,HttpContexthttp,CancellationTokenct)=>"
         + "Ok(awaitservice.GetAsync(documentId,includeArchived??false,ct),http));",
         "group.MapGet(\"\",async(string?query,string?scopeType,string?scopeId,bool?includeArchived,int?page,int?pageSize,[FromServices]KnowledgeServiceservice,HttpContexthttp,CancellationTokenct)=>"
@@ -992,6 +1107,28 @@ public sealed class RefactorRuntimeContractTests
 
     private static readonly string[] PortFocusedVerticalSliceEndpointMappings =
     [
+        "group.MapGet(\"/templates\",async(stringprojectId,int?page,int?pageSize,bool?includeArchived,ListWorkItemTemplatesHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newListWorkItemTemplatesQuery(projectId,page??1,pageSize??50,includeArchived??false),ct),http));",
+        "group.MapGet(\"/recurrences\",async(stringprojectId,int?page,int?pageSize,bool?includeArchived,ListWorkItemRecurrencesHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newListWorkItemRecurrencesQuery(projectId,page??1,pageSize??50,includeArchived??false),ct),http));",
+        "group.MapGet(\"/recurrences/{recurrenceId}/occurrences\",async(stringrecurrenceId,int?page,int?pageSize,ListRecurrenceOccurrencesHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newListRecurrenceOccurrencesQuery(recurrenceId,page??1,pageSize??50),ct),http));",
+        "group.MapPost(\"/recurrences/preview\",async(PreviewWorkItemRecurrenceRequestrequest,PreviewWorkItemRecurrenceHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newPreviewWorkItemRecurrenceQuery(request),ct),http)).WithZumboPermission(PermissionCatalog.WorkItemCreate);",
+        "group.MapPost(\"/recurrences\",async(CreateWorkItemRecurrenceRequestrequest,CreateWorkItemRecurrenceHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Created(awaithandler.HandleAsync(newCreateWorkItemRecurrenceCommand(request,CorrelationId(http)),ct),http)).WithZumboPermission(PermissionCatalog.WorkItemCreate);",
+        "group.MapPatch(\"/recurrences/{recurrenceId}/state\",async(stringrecurrenceId,SetWorkItemRecurrenceStateRequestrequest,SetWorkItemRecurrenceStateHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newSetWorkItemRecurrenceStateCommand(recurrenceId,request.Active,CorrelationId(http)),ct),http)).WithZumboPermission(PermissionCatalog.WorkItemUpdate);",
+        "group.MapDelete(\"/recurrences/{recurrenceId}\",async(stringrecurrenceId,ArchiveWorkItemRecurrenceHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "{awaithandler.HandleAsync(newArchiveWorkItemRecurrenceCommand(recurrenceId,CorrelationId(http)),ct);returnResults.NoContent();}).WithZumboPermission(PermissionCatalog.WorkItemUpdate);",
+        "group.MapPost(\"/templates\",async(CreateWorkItemTemplateRequestrequest,CreateWorkItemTemplateHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Created(awaithandler.HandleAsync(newCreateWorkItemTemplateCommand(request,CorrelationId(http)),ct),http)).WithZumboPermission(PermissionCatalog.WorkItemCreate);",
+        "group.MapPut(\"/templates/{templateId}\",async(stringtemplateId,UpdateWorkItemTemplateRequestrequest,UpdateWorkItemTemplateHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newUpdateWorkItemTemplateCommand(templateId,request,CorrelationId(http)),ct),http)).WithZumboPermission(PermissionCatalog.WorkItemUpdate);",
+        "group.MapDelete(\"/templates/{templateId}\",async(stringtemplateId,ArchiveWorkItemTemplateHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "{awaithandler.HandleAsync(newArchiveWorkItemTemplateCommand(templateId,CorrelationId(http)),ct);returnResults.NoContent();}).WithZumboPermission(PermissionCatalog.WorkItemUpdate);",
+        "group.MapPost(\"/recurrences/process-due\",async(ScheduleDueRecurrencesHandlerhandler,CancellationTokenct)=>"
+        + "Results.Ok(new{scheduled=awaithandler.HandleAsync(newScheduleDueRecurrencesCommand(),ct)})).WithZumboPermission(PermissionCatalog.OperationsManage,isGlobal:true);",
         "group.MapGet(\"/{documentId}\",async(stringdocumentId,bool?includeArchived,[FromServices]GetKnowledgeDocumentHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
         + "Ok(awaithandler.HandleAsync(newGetKnowledgeDocumentQuery(documentId,includeArchived??false),ct),http));",
         "group.MapGet(\"\",async(string?query,string?scopeType,string?scopeId,bool?includeArchived,int?page,int?pageSize,[FromServices]SearchKnowledgeDocumentsHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
@@ -1352,6 +1489,7 @@ public sealed class RefactorRuntimeContractTests
             },
             intentionalRuntimeContractReplacements = new[]
             {
+                "The template and recurrence read, preview, create, state, and archive handlers are scoped through port-focused constructors; their endpoints resolve them directly while the corresponding WorkItemTemplateRecurrenceService methods remain compatibility facades preserving the original public contracts.",
                 "RegisterUserHandler and SearchUsersHandler remain scoped self-services; explicit factories select their port-focused constructors while compatibility constructors remain available.",
                 "CreateOrganizationHandler and ListOrganizationsHandler remain scoped self-services; explicit factories select their port-focused constructors while compatibility constructors remain available.",
                 "CreateTeamHandler and ListTeamsHandler remain scoped self-services; explicit factories select their port-focused constructors while compatibility constructors remain available.",

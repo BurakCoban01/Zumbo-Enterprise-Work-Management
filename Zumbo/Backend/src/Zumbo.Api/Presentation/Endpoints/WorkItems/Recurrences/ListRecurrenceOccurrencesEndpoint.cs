@@ -1,4 +1,5 @@
 using Zumbo.Modules.WorkItems;
+using Zumbo.Modules.WorkItems.Application.Features.Recurrences;
 using Zumbo.BuildingBlocks.Application.Messaging;
 using Zumbo.BuildingBlocks.Application.Security;
 using Zumbo.SharedKernel;
@@ -15,9 +16,14 @@ internal static class ListRecurrenceOccurrencesEndpoint
             string recurrenceId,
             int? page,
             int? pageSize,
-            WorkItemTemplateRecurrenceService service,
+            ListRecurrenceOccurrencesHandler handler,
             HttpContext http,
             CancellationToken ct) =>
-            Ok(await service.ListOccurrencesAsync(recurrenceId, page ?? 1, pageSize ?? 50, ct), http));
+            Ok(await handler.HandleAsync(
+                new ListRecurrenceOccurrencesQuery(
+                    recurrenceId,
+                    page ?? 1,
+                    pageSize ?? 50),
+                ct), http));
     }
 }

@@ -1,4 +1,5 @@
 using Zumbo.Modules.WorkItems;
+using Zumbo.Modules.WorkItems.Application.Features.Recurrences;
 using Zumbo.BuildingBlocks.Application.Messaging;
 using Zumbo.BuildingBlocks.Application.Security;
 using Zumbo.SharedKernel;
@@ -13,10 +14,12 @@ internal static class CreateTemplateEndpoint
     {
         group.MapPost("/templates", async (
             CreateWorkItemTemplateRequest request,
-            WorkItemTemplateRecurrenceService service,
+            CreateWorkItemTemplateHandler handler,
             HttpContext http,
             CancellationToken ct) =>
-            Created(await service.CreateTemplateAsync(request, CorrelationId(http), ct), http))
+            Created(await handler.HandleAsync(
+                new CreateWorkItemTemplateCommand(request, CorrelationId(http)),
+                ct), http))
             .WithZumboPermission(PermissionCatalog.WorkItemCreate);
     }
 }
