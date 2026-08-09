@@ -186,13 +186,111 @@ public sealed class RefactorSemanticPreservationTests
             ["Zumbo.Api|IdentityEndpoints|method:MapIdentityEndpoints:(thisRouteGroupBuilderapi):void"] =
                 "The login route now resolves the independent Login handler while preserving its HTTP route, rate limiting, request binding, and response mapping through the exact runtime contract audit.",
             ["Zumbo.Persistence.PostgreSql|Zumbo.Persistence.PostgreSql.PostgreSqlMigrationRunner|method:BuildMigrations:():IReadOnlyList<Migration>"] =
-                "Migration SQL constants moved from one method body to private fields while the ordered 37 Migration.Create calls remain in BuildMigrations; IDs, names, SQL, and checksums are verified by the runtime contract audit.",
+                "The ordered registry retains all 37 explicit Migration.Create calls while immutable definition types own each migration's exact Up and Down SQL; the first three catalog-derived definitions preserve their existing generation order, and the runtime audit verifies IDs, names, SQL, order, and checksum inputs.",
             ["Zumbo.BuildingBlocks.Infrastructure|Zumbo.BuildingBlocks.Infrastructure.Search.OpenSearchWorkItemSearchIndex|method:InitializeAsync:(CancellationTokencancellationToken=default):Task"] =
                 "Initialization now detects the pre-alias concrete index layout and delegates to a lossless, count-verified reindex migration before atomically installing the write alias; unit and live runtime checks cover both success and fail-closed behavior.",
             ["Zumbo.Api|MongoMigrationRunner|method:ApplyIndexesAsync:(stringmigrationId,IReadOnlyList<MongoIndexSpecification>indexes,CancellationTokencancellationToken):Task<MongoMigrationOutcome>"] =
                 "Index application preserves catalog checksums while accepting semantically equivalent legacy names and skipping superseded identity and notification definitions whose dedicated later migrations own the valid replacements.",
             ["Zumbo.Api|MongoMigrationRunner|method:RunAsync:(CancellationTokencancellationToken=default):Task<MongoMigrationRunReport>"] =
                 "Startup now always runs idempotent compatibility migrations that normalize legacy user document versions and remove infrastructure-only migration markers; optional high-volume business backfills remain explicitly gated.",
+            ["Zumbo.Api|MongoMigrationRunner|method:BackfillUserVersionsAsync:(CancellationTokencancellationToken):Task<MongoMigrationOutcome>"] =
+                "The compatibility facade delegates user-version normalization to an independent Mongo migration definition through the narrow execution-context port while preserving the migration ID, checksum, filters, checkpoint order, lease, batch, dry-run, and outcome behavior.",
+            ["Zumbo.Api|MongoMigrationRunner|method:UserVersionFilter:(BsonValuecheckpoint):FilterDefinition<BsonDocument>"] =
+                "The compatibility helper delegates to the user-version definition's unchanged missing, null, non-positive, and checkpoint filter.",
+            ["Zumbo.Api|MongoMigrationRunner|method:UserVersionForId:(BsonValueid):FilterDefinition<BsonDocument>"] =
+                "The compatibility helper delegates to the user-version definition's unchanged identity and version guard filter.",
+            ["Zumbo.Api|MongoMigrationRunner|method:CleanupLegacyMigrationMarkersAsync:(CancellationTokencancellationToken):Task<MongoMigrationOutcome>"] =
+                "The compatibility facade delegates legacy marker cleanup to an independent Mongo migration definition through the narrow execution-context port while preserving targets, marker filters, dry-run counts, ledger, lease, updates, and outcomes.",
+            ["Zumbo.Api|MongoMigrationRunner|method:BackfillApiKeyVersionsAsync:(CancellationTokencancellationToken):Task<MongoMigrationOutcome>"] =
+                "The compatibility facade delegates API-key version and scalar UTC normalization to an independent Mongo definition while preserving migration identity, checksum, filters, checkpoint order, batch saves, lease, dry-run, and update behavior.",
+            ["Zumbo.Api|MongoMigrationRunner|method:ApiKeyVersionFilter:(BsonValuecheckpoint):FilterDefinition<BsonDocument>"] =
+                "The compatibility helper delegates to the API-key definition's unchanged version and scalar UTC candidate filter.",
+            ["Zumbo.Api|MongoMigrationRunner|method:ApiKeyVersionForId:(BsonValueid):FilterDefinition<BsonDocument>"] =
+                "The compatibility helper delegates to the API-key definition's unchanged identity and migration guard filter.",
+            ["Zumbo.Api|MongoMigrationRunner|method:BackfillOrganizationVersionsAsync:(CancellationTokencancellationToken):Task<MongoMigrationOutcome>"] =
+                "The compatibility facade delegates organization version/status normalization to an independent Mongo definition while preserving migration identity, checksum, filters, checkpoints, batching, lease, dry-run, and updates.",
+            ["Zumbo.Api|MongoMigrationRunner|method:OrganizationVersionFilter:(BsonValuecheckpoint):FilterDefinition<BsonDocument>"] =
+                "The compatibility helper delegates to the organization definition's unchanged missing, null, non-positive, and checkpoint filter.",
+            ["Zumbo.Api|MongoMigrationRunner|method:OrganizationVersionForId:(BsonValueid):FilterDefinition<BsonDocument>"] =
+                "The compatibility helper delegates to the organization definition's unchanged identity and version guard filter.",
+            ["Zumbo.Api|MongoMigrationRunner|method:ExpireLegacyTeamInvitesAsync:(CancellationTokencancellationToken):Task<MongoMigrationOutcome>"] =
+                "The compatibility facade delegates legacy team-invite expiry to an independent Mongo definition while preserving migration marker, version increment, invitation mutation, checkpoint, lease, batch, dry-run, and replace behavior.",
+            ["Zumbo.Api|MongoMigrationRunner|method:LegacyTeamInviteFilter:(BsonValuecheckpoint):FilterDefinition<BsonDocument>"] =
+                "The compatibility helper delegates to the team-invite definition's unchanged invited-without-hash and checkpoint filter.",
+            ["Zumbo.Api|MongoMigrationRunner|method:TeamVersionForId:(BsonValueid,longversion):FilterDefinition<BsonDocument>"] =
+                "The compatibility helper delegates to the team-invite definition's unchanged identity and optimistic version guard.",
+            ["Zumbo.Api|MongoMigrationRunner|method:BackfillProjectLifecycleAsync:(CancellationTokencancellationToken):Task<MongoMigrationOutcome>"] =
+                "The compatibility facade delegates project lifecycle normalization to an independent Mongo definition while preserving migration identity, checksum, defaults, optimistic version guard, checkpoints, lease, batching, dry-run, and outcomes.",
+            ["Zumbo.Api|MongoMigrationRunner|method:ProjectLifecycleFilter:(BsonValuecheckpoint):FilterDefinition<BsonDocument>"] =
+                "The compatibility helper delegates to the project lifecycle definition's unchanged candidate and checkpoint filter.",
+            ["Zumbo.Api|MongoMigrationRunner|method:ProjectVersionForId:(BsonValueid,longversion):FilterDefinition<BsonDocument>"] =
+                "The compatibility helper delegates to the project lifecycle definition's unchanged identity and optimistic version guard.",
+            ["Zumbo.Api|MongoMigrationRunner|method:AddProjectDefault:(BsonDocumentdocument,ICollection<UpdateDefinition<BsonDocument>>updates,stringfield,BsonValuevalue):void"] =
+                "The compatibility helper delegates to the project lifecycle definition's unchanged missing-or-null default update behavior.",
+            ["Zumbo.Api|MongoMigrationRunner|method:BackfillWorkflowLifecycleAsync:(CancellationTokencancellationToken):Task<MongoMigrationOutcome>"] =
+                "The compatibility facade delegates workflow lifecycle normalization to an independent Mongo definition while preserving status schemes, published version projection, optimistic version guard, checkpoints, lease, batching, dry-run, and outcomes.",
+            ["Zumbo.Api|MongoMigrationRunner|method:WorkflowLifecycleFilter:(BsonValuecheckpoint):FilterDefinition<BsonDocument>"] =
+                "The compatibility helper delegates to the workflow lifecycle definition's unchanged candidate and checkpoint filter.",
+            ["Zumbo.Api|MongoMigrationRunner|method:WorkflowVersionForId:(BsonValueid,longversion):FilterDefinition<BsonDocument>"] =
+                "The compatibility helper delegates to the workflow lifecycle definition's unchanged identity and optimistic version guard.",
+            ["Zumbo.Api|MongoMigrationRunner|method:BackfillSprintLifecycleAsync:(CancellationTokencancellationToken):Task<MongoMigrationOutcome>"] =
+                "The compatibility facade delegates sprint lifecycle normalization to an independent Mongo definition while preserving deterministic sprint creation, work-item updates, optimistic version guard, checkpoints, lease, batching, dry-run, and outcomes.",
+            ["Zumbo.Api|MongoMigrationRunner|method:SprintLifecycleFilter:(BsonValuecheckpoint):FilterDefinition<BsonDocument>"] =
+                "The compatibility helper delegates to the sprint lifecycle definition's unchanged legacy sprint and checkpoint filter.",
+            ["Zumbo.Api|MongoMigrationRunner|method:LegacySprintId:(stringprojectId,stringsprintId):string"] =
+                "The compatibility helper delegates to the sprint lifecycle definition's unchanged deterministic MD5 identifier generation.",
+            ["Zumbo.Api|MongoMigrationRunner|method:BackfillWorkItemTypeSchemasAsync:(CancellationTokencancellationToken):Task<MongoMigrationOutcome>"] =
+                "The compatibility facade delegates work-item type schema normalization to an independent Mongo definition while preserving default schema creation, custom type projection, optimistic version guard, checkpoints, lease, batching, dry-run, and outcomes.",
+            ["Zumbo.Api|MongoMigrationRunner|method:WorkItemTypeSchemaFilter:(BsonValuecheckpoint):FilterDefinition<BsonDocument>"] =
+                "The compatibility helper delegates to the type-schema definition's unchanged candidate and checkpoint filter.",
+            ["Zumbo.Api|MongoMigrationRunner|method:DefaultIssueTypes:():BsonArray"] =
+                "The compatibility helper delegates to the type-schema definition's unchanged default issue-type projection.",
+            ["Zumbo.Api|MongoMigrationRunner|method:DefaultIssueTypeLayouts:():BsonArray"] =
+                "The compatibility helper delegates to the type-schema definition's unchanged default layout projection.",
+            ["Zumbo.Api|MongoMigrationRunner|method:IssueType:(stringkey,stringname,stringhierarchy,intposition):BsonDocument"] =
+                "The compatibility helper delegates to the type-schema definition's unchanged issue-type document projection.",
+            ["Zumbo.Api|MongoMigrationRunner|method:BackfillWorkItemGraphAsync:(CancellationTokencancellationToken):Task<MongoMigrationOutcome>"] =
+                "The compatibility facade delegates work-item graph normalization to an independent Mongo definition while preserving relation parsing, deterministic edge upserts, dependency direction, checkpoints, lease, batching, dry-run, and outcomes.",
+            ["Zumbo.Api|MongoMigrationRunner|method:WorkItemGraphFilter:(BsonValuecheckpoint):FilterDefinition<BsonDocument>"] =
+                "The compatibility helper delegates to the graph definition's unchanged relation and checkpoint filter.",
+            ["Zumbo.Api|MongoMigrationRunner|method:WorkItemRelationEdgeId:(stringprojectId,stringsourceWorkItemId,stringtargetWorkItemId,stringrelationType):string"] =
+                "The compatibility helper delegates to the graph definition's unchanged deterministic MD5 edge identifier generation.",
+            ["Zumbo.Api|MongoMigrationRunner|method:NormalizeGraphRelationType:(string?relationType):string?"] =
+                "The compatibility helper delegates to the graph definition's unchanged relation-type normalization.",
+            ["Zumbo.Api|MongoMigrationRunner|method:BackfillRanksAsync:(CancellationTokencancellationToken):Task<MongoMigrationOutcome>"] =
+                "The compatibility facade delegates rank normalization to an independent Mongo definition while preserving migration identity, checksum, rollback reset, backup records, candidate guards, checkpoints, lease, batching, dry-run, and outcomes.",
+            ["Zumbo.Api|MongoMigrationRunner|method:RankCandidateFilter:(BsonValuecheckpoint):FilterDefinition<BsonDocument>"] =
+                "The compatibility helper delegates to the rank definition's unchanged missing-or-zero candidate and checkpoint filter.",
+            ["Zumbo.Api|MongoMigrationRunner|method:RankCandidateForId:(BsonValueid):FilterDefinition<BsonDocument>"] =
+                "The compatibility helper delegates to the rank definition's unchanged identity and missing-or-zero update guard.",
+            ["Zumbo.Api|MongoMigrationRunner|method:TryResolveRank:(BsonValuecreatedAt,outlongrank):bool"] =
+                "The preserved public helper delegates to the rank definition while retaining supported BSON representations, exception masking, positive bounds, signature, and result.",
+            ["Zumbo.Api|MongoMigrationRunner|method:ResolveDocumentTicks:(BsonDocumentdocument):long"] =
+                "The compatibility helper delegates to the rank definition's unchanged Ticks and BSON DateTime resolution behavior.",
+            ["Zumbo.Api|MongoMigrationRunner|method:BackfillRefreshSessionsAsync:(CancellationTokencancellationToken):Task<MongoMigrationOutcome>"] =
+                "The compatibility facade delegates refresh-session normalization to an independent Mongo definition while preserving migration identity, checksum, token projection, duplicate handling, ownership validation, per-user ledger saves, checkpoints, lease, batching, dry-run, and outcomes.",
+            ["Zumbo.Api|MongoMigrationRunner|method:RefreshSessionUserFilter:(BsonValuecheckpoint):FilterDefinition<BsonDocument>"] =
+                "The compatibility helper delegates to the refresh-session definition's unchanged legacy-token and checkpoint filter.",
+            ["Zumbo.Api|MongoMigrationRunner|method:TryCreateRefreshSession:(BsonValuevalue,stringuserId,stringorganizationId,outBsonDocumentsession):bool"] =
+                "The compatibility helper delegates to the refresh-session definition while preserving validation, UTC resolution, retention calculation, legacy BSON values, ownership fields, version, and result.",
+            ["Zumbo.Api|MongoMigrationRunner|method:EnsureRefreshSessionMatchesAsync:(IMongoCollection<BsonDocument>sessions,BsonDocumentexpected,CancellationTokencancellationToken):Task"] =
+                "The compatibility helper delegates to the refresh-session definition's unchanged ID-or-token lookup and incompatible ownership conflict behavior.",
+            ["Zumbo.Api|MongoMigrationRunner|method:BackfillWorkItemActivitiesAsync:(CancellationTokencancellationToken):Task<MongoMigrationOutcome>"] =
+                "The compatibility facade delegates work-item activity migration to an independent Mongo definition while preserving migration identity, checksum, tenant ownership, all activity projections, optimistic versioning, per-item ledger saves, checkpoints, lease, batching, dry-run, and outcomes.",
+            ["Zumbo.Api|MongoMigrationRunner|method:WorkItemActivityFilter:(BsonValuecheckpoint):FilterDefinition<BsonDocument>"] =
+                "The compatibility helper delegates to the activity definition's unchanged storage-version and checkpoint filter.",
+            ["Zumbo.Api|MongoMigrationRunner|method:WorkItemActivityVersionFilter:():FilterDefinition<BsonDocument>"] =
+                "The compatibility helper delegates to the activity definition's unchanged missing-or-legacy storage-version filter.",
+            ["Zumbo.Api|MongoMigrationRunner|method:HasMigratableActivities:(BsonDocumentworkItem):bool"] =
+                "The compatibility helper delegates to the activity definition while preserving legacy array, identifier, status, and timestamp eligibility checks.",
+            ["Zumbo.Api|MongoMigrationRunner|method:UpsertWorkItemActivitiesAsync:(BsonDocumentworkItem,stringorganizationId,stringprojectId,stringworkItemId,CancellationTokencancellationToken):Task"] =
+                "The compatibility helper delegates to the activity definition while preserving all six collection names, comment revisions, copied fields, timeline projections, deterministic identifiers, and write order.",
+            ["Zumbo.Api|MongoMigrationRunner|method:ActivityId:(paramsstring[]parts):string"] =
+                "The compatibility helper delegates to the activity definition's unchanged unit-separator, SHA256, lowercase hexadecimal, and 32-character identifier algorithm.",
+            ["Zumbo.Api|MongoMigrationRunner|method:CopyArrayAsync:(IMongoCollection<BsonDocument>target,BsonDocumentworkItem,stringfield,stringorganizationId,stringprojectId,stringworkItemId,IReadOnlyCollection<string>copiedFields,CancellationTokencancellationToken):Task"] =
+                "The compatibility helper delegates to the activity definition's unchanged source filtering, ownership projection, copied-field ordering, version, and replacement behavior.",
+            ["Zumbo.Api|MongoMigrationRunner|method:ReplaceMigratedActivityAsync:(IMongoCollection<BsonDocument>collection,BsonDocumentexpected,CancellationTokencancellationToken):Task"] =
+                "The compatibility helper delegates to the activity definition's unchanged ownership filter, upsert, duplicate-key masking, and tenant-conflict exception behavior.",
             ["Zumbo.Modules.Identity|Zumbo.Modules.Identity.IdentityService|method:RegisterAsync:(RegisterUserRequestrequest,CancellationTokenct):Task<AuthResponse>"] =
                 "The compatibility facade delegates registration to the port-focused RegisterUser slice; the original public signature remains available and registration behavior is covered by focused unit and API tests.",
             ["Zumbo.Modules.Identity|Zumbo.Modules.Identity.IdentityService|method:LoginAsync:(LoginRequestrequest,CancellationTokenct):Task<AuthResponse>"] =

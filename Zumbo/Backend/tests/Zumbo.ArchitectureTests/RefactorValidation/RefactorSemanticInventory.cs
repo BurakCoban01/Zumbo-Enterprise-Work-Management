@@ -152,8 +152,15 @@ internal static class RefactorSemanticInventory
                 project,
                 fullName,
                 TypeKind(declaration),
-                TypeSignature(declaration));
+                TypeSignature(declaration),
+                declaration.BaseList is not null);
             builders.Add(key, builder);
+        }
+        else
+        {
+            builder.ConsiderSignature(
+                TypeSignature(declaration),
+                declaration.BaseList is not null);
         }
 
         builder.Files.Add(path);
@@ -454,10 +461,23 @@ internal static class RefactorSemanticInventory
         string project,
         string fullName,
         string kind,
-        string signature)
+        string signature,
+        bool hasBaseList)
     {
+        private string signature = signature;
+        private bool hasBaseList = hasBaseList;
+
         internal HashSet<string> Files { get; } = new(StringComparer.Ordinal);
         internal List<MemberElement> Members { get; } = [];
+
+        internal void ConsiderSignature(string candidate, bool candidateHasBaseList)
+        {
+            if (!hasBaseList && candidateHasBaseList)
+            {
+                signature = candidate;
+                hasBaseList = true;
+            }
+        }
 
         internal TypeElement Build() => new(
             key,

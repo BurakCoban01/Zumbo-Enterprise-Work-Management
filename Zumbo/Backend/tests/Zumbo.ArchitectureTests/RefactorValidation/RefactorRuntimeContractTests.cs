@@ -2043,45 +2043,161 @@ public sealed class RefactorRuntimeContractTests
         IReadOnlyList<RefactorSourceReader.SourceFile> files)
     {
         var roots = Parsed(files, file =>
-                file.Path.StartsWith("Backend/src/Zumbo.Persistence.PostgreSql/PostgreSqlMigrations", StringComparison.Ordinal))
+                file.Path.StartsWith(
+                    "Backend/src/Zumbo.Persistence.PostgreSql/",
+                    StringComparison.Ordinal)
+                && (file.Path.Contains("/PostgreSqlMigrations", StringComparison.Ordinal)
+                    || file.Path.Contains(
+                        "/Infrastructure/Persistence/Migrations/",
+                        StringComparison.Ordinal)))
             .ToArray();
         var migrationInvocations = roots
             .SelectMany(source => source.Root.DescendantNodes().OfType<InvocationExpressionSyntax>())
-            .Where(invocation => InvocationName(invocation) == "Create"
-                && invocation.Expression.ToString().Contains("Migration", StringComparison.Ordinal))
+            .Where(invocation => invocation.Expression.ToString() == "Migration.Create")
             .ToArray();
-        var referencedSqlNames = migrationInvocations
-            .SelectMany(invocation => invocation.ArgumentList.Arguments.Skip(2).Select(argument => argument.Expression.ToString()))
-            .ToHashSet(StringComparer.Ordinal);
-        var initializers = roots
-            .SelectMany(source => source.Root.DescendantNodes().OfType<VariableDeclaratorSyntax>())
-            .Where(variable => variable.Initializer is not null
-                && referencedSqlNames.Contains(variable.Identifier.ValueText))
-            .GroupBy(variable => variable.Identifier.ValueText, StringComparer.Ordinal)
-            .ToDictionary(
-                group => group.Key,
-                group => group.Select(variable => Normalize(variable.Initializer!.Value))
-                    .Distinct(StringComparer.Ordinal)
-                    .Single(),
-                StringComparer.Ordinal);
 
         return migrationInvocations
             .Select(invocation =>
             {
                 var arguments = invocation.ArgumentList.Arguments;
                 Assert.Equal(4, arguments.Count);
-                var upName = arguments[2].Expression.ToString();
-                var downName = arguments[3].Expression.ToString();
                 return string.Join('|',
                     Normalize(arguments[0].Expression),
                     Normalize(arguments[1].Expression),
-                    upName,
-                    initializers[upName],
-                    downName,
-                    initializers[downName]);
+                    ResolveMigrationSql(arguments[2].Expression, roots),
+                    ResolveMigrationSql(arguments[3].Expression, roots));
             })
             .OrderBy(item => long.Parse(item[..item.IndexOf('|')]))
             .ToArray();
+    }
+
+    private static string ResolveMigrationSql(
+        ExpressionSyntax expression,
+        IReadOnlyList<ParsedSource> roots,
+        TypeDeclarationSyntax? preferredType = null)
+    {
+        if (expression is IdentifierNameSyntax identifier)
+        {
+            var declaration = FindMigrationVariable(
+                identifier.Identifier.ValueText,
+                roots,
+                preferredType);
+            return ResolveMigrationSql(
+                declaration.Initializer!.Value,
+                roots,
+                declaration.FirstAncestorOrSelf<TypeDeclarationSyntax>());
+        }
+
+        if (expression is MemberAccessExpressionSyntax member
+            && member.Name.Identifier.ValueText is "UpSql" or "DownSql")
+        {
+            var sqlIndex = member.Name.Identifier.ValueText == "UpSql" ? 2 : 3;
+            if (member.Expression is IdentifierNameSyntax localIdentifier)
+            {
+                var declaration = FindMigrationVariable(
+                    localIdentifier.Identifier.ValueText,
+                    roots,
+                    preferredType);
+                if (declaration.Initializer!.Value is InvocationExpressionSyntax factory)
+                {
+                    var argumentIndex = sqlIndex - 2;
+                    return ResolveMigrationSql(
+                        factory.ArgumentList.Arguments[argumentIndex].Expression,
+                        roots,
+                        factory.FirstAncestorOrSelf<TypeDeclarationSyntax>());
+                }
+
+                return ResolveMigrationDefinitionProperty(
+                    declaration.Initializer.Value,
+                    sqlIndex,
+                    roots,
+                    declaration.FirstAncestorOrSelf<TypeDeclarationSyntax>());
+            }
+
+            if (member.Expression is MemberAccessExpressionSyntax definitionAccess
+                && definitionAccess.Name.Identifier.ValueText == "Definition")
+            {
+                var typeName = definitionAccess.Expression.ToString();
+                var definitionType = roots
+                    .SelectMany(source => source.Root.DescendantNodes()
+                        .OfType<TypeDeclarationSyntax>())
+                    .Single(type => type.Identifier.ValueText == typeName);
+                var definition = Assert.Single(
+                    definitionType.Members.OfType<PropertyDeclarationSyntax>(),
+                    property => property.Identifier.ValueText == "Definition"
+                        && property.Initializer is not null);
+                return ResolveMigrationDefinitionProperty(
+                    definition.Initializer!.Value,
+                    sqlIndex,
+                    roots,
+                    definitionType);
+            }
+
+            if (member.Expression is IdentifierNameSyntax typeIdentifier)
+            {
+                var definitionType = roots
+                    .SelectMany(source => source.Root.DescendantNodes()
+                        .OfType<TypeDeclarationSyntax>())
+                    .Single(type => type.Identifier.ValueText
+                        == typeIdentifier.Identifier.ValueText);
+                var declaration = FindMigrationVariable(
+                    member.Name.Identifier.ValueText,
+                    roots,
+                    definitionType);
+                return ResolveMigrationSql(
+                    declaration.Initializer!.Value,
+                    roots,
+                    definitionType);
+            }
+        }
+
+        return Normalize(expression);
+    }
+
+    private static string ResolveMigrationDefinitionProperty(
+        ExpressionSyntax definition,
+        int argumentIndex,
+        IReadOnlyList<ParsedSource> roots,
+        TypeDeclarationSyntax? preferredType)
+    {
+        var arguments = definition switch
+        {
+            ObjectCreationExpressionSyntax creation => creation.ArgumentList!.Arguments,
+            ImplicitObjectCreationExpressionSyntax creation => creation.ArgumentList.Arguments,
+            _ => throw new Xunit.Sdk.XunitException(
+                $"Unsupported migration definition initializer: {definition}")
+        };
+        Assert.Equal(4, arguments.Count);
+        return ResolveMigrationSql(
+            arguments[argumentIndex].Expression,
+            roots,
+            preferredType);
+    }
+
+    private static VariableDeclaratorSyntax FindMigrationVariable(
+        string name,
+        IReadOnlyList<ParsedSource> roots,
+        TypeDeclarationSyntax? preferredType)
+    {
+        var candidates = roots
+            .SelectMany(source => source.Root.DescendantNodes()
+                .OfType<VariableDeclaratorSyntax>())
+            .Where(variable => variable.Identifier.ValueText == name
+                && variable.Initializer is not null)
+            .ToArray();
+        if (preferredType is not null)
+        {
+            var scoped = candidates.Where(variable =>
+                    variable.FirstAncestorOrSelf<TypeDeclarationSyntax>()?
+                        .Identifier.ValueText == preferredType.Identifier.ValueText)
+                .ToArray();
+            if (scoped.Length == 1)
+            {
+                return scoped[0];
+            }
+        }
+
+        return Assert.Single(candidates);
     }
 
     private static IReadOnlyList<string> MongoContracts(

@@ -208,6 +208,183 @@ public sealed class ArchitectureBoundaryTests
     }
 
     [Fact]
+    public void PostgreSqlMigrations_AreOrderedDefinitionTypesWithCompatibilityRunner()
+    {
+        var persistenceDirectory = Path.Combine(SourceDirectory, "Zumbo.Persistence.PostgreSql");
+        var migrationsDirectory = Path.Combine(
+            persistenceDirectory,
+            "Infrastructure",
+            "Persistence",
+            "Migrations");
+        var definitionsDirectory = Path.Combine(migrationsDirectory, "Definitions");
+        var definitionFiles = Directory.GetFiles(
+                definitionsDirectory,
+                "V*.cs",
+                SearchOption.TopDirectoryOnly)
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+
+        Assert.Equal(37, definitionFiles.Length);
+        Assert.Equal(
+            Enumerable.Range(1, 37).Select(version => $"V{version:000}").ToArray(),
+            definitionFiles.Select(path => (Path.GetFileName(path)!)[..4]).ToArray());
+        Assert.All(definitionFiles, path =>
+        {
+            Assert.True(path.Length <= 225, $"Migration definition path exceeds budget: {path}");
+            Assert.Contains(
+                "PostgreSqlMigrationDefinition",
+                File.ReadAllText(path),
+                StringComparison.Ordinal);
+        });
+
+        var abstractionsDirectory = Path.Combine(migrationsDirectory, "Abstractions");
+        Assert.Equal(
+            [
+                "IPostgreSqlMigrationRunner.cs",
+                "PostgreSqlMigrationDefinition.cs",
+                "PostgreSqlMigrationInfo.cs",
+                "PostgreSqlMigrationStatus.cs"
+            ],
+            Directory.GetFiles(abstractionsDirectory, "*.cs", SearchOption.TopDirectoryOnly)
+                .Select(path => Path.GetFileName(path)!)
+                .Order(StringComparer.Ordinal)
+                .ToArray());
+        var abstraction = File.ReadAllText(Path.Combine(
+            abstractionsDirectory,
+            "PostgreSqlMigrationDefinition.cs"));
+        Assert.Contains("long Version", abstraction, StringComparison.Ordinal);
+
+        var runnerDirectory = Path.Combine(migrationsDirectory, "Runner");
+        Assert.Equal(
+            [
+                "PostgreSqlMigrationRunner.Apply.cs",
+                "PostgreSqlMigrationRunner.Inspection.cs",
+                "PostgreSqlMigrationRunner.Ledger.cs",
+                "PostgreSqlMigrationRunner.Locking.cs",
+                "PostgreSqlMigrationRunner.Registry.cs",
+                "PostgreSqlMigrationRunner.Rollback.cs",
+                "PostgreSqlMigrationRunner.Sql.cs",
+                "PostgreSqlMigrationRunner.cs"
+            ],
+            Directory.GetFiles(runnerDirectory, "*.cs", SearchOption.TopDirectoryOnly)
+                .Select(path => Path.GetFileName(path)!)
+                .Order(StringComparer.Ordinal)
+                .ToArray());
+        Assert.All(
+            Directory.GetFiles(migrationsDirectory, "*.cs", SearchOption.AllDirectories),
+            path => Assert.True(path.Length <= 225, $"Migration path exceeds budget: {path}"));
+
+        var legacyMigrations = Path.Combine(
+            persistenceDirectory,
+            "PostgreSqlMigrations");
+        Assert.Empty(
+            Directory.Exists(legacyMigrations)
+                ? Directory.GetFiles(legacyMigrations, "*.cs", SearchOption.AllDirectories)
+                : []);
+
+        var registryPath = Path.Combine(
+            runnerDirectory,
+            "PostgreSqlMigrationRunner.Registry.cs");
+        Assert.Equal(
+            37,
+            File.ReadLines(registryPath).Count(line => line.TrimStart().StartsWith(
+                "Migration.Create(",
+                StringComparison.Ordinal)));
+    }
+
+    [Fact]
+    public void MongoMigrations_AreGroupedByAdapterResponsibility()
+    {
+        var apiDirectory = Path.Combine(SourceDirectory, "Zumbo.Api");
+        var migrationsDirectory = Path.Combine(
+            apiDirectory,
+            "Infrastructure",
+            "Persistence",
+            "MongoDb",
+            "Migrations");
+
+        Assert.Equal(
+            [
+                "IMongoMigrationExecutionContext.cs",
+                "MongoIndexSpecification.cs",
+                "MongoMigrationOptions.cs",
+                "MongoMigrationOutcome.cs",
+                "MongoMigrationRunReport.cs",
+                "MongoMigrationStates.cs"
+            ],
+            FileNames(Path.Combine(migrationsDirectory, "Abstractions")));
+        Assert.Equal(
+            [
+                "MongoMigrationLedgerDocument.cs",
+                "MongoRankMigrationBackupDocument.cs"
+            ],
+            FileNames(Path.Combine(migrationsDirectory, "Documents")));
+        Assert.Equal(25, FileNames(Path.Combine(
+            migrationsDirectory,
+            "Definitions",
+            "Indexes")).Length);
+        Assert.Equal(
+            [
+                "MongoApiKeyVersionBackfill.cs",
+                "MongoLegacyMarkerCleanup.cs",
+                "MongoMigrationRunner.ApiKeyVersionBackfill.cs",
+                "MongoMigrationRunner.LegacyMarkerCleanup.cs",
+                "MongoMigrationRunner.OrganizationBackfill.cs",
+                "MongoMigrationRunner.ProjectLifecycleBackfill.cs",
+                "MongoMigrationRunner.RankBackfill.cs",
+                "MongoMigrationRunner.RefreshSessionBackfill.cs",
+                "MongoMigrationRunner.SprintLifecycleBackfill.cs",
+                "MongoMigrationRunner.TeamInviteBackfill.cs",
+                "MongoMigrationRunner.TypeSchemaBackfill.cs",
+                "MongoMigrationRunner.UserVersionBackfill.cs",
+                "MongoMigrationRunner.WorkItemActivityBackfill.cs",
+                "MongoMigrationRunner.WorkItemGraphBackfill.cs",
+                "MongoMigrationRunner.WorkflowLifecycleBackfill.cs",
+                "MongoOrganizationVersionBackfill.cs",
+                "MongoProjectLifecycleBackfill.cs",
+                "MongoRankBackfill.cs",
+                "MongoRefreshSessionBackfill.cs",
+                "MongoSprintLifecycleBackfill.cs",
+                "MongoTeamInviteBackfill.cs",
+                "MongoUserVersionBackfill.cs",
+                "MongoWorkItemActivityBackfill.cs",
+                "MongoWorkItemGraphBackfill.cs",
+                "MongoWorkItemTypeSchemaBackfill.cs",
+                "MongoWorkflowLifecycleBackfill.cs"
+            ],
+            FileNames(Path.Combine(migrationsDirectory, "Definitions", "Backfills")));
+        Assert.Equal(
+            [
+                "MongoMigrationRunner.Bson.cs",
+                "MongoMigrationRunner.Context.cs",
+                "MongoMigrationRunner.Indexes.cs",
+                "MongoMigrationRunner.Ledger.cs",
+                "MongoMigrationRunner.Rollback.cs",
+                "MongoMigrationRunner.cs"
+            ],
+            FileNames(Path.Combine(migrationsDirectory, "Runner")));
+
+        Assert.All(
+            Directory.GetFiles(migrationsDirectory, "*.cs", SearchOption.AllDirectories),
+            path => Assert.True(path.Length <= 225, $"Mongo migration path exceeds budget: {path}"));
+        var legacyMigrations = Path.Combine(apiDirectory, "MongoMigrations");
+        Assert.Empty(
+            Directory.Exists(legacyMigrations)
+                ? Directory.GetFiles(legacyMigrations, "*.cs", SearchOption.AllDirectories)
+                : []);
+
+        var runnerPath = Path.Combine(
+            migrationsDirectory,
+            "Runner",
+            "MongoMigrationRunner.cs");
+        Assert.Equal(
+            38,
+            File.ReadLines(runnerPath).Count(line => line.TrimStart().StartsWith(
+                "public const string ",
+                StringComparison.Ordinal)));
+    }
+
+    [Fact]
     public void ApiPipeline_PreservesExactMiddlewareOrder()
     {
         var pipeline = Path.Combine(
@@ -3346,6 +3523,12 @@ public sealed class ArchitectureBoundaryTests
             .OfType<string>()
             .Order(StringComparer.Ordinal)
             .ToList();
+
+    private static string[] FileNames(string directory) =>
+        Directory.GetFiles(directory, "*.cs", SearchOption.TopDirectoryOnly)
+            .Select(path => Path.GetFileName(path)!)
+            .Order(StringComparer.Ordinal)
+            .ToArray();
 
     private static string ProjectName(string projectFile) => Path.GetFileNameWithoutExtension(projectFile);
 

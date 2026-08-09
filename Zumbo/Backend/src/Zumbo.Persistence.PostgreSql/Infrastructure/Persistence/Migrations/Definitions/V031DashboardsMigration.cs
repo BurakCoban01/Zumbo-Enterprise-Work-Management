@@ -1,0 +1,39 @@
+namespace Zumbo.Persistence.PostgreSql;
+
+internal static class V031DashboardsMigration
+{
+        private const string UpSql = """
+            CREATE TABLE IF NOT EXISTS work_items.dashboards (
+                id text PRIMARY KEY,
+                version bigint NOT NULL DEFAULT 0 CHECK (version >= 0),
+                document jsonb NOT NULL CHECK (jsonb_typeof(document) = 'object'),
+                created_at timestamptz NOT NULL DEFAULT transaction_timestamp(),
+                updated_at timestamptz NOT NULL DEFAULT transaction_timestamp(),
+                CHECK (document ->> 'Id' = id),
+                CHECK (COALESCE((document ->> 'Version')::bigint, 0) = version)
+            );
+            CREATE INDEX IF NOT EXISTS ix_dashboards_tenant_owner_state
+                ON work_items.dashboards (
+                    (document ->> 'OrganizationId'),
+                    (document ->> 'OwnerUserId'),
+                    ((document ->> 'Archived')::boolean),
+                    public.zumbo_parse_timestamptz(document ->> 'UpdatedAt') DESC,
+                    id);
+            CREATE INDEX IF NOT EXISTS ix_dashboards_tenant_viewers
+                ON work_items.dashboards
+                USING gin ((document -> 'ViewerUserIds'));
+            CREATE INDEX IF NOT EXISTS ix_dashboards_tenant_projects
+                ON work_items.dashboards
+                USING gin ((document -> 'ProjectIds'));
+            """;
+
+        private const string DownSql = """
+            DROP TABLE IF EXISTS work_items.dashboards;
+            """;
+
+    internal static PostgreSqlMigrationDefinition Definition { get; } = new(
+        31,
+        "dashboards",
+        UpSql,
+        DownSql);
+}
