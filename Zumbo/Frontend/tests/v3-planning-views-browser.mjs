@@ -164,7 +164,8 @@ try {
   assert.equal(owner.data.tasks[1].dueDate, '2026-07-31T00:00:00.000Z');
   assert.ok(owner.data.ifMatches.includes('"3"'));
 
-  await page.getByRole('tab', { name: 'Zaman çizelgesi', exact: true }).click();
+  await page.getByRole('button', { name: 'Daha fazla', exact: true }).click();
+  await page.getByRole('menuitem', { name: 'Zaman çizelgesi', exact: true }).click();
   await page.locator('.planning-gantt-row').first().waitFor();
   assert.match(await page.locator('.planning-risk-note').innerText(), /1 bağımlılık · 1 tarih çakışması/);
   await page.screenshot({ path: resolve(output, 'desktop-timeline-gantt.png'), fullPage: true });
@@ -172,12 +173,19 @@ try {
   assert.ok(await page.locator('.planning-table tbody tr').count() > 180);
   await page.screenshot({ path: resolve(output, 'desktop-timeline-table.png'), fullPage: true });
 
-  await page.getByRole('tab', { name: 'Yol haritası', exact: true }).click();
+  await page.getByRole('button', { name: 'Daha fazla', exact: true }).click();
+  await page.getByRole('menuitem', { name: 'Yol haritası', exact: true }).click();
   await page.getByText('Teslimat yol haritası', { exact: true }).waitFor();
   assert.ok(await page.getByText('Pilot onayı', { exact: true }).isVisible());
   assert.ok(await page.getByText('Sürüm 1.0', { exact: true }).isVisible());
   await page.getByRole('button', { name: /Grafi/ }).click();
   await page.locator('.planning-gantt-row').first().waitFor();
+  assert.ok(await page.locator('.roadmap-segment').count() >= 1);
+  const percentageTotal = await page.locator('.roadmap-status-legend span').evaluateAll(items => items.reduce((sum, item) => {
+    const match = item.textContent.match(/%([0-9]+(?:[.,][0-9]+)?)/);
+    return sum + (match ? Number(match[1].replace(',', '.')) : 0);
+  }, 0));
+  assert.equal(percentageTotal, 100);
   await page.screenshot({ path: resolve(output, 'desktop-roadmap.png'), fullPage: true });
   const overflow = await page.evaluate(() => ({ width: window.innerWidth, scrollWidth: document.documentElement.scrollWidth }));
   assert.ok(overflow.scrollWidth <= overflow.width + 1);

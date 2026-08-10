@@ -185,22 +185,60 @@
 
           vm.moveTaskToColumn = function(taskId, column) {
             if (!vm.canEditWorkItems()) return $q.when();
+            var task = vm.tasks.find(function(item) { return item.id === taskId; });
+            if (!vm.canMoveTaskToColumn(task, column)) {
+              vm.notify('error', 'Kolonun WIP limiti dolu; görev taşınmadı.');
+              return $q.when();
+            }
             rememberTaskVersion(taskId);
             return originalMove(taskId, column);
           };
-          vm.dropTaskBefore = function(taskId, anchor) {
+          vm.dropTaskBefore = function(taskId, anchor, placement) {
             if (!vm.canEditWorkItems()) return $q.when();
+            var task = vm.tasks.find(function(item) { return item.id === taskId; });
+            var targetColumn = vm.board && vm.board.columns.find(function(column) {
+              var statuses = column.statusNames && column.statusNames.length ? column.statusNames : [column.name];
+              return column.id === anchor.columnId || statuses.indexOf(anchor.status) >= 0;
+            });
+            if (!vm.canMoveTaskToColumn(task, targetColumn)) {
+              vm.notify('error', 'Kolonun WIP limiti dolu; görev taşınmadı.');
+              return $q.when();
+            }
             rememberTaskVersion(taskId);
-            return originalDropBefore(taskId, anchor);
+            return originalDropBefore(taskId, anchor, placement);
+          };
+          vm.canMoveTaskToColumn = function(task, column) {
+            if (!task || !column) return false;
+            var statuses = column.statusNames && column.statusNames.length ? column.statusNames : [column.name];
+            if (task.columnId === column.id || statuses.indexOf(task.status) >= 0) return true;
+            if (!column.wipLimit) return true;
+            var count = vm.tasks.filter(function(item) {
+              return item.columnId === column.id || statuses.indexOf(item.status) >= 0;
+            }).length;
+            return count < column.wipLimit;
           };
           vm.canMoveTaskDirection = function(task, direction) {
             if (!vm.canEditWorkItems() || !vm.board || vm.pendingTaskIds[task.id]) return false;
             var index = columnIndex(task);
-            return index >= 0 && !!vm.board.columns[index + direction];
+            var target = index >= 0 ? vm.board.columns[index + direction] : null;
+            return !!target && vm.canMoveTaskToColumn(task, target);
           };
           vm.moveTaskDirection = function(task, direction) {
             if (!vm.canMoveTaskDirection(task, direction)) return $q.when();
             return vm.moveTaskToColumn(task.id, vm.board.columns[columnIndex(task) + direction]);
+          };
+          vm.canReorderTaskDirection = function(task, direction) {
+            if (!vm.canEditWorkItems() || !task || vm.pendingTaskIds[task.id]) return false;
+            var tasks = visibleColumnTasks(task);
+            var index = tasks.findIndex(function(item) { return item.id === task.id; });
+            return index >= 0 && !!tasks[index + direction];
+          };
+          vm.reorderTaskDirection = function(task, direction) {
+            if (!vm.canReorderTaskDirection(task, direction)) return $q.when();
+            var tasks = visibleColumnTasks(task);
+            var index = tasks.findIndex(function(item) { return item.id === task.id; });
+            var anchor = tasks[index + direction];
+            return vm.dropTaskBefore(task.id, anchor, direction < 0 ? 'before' : 'after');
           };
           vm.handleTaskKey = function(event, task) {
             if (event.key === 'Enter') { event.preventDefault(); vm.selectTask(task); return; }
@@ -209,14 +247,35 @@
               vm.toggleTaskSelection(task.id);
               return;
             }
-            if (!event.altKey || (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight')) return;
+            if (!event.altKey || ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].indexOf(event.key) < 0) return;
             event.preventDefault();
+            if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+              vm.reorderTaskDirection(task, event.key === 'ArrowUp' ? -1 : 1);
+              return;
+            }
             vm.moveTaskDirection(task, event.key === 'ArrowLeft' ? -1 : 1);
           };
 
           vm.bulkMove = function(status) {
             var payload = { workItemIds: vm.selectedIds(), status: status };
             return runBulk(function() { return apiClient.post('/api/work-items/bulk/move', payload); }, payload, 'Taşıma');
+          };
+          vm.bulkTransitionOptions = function() {
+            var selected = (vm.tasks || []).filter(function(task) { return !!vm.selectedTaskIds[task.id]; });
+            if (!selected.length) return [];
+            var transitions = vm.workflow && vm.workflow.transitions || [];
+            var firstTargets = transitions.filter(function(transition) { return transition.fromStatus === selected[0].status; })
+              .map(function(transition) { return transition.toStatus; });
+            return firstTargets.filter(function(target, index) {
+              return firstTargets.indexOf(target) === index && selected.every(function(task) {
+                return transitions.some(function(transition) {
+                  return transition.fromStatus === task.status && transition.toStatus === target;
+                });
+              });
+            });
+          };
+          vm.bulkTransitionAllowed = function() {
+            return vm.bulkTransitionOptions().indexOf(vm.bulkTargetStatus) >= 0;
           };
           vm.bulkAssignToMe = function() {
             var payload = {
@@ -236,7 +295,7 @@
             }).length;
           };
           vm.taskDueState = function(task) {
-            if (!task.dueDate || String(task.status).toLowerCase() === 'done') return '';
+            if (!task.dueDate || vm.statusCategory(task.status) === 'Done') return '';
             var days = (new Date(task.dueDate).getTime() - Date.now()) / 86400000;
             return days < 0 ? 'overdue' : days <= 2 ? 'soon' : '';
           };
@@ -248,6 +307,17 @@
             return vm.board.columns.findIndex(function(column) {
               return column.id === task.columnId || column.name === task.status;
             });
+          }
+
+          function visibleColumnTasks(task) {
+            var rows = vm.boardRows || [];
+            for (var rowIndex = 0; rowIndex < rows.length; rowIndex += 1) {
+              for (var column = 0; column < rows[rowIndex].columns.length; column += 1) {
+                var tasks = rows[rowIndex].columns[column].tasks || [];
+                if (tasks.some(function(item) { return item.id === task.id; })) return tasks;
+              }
+            }
+            return [];
           }
           function rememberTaskVersion(taskId) {
             var task = (vm.tasks || []).find(function(item) { return item.id === taskId; });

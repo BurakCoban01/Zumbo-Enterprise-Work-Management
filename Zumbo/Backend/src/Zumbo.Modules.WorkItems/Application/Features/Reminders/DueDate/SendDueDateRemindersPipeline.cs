@@ -77,12 +77,14 @@ internal sealed class SendDueDateRemindersPipeline(
             }
 
             var deduplicationKey = $"due:{workItem.Id}:{workItem.DueDate.Value.UtcTicks}";
-            await notifications.NotifyAsync(
+            await notifications.NotifyWithSourceAsync(
                 workItem.AssigneeUserId,
                 "DueDateReminder",
                 $"{workItem.Title} is due at {workItem.DueDate:O}.",
                 ct,
-                deduplicationKey);
+                deduplicationKey,
+                workItem.Id,
+                workItem.ProjectId);
             workItem.DueReminderSentAt = clock.UtcNow;
             workItem.UpdatedAt = clock.UtcNow;
             await SaveAsync(workItem, ct);

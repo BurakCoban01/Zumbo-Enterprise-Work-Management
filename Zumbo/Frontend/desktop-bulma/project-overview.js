@@ -4,25 +4,25 @@
   angular.module('zumboDesktop')
     .factory('desktopProjectOverviewFeature', function($timeout) {
       var views = [
-        view('overview', 'Genel bakış', 'layout-dashboard', 'board'),
-        view('board', 'Pano', 'kanban', 'board', true),
-        view('list', 'Liste', 'list', 'board', true),
-        view('backlog', 'Backlog', 'inbox', 'board', true),
-        view('sprint', 'Sprint', 'timer', 'board', true),
-        view('calendar', 'Takvim', 'calendar-days', 'board', true),
-        view('timeline', 'Zaman çizelgesi', 'chart-gantt', 'board', true),
-        view('roadmap', 'Yol haritası', 'route', 'board', true),
-        view('catalog', 'Teslimat', 'package-open', 'board'),
-        view('intake', 'Intake', 'clipboard-list', 'board'),
-        view('automation', 'Otomasyon', 'repeat-2', 'board'),
-        view('jobs', 'İş merkezi', 'database-zap', 'board'),
-        view('workload', 'İş yükü', 'users', 'reports'),
-        view('reports', 'Raporlar', 'chart-no-axes-combined', 'reports'),
-        view('dashboards', 'Dashboardlar', 'panels-top-left', 'reports')
+        view('overview', 'Genel bakış', 'layout-dashboard', 'board', false, 'primary'),
+        view('board', 'Pano', 'kanban', 'board', true, 'primary'),
+        view('list', 'Liste', 'list', 'board', true, 'primary'),
+        view('backlog', 'Backlog', 'inbox', 'board', true, 'primary'),
+        view('sprint', 'Sprint', 'timer', 'board', true, 'primary'),
+        view('calendar', 'Takvim', 'calendar-days', 'board', true, 'plan'),
+        view('timeline', 'Zaman çizelgesi', 'chart-gantt', 'board', true, 'plan'),
+        view('roadmap', 'Yol haritası', 'route', 'board', true, 'plan'),
+        view('catalog', 'Teslimat', 'package-open', 'board', false, 'plan'),
+        view('intake', 'Intake', 'clipboard-list', 'board', false, 'operate'),
+        view('automation', 'Otomasyon', 'repeat-2', 'board', false, 'operate'),
+        view('jobs', 'İş merkezi', 'database-zap', 'board', false, 'operate'),
+        view('workload', 'İş yükü', 'users', 'reports', false, 'insights'),
+        view('reports', 'Raporlar', 'chart-no-axes-combined', 'reports', false, 'insights'),
+        view('dashboards', 'Dashboardlar', 'panels-top-left', 'reports', false, 'insights')
       ];
 
-      function view(id, label, icon, section, requiresBoard) {
-        return { id: id, label: label, icon: icon, section: section, requiresBoard: requiresBoard === true };
+      function view(id, label, icon, section, requiresBoard, group) {
+        return { id: id, label: label, icon: icon, section: section, requiresBoard: requiresBoard === true, group: group };
       }
 
       function firstByDate(items, field) {
@@ -33,10 +33,21 @@
         })[0] || null;
       }
 
+      function readPreference(key) {
+        return window.localStorage ? window.localStorage.getItem(key) : null;
+      }
+
+      function writePreference(key, value) {
+        if (window.localStorage) window.localStorage.setItem(key, value);
+      }
+
       return {
         install: function(vm, helpers) {
           var updateLocation = helpers.updateLocation;
+          var secondaryGroupsCacheKey = '';
+          var secondaryGroupsCache = [];
           vm.projectViews = views;
+          vm.projectMoreOpen = false;
 
           vm.projectViewAvailable = function(candidate) {
             return !!candidate && !!vm.project && !!vm.projectMembership
@@ -44,6 +55,27 @@
           };
           vm.availableProjectViews = function() {
             return vm.projectViews.filter(vm.projectViewAvailable);
+          };
+          vm.primaryProjectViews = function() {
+            return vm.availableProjectViews().filter(function(candidate) { return candidate.group === 'primary'; });
+          };
+          vm.secondaryProjectViewGroups = function() {
+            var available = vm.availableProjectViews();
+            var cacheKey = available.map(function(candidate) { return candidate.id; }).join('|');
+            if (cacheKey === secondaryGroupsCacheKey) return secondaryGroupsCache;
+            secondaryGroupsCacheKey = cacheKey;
+            secondaryGroupsCache = [
+              { id: 'plan', label: 'Planlama' },
+              { id: 'operate', label: 'Operasyon' },
+              { id: 'insights', label: 'İçgörüler' }
+            ].map(function(group) {
+              return {
+                id: group.id,
+                label: group.label,
+                views: available.filter(function(candidate) { return candidate.group === group.id; })
+              };
+            }).filter(function(group) { return group.views.length; });
+            return secondaryGroupsCache;
           };
           vm.currentProjectView = function() {
             return vm.projectViews.find(function(candidate) { return candidate.id === vm.workMode; }) || vm.projectViews[0];
@@ -59,6 +91,8 @@
             }
             vm.workMode = target.id;
             vm.activeSection = target.section;
+            vm.projectMoreOpen = false;
+            if (vm.project) writePreference('zumbo.projectView.' + vm.project.id, target.id);
             vm.clearSelection();
             vm.selectedTask = null;
             vm.taskDraft = null;
@@ -86,7 +120,8 @@
             var searchChanged = vm.search !== search;
             vm.priorityFilter = ['', 'Critical', 'High', 'Medium', 'Low'].indexOf(priority) >= 0 ? priority : '';
             vm.search = search;
-            var requested = params.get('view') || (params.get('section') === 'reports' ? 'reports' : 'overview');
+            var remembered = vm.project && readPreference('zumbo.projectView.' + vm.project.id);
+            var requested = params.get('view') || remembered || (params.get('section') === 'reports' ? 'reports' : 'overview');
             var selected = vm.setProjectView(requested, true);
             if (vm.applyPlanningViewLocation) vm.applyPlanningViewLocation(params);
             if (vm.applyReportingLocation) vm.applyReportingLocation(params);

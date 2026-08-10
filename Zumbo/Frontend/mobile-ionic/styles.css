@@ -313,6 +313,17 @@ body, .pane, .view {
   background: var(--panel);
 }
 
+.mobile-more-nav > h3 {
+  margin: 0;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface-subtle);
+  color: var(--muted);
+  padding: 10px 16px 7px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
 .mobile-more-nav > button {
   display: grid;
   width: 100%;

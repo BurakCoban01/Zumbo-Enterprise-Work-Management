@@ -161,7 +161,7 @@ try {
   });
   await flowPage.getByRole('heading', { name: 'Daha fazla' }).waitFor();
   await flowPage.waitForFunction(() => document.querySelectorAll('.zumbo-primary-tabs .tab-item').length === 5);
-  assert.equal(await flowPage.locator('.mobile-more-nav > button').count(), 3);
+  assert.equal(await flowPage.locator('.mobile-more-nav > button').count(), 7);
   await assertNoOverflow(flowPage);
   await flowPage.screenshot({ path: resolve(output, 'more-390.png'), fullPage: true });
   checks.push('more-context-and-secondary-navigation');

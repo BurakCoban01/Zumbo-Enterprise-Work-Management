@@ -56,7 +56,7 @@ function model({ role = 'Developer', api = {} } = {}) {
     priorityFilter: '',
     userName: id => id === 'user-1' ? 'Ada' : 'Mert',
     moveTaskToColumn: (id, target) => Promise.resolve({ id, target }),
-    dropTaskBefore: (id, anchor) => Promise.resolve({ id, anchor }),
+    dropTaskBefore(id, anchor, placement) { vm.dropCall = { id, anchor, placement }; return Promise.resolve(); },
     refreshBoardModel() {},
     loadTasks() { vm.reloads = (vm.reloads || 0) + 1; return Promise.resolve(); },
     selectedIds() { return Object.keys(vm.selectedTaskIds).filter(id => vm.selectedTaskIds[id]); },
@@ -203,6 +203,36 @@ test('board WIP state uses the whole loaded column, not each swimlane subset', (
     assert.equal(row.columns[0].wipState, 'full');
     assert.equal(row.columns[0].atWipLimit, true);
   }
+});
+
+test('movement affordance is disabled before requesting a visibly WIP-full column', async () => {
+  const { vm } = installExcellence();
+  vm.board.columns[2].wipLimit = 1;
+  vm.tasks.push(task('review-task', 'Review item', 'Medium', 'review', 'Review', 30));
+  vm.refreshBoardModel();
+
+  const moving = vm.tasks.find(item => item.id === 'task-high');
+  assert.equal(vm.canMoveTaskDirection(moving, 1), false);
+  await vm.moveTaskDirection(moving, 1);
+  assert.equal(vm.pendingTaskIds[moving.id], undefined);
+});
+
+test('keyboard vertical movement reuses before-after rank placement', async () => {
+  const { vm } = installExcellence();
+  const first = vm.tasks.find(item => item.id === 'task-high');
+  const second = vm.tasks.find(item => item.id === 'task-low');
+  second.columnId = first.columnId;
+  second.status = first.status;
+  vm.boardRows = [{ columns: [{ tasks: [first, second] }] }];
+  const event = { key: 'ArrowDown', altKey: true, preventDefault() { this.prevented = true; } };
+
+  vm.handleTaskKey(event, first);
+  await Promise.resolve();
+
+  assert.equal(event.prevented, true);
+  assert.equal(vm.dropCall.id, first.id);
+  assert.equal(vm.dropCall.anchor.id, second.id);
+  assert.equal(vm.dropCall.placement, 'after');
 });
 
 test('templates expose semantic table, keyboard/touch movement and permission-aware controls', () => {

@@ -762,11 +762,13 @@
           <p>{{vm.session.currentUser.displayName || vm.session.currentUser.username || 'Zumbo kullanıcısı'}}</p>
         </header>
         <nav class="mobile-more-nav" aria-label="İkincil gezinme">
+          <h3>Çalışma alanı</h3>
           <button type="button" ui-sref="app.projects">
             <i class="icon ion-folder" aria-hidden="true"></i>
             <span><strong>Projeler ve ekipler</strong><small>Çalışma alanları, ekipler ve arşiv</small></span>
             <i class="icon ion-chevron-right" aria-hidden="true"></i>
           </button>
+          <h3>Planlama</h3>
           <button type="button" ui-sref="portfolio-center">
             <i class="icon ion-map" aria-hidden="true"></i>
             <span><strong>Portföyler</strong><small>Initiative, sağlık ve çapraz proje planı</small></span>
@@ -787,6 +789,7 @@
             <span><strong>Bilgi</strong><small>Proje kararları, sürümler ve yorumlar</small></span>
             <i class="icon ion-chevron-right" aria-hidden="true"></i>
           </button>
+          <h3>Araçlar ve hesap</h3>
           <button type="button" ui-sref="app.search">
             <i class="icon ion-search" aria-hidden="true"></i>
             <span><strong>Arama</strong><small>Projelerde işe ulaşın</small></span>
@@ -1153,9 +1156,7 @@
         </div>
         <div class="segmented" ng-if="vm.mode === 'my'">
           <button ng-class="{active: vm.status === ''}" ng-click="vm.filter('')">Tümü</button>
-          <button ng-class="{active: vm.status === 'To Do'}" ng-click="vm.filter('To Do')">Yapılacak</button>
-          <button ng-class="{active: vm.status === 'In Progress'}" ng-click="vm.filter('In Progress')">Aktif</button>
-          <button ng-class="{active: vm.status === 'Done'}" ng-click="vm.filter('Done')">Tamam</button>
+          <button ng-repeat="status in vm.statusOptions() track by status.name" ng-class="{active: vm.status === status.name}" ng-click="vm.filter(status.name)">{{status.name}}</button>
         </div>
         <section class="mobile-planning" ng-if="vm.mode === 'backlog'">
           <div class="mobile-feedback error" ng-if="vm.planningError" role="alert" aria-live="assertive">{{vm.planningError}}</div>

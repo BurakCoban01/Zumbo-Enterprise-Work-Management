@@ -158,6 +158,12 @@ try {
   const ownerContext = await browser.newContext({ viewport: { width: 1440, height: 1000 }, reducedMotion: 'reduce' });
   await browserContextLogin(ownerContext, owner.username);
   const ownerPage = await ownerContext.newPage();
+  let ownerStatusRequests = 0;
+  ownerPage.on('request', request => {
+    if (request.method() === 'PATCH' && /\/api\/work-items\/[^/]+\/status$/.test(new URL(request.url()).pathname)) {
+      ownerStatusRequests += 1;
+    }
+  });
   attachDiagnostics(ownerPage, 'owner');
   await ownerPage.goto(
     `${frontendBaseUrl}/desktop-bulma/index.html#section=board&project=${project.id}&board=${board.id}&view=board`,
@@ -170,11 +176,14 @@ try {
   checks.push('real-wip-projection');
 
   const rollbackTask = ownerPage.locator(`[data-work-item-id="${createdTasks[1].id}"]`);
+  assert.equal(await rollbackTask.getByTitle('Sonraki kolona taşı').isDisabled(), true);
+  const ownerStatusRequestsBefore = ownerStatusRequests;
   await rollbackTask.focus();
   await rollbackTask.press('Alt+ArrowRight');
-  await ownerPage.getByText('Kolonun WIP limiti dolu; görev önceki konumuna alındı.', { exact: true }).waitFor();
+  await ownerPage.waitForTimeout(250);
+  assert.equal(ownerStatusRequests, ownerStatusRequestsBefore);
   assert.equal(await rollbackTask.evaluate(element => element.closest('.column-lane').querySelector('.lane-title strong').textContent.trim()), todoColumn.name);
-  checks.push('real-keyboard-wip-rollback');
+  checks.push('real-keyboard-wip-preflight');
 
   const missingTaskId = `missing-${stamp}`;
   await ownerPage.evaluate(({ taskId, missingId }) => {
@@ -271,4 +280,4 @@ try {
 }
 
 assert.equal(cleanupResult.failed, 0, `Cleanup failures: ${cleanupResult.results.map(result => result.error).filter(Boolean).join(' | ')}`);
-console.log('V3-UX-004 real-browser passed: WIP rollback, partial bulk, inline conflict, Viewer and mobile touch behavior.');
+console.log('V3-UX-004 real-browser passed: desktop WIP preflight, partial bulk, inline conflict, Viewer and mobile touch rollback.');

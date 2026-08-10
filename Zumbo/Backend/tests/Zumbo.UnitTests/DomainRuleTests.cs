@@ -3402,6 +3402,16 @@ public sealed class DomainRuleTests
             CancellationToken ct,
             string? deduplicationKey = null) =>
             service.NotifyAsync(userId, type, message, ct, deduplicationKey);
+
+        public Task NotifyWithSourceAsync(
+            string userId,
+            string type,
+            string message,
+            CancellationToken ct,
+            string? deduplicationKey = null,
+            string? sourceId = null,
+            string? projectId = null) =>
+            service.NotifyAsync(userId, type, message, ct, deduplicationKey, "WorkItem", sourceId, projectId);
     }
 
     private sealed class DirectWorkItemSearchPublisher(IWorkItemSearchIndex search)

@@ -150,11 +150,19 @@
     }
 
     function nextStatusFor(status) {
-      if (status === 'To Do') return 'In Progress';
-      if (status === 'In Progress') return 'Code Review';
-      if (status === 'Code Review') return 'Test';
-      return 'Done';
+      var transition = (vm.workflow && vm.workflow.transitions || []).find(function(candidate) {
+        return candidate.fromStatus === status;
+      });
+      return transition ? transition.toStatus : '';
     }
+
+          vm.nextStatusFor = nextStatusFor;
+          vm.statusCategory = function(status) {
+            var definition = (vm.workflow && vm.workflow.statuses || []).find(function(candidate) {
+              return candidate.name === status;
+            });
+            return definition ? definition.category : 'Custom';
+          };
 
           return { nextStatusFor: nextStatusFor };
         }

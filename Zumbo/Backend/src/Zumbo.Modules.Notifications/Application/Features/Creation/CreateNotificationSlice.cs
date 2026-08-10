@@ -1,6 +1,8 @@
 using Zumbo.BuildingBlocks.Application.Persistence;
 using Zumbo.SharedKernel;
 
+using Zumbo.Modules.Notifications.Application.Policies;
+
 namespace Zumbo.Modules.Notifications;
 
 internal sealed class CreateNotificationSlice(
@@ -47,11 +49,11 @@ internal sealed class CreateNotificationSlice(
                 return;
             }
 
-            await CreateAsync(user, type, message, preference, deduplicationKey, ct);
+            await CreateAsync(user, type, message, preference, deduplicationKey, command, ct);
             return;
         }
 
-        await CreateAsync(user, type, message, preference, null, ct);
+        await CreateAsync(user, type, message, preference, null, command, ct);
     }
 
     private async Task CreateAsync(
@@ -60,6 +62,7 @@ internal sealed class CreateNotificationSlice(
         string message,
         NotificationPreferenceDocument? preference,
         string? deduplicationKey,
+        CreateNotificationCommand command,
         CancellationToken ct)
     {
         var typeSetting = preference?.TypeSettings.SingleOrDefault(
@@ -89,6 +92,9 @@ internal sealed class CreateNotificationSlice(
             UserId = user.Id,
             Type = type,
             Message = message,
+            SourceKind = NotificationPresentationPolicy.NormalizeSourceKind(command.SourceKind),
+            SourceId = NotificationPresentationPolicy.NormalizeSourceId(command.SourceId),
+            ProjectId = NotificationPresentationPolicy.NormalizeSourceId(command.ProjectId),
             Read = !inAppEnabled,
             EmailAddress = emailEnabled ? user.Email : null,
             EmailStatus = emailEnabled

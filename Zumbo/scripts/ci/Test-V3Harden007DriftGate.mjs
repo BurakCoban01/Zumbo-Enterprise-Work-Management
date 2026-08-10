@@ -40,7 +40,7 @@ for (const [path, definition] of Object.entries(openApi.paths)) {
 }
 const permissionCatalog = new Set(
   [...text(
-    'Backend/src/Zumbo.BuildingBlocks.Application/Security/PermissionCatalog.cs')
+    'Backend/src/Zumbo.Modules.Identity.Contracts/Security/PermissionCatalog.cs')
     .matchAll(/public const string \w+ = "([^"]+)";/g)]
     .map(match => match[1]));
 const ownershipById = new Map(

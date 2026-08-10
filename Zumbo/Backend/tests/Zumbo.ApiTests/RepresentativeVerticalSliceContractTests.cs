@@ -7,6 +7,7 @@ using Zumbo.Modules.Audit;
 using Zumbo.Modules.Boards;
 using Zumbo.Modules.Identity;
 using Zumbo.Modules.Notifications;
+using Zumbo.Modules.Notifications.Application.Policies;
 using Zumbo.Modules.Organizations;
 using Zumbo.Modules.Projects;
 using Zumbo.Modules.Teams;
@@ -135,6 +136,11 @@ public sealed class RepresentativeVerticalSliceContractTests : IClassFixture<Web
                 HttpStatusCode.OK);
             return notifications.SingleOrDefault(item => item.Type == "Assignment");
         });
+        Assert.Equal(NotificationCategories.Action, notification.Category);
+        Assert.Equal(NotificationActionKinds.OpenWorkItem, notification.ActionKind);
+        Assert.Equal("WorkItem", notification.SourceKind);
+        Assert.Equal(workItem.Id, notification.SourceId);
+        Assert.Equal(project.Id, notification.ProjectId);
         var readResult = await AssertSuccessAsync<MarkNotificationAsReadResponse>(
             await _client.PatchAsJsonAsync($"/api/notifications/{notification.Id}/read", new { }),
             HttpStatusCode.OK);

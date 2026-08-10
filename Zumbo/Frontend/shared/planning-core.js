@@ -110,8 +110,62 @@
     return true;
   }
 
-  function isDone(task) {
-    return !!task.completedAt || ['done', 'completed', 'tamamlandı'].indexOf(normalized(task.status)) >= 0;
+  function statusMetadata(workflow) {
+    return (workflow && workflow.statuses || []).reduce(function(result, status, index) {
+      result[status.name] = { category: status.category || 'Custom', order: index };
+      return result;
+    }, {});
+  }
+
+  function statusCategory(status, metadata) {
+    return metadata[status] ? metadata[status].category : 'Custom';
+  }
+
+  function isDone(task, metadata) {
+    return !!task.completedAt || normalized(statusCategory(task.status, metadata)) === 'done';
+  }
+
+  function segmentTone(category) {
+    var value = normalized(category).replace(/[^a-z0-9]+/g, '-');
+    return value || 'custom';
+  }
+
+  function statusSegments(distribution, workflow) {
+    var metadata = statusMetadata(workflow);
+    var total = (distribution || []).reduce(function(sum, item) { return sum + Math.max(0, Number(item.count) || 0); }, 0);
+    var segments = (distribution || []).filter(function(item) { return Number(item.count) > 0; }).map(function(item, index) {
+      var meta = metadata[item.status] || { category: 'Custom', order: 10000 + index };
+      var exactUnits = total ? Number(item.count) / total * 10000 : 0;
+      return {
+        status: item.status,
+        category: meta.category,
+        tone: segmentTone(meta.category),
+        count: Number(item.count),
+        percentageUnits: Math.floor(exactUnits),
+        percentageRemainder: exactUnits - Math.floor(exactUnits),
+        order: meta.order
+      };
+    });
+    var missingUnits = 10000 - segments.reduce(function(sum, segment) { return sum + segment.percentageUnits; }, 0);
+    segments.slice().sort(function(left, right) {
+      return right.percentageRemainder - left.percentageRemainder || left.order - right.order;
+    }).forEach(function(segment, index) {
+      if (index < missingUnits) segment.percentageUnits += 1;
+    });
+    return segments.map(function(segment) {
+      segment.percentage = segment.percentageUnits / 100;
+      delete segment.percentageUnits;
+      delete segment.percentageRemainder;
+      return segment;
+    }).sort(function(left, right) {
+      return left.order - right.order || left.status.localeCompare(right.status, 'tr-TR');
+    });
+  }
+
+  function taskDistribution(tasks) {
+    var counts = {};
+    (tasks || []).forEach(function(task) { counts[task.status] = (counts[task.status] || 0) + 1; });
+    return Object.keys(counts).map(function(status) { return { status: status, count: counts[status] }; });
   }
 
   function dependencies(tasks) {
@@ -195,7 +249,8 @@
     });
   }
 
-  function roadmapEntries(project, sprints, tasks, sprintRows, timeZone) {
+  function roadmapEntries(project, sprints, tasks, sprintRows, timeZone, workflow) {
+    var metadata = statusMetadata(workflow);
     var taskBySprint = {};
     tasks.forEach(function(task) {
       if (!task.sprintId) return;
@@ -233,7 +288,7 @@
     });
     sprints.forEach(function(sprint) {
       var scoped = taskBySprint[sprint.id] || [];
-      var complete = scoped.filter(isDone).length;
+      var complete = scoped.filter(function(task) { return isDone(task, metadata); }).length;
       entries.push({
         id: 'sprint-' + sprint.id,
         kind: 'Sprint',
@@ -242,6 +297,7 @@
         startKey: dateKey(sprint.startDate, null, true),
         endKey: dateKey(sprint.endDate, null, true),
         milestone: false,
+        segments: statusSegments(taskDistribution(scoped), workflow),
         progress: scoped.length ? Math.round(complete / scoped.length * 100) : 0,
         progressSource: scoped.length ? complete + '/' + scoped.length + ' görev tamamlandı' : 'Sprint kapsamı boş'
       });
@@ -256,6 +312,7 @@
     var tasks = (input.tasks || []).filter(function(task) { return taskMatches(task, input.filters); });
     var sprints = (input.sprints || []).slice();
     var project = input.project || { milestones: [], releases: [] };
+    var metadata = statusMetadata(input.workflow);
     var sprintById = sprints.reduce(function(result, sprint) { result[sprint.id] = sprint; return result; }, {});
     var rows = tasks.map(function(task) { return timelineRow(task, sprintById); });
     var edges = dependencies(tasks);
@@ -279,7 +336,7 @@
         title: row.title,
         task: row.task,
         inputDate: inputDate(row.dueKey),
-        tone: row.dependencyRisk ? 'risk' : isDone(row.task) ? 'done' : 'task'
+        tone: row.dependencyRisk ? 'risk' : isDone(row.task, metadata) ? 'done' : 'task'
       });
     });
     sprints.forEach(function(sprint) {
@@ -306,14 +363,22 @@
     var window = windowSpec(anchorKey, input.zoom || 'month');
     var scheduledRows = rows.filter(function(row) { return !!row.startKey; });
     placeRows(scheduledRows, window);
-    var roadmap = roadmapEntries(project, sprints, tasks, [], input.timeZone);
+    var roadmap = roadmapEntries(project, sprints, tasks, [], input.timeZone, input.workflow);
     placeRows(roadmap.filter(function(row) { return !!row.startKey; }), window);
     var total = tasks.length;
-    var done = tasks.filter(isDone).length;
+    var done = tasks.filter(function(task) { return isDone(task, metadata); }).length;
     var overdue = tasks.filter(function(task) {
       var key = dateKey(task.dueDate, null, true);
-      return key && key < dateKey(input.today || new Date(), input.timeZone, true) && !isDone(task);
+      return key && key < dateKey(input.today || new Date(), input.timeZone, true) && !isDone(task, metadata);
     }).length;
+    var visibleSegments = statusSegments(taskDistribution(tasks), input.workflow);
+    var projectDistribution = input.statusDistribution && input.statusDistribution.length
+      ? input.statusDistribution
+      : taskDistribution(tasks);
+    var projectSegments = statusSegments(projectDistribution, input.workflow);
+    var projectTotal = projectSegments.reduce(function(sum, segment) { return sum + segment.count; }, 0);
+    var projectDone = projectSegments.filter(function(segment) { return normalized(segment.category) === 'done'; })
+      .reduce(function(sum, segment) { return sum + segment.count; }, 0);
     return {
       anchorKey: anchorKey,
       calendarDays: calendarDays(anchorKey, input.calendarMode || 'month').map(function(day) {
@@ -327,7 +392,17 @@
       dependencyRisks: edges.filter(function(edge) { return edge.risk; }),
       roadmapRows: roadmap,
       window: window,
-      totals: { tasks: total, done: done, overdue: overdue, progress: total ? Math.round(done / total * 100) : 0 }
+      totals: {
+        tasks: total,
+        done: done,
+        overdue: overdue,
+        progress: total ? Math.round(done / total * 100) : 0,
+        segments: visibleSegments,
+        projectTasks: projectTotal,
+        projectDone: projectDone,
+        projectProgress: projectTotal ? Math.round(projectDone / projectTotal * 100) : 0,
+        projectSegments: projectSegments
+      }
     };
   }
 
@@ -341,6 +416,7 @@
     calendarDays: calendarDays,
     dependencies: dependencies,
     windowSpec: windowSpec,
+    statusSegments: statusSegments,
     buildModel: buildModel
   });
 })(window);

@@ -1,5 +1,5 @@
 angular.module('zumboDesktop', ['zumbo.shared.api', 'zumbo.shared.displayNames', 'zumbo.desktop.pwa'])
-  .controller('WorkspaceController', function($scope, $window, $document, $timeout, $q, apiClient, sessionStore, realtimeService, displayNameResolver, desktopPwaService, desktopShellFeature, desktopPersonalWorkFeature, desktopProjectOverviewFeature, desktopProjectCatalogFeature, desktopIntakeFeature, desktopWorkAutomationFeature, desktopBulkJobFeature, desktopSettingsFeature, desktopPrivacyFeature, desktopAuditFeature, desktopIntegrationFeature, desktopOperationsFeature, desktopPlanningFeature, desktopPlanningViewsFeature, desktopReportingViewsFeature, desktopPortfolioFeature, desktopGoalFeature, desktopCapacityFeature, desktopKnowledgeFeature, desktopWorkItemFeature, desktopManagementFeature, desktopBoardViewFeature, desktopTaskBoardFeature, desktopBoardExcellenceFeature) {
+  .controller('WorkspaceController', function($scope, $window, $document, $timeout, $q, apiClient, sessionStore, realtimeService, displayNameResolver, desktopPwaService, desktopShellFeature, desktopPersonalWorkFeature, desktopProjectDirectoryFeature, desktopProjectOverviewFeature, desktopProjectCatalogFeature, desktopIntakeFeature, desktopWorkAutomationFeature, desktopBulkJobFeature, desktopSettingsFeature, desktopPrivacyFeature, desktopAuditFeature, desktopIntegrationFeature, desktopOperationsFeature, desktopPlanningFeature, desktopPlanningViewsFeature, desktopReportingViewsFeature, desktopPortfolioFeature, desktopGoalFeature, desktopCapacityFeature, desktopKnowledgeFeature, desktopWorkItemFeature, desktopManagementFeature, desktopBoardViewFeature, desktopTaskBoardFeature, desktopBoardExcellenceFeature) {
     var vm = this;
     vm.session = sessionStore;
     vm.pwa = desktopPwaService.state;
@@ -32,7 +32,7 @@ angular.module('zumboDesktop', ['zumbo.shared.api', 'zumbo.shared.displayNames',
     vm.workMode = 'overview';
     vm.burndown = [];
     vm.workflow = { transitions: [] };
-    vm.nextStatus = 'In Progress';
+    vm.nextStatus = '';
     vm.activeViewId = '';
     vm.priorityFilter = '';
     vm.viewDraftName = '';
@@ -361,6 +361,7 @@ angular.module('zumboDesktop', ['zumbo.shared.api', 'zumbo.shared.displayNames',
       updateLocation: updateLocation,
       apiActionError: desktopTasks.apiActionError
     });
+    desktopProjectDirectoryFeature.install(vm, { membershipFor: membershipFor });
     desktopPortfolioFeature.install(vm, { apiActionError: desktopTasks.apiActionError }); desktopGoalFeature.install(vm, { apiActionError: desktopTasks.apiActionError }); desktopCapacityFeature.install(vm, { apiActionError: desktopTasks.apiActionError }); desktopKnowledgeFeature.install(vm, { apiActionError: desktopTasks.apiActionError }); desktopProjectOverviewFeature.install(vm, { updateLocation: updateLocation });
     function membershipFor(project) { return desktopManagement.membershipFor(project); }
     function firstAccessibleProject(projects) { return desktopManagement.firstAccessibleProject(projects); }

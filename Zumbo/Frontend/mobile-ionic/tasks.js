@@ -27,6 +27,8 @@
     vm.pageSize = 50;
     vm.hasMore = false;
     vm.schema = { issueTypes: [], customFields: [], layouts: [] };
+    vm.workflowStatuses = [];
+    vm.workflowProjectId = null;
     vm.moveError = null;
     vm.createDraft = { title: '', type: 'Task', priority: 'Medium', customFieldValues: {} };
     vm.customFieldsFor = function(typeKey) {
@@ -101,6 +103,16 @@
       });
     };
     vm.filter = function(status) { vm.status = status; vm.load(); };
+    vm.statusOptions = function() { return vm.workflowStatuses; };
+    function loadWorkflowStatuses(projectId) {
+      if (vm.workflowProjectId === projectId && vm.workflowStatuses.length) return $q.when(vm.workflowStatuses);
+      return zumboApi.workflow(projectId).then(function(workflow) {
+        vm.workflowProjectId = projectId;
+        vm.workflowStatuses = workflow.statuses || [];
+        if (vm.status && !vm.workflowStatuses.some(function(status) { return status.name === vm.status; })) vm.status = '';
+        return vm.workflowStatuses;
+      });
+    }
     function rebuildBoardLanes() {
       var board = vm.boards.find(function(item) { return item.id === vm.selectedBoardId; });
       vm.boardLanes = (board ? board.columns : []).map(function(column) {
@@ -332,7 +344,10 @@
           return [];
         }
         apiClient.transitionContext('project:' + project.id);
-        return realtimeService.connect(project.id).catch(angular.noop).then(function() {
+        return $q.all([
+          realtimeService.connect(project.id).catch(angular.noop),
+          loadWorkflowStatuses(project.id)
+        ]).then(function() {
           if (vm.mode === 'backlog') {
             return $q.all([zumboApi.backlog(project.id), zumboApi.sprints(project.id)]).then(function(result) {
               vm.backlogItems = result[0].items || [];

@@ -94,12 +94,14 @@ public sealed class WorkItemCollaborationService(
                      .Where(id => !excluded.Contains(id))
                      .Distinct(StringComparer.Ordinal))
         {
-            await notifications.NotifyAsync(
+            await notifications.NotifyWithSourceAsync(
                 watcherId,
                 type,
                 message,
                 ct,
-                StableId("watcher", workItem.Id, type, eventId, watcherId));
+                StableId("watcher", workItem.Id, type, eventId, watcherId),
+                workItem.Id,
+                workItem.ProjectId);
         }
     }
 

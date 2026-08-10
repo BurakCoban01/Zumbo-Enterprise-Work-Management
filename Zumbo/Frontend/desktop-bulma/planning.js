@@ -76,6 +76,26 @@
             vm.selectPlanningSprint();
           };
 
+          vm.reconcileStatusDistribution = function(fromStatus, toStatus, beforeDistribution) {
+            if (!fromStatus || !toStatus || fromStatus === toStatus) return;
+            var before = beforeDistribution || vm.statusDistribution;
+            var from = vm.statusDistribution.find(function(item) { return item.status === fromStatus; });
+            var to = vm.statusDistribution.find(function(item) { return item.status === toStatus; });
+            var beforeFrom = before.find(function(item) { return item.status === fromStatus; });
+            var beforeTo = before.find(function(item) { return item.status === toStatus; });
+            var fromCount = from ? from.count : 0;
+            var toCount = to ? to.count : 0;
+            var beforeFromCount = beforeFrom ? beforeFrom.count : 0;
+            var beforeToCount = beforeTo ? beforeTo.count : 0;
+            if (fromCount === Math.max(0, beforeFromCount - 1) && toCount === beforeToCount + 1) return;
+            if (fromCount !== beforeFromCount || toCount !== beforeToCount) return;
+            if (from) from.count = Math.max(0, from.count - 1);
+            if (to) to.count += 1;
+            else vm.statusDistribution.push({ status: toStatus, count: 1 });
+            vm.statusDistribution = vm.statusDistribution.filter(function(item) { return item.count > 0; });
+            vm.rebuildAdvancedViews();
+          };
+
           vm.selectPlanningSprint = function() {
             vm.selectedPlanningSprint = (vm.sprints || []).find(function(sprint) {
               return sprint.id === vm.selectedPlanningSprintId;
@@ -397,6 +417,8 @@
               if (vm.project && vm.project.id === projectId) {
                 vm.workflow = workflow;
                 vm.workflowDraft = angular.copy(workflow);
+                if (vm.selectedTask && vm.nextStatusFor) vm.nextStatus = vm.nextStatusFor(vm.selectedTask.status);
+                vm.rebuildAdvancedViews();
               }
             }).finally(function() {
               if (vm.project && vm.project.id === projectId) vm.workflowLoading = false;

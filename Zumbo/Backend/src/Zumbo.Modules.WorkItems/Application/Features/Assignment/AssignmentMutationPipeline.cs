@@ -107,11 +107,13 @@ internal sealed class AssignmentMutationPipeline(
             assigneeUserId,
             correlationId,
             ct);
-        await notifications.NotifyAsync(
+        await notifications.NotifyWithSourceAsync(
             assigneeUserId,
             "Assignment",
             $"Assigned to {workItem.Title}",
-            ct);
+            ct,
+            sourceId: workItem.Id,
+            projectId: workItem.ProjectId);
         if (collaborationService is not null)
         {
             var organizationId = CurrentOrganizationId(workItem.ProjectId);

@@ -47,10 +47,14 @@
 
       function synchronize(items) {
         knownVersions = Object.create(null);
-        (items || []).forEach(function(item) {
-          if (item && item.id && Number.isSafeInteger(item.version)) knownVersions[item.id] = item.version;
-        });
+        (items || []).forEach(remember);
         resyncPending = false;
+      }
+
+      function remember(item) {
+        if (!item || !item.id || !Number.isSafeInteger(item.version)) return;
+        var previous = knownVersions[item.id];
+        if (previous === undefined || item.version > previous) knownVersions[item.id] = item.version;
       }
 
       window.addEventListener('online', function() {
@@ -101,6 +105,7 @@
 
       return {
         connect: connect,
+        remember: remember,
         synchronize: synchronize,
         subscribe: function(listener) {
           listeners.push(listener);

@@ -8,6 +8,9 @@ import vmModule from 'node:vm';
 const root = resolve(import.meta.dirname, '..');
 const coreSource = await readFile(resolve(root, 'shared/planning-core.js'), 'utf8');
 const desktopSource = await readFile(resolve(root, 'desktop-bulma/planning-views.js'), 'utf8');
+const boardViewSource = await readFile(resolve(root, 'desktop-bulma/board-view.js'), 'utf8');
+const planningSource = await readFile(resolve(root, 'desktop-bulma/planning.js'), 'utf8');
+const workItemsSource = await readFile(resolve(root, 'desktop-bulma/work-items.js'), 'utf8');
 const desktopHtml = await readFile(resolve(root, 'desktop-bulma/index.html'), 'utf8');
 const desktopCss = await readFile(resolve(root, 'desktop-bulma/planning-views.css'), 'utf8');
 const mobileApp = await readFile(resolve(root, 'mobile-ionic/app.js'), 'utf8');
@@ -107,6 +110,61 @@ test('large project projection is complete, filterable and never capped by the v
   assert.equal(filtered.timelineRows[0].id, 'task-1204');
 });
 
+test('roadmap completion and exact segments follow workflow metadata instead of status names', () => {
+  const workflow = {
+    statuses: [
+      { name: 'Hazır', category: 'Todo' },
+      { name: 'İncelemede', category: 'InProgress' },
+      { name: 'Yayında', category: 'Done' }
+    ]
+  };
+  const tasks = [
+    task('ready', { status: 'Hazır', sprintId: 'sprint-1' }),
+    task('review-1', { status: 'İncelemede', sprintId: 'sprint-1' }),
+    task('review-2', { status: 'İncelemede', sprintId: 'sprint-1' }),
+    task('live', { status: 'Yayında', sprintId: 'sprint-1' })
+  ];
+  const model = core.buildModel({
+    tasks,
+    workflow,
+    statusDistribution: [
+      { status: 'Hazır', count: 3 },
+      { status: 'İncelemede', count: 2 },
+      { status: 'Yayında', count: 5 }
+    ],
+    sprints: [{ id: 'sprint-1', name: 'Dil bağımsız akış', startDate: '2026-08-01', endDate: '2026-08-14', status: 'Active' }],
+    anchorDate: '2026-08-05'
+  });
+  assert.equal(model.totals.done, 1);
+  assert.equal(model.totals.projectDone, 5);
+  assert.equal(model.totals.projectProgress, 50);
+  assert.deepEqual(Array.from(model.totals.projectSegments, item => [item.status, item.count, item.percentage]), [
+    ['Hazır', 3, 30], ['İncelemede', 2, 20], ['Yayında', 5, 50]
+  ]);
+  const sprint = model.roadmapRows.find(row => row.id === 'sprint-sprint-1');
+  assert.equal(sprint.progress, 25);
+  assert.deepEqual(Array.from(sprint.segments, item => [item.status, item.count, item.percentage]), [
+    ['Hazır', 1, 25], ['İncelemede', 2, 50], ['Yayında', 1, 25]
+  ]);
+});
+
+test('task and bulk status changes are selected from workflow transitions', () => {
+  assert.match(boardViewSource, /vm\.workflow && vm\.workflow\.transitions/);
+  assert.doesNotMatch(boardViewSource, /status === 'To Do'|status === 'In Progress'|return 'Done'/);
+  assert.match(desktopHtml, /vm\.bulkTransitionOptions\(\)/);
+  assert.doesNotMatch(desktopHtml, /vm\.bulkMove\('In Progress'\)/);
+  assert.match(planningSource, /vm\.reconcileStatusDistribution/);
+  assert.match(workItemsSource, /reconcileStatusDistribution\(previousStatus, task\.status, previousDistribution\)/);
+});
+
+test('status segment rounding remains deterministic and totals exactly one hundred percent', () => {
+  const segments = core.statusSegments([
+    { status: 'A', count: 1 }, { status: 'B', count: 1 }, { status: 'C', count: 1 }
+  ], { statuses: [] });
+  assert.deepEqual(Array.from(segments, segment => segment.percentage), [33.34, 33.33, 33.33]);
+  assert.equal(segments.reduce((sum, segment) => sum + segment.percentage, 0), 100);
+});
+
 function desktopFeature({ put } = {}) {
   let provider;
   const module = {
@@ -163,6 +221,7 @@ test('desktop and mobile surfaces expose scope, alternatives, zoom, filters and 
   assert.match(desktopHtml, /planning-drop-date="vm\.dropPlanningTask/);
   assert.match(desktopHtml, /vm\.planningScopeComplete/);
   assert.match(desktopCss, /grid-template-columns: repeat\(12,/);
+  assert.match(desktopHtml, /roadmap-segmented-bar/);
   assert.match(desktopSource, /loadEveryTaskPage/);
   assert.match(desktopSource, /loadEverySprintPage/);
   assert.match(desktopSource, /zumbo\.planningViews/);

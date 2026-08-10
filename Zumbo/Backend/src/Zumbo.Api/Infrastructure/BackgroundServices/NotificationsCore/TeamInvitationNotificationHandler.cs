@@ -22,6 +22,8 @@ public sealed class TeamInvitationNotificationHandler(
             "TeamInvitation",
             $"You were invited to join team '{payload.TeamName}'.",
             cancellationToken,
-            payload.DeduplicationKey);
+            payload.DeduplicationKey,
+            "Team",
+            payload.TeamId);
     }
 }

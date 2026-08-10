@@ -25,6 +25,9 @@ public sealed class WorkItemNotificationDurableHandler(
             payload.Type,
             payload.Message,
             cancellationToken,
-            payload.DeduplicationKey);
+            payload.DeduplicationKey,
+            payload.SourceKind,
+            payload.SourceId,
+            payload.ProjectId);
     }
 }

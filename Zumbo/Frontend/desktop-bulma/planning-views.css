@@ -52,6 +52,7 @@
 
 .planning-freshness strong,
 .planning-freshness small { display: block; }
+.planning-freshness strong { color: var(--ink); }
 .planning-freshness small { color: var(--muted); }
 
 .planning-toolbar {
@@ -339,6 +340,7 @@
   font-weight: 700;
   overflow-wrap: anywhere;
 }
+.planning-gantt-label > strong { color: var(--ink); }
 .planning-gantt-label small { display: block; color: var(--muted); }
 .planning-gantt-track {
   position: relative;
@@ -379,6 +381,23 @@
 
 .planning-gantt-bar[data-kind="Sürüm"] { border-color: var(--success); background: var(--success-soft); }
 .planning-gantt-bar[data-kind="Kilometre taşı"] { border-color: var(--warning); background: var(--warning-soft); }
+.roadmap-segmented-bar {
+  position: relative;
+  display: flex;
+  padding: 0;
+  background: var(--surface-subtle);
+}
+.roadmap-segment { min-width: 2px; min-height: 28px; }
+.roadmap-segment:first-child { border-radius: 3px 0 0 3px; }
+.roadmap-segment:last-of-type { border-radius: 0 3px 3px 0; }
+.status-todo { background: var(--surface-subtle); }
+.status-inprogress,
+.status-in-progress { background: var(--color-info); }
+.status-done { background: var(--success); }
+.status-custom { background: var(--warning); }
+.roadmap-status-legend { display: flex; flex-wrap: wrap; gap: 6px 12px; margin-top: 8px; }
+.roadmap-status-legend span { display: inline-flex; align-items: center; gap: 5px; color: var(--muted); font-size: .72rem; }
+.roadmap-status-legend i { width: 9px; height: 9px; border: 1px solid var(--line-strong); border-radius: 2px; }
 
 .planning-risk-note {
   align-items: flex-start;

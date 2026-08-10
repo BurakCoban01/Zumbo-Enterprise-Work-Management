@@ -12,7 +12,7 @@ const routeInventoryPath = 'Backend/tests/Zumbo.ApiTests/RouteInventory.approved
 const routeTestPath = 'Backend/tests/Zumbo.ApiTests/RouteInventoryCharacterizationTests.cs';
 const openApiPath = 'contracts/openapi.v1.json';
 const permissionCatalogPath =
-  'Backend/src/Zumbo.BuildingBlocks.Application/Security/PermissionCatalog.cs';
+  'Backend/src/Zumbo.Modules.Identity.Contracts/Security/PermissionCatalog.cs';
 const consumerOwnershipPath = 'docs/product/api-consumer-ownership.json';
 const outputJsonPath = 'docs/product/api-ui-capability-matrix.json';
 const outputMarkdownPath = 'docs/product/api-ui-capability-matrix.md';
@@ -473,15 +473,15 @@ function isAdministrative(operation, consumer) {
 
 function buildBackgroundCapabilities() {
   const items = [
-    ['search-index-initializer', 'SearchIndexInitializer', 'Backend/src/Zumbo.Api/Hosting/ApiHostRegistration.cs', 'Backend/tests/Zumbo.UnitTests/WorkItemSearchTests.cs'],
-    ['mongo-index-initializer', 'MongoIndexInitializer', 'Backend/src/Zumbo.Api/Hosting/ApiHostRegistration.cs', 'Backend/tests/Zumbo.ApiTests/RouteInventoryCharacterizationTests.cs'],
-    ['durable-event-worker', 'DurableEventWorker', 'Backend/src/Zumbo.BuildingBlocks.Infrastructure/Messaging/DurableEventProcessing.cs', 'Backend/tests/Zumbo.UnitTests/DurableMessagingTests.cs'],
-    ['attachment-security-maintenance', 'AttachmentSecurityMaintenanceHostedService', 'Backend/src/Zumbo.Api/AttachmentSecurityMaintenanceHostedService.cs', 'Backend/tests/Zumbo.ApiTests/AttachmentSecurityTests.cs'],
-    ['due-date-reminders', 'DueDateReminderHostedService', 'Backend/src/Zumbo.Api/WorkItemDueDateReminderHostedService.cs', 'Backend/tests/Zumbo.ApiTests/WorkItemCollaborationRecurrenceApiTests.cs'],
-    ['recurrence-scheduler', 'WorkItemRecurrenceSchedulerHostedService', 'Backend/src/Zumbo.Api/WorkItemRecurrenceSchedulerHostedService.cs', 'Backend/tests/Zumbo.ApiTests/WorkItemCollaborationRecurrenceApiTests.cs'],
-    ['webhook-dispatcher', 'WebhookDispatcherHostedService', 'Backend/src/Zumbo.Api/WebhookAdapters.cs', 'Backend/tests/Zumbo.ApiTests/WebhookApiTests.cs'],
-    ['notification-email-dispatcher', 'NotificationEmailDispatcherHostedService', 'Backend/src/Zumbo.Api/NotificationAdapters.cs', 'Backend/tests/Zumbo.PersistenceIntegrationTests/MailpitNotificationDeliveryTests.cs'],
-    ['development-webhook-receipt-retention', 'DevelopmentWebhookReceiptRetentionHostedService', 'Backend/src/Zumbo.Api/DevelopmentWebhookReceiptRetentionHostedService.cs', 'Backend/tests/Zumbo.UnitTests/DevelopmentIntegrationServiceTests.cs']
+    ['search-index-initializer', 'SearchIndexInitializer', 'Backend/src/Zumbo.Api/Infrastructure/BackgroundServices/Search/SearchIndexInitializer.cs', 'Backend/tests/Zumbo.UnitTests/WorkItemSearchTests.cs'],
+    ['mongo-index-initializer', 'MongoIndexInitializer', 'Backend/src/Zumbo.Api/MongoIndexInitializer.cs', 'Backend/tests/Zumbo.ApiTests/RouteInventoryCharacterizationTests.cs'],
+    ['durable-event-worker', 'DurableEventWorker', 'Backend/src/Zumbo.BuildingBlocks.Infrastructure/Messaging/DurableEventProcessing/DurableEventWorker.cs', 'Backend/tests/Zumbo.UnitTests/DurableMessagingTests.cs'],
+    ['attachment-security-maintenance', 'AttachmentSecurityMaintenanceHostedService', 'Backend/src/Zumbo.Api/Infrastructure/BackgroundServices/PlatformCore/AttachmentSecurityMaintenanceHostedService.cs', 'Backend/tests/Zumbo.ApiTests/AttachmentSecurityTests.cs'],
+    ['due-date-reminders', 'DueDateReminderHostedService', 'Backend/src/Zumbo.Api/Infrastructure/BackgroundServices/Planning/WorkItemDueDateReminderHostedService.cs', 'Backend/tests/Zumbo.ApiTests/WorkItemCollaborationRecurrenceApiTests.cs'],
+    ['recurrence-scheduler', 'WorkItemRecurrenceSchedulerHostedService', 'Backend/src/Zumbo.Api/Infrastructure/BackgroundServices/Recurrences/WorkItemRecurrenceSchedulerHostedService.cs', 'Backend/tests/Zumbo.ApiTests/WorkItemCollaborationRecurrenceApiTests.cs'],
+    ['webhook-dispatcher', 'WebhookDispatcherHostedService', 'Backend/src/Zumbo.Api/Infrastructure/BackgroundServices/PlatformCore/WebhookDispatcherHostedService.cs', 'Backend/tests/Zumbo.ApiTests/WebhookApiTests.cs'],
+    ['notification-email-dispatcher', 'NotificationEmailDispatcherHostedService', 'Backend/src/Zumbo.Api/Infrastructure/BackgroundServices/Delivery/NotificationEmailDispatcherHostedService.cs', 'Backend/tests/Zumbo.PersistenceIntegrationTests/MailpitNotificationDeliveryTests.cs'],
+    ['development-webhook-receipt-retention', 'DevelopmentWebhookReceiptRetentionHostedService', 'Backend/src/Zumbo.Api/Infrastructure/BackgroundServices/PlatformCore/DevelopmentWebhookReceiptRetentionHostedService.cs', 'Backend/tests/Zumbo.UnitTests/DevelopmentIntegrationServiceTests.cs']
   ].map(([id, service, source, test]) => ({ id, service, consumer: 'background', status: 'intentional', source, test, documentation: 'readme.md' }));
   for (const item of items) {
     assert.ok(exists(item.source) && read(item.source).includes(item.service), `Background source missing for ${item.service}.`);

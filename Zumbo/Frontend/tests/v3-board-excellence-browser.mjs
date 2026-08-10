@@ -66,7 +66,7 @@ function createFixture(role = 'ProjectOwner') {
       });
     }
   }
-  return { project, tasks };
+  return { project, tasks, statusPatchCount: 0 };
 }
 
 function envelope(data) {
@@ -99,6 +99,7 @@ async function createContext(viewport, role = 'ProjectOwner') {
     const statusMatch = path.match(/^\/api\/work-items\/(task-\d+)\/status$/);
 
     if (statusMatch && method === 'PATCH') {
+      fixture.statusPatchCount += 1;
       const task = fixture.tasks.find(item => item.id === statusMatch[1]);
       const target = taskColumn(body.status);
       const targetCount = fixture.tasks.filter(item => item.columnId === target.id).length;
@@ -187,8 +188,13 @@ try {
   await page.waitForFunction(() => document.querySelector('[data-work-item-id="task-02"]')?.closest('.column-lane')?.textContent.includes('In Progress'));
 
   const rollbackTask = page.locator('[data-work-item-id="task-15"]');
-  await rollbackTask.getByTitle('Sonraki kolona taşı').click();
-  await page.getByText('Kolonun WIP limiti dolu; görev önceki konumuna alındı.', { exact: true }).waitFor();
+  const blockedMove = rollbackTask.getByTitle('Sonraki kolona taşı');
+  assert.equal(await blockedMove.isDisabled(), true);
+  const statusPatchCount = owner.fixture.statusPatchCount;
+  await rollbackTask.focus();
+  await rollbackTask.press('Alt+ArrowRight');
+  await page.waitForTimeout(250);
+  assert.equal(owner.fixture.statusPatchCount, statusPatchCount);
   assert.match(await page.locator('[data-work-item-id="task-15"]').evaluate(element => element.closest('.column-lane').querySelector('.lane-title strong').textContent), /In Progress/);
 
   await page.locator('[data-work-item-id="task-03"] input[type="checkbox"]').click();

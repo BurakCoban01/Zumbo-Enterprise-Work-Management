@@ -284,7 +284,9 @@
               anchorDate: vm.planningAnchor,
               calendarMode: vm.planningCalendarMode === 'list' ? 'month' : vm.planningCalendarMode,
               zoom: vm.planningZoom,
-              timeZone: vm.planningTimeZone
+              timeZone: vm.planningTimeZone,
+              workflow: vm.workflow,
+              statusDistribution: vm.statusDistribution
             });
           }
 

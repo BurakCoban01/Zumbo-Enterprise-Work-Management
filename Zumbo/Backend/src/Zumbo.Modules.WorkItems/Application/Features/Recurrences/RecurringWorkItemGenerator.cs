@@ -184,12 +184,14 @@ public sealed class RecurringWorkItemGenerator(
             ct);
         if (workItem.AssigneeUserId is not null)
         {
-            await notifications.NotifyAsync(
+            await notifications.NotifyWithSourceAsync(
                 workItem.AssigneeUserId,
                 "Assignment",
                 $"Assigned to {workItem.Title}",
                 ct,
-                $"recurrence-assignment:{occurrence.Id}:{workItem.AssigneeUserId}");
+                $"recurrence-assignment:{occurrence.Id}:{workItem.AssigneeUserId}",
+                workItem.Id,
+                workItem.ProjectId);
         }
         await realtime.PublishAsync(new WorkItemRealtimeChange(
             "created",

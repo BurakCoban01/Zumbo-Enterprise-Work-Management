@@ -74,12 +74,14 @@ internal sealed class AddCommentPipeline(
         {
             if (mentionedUserId != currentUser.UserId)
             {
-                await notifications.NotifyAsync(
+                await notifications.NotifyWithSourceAsync(
                     mentionedUserId,
                     "Mention",
                     $"Mentioned on {workItem.Title}",
                     ct,
-                    $"mention:{workItem.Id}:{comment.Id}:{mentionedUserId}");
+                    $"mention:{workItem.Id}:{comment.Id}:{mentionedUserId}",
+                    workItem.Id,
+                    workItem.ProjectId);
             }
         }
 

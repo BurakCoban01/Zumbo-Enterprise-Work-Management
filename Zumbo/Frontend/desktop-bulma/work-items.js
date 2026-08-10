@@ -712,11 +712,15 @@
         return;
       }
 
-      apiClient.patch('/api/work-items/' + vm.selectedTask.id + '/status', { status: vm.nextStatus })
+      var previousStatus = vm.selectedTask.status;
+      var previousDistribution = angular.copy(vm.statusDistribution || []);
+      return apiClient.patch('/api/work-items/' + vm.selectedTask.id + '/status', { status: vm.nextStatus })
         .then(function(task) {
           acceptTaskMutation(task);
           vm.nextStatus = nextStatusFor(task.status);
-          return $q.all([vm.loadTasks(), refreshStreams(['timeline', 'activity'])]);
+          return $q.all([vm.loadTasks(), refreshStreams(['timeline', 'activity'])]).then(function() {
+            if (vm.reconcileStatusDistribution) vm.reconcileStatusDistribution(previousStatus, task.status, previousDistribution);
+          });
         }).catch(function(error) { vm.taskDetail.actionError = apiActionError(error, 'Görev taşınamadı.'); });
     };
 

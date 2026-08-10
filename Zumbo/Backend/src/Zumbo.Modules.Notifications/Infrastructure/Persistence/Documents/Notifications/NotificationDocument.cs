@@ -9,6 +9,9 @@ public sealed class NotificationDocument : IDocument
     public string UserId { get; set; } = string.Empty;
     public string Type { get; set; } = string.Empty;
     public string Message { get; set; } = string.Empty;
+    public string? SourceKind { get; set; }
+    public string? SourceId { get; set; }
+    public string? ProjectId { get; set; }
     public bool Read { get; set; }
     public string? EmailAddress { get; set; }
     public string EmailStatus { get; set; } = NotificationEmailStatuses.Disabled;

@@ -193,8 +193,35 @@
         .then(function() { vm.clearSelection(); vm.selectedTask = null; return vm.loadTasks(); });
     };
 
-    vm.dropTask = function(taskId, column) { return vm.moveTaskToColumn(taskId, column); };
-    vm.dropTaskBefore = function(taskId, anchor) {
+    vm.dropTask = function(taskId, column, placement) {
+      if (placement !== 'end') return vm.moveTaskToColumn(taskId, column);
+      var task = vm.tasks.find(function(item) { return item.id === taskId; });
+      if (!task) return;
+      if (task.columnId !== column.id && task.status !== column.name) return vm.moveTaskToColumn(taskId, column);
+      var anchors = vm.tasks.filter(function(item) {
+        return item.id !== taskId && (item.columnId === column.id || item.status === column.name);
+      }).sort(function(left, right) { return (left.rank || 0) - (right.rank || 0); });
+      if (!anchors.length) return;
+      return vm.dropTaskBefore(taskId, anchors[anchors.length - 1], 'after');
+    };
+    function reconcileMovedTask(task, authoritative) {
+      if (!authoritative || authoritative.id !== task.id) return false;
+      angular.extend(task, authoritative);
+      vm.tasks.sort(function(left, right) { return (left.rank || 0) - (right.rank || 0); });
+      if (vm.selectedTask && vm.selectedTask.id === task.id && vm.selectedTask !== task) {
+        angular.extend(vm.selectedTask, authoritative);
+      }
+      realtimeService.remember(authoritative);
+      vm.refreshBoardModel();
+      return true;
+    }
+
+    function requiresMovementRecovery(error) {
+      var code = error.data && error.data.error && error.data.error.code;
+      return ['BOARD_WIP_LIMIT_EXCEEDED', 'WIP_LIMIT_EXCEEDED', 'WORKFLOW_TRANSITION_FORBIDDEN'].indexOf(code) < 0;
+    }
+
+    vm.dropTaskBefore = function(taskId, anchor, placement) {
       if (!anchor || taskId === anchor.id) return;
       var task = vm.tasks.find(function(item) { return item.id === taskId; });
       if (!task || vm.pendingTaskIds[taskId]) return;
@@ -202,32 +229,38 @@
       var statusChanged = task.status !== anchor.status;
       task.status = anchor.status;
       task.columnId = anchor.columnId;
-      task.rank = (anchor.rank || 0) - 1;
+      var placeAfter = placement === 'after';
+      task.rank = (anchor.rank || 0) + (placeAfter ? 1 : -1);
       vm.pendingTaskIds[taskId] = true;
       vm.refreshBoardModel();
+      var statusMoved = false;
       var move = !statusChanged
         ? $q.when()
         : apiClient.patch('/api/work-items/' + taskId + '/status', { status: anchor.status });
       return move
-        .then(function() {
+        .then(function(movedTask) {
+          if (statusChanged) {
+            statusMoved = true;
+            realtimeService.remember(movedTask);
+          }
           return apiClient.patch('/api/work-items/' + taskId + '/rank', {
-            beforeWorkItemId: anchor.id,
-            afterWorkItemId: null
+            beforeWorkItemId: placeAfter ? null : anchor.id,
+            afterWorkItemId: placeAfter ? anchor.id : null
           });
         })
-        .then(function() {
+        .then(function(reorderedTask) {
+          if (!reconcileMovedTask(task, reorderedTask)) return vm.loadTasks();
           vm.notify('success', 'Görev konumu kaydedildi.');
-          return vm.loadTasks();
         })
         .catch(function(error) {
-          var compensation = statusChanged
+          var compensation = statusMoved
             ? apiClient.patch('/api/work-items/' + taskId + '/status', { status: snapshot.status }).catch(angular.noop)
             : $q.when();
           return compensation.then(function() {
             angular.extend(task, snapshot);
             vm.refreshBoardModel();
             vm.notify('error', movementError(error));
-            return vm.loadTasks();
+            if (statusMoved || requiresMovementRecovery(error)) return vm.loadTasks();
           });
         })
         .finally(function() { delete vm.pendingTaskIds[taskId]; });
@@ -242,14 +275,15 @@
       vm.pendingTaskIds[taskId] = true;
       vm.refreshBoardModel();
       return apiClient.patch('/api/work-items/' + taskId + '/status', { status: column.name })
-        .then(function() {
+        .then(function(movedTask) {
+          if (!reconcileMovedTask(task, movedTask)) return vm.loadTasks();
           vm.notify('success', 'Görev ' + column.name + ' kolonuna taşındı.');
-          return vm.loadTasks();
         })
         .catch(function(error) {
           angular.extend(task, snapshot);
           vm.refreshBoardModel();
           vm.notify('error', movementError(error));
+          if (requiresMovementRecovery(error)) return vm.loadTasks();
         })
         .finally(function() { delete vm.pendingTaskIds[taskId]; });
     };
@@ -415,21 +449,6 @@
         })
         .catch(function(error) { vm.notify('error', apiActionError(error, 'Kayıt geri yüklenemedi.')); })
         .finally(function() { vm.archiveActionId = null; });
-    };
-
-    vm.loadNotifications = function() {
-      if (!vm.session.currentUser) return;
-      return apiClient.get('/api/notifications?page=1&pageSize=20').then(function(notifications) {
-        vm.notifications = notifications;
-        vm.unreadCount = notifications.filter(function(notification) { return !notification.read; }).length;
-      });
-    };
-    vm.readNotification = function(notification) {
-      if (notification.read) return;
-      return apiClient.patch('/api/notifications/' + notification.id + '/read', {}).then(function() {
-        notification.read = true;
-        vm.unreadCount = Math.max(0, vm.unreadCount - 1);
-      });
     };
 
           return { apiActionError: apiActionError };

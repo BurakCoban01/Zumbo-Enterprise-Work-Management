@@ -20,29 +20,38 @@
       }
 
       function isDone(task) {
-        return task.completedAt || ['done', 'completed', 'tamamlandı'].indexOf(String(task.status || '').toLocaleLowerCase('tr-TR')) >= 0;
+        return !!task.completedAt;
       }
 
       function isBlocked(task) {
-        if (String(task.status || '').toLocaleLowerCase('tr-TR').indexOf('block') >= 0) return true;
         return (task.relations || []).some(function(relation) {
-          return ['blockedby', 'dependson'].indexOf(String(relation.relationType || '').toLowerCase()) >= 0;
+          return ['blockedby', 'isblockedby', 'dependson'].indexOf(String(relation.relationType || '').toLowerCase()) >= 0;
         });
+      }
+
+      function preference(storage, key, fallback) {
+        var value = storage.getItem('zumbo.personal.' + key);
+        return value || fallback;
       }
 
       return {
         install: function(vm, helpers) {
+          var storage = window.localStorage;
           vm.personalTasks = [];
-          vm.personalMode = 'assigned';
-          vm.inboxMode = 'unread';
+          vm.personalMode = preference(storage, 'mode', 'assigned');
+          vm.personalSort = preference(storage, 'sort', 'urgency');
+          vm.inboxMode = preference(storage, 'inboxMode', 'unread');
           vm.personalLoading = false;
           vm.personalError = null;
           vm.personalPartial = false;
           vm.personalPage = 1;
           vm.personalHasMore = false;
           vm.personalFreshAt = null;
-          vm.savedPersonalViews = JSON.parse(window.localStorage.getItem('zumbo.personalViews') || '[]');
+          vm.savedPersonalViews = JSON.parse(storage.getItem('zumbo.personalViews') || '[]');
           vm.personalViewDraft = '';
+          vm.notificationsLoading = false;
+          vm.notificationsPage = 1;
+          vm.notificationsHasMore = false;
 
           vm.sectionLabel = function(section) {
             return {
@@ -109,10 +118,28 @@
             });
           };
           vm.personalList = function() {
-            if (vm.personalMode === 'due') return vm.personalDue();
-            if (vm.personalMode === 'blocked') return vm.personalBlocked();
-            if (vm.personalMode === 'recent') return vm.personalRecent();
-            return vm.personalAssigned();
+            var items = vm.personalMode === 'due' ? vm.personalDue()
+              : vm.personalMode === 'blocked' ? vm.personalBlocked()
+                : vm.personalMode === 'recent' ? vm.personalRecent()
+                  : vm.personalAssigned();
+            if (vm.personalSort === 'project') {
+              return items.slice().sort(function(left, right) {
+                return String(left.projectName).localeCompare(String(right.projectName), 'tr');
+              });
+            }
+            if (vm.personalSort === 'recent') return vm.personalRecent().filter(function(task) { return items.indexOf(task) >= 0; });
+            return items.slice().sort(function(left, right) {
+              var leftBlocked = isBlocked(left) ? 0 : 1;
+              var rightBlocked = isBlocked(right) ? 0 : 1;
+              if (leftBlocked !== rightBlocked) return leftBlocked - rightBlocked;
+              var leftDue = left.dueDate ? new Date(left.dueDate).getTime() : Number.MAX_SAFE_INTEGER;
+              var rightDue = right.dueDate ? new Date(right.dueDate).getTime() : Number.MAX_SAFE_INTEGER;
+              return leftDue - rightDue;
+            });
+          };
+          vm.personalTaskBlocked = isBlocked;
+          vm.personalTaskOverdue = function(task) {
+            return !isDone(task) && !!task.dueDate && new Date(task.dueDate).getTime() < Date.now();
           };
           vm.pendingApprovals = function() {
             return vm.personalTasks.filter(function(task) {
@@ -122,12 +149,29 @@
           vm.inboxNotifications = function() {
             if (vm.inboxMode === 'all') return vm.notifications;
             if (vm.inboxMode === 'actions') {
-              return vm.notifications.filter(function(item) { return /approval|mention|onay|bahset/i.test(item.type); });
+              return vm.notifications.filter(function(item) { return item.category === 'Action'; });
             }
             return vm.notifications.filter(function(item) { return !item.read; });
           };
-          vm.setPersonalMode = function(mode) { vm.personalMode = mode; };
-          vm.setInboxMode = function(mode) { vm.inboxMode = mode; };
+          vm.notificationLabel = function(notification) {
+            return {
+              Mention: 'Bahsetme', Assignment: 'Atama', ApprovalRequest: 'Onay isteği',
+              Approval: 'Onay sonucu', DueDateReminder: 'Tarih hatırlatması',
+              TeamInvitation: 'Ekip daveti'
+            }[notification.type] || 'Bildirim';
+          };
+          vm.setPersonalMode = function(mode) {
+            vm.personalMode = mode;
+            storage.setItem('zumbo.personal.mode', mode);
+          };
+          vm.setPersonalSort = function(sort) {
+            vm.personalSort = sort;
+            storage.setItem('zumbo.personal.sort', sort);
+          };
+          vm.setInboxMode = function(mode) {
+            vm.inboxMode = mode;
+            storage.setItem('zumbo.personal.inboxMode', mode);
+          };
           vm.loadMorePersonalWork = function() {
             if (!vm.personalLoading && vm.personalHasMore) return vm.loadPersonalWork(vm.personalPage + 1, true);
           };
@@ -136,13 +180,60 @@
             if (!name) return;
             vm.savedPersonalViews = [{ id: String(Date.now()), name: name, mode: vm.personalMode }]
               .concat(vm.savedPersonalViews.filter(function(view) { return view.name !== name; })).slice(0, 8);
-            window.localStorage.setItem('zumbo.personalViews', JSON.stringify(vm.savedPersonalViews));
+            storage.setItem('zumbo.personalViews', JSON.stringify(vm.savedPersonalViews));
             vm.personalViewDraft = '';
           };
           vm.applyPersonalView = function(view) { if (view) vm.personalMode = view.mode; };
           vm.removePersonalView = function(view) {
             vm.savedPersonalViews = vm.savedPersonalViews.filter(function(item) { return item.id !== view.id; });
-            window.localStorage.setItem('zumbo.personalViews', JSON.stringify(vm.savedPersonalViews));
+            storage.setItem('zumbo.personalViews', JSON.stringify(vm.savedPersonalViews));
+          };
+
+          vm.loadNotifications = function(page, append) {
+            if (!vm.session.currentUser || vm.notificationsLoading) return $q.when();
+            page = Number.isInteger(page) && page > 0 ? page : 1;
+            vm.notificationsLoading = true;
+            return apiClient.get('/api/notifications?page=' + page + '&pageSize=50').then(function(notifications) {
+              vm.notifications = append
+                ? vm.notifications.concat(notifications.filter(function(item) {
+                    return !vm.notifications.some(function(existing) { return existing.id === item.id; });
+                  }))
+                : notifications;
+              vm.notificationsPage = page;
+              vm.notificationsHasMore = notifications.length === 50;
+              vm.unreadCount = vm.notifications.filter(function(notification) { return !notification.read; }).length;
+            }).finally(function() { vm.notificationsLoading = false; });
+          };
+          vm.loadMoreNotifications = function() {
+            if (vm.notificationsHasMore) return vm.loadNotifications(vm.notificationsPage + 1, true);
+          };
+          vm.readNotification = function(notification) {
+            if (!notification || notification.read) return $q.when(notification);
+            return apiClient.patch('/api/notifications/' + notification.id + '/read', {}).then(function() {
+              notification.read = true;
+              vm.unreadCount = Math.max(0, vm.unreadCount - 1);
+              return notification;
+            });
+          };
+          vm.readAllNotifications = function() {
+            return $q.all(vm.notifications.filter(function(item) { return !item.read; }).map(vm.readNotification));
+          };
+          vm.openNotificationSource = function(notification) {
+            var task = notification && notification.sourceId && vm.personalTasks.find(function(item) {
+              return item.id === notification.sourceId;
+            });
+            if (notification && notification.actionKind === 'OpenWorkItem' && task) return vm.openPersonalTask(task);
+            if (notification && notification.actionKind === 'OpenTeam' && notification.sourceId) {
+              vm.showSection('teams');
+              var team = (vm.teams || []).find(function(item) { return item.id === notification.sourceId; });
+              if (team) return vm.selectTeam(team);
+            }
+            return $q.when(null);
+          };
+          vm.triageNotification = function(notification) {
+            return vm.readNotification(notification).then(function() {
+              return vm.openNotificationSource(notification);
+            });
           };
           vm.openPersonalTask = function(task) {
             var project = vm.projects.find(function(item) { return item.id === task.projectId; });
