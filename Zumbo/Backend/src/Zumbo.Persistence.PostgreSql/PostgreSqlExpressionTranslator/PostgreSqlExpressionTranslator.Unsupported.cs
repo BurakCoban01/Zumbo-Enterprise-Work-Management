@@ -12,6 +12,5 @@ namespace Zumbo.Persistence.PostgreSql;
 
 internal sealed partial class PostgreSqlExpressionTranslator{
 
-    private static DocumentQueryException Unsupported(Expression expression) =>
-        new($"Expression '{expression}' ({expression.NodeType}) is not supported by PostgreSQL persistence.");
+    private static DocumentQueryException Unsupported(Expression expression) => PostgreSqlExpressionUtilities.Unsupported(expression);
 }

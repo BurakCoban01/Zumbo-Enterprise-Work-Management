@@ -20,6 +20,7 @@ public sealed class RefactorRuntimeContractTests
 
     private static readonly string[] ReplacedVerticalSliceDiRegistrations =
     [
+        "services.AddScoped<IWorkItemTypeSchemaPolicy>(provider=>provider.GetRequiredService<WorkItemTypeSchemaService>());",
         "services.AddScoped<RegisterUserHandler>();",
         "services.AddScoped<SearchUsersHandler>();",
         "services.AddScoped<CreateOrganizationHandler>();",
@@ -48,6 +49,366 @@ public sealed class RefactorRuntimeContractTests
 
     private static readonly string[] PortFocusedVerticalSliceDiRegistrations =
     [
+        "services.AddScoped<ListPortfoliosHandler>(provider=>newListPortfoliosHandler("
+        + "provider.GetRequiredService<IDocumentRepository<PortfolioDocument>>(),"
+        + "provider.GetRequiredService<ICurrentUser>()));",
+        "services.AddScoped<GetPortfolioHandler>(provider=>newGetPortfolioHandler("
+        + "provider.GetRequiredService<IDocumentRepository<PortfolioDocument>>(),"
+        + "provider.GetRequiredService<ICurrentUser>()));",
+        "services.AddScoped<GetPortfolioRoadmapHandler>(provider=>newGetPortfolioRoadmapHandler("
+        + "provider.GetRequiredService<IDocumentRepository<PortfolioDocument>>(),"
+        + "provider.GetRequiredService<IPortfolioDirectory>(),"
+        + "provider.GetRequiredService<ICurrentUser>(),"
+        + "provider.GetRequiredService<IClock>()));",
+        "services.AddScoped<SavePortfolioHandler>(provider=>newSavePortfolioHandler("
+        + "provider.GetRequiredService<IDocumentRepository<PortfolioDocument>>(),"
+        + "provider.GetRequiredService<IPortfolioDirectory>(),"
+        + "provider.GetRequiredService<IPortfolioAuditWriter>(),"
+        + "provider.GetRequiredService<ICurrentUser>(),"
+        + "provider.GetRequiredService<IClock>(),"
+        + "provider.GetService<IExpectedVersionAccessor>()));",
+        "services.AddScoped<ArchivePortfolioHandler>(provider=>newArchivePortfolioHandler("
+        + "provider.GetRequiredService<IDocumentRepository<PortfolioDocument>>(),"
+        + "provider.GetRequiredService<IPortfolioAuditWriter>(),"
+        + "provider.GetRequiredService<ICurrentUser>(),"
+        + "provider.GetRequiredService<IClock>(),"
+        + "provider.GetService<IExpectedVersionAccessor>()));",
+        "services.AddScoped<SaveInitiativeHandler>(provider=>newSaveInitiativeHandler("
+        + "provider.GetRequiredService<IDocumentRepository<PortfolioDocument>>(),"
+        + "provider.GetRequiredService<IPortfolioDirectory>(),"
+        + "provider.GetRequiredService<IPortfolioAuditWriter>(),"
+        + "provider.GetRequiredService<ICurrentUser>(),"
+        + "provider.GetRequiredService<IClock>(),"
+        + "provider.GetService<IExpectedVersionAccessor>()));",
+        "services.AddScoped<AddInitiativeStatusUpdateHandler>(provider=>newAddInitiativeStatusUpdateHandler("
+        + "provider.GetRequiredService<IDocumentRepository<PortfolioDocument>>(),"
+        + "provider.GetRequiredService<IPortfolioAuditWriter>(),"
+        + "provider.GetRequiredService<ICurrentUser>(),"
+        + "provider.GetRequiredService<IClock>(),"
+        + "provider.GetService<IExpectedVersionAccessor>()));",
+        "services.AddScoped<SavePortfolioDependencyHandler>(provider=>newSavePortfolioDependencyHandler("
+        + "provider.GetRequiredService<IDocumentRepository<PortfolioDocument>>(),"
+        + "provider.GetRequiredService<IPortfolioDirectory>(),"
+        + "provider.GetRequiredService<IPortfolioAuditWriter>(),"
+        + "provider.GetRequiredService<ICurrentUser>(),"
+        + "provider.GetRequiredService<IClock>(),"
+        + "provider.GetService<IExpectedVersionAccessor>()));",
+        "services.AddScoped<ArchiveGoalHandler>(provider=>newArchiveGoalHandler("
+        + "provider.GetRequiredService<IDocumentRepository<GoalDocument>>(),"
+        + "provider.GetRequiredService<IGoalAuditWriter>(),"
+        + "provider.GetRequiredService<ICurrentUser>(),"
+        + "provider.GetRequiredService<IClock>(),"
+        + "provider.GetService<IExpectedVersionAccessor>()));",
+        "services.AddScoped<SaveGoalHandler>(provider=>newSaveGoalHandler("
+        + "provider.GetRequiredService<IDocumentRepository<GoalDocument>>(),"
+        + "provider.GetRequiredService<IGoalDirectory>(),"
+        + "provider.GetRequiredService<IGoalAuditWriter>(),"
+        + "provider.GetRequiredService<ICurrentUser>(),"
+        + "provider.GetRequiredService<IClock>(),"
+        + "provider.GetService<IExpectedVersionAccessor>()));",
+        "services.AddScoped<SaveKeyResultHandler>(provider=>newSaveKeyResultHandler("
+        + "provider.GetRequiredService<IDocumentRepository<GoalDocument>>(),"
+        + "provider.GetRequiredService<IGoalDirectory>(),"
+        + "provider.GetRequiredService<IGoalAuditWriter>(),"
+        + "provider.GetRequiredService<ICurrentUser>(),"
+        + "provider.GetRequiredService<IClock>(),"
+        + "provider.GetService<IExpectedVersionAccessor>()));",
+        "services.AddScoped<AddGoalStatusUpdateHandler>(provider=>newAddGoalStatusUpdateHandler("
+        + "provider.GetRequiredService<IDocumentRepository<GoalDocument>>(),"
+        + "provider.GetRequiredService<IGoalAuditWriter>(),"
+        + "provider.GetRequiredService<ICurrentUser>(),"
+        + "provider.GetRequiredService<IClock>(),"
+        + "provider.GetService<IExpectedVersionAccessor>()));",
+        "services.AddScoped<AddKeyResultProgressHandler>(provider=>newAddKeyResultProgressHandler("
+        + "provider.GetRequiredService<IDocumentRepository<GoalDocument>>(),"
+        + "provider.GetRequiredService<IGoalAuditWriter>(),"
+        + "provider.GetRequiredService<ICurrentUser>(),"
+        + "provider.GetRequiredService<IClock>(),"
+        + "provider.GetService<IExpectedVersionAccessor>()));",
+        "services.AddScoped<CompleteSprintHandler>(provider=>newCompleteSprintHandler("
+        + "provider.GetRequiredService<IDocumentRepository<SprintDocument>>(),"
+        + "provider.GetRequiredService<IDocumentRepository<SprintScopeSnapshotDocument>>(),"
+        + "provider.GetRequiredService<IDocumentRepository<SprintCompletionSnapshotDocument>>(),"
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemDocument>>(),"
+        + "provider.GetRequiredService<IProjectPermissionChecker>(),"
+        + "provider.GetRequiredService<IWorkItemAuditPublisher>(),"
+        + "provider.GetRequiredService<IDistributedLockProvider>(),"
+        + "provider.GetRequiredService<IOptions<DistributedLockOptions>>(),"
+        + "provider.GetRequiredService<IOptions<SprintOptions>>(),"
+        + "provider.GetRequiredService<IClock>(),"
+        + "provider.GetRequiredService<ICurrentUser>(),"
+        + "provider.GetRequiredService<IWorkItemCacheInvalidationPublisher>(),"
+        + "provider.GetService<IExpectedVersionAccessor>()));",
+        "services.AddScoped<CreateSprintHandler>(provider=>newCreateSprintHandler("
+        + "provider.GetRequiredService<IDocumentRepository<SprintDocument>>(),"
+        + "provider.GetRequiredService<IProjectPermissionChecker>(),"
+        + "provider.GetRequiredService<IWorkItemAuditPublisher>(),"
+        + "provider.GetRequiredService<IDistributedLockProvider>(),"
+        + "provider.GetRequiredService<IOptions<DistributedLockOptions>>(),"
+        + "provider.GetRequiredService<IClock>(),"
+        + "provider.GetRequiredService<ICurrentUser>(),"
+        + "provider.GetRequiredService<IWorkItemCacheInvalidationPublisher>()));",
+        "services.AddScoped<GetCustomFieldDistributionHandler>(provider=>newGetCustomFieldDistributionHandler("
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemTypeSchemaDocument>>(),"
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemDocument>>(),"
+        + "provider.GetRequiredService<IProjectPermissionChecker>(),"
+        + "provider.GetRequiredService<ICurrentUser>(),"
+        + "provider.GetRequiredService<IOptions<WorkItemTypeSchemaOptions>>(),"
+        + "provider.GetRequiredService<IClock>()));",
+        "services.AddScoped<GetGoalHandler>(provider=>newGetGoalHandler("
+        + "provider.GetRequiredService<IDocumentRepository<GoalDocument>>(),"
+        + "provider.GetRequiredService<ICurrentUser>()));",
+        "services.AddScoped<GetGoalRollupHandler>(provider=>newGetGoalRollupHandler("
+        + "provider.GetRequiredService<IDocumentRepository<GoalDocument>>(),"
+        + "provider.GetRequiredService<IGoalDirectory>(),"
+        + "provider.GetRequiredService<ICurrentUser>(),"
+        + "provider.GetRequiredService<IClock>()));",
+        "services.AddScoped<GetIssueTypeDistributionHandler>(provider=>newGetIssueTypeDistributionHandler("
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemTypeSchemaDocument>>(),"
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemDocument>>(),"
+        + "provider.GetRequiredService<IProjectPermissionChecker>(),"
+        + "provider.GetRequiredService<ICurrentUser>(),"
+        + "provider.GetRequiredService<IOptions<WorkItemTypeSchemaOptions>>(),"
+        + "provider.GetRequiredService<IClock>()));",
+        "services.AddScoped<GetIssueTypeHierarchyHandler>(provider=>newGetIssueTypeHierarchyHandler("
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemTypeSchemaDocument>>(),"
+        + "provider.GetRequiredService<IClock>()));",
+        "services.AddScoped<GetSprintBurndownHandler>(provider=>newGetSprintBurndownHandler("
+        + "provider.GetRequiredService<IDocumentRepository<SprintDocument>>(),"
+        + "provider.GetRequiredService<IDocumentRepository<SprintScopeSnapshotDocument>>(),"
+        + "provider.GetRequiredService<IDocumentRepository<SprintCompletionSnapshotDocument>>(),"
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemDocument>>(),"
+        + "provider.GetRequiredService<IProjectPermissionChecker>(),"
+        + "provider.GetRequiredService<ICurrentUser>(),"
+        + "provider.GetRequiredService<IOptions<SprintOptions>>(),"
+        + "provider.GetRequiredService<IWorkItemReadModelCache>(),"
+        + "provider.GetRequiredService<IOptions<WorkItemReadModelCacheOptions>>()));",
+        "services.AddScoped<GetSprintHandler>(provider=>newGetSprintHandler("
+        + "provider.GetRequiredService<IDocumentRepository<SprintDocument>>(),"
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemDocument>>(),"
+        + "provider.GetRequiredService<IProjectPermissionChecker>(),"
+        + "provider.GetRequiredService<ICurrentUser>()));",
+        "services.AddScoped<GetSprintVelocityHandler>(provider=>newGetSprintVelocityHandler("
+        + "provider.GetRequiredService<IDocumentRepository<SprintDocument>>(),"
+        + "provider.GetRequiredService<IProjectPermissionChecker>(),"
+        + "provider.GetRequiredService<ICurrentUser>(),"
+        + "provider.GetRequiredService<IWorkItemReadModelCache>(),"
+        + "provider.GetRequiredService<IOptions<WorkItemReadModelCacheOptions>>()));",
+        "services.AddScoped<GetWorkItemTypeSchemaHandler>(provider=>newGetWorkItemTypeSchemaHandler("
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemTypeSchemaDocument>>(),"
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemDocument>>(),"
+        + "provider.GetRequiredService<IProjectPermissionChecker>(),"
+        + "provider.GetRequiredService<ICurrentUser>(),"
+        + "provider.GetRequiredService<IOptions<WorkItemTypeSchemaOptions>>(),"
+        + "provider.GetRequiredService<IClock>()));",
+        "services.AddScoped<IWorkItemTypeSchemaPolicy,WorkItemTypeSchemaPolicyAdapter>();",
+        "services.AddScoped<ListSprintBacklogHandler>(provider=>newListSprintBacklogHandler("
+        + "provider.GetRequiredService<IDocumentRepository<SprintDocument>>(),"
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemDocument>>(),"
+        + "provider.GetRequiredService<IProjectPermissionChecker>(),"
+        + "provider.GetRequiredService<ICurrentUser>()));",
+        "services.AddScoped<ListGoalsHandler>(provider=>newListGoalsHandler("
+        + "provider.GetRequiredService<IDocumentRepository<GoalDocument>>(),"
+        + "provider.GetRequiredService<ICurrentUser>()));",
+        "services.AddScoped<ListSprintsHandler>(provider=>newListSprintsHandler("
+        + "provider.GetRequiredService<IDocumentRepository<SprintDocument>>(),"
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemDocument>>(),"
+        + "provider.GetRequiredService<IProjectPermissionChecker>(),"
+        + "provider.GetRequiredService<ICurrentUser>()));",
+        "services.AddScoped<PlanSprintWorkItemHandler>(provider=>newPlanSprintWorkItemHandler("
+        + "provider.GetRequiredService<IDocumentRepository<SprintDocument>>(),"
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemDocument>>(),"
+        + "provider.GetRequiredService<IProjectPermissionChecker>(),"
+        + "provider.GetRequiredService<IWorkItemAuditPublisher>(),"
+        + "provider.GetRequiredService<IDistributedLockProvider>(),"
+        + "provider.GetRequiredService<IOptions<DistributedLockOptions>>(),"
+        + "provider.GetRequiredService<IClock>(),"
+        + "provider.GetRequiredService<ICurrentUser>(),"
+        + "provider.GetRequiredService<IWorkItemCacheInvalidationPublisher>(),"
+        + "provider.GetService<IExpectedVersionAccessor>()));",
+        "services.AddScoped<StartSprintHandler>(provider=>newStartSprintHandler("
+        + "provider.GetRequiredService<IDocumentRepository<SprintDocument>>(),"
+        + "provider.GetRequiredService<IDocumentRepository<SprintScopeSnapshotDocument>>(),"
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemDocument>>(),"
+        + "provider.GetRequiredService<IProjectPermissionChecker>(),"
+        + "provider.GetRequiredService<IWorkItemAuditPublisher>(),"
+        + "provider.GetRequiredService<IDistributedLockProvider>(),"
+        + "provider.GetRequiredService<IOptions<DistributedLockOptions>>(),"
+        + "provider.GetRequiredService<IOptions<SprintOptions>>(),"
+        + "provider.GetRequiredService<IClock>(),"
+        + "provider.GetRequiredService<ICurrentUser>(),"
+        + "provider.GetRequiredService<IWorkItemCacheInvalidationPublisher>(),"
+        + "provider.GetService<IExpectedVersionAccessor>()));",
+        "services.AddScoped<UpsertWorkItemTypeSchemaHandler>(provider=>newUpsertWorkItemTypeSchemaHandler("
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemTypeSchemaDocument>>(),"
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemDocument>>(),"
+        + "provider.GetRequiredService<IProjectPermissionChecker>(),"
+        + "provider.GetRequiredService<IWorkItemAuditPublisher>(),"
+        + "provider.GetRequiredService<IDistributedLockProvider>(),"
+        + "provider.GetRequiredService<IOptions<DistributedLockOptions>>(),"
+        + "provider.GetRequiredService<IOptions<WorkItemTypeSchemaOptions>>(),"
+        + "provider.GetRequiredService<IClock>(),"
+        + "provider.GetRequiredService<ICurrentUser>(),"
+        + "provider.GetService<IExpectedVersionAccessor>()));",
+        "services.AddScoped<UnplanSprintWorkItemHandler>(provider=>newUnplanSprintWorkItemHandler("
+        + "provider.GetRequiredService<IDocumentRepository<SprintDocument>>(),"
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemDocument>>(),"
+        + "provider.GetRequiredService<IProjectPermissionChecker>(),"
+        + "provider.GetRequiredService<IWorkItemAuditPublisher>(),"
+        + "provider.GetRequiredService<IDistributedLockProvider>(),"
+        + "provider.GetRequiredService<IOptions<DistributedLockOptions>>(),"
+        + "provider.GetRequiredService<IClock>(),"
+        + "provider.GetRequiredService<ICurrentUser>(),"
+        + "provider.GetRequiredService<IWorkItemCacheInvalidationPublisher>(),"
+        + "provider.GetService<IExpectedVersionAccessor>()));",
+        "services.AddScoped<ValidateWorkItemSearchFilterHandler>(provider=>newValidateWorkItemSearchFilterHandler("
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemTypeSchemaDocument>>(),"
+        + "provider.GetRequiredService<IClock>()));",
+        "services.AddScoped<ValidateWorkItemShapeHandler>(provider=>newValidateWorkItemShapeHandler("
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemTypeSchemaDocument>>(),"
+        + "provider.GetRequiredService<IClock>()));",
+        "services.AddScoped<ListWorkItemTemplatesHandler>(provider=>newListWorkItemTemplatesHandler("
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemTemplateDocument>>(),"
+        + "provider.GetRequiredService<IProjectPermissionChecker>(),"
+        + "provider.GetRequiredService<ICurrentUser>()));",
+        "services.AddScoped<ListWorkItemRecurrencesHandler>(provider=>newListWorkItemRecurrencesHandler("
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemRecurrenceDocument>>(),"
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemRecurrenceOccurrenceDocument>>(),"
+        + "provider.GetRequiredService<IProjectPermissionChecker>(),"
+        + "provider.GetRequiredService<ICurrentUser>()));",
+        "services.AddScoped<ListRecurrenceOccurrencesHandler>(provider=>newListRecurrenceOccurrencesHandler("
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemRecurrenceDocument>>(),"
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemRecurrenceOccurrenceDocument>>(),"
+        + "provider.GetRequiredService<IProjectPermissionChecker>(),"
+        + "provider.GetRequiredService<ICurrentUser>()));",
+        "services.AddScoped<PreviewWorkItemRecurrenceHandler>(provider=>newPreviewWorkItemRecurrenceHandler("
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemTemplateDocument>>(),"
+        + "provider.GetRequiredService<IProjectPermissionChecker>(),"
+        + "provider.GetRequiredService<ICurrentUser>(),"
+        + "provider.GetRequiredService<IOptions<WorkItemRecurrenceOptions>>(),"
+        + "provider.GetRequiredService<IClock>()));",
+        "services.AddScoped<CreateWorkItemRecurrenceHandler>(provider=>newCreateWorkItemRecurrenceHandler("
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemTemplateDocument>>(),"
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemRecurrenceDocument>>(),"
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemRecurrenceOccurrenceDocument>>(),"
+        + "provider.GetRequiredService<IProjectPermissionChecker>(),"
+        + "provider.GetRequiredService<ICurrentUser>(),"
+        + "provider.GetRequiredService<IOptions<WorkItemRecurrenceOptions>>(),"
+        + "provider.GetRequiredService<IClock>(),"
+        + "provider.GetRequiredService<IWorkItemAuditPublisher>()));",
+        "services.AddScoped<SetWorkItemRecurrenceStateHandler>(provider=>newSetWorkItemRecurrenceStateHandler("
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemRecurrenceDocument>>(),"
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemRecurrenceOccurrenceDocument>>(),"
+        + "provider.GetRequiredService<IProjectPermissionChecker>(),"
+        + "provider.GetRequiredService<ICurrentUser>(),"
+        + "provider.GetRequiredService<IDistributedLockProvider>(),"
+        + "provider.GetRequiredService<IOptions<DistributedLockOptions>>(),"
+        + "provider.GetRequiredService<IClock>(),"
+        + "provider.GetRequiredService<IWorkItemAuditPublisher>(),"
+        + "provider.GetService<IExpectedVersionAccessor>()));",
+        "services.AddScoped<ArchiveWorkItemRecurrenceHandler>(provider=>newArchiveWorkItemRecurrenceHandler("
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemRecurrenceDocument>>(),"
+        + "provider.GetRequiredService<IProjectPermissionChecker>(),"
+        + "provider.GetRequiredService<ICurrentUser>(),"
+        + "provider.GetRequiredService<IDistributedLockProvider>(),"
+        + "provider.GetRequiredService<IOptions<DistributedLockOptions>>(),"
+        + "provider.GetRequiredService<IClock>(),"
+        + "provider.GetRequiredService<IWorkItemAuditPublisher>(),"
+        + "provider.GetService<IExpectedVersionAccessor>()));",
+        "services.AddScoped<CreateWorkItemTemplateHandler>(provider=>newCreateWorkItemTemplateHandler("
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemTemplateDocument>>(),"
+        + "provider.GetRequiredService<IProjectPermissionChecker>(),"
+        + "provider.GetRequiredService<ICurrentUser>(),"
+        + "provider.GetRequiredService<IWorkItemTeamPolicy>(),"
+        + "provider.GetRequiredService<IWorkItemCollaboratorDirectory>(),"
+        + "provider.GetRequiredService<IBoardPlacementPolicy>(),"
+        + "provider.GetRequiredService<IWorkItemTypeSchemaPolicy>(),"
+        + "provider.GetRequiredService<IDistributedLockProvider>(),"
+        + "provider.GetRequiredService<IOptions<DistributedLockOptions>>(),"
+        + "provider.GetRequiredService<IClock>(),"
+        + "provider.GetRequiredService<IWorkItemAuditPublisher>()));",
+        "services.AddScoped<UpdateWorkItemTemplateHandler>(provider=>newUpdateWorkItemTemplateHandler("
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemTemplateDocument>>(),"
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemRecurrenceDocument>>(),"
+        + "provider.GetRequiredService<IProjectPermissionChecker>(),"
+        + "provider.GetRequiredService<ICurrentUser>(),"
+        + "provider.GetRequiredService<IWorkItemTeamPolicy>(),"
+        + "provider.GetRequiredService<IWorkItemCollaboratorDirectory>(),"
+        + "provider.GetRequiredService<IBoardPlacementPolicy>(),"
+        + "provider.GetRequiredService<IWorkItemTypeSchemaPolicy>(),"
+        + "provider.GetRequiredService<IDistributedLockProvider>(),"
+        + "provider.GetRequiredService<IOptions<DistributedLockOptions>>(),"
+        + "provider.GetRequiredService<IClock>(),"
+        + "provider.GetRequiredService<IWorkItemAuditPublisher>(),"
+        + "provider.GetService<IExpectedVersionAccessor>()));",
+        "services.AddScoped<ArchiveWorkItemTemplateHandler>(provider=>newArchiveWorkItemTemplateHandler("
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemTemplateDocument>>(),"
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemRecurrenceDocument>>(),"
+        + "provider.GetRequiredService<IProjectPermissionChecker>(),"
+        + "provider.GetRequiredService<ICurrentUser>(),"
+        + "provider.GetRequiredService<IDistributedLockProvider>(),"
+        + "provider.GetRequiredService<IOptions<DistributedLockOptions>>(),"
+        + "provider.GetRequiredService<IClock>(),"
+        + "provider.GetRequiredService<IWorkItemAuditPublisher>(),"
+        + "provider.GetService<IExpectedVersionAccessor>()));",
+        "services.AddScoped<ScheduleDueRecurrencesHandler>(provider=>newScheduleDueRecurrencesHandler("
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemTemplateDocument>>(),"
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemRecurrenceDocument>>(),"
+        + "provider.GetRequiredService<IDocumentRepository<WorkItemRecurrenceOccurrenceDocument>>(),"
+        + "provider.GetRequiredService<IWorkItemRecurrenceEventPublisher>(),"
+        + "provider.GetRequiredService<IDistributedLockProvider>(),"
+        + "provider.GetRequiredService<IOptions<DistributedLockOptions>>(),"
+        + "provider.GetRequiredService<IOptions<WorkItemRecurrenceOptions>>(),"
+        + "provider.GetRequiredService<IClock>()));",
+        "services.AddScoped<GetKnowledgeDocumentHandler>(provider=>newGetKnowledgeDocumentHandler("
+        + "provider.GetRequiredService<IDocumentRepository<KnowledgeDocument>>(),"
+        + "provider.GetRequiredService<IKnowledgeDirectory>(),"
+        + "provider.GetRequiredService<ICurrentUser>()));",
+        "services.AddScoped<GetKnowledgeVersionHandler>(provider=>newGetKnowledgeVersionHandler("
+        + "provider.GetRequiredService<IDocumentRepository<KnowledgeDocument>>(),"
+        + "provider.GetRequiredService<IKnowledgeDirectory>(),"
+        + "provider.GetRequiredService<ICurrentUser>()));",
+        "services.AddScoped<GetKnowledgeLinkOptionsHandler>(provider=>newGetKnowledgeLinkOptionsHandler("
+        + "provider.GetRequiredService<IKnowledgeDirectory>(),"
+        + "provider.GetRequiredService<ICurrentUser>()));",
+        "services.AddScoped<SearchKnowledgeDocumentsHandler>(provider=>newSearchKnowledgeDocumentsHandler("
+        + "provider.GetRequiredService<IDocumentRepository<KnowledgeDocument>>(),"
+        + "provider.GetRequiredService<IKnowledgeDirectory>(),"
+        + "provider.GetRequiredService<ICurrentUser>()));",
+        "services.AddScoped<AddKnowledgeCommentHandler>(provider=>newAddKnowledgeCommentHandler("
+        + "provider.GetRequiredService<IDocumentRepository<KnowledgeDocument>>(),"
+        + "provider.GetRequiredService<IKnowledgeDirectory>(),"
+        + "provider.GetRequiredService<IKnowledgeAuditWriter>(),"
+        + "provider.GetRequiredService<ICurrentUser>(),"
+        + "provider.GetRequiredService<IClock>(),"
+        + "provider.GetService<IExpectedVersionAccessor>()));",
+        "services.AddScoped<ResolveKnowledgeCommentHandler>(provider=>newResolveKnowledgeCommentHandler("
+        + "provider.GetRequiredService<IDocumentRepository<KnowledgeDocument>>(),"
+        + "provider.GetRequiredService<IKnowledgeDirectory>(),"
+        + "provider.GetRequiredService<IKnowledgeAuditWriter>(),"
+        + "provider.GetRequiredService<ICurrentUser>(),"
+        + "provider.GetRequiredService<IClock>(),"
+        + "provider.GetService<IExpectedVersionAccessor>()));",
+        "services.AddScoped<CreateKnowledgeDocumentHandler>(provider=>newCreateKnowledgeDocumentHandler("
+        + "provider.GetRequiredService<IDocumentRepository<KnowledgeDocument>>(),"
+        + "provider.GetRequiredService<IKnowledgeDirectory>(),"
+        + "provider.GetRequiredService<IKnowledgeAuditWriter>(),"
+        + "provider.GetRequiredService<ICurrentUser>(),"
+        + "provider.GetRequiredService<IClock>()));",
+        "services.AddScoped<AddKnowledgeVersionHandler>(provider=>newAddKnowledgeVersionHandler("
+        + "provider.GetRequiredService<IDocumentRepository<KnowledgeDocument>>(),"
+        + "provider.GetRequiredService<IKnowledgeDirectory>(),"
+        + "provider.GetRequiredService<IKnowledgeAuditWriter>(),"
+        + "provider.GetRequiredService<ICurrentUser>(),"
+        + "provider.GetRequiredService<IClock>(),"
+        + "provider.GetService<IExpectedVersionAccessor>()));",
+        "services.AddScoped<ArchiveKnowledgeDocumentHandler>(provider=>newArchiveKnowledgeDocumentHandler("
+        + "provider.GetRequiredService<IDocumentRepository<KnowledgeDocument>>(),"
+        + "provider.GetRequiredService<IKnowledgeDirectory>(),"
+        + "provider.GetRequiredService<IKnowledgeAuditWriter>(),"
+        + "provider.GetRequiredService<ICurrentUser>(),"
+        + "provider.GetRequiredService<IClock>(),"
+        + "provider.GetService<IExpectedVersionAccessor>()));",
         "services.AddScoped<RegisterUserHandler>(provider=>newRegisterUserHandler("
         + "provider.GetRequiredService<IUserRepository>(),"
         + "provider.GetRequiredService<IRefreshSessionStore>(),"
@@ -615,6 +976,39 @@ public sealed class RefactorRuntimeContractTests
         "services.AddScoped<MarkNotificationAsReadHandler>(provider=>newMarkNotificationAsReadHandler("
         + "provider.GetRequiredService<IDocumentRepository<NotificationDocument>>(),"
         + "provider.GetRequiredService<ICurrentUser>()));",
+        "services.AddScoped<GetNotificationPreferencesHandler>(provider=>newGetNotificationPreferencesHandler("
+        + "provider.GetRequiredService<IDocumentRepository<NotificationPreferenceDocument>>(),"
+        + "provider.GetRequiredService<IDistributedLockProvider>(),"
+        + "provider.GetRequiredService<IOptions<DistributedLockOptions>>(),"
+        + "provider.GetRequiredService<ICurrentUser>()));",
+        "services.AddScoped<UpdateNotificationPreferencesHandler>(provider=>newUpdateNotificationPreferencesHandler("
+        + "provider.GetRequiredService<IDocumentRepository<NotificationPreferenceDocument>>(),"
+        + "provider.GetRequiredService<IDistributedLockProvider>(),"
+        + "provider.GetRequiredService<IOptions<DistributedLockOptions>>(),"
+        + "provider.GetRequiredService<IClock>(),"
+        + "provider.GetRequiredService<ICurrentUser>()));",
+        "services.AddScoped<GetNotificationDeliveryMetricsHandler>(provider=>newGetNotificationDeliveryMetricsHandler("
+        + "provider.GetRequiredService<IDocumentRepository<NotificationDocument>>(),"
+        + "provider.GetRequiredService<IClock>()));",
+        "services.AddScoped<ListNotificationDeadLettersHandler>(provider=>newListNotificationDeadLettersHandler("
+        + "provider.GetRequiredService<IDocumentRepository<NotificationDocument>>()));",
+        "services.AddScoped<ReplayNotificationDeadLetterHandler>(provider=>newReplayNotificationDeadLetterHandler("
+        + "provider.GetRequiredService<IDocumentRepository<NotificationDocument>>(),"
+        + "provider.GetRequiredService<IClock>()));",
+        "services.AddScoped<CreateNotificationHandler>(provider=>newCreateNotificationHandler("
+        + "provider.GetRequiredService<IDocumentRepository<NotificationDocument>>(),"
+        + "provider.GetRequiredService<IDocumentRepository<NotificationPreferenceDocument>>(),"
+        + "provider.GetRequiredService<INotificationUserDirectory>(),"
+        + "provider.GetRequiredService<IOptions<EmailNotificationOptions>>(),"
+        + "provider.GetRequiredService<IDistributedLockProvider>(),"
+        + "provider.GetRequiredService<IOptions<DistributedLockOptions>>(),"
+        + "provider.GetRequiredService<IClock>()));",
+        "services.AddScoped<DispatchNotificationEmailsHandler>(provider=>newDispatchNotificationEmailsHandler("
+        + "provider.GetRequiredService<IDocumentRepository<NotificationDocument>>(),"
+        + "provider.GetRequiredService<IEmailNotificationSender>(),"
+        + "provider.GetRequiredService<IOptions<EmailNotificationOptions>>(),"
+        + "provider.GetRequiredService<IClock>(),"
+        + "provider.GetService<IDurableMessageJitter>()));",
         "services.AddScoped<WriteAuditLogHandler>(provider=>newWriteAuditLogHandler("
         + "provider.GetRequiredService<IDocumentRepository<AuditLogDocument>>(),"
         + "provider.GetRequiredService<IClock>(),"
@@ -673,6 +1067,129 @@ public sealed class RefactorRuntimeContractTests
 
     private static readonly string[] ReplacedVerticalSliceEndpointMappings =
     [
+        "group.MapGet(\"/delivery/status\",async(stringorganizationId,NotificationServiceservice,CancellationTokenct)=>"
+        + "Results.Ok(awaitservice.GetDeliveryMetricsAsync(organizationId,ct))).WithZumboPermission(PermissionCatalog.OperationsManage,isGlobal:true).RequireRateLimiting(\"report\");",
+        "group.MapGet(\"/delivery/dead-letters\",async(stringorganizationId,int?pageSize,NotificationServiceservice,CancellationTokenct)=>"
+        + "Results.Ok(awaitservice.ListDeadLettersAsync(organizationId,Math.Clamp(pageSize??20,1,50),ct))).WithZumboPermission(PermissionCatalog.OperationsManage,isGlobal:true).RequireRateLimiting(\"report\");",
+        "group.MapPost(\"/delivery/{notificationId}/replay\",async(stringnotificationId,stringorganizationId,NotificationServiceservice,INotificationAuditWriteraudit,HttpContexthttp,CancellationTokenct)=>"
+        + "{if(!awaitservice.ReplayDeadLetterAsync(organizationId,notificationId,ct)){returnResults.NotFound();}awaitaudit.WriteAsync(\"NotificationDeliveryReplayed\",notificationId,\"DeadLetter\",\"Pending\",CorrelationId(http),ct);returnResults.Ok();}).WithZumboPermission(PermissionCatalog.OperationsManage,isGlobal:true).RequireRateLimiting(\"bulk\");",
+        "group.MapGet(\"/preferences/me\",async(NotificationServiceservice,HttpContexthttp,CancellationTokenct)=>Ok(awaitservice.GetPreferencesAsync(ct),http));",
+        "group.MapPut(\"/preferences/me\",async(UpdateNotificationPreferencesRequestrequest,NotificationServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.UpdatePreferencesAsync(request,ct),http)).WithZumboPermission(PermissionCatalog.NotificationManage);",
+        "group.MapPost(\"/{portfolioId}/dependencies\",async(stringportfolioId,SavePortfolioDependencyRequestrequest,[FromServices]PortfolioServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.SaveDependencyAsync(portfolioId,null,request,CorrelationId(http),ct),http));",
+        "group.MapPut(\"/{portfolioId}/dependencies/{dependencyId}\",async(stringportfolioId,stringdependencyId,SavePortfolioDependencyRequestrequest,[FromServices]PortfolioServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.SaveDependencyAsync(portfolioId,dependencyId,request,CorrelationId(http),ct),http));",
+        "group.MapPost(\"/{portfolioId}/initiatives\",async(stringportfolioId,SaveInitiativeRequestrequest,[FromServices]PortfolioServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.SaveInitiativeAsync(portfolioId,null,request,CorrelationId(http),ct),http));",
+        "group.MapPut(\"/{portfolioId}/initiatives/{initiativeId}\",async(stringportfolioId,stringinitiativeId,SaveInitiativeRequestrequest,[FromServices]PortfolioServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.SaveInitiativeAsync(portfolioId,initiativeId,request,CorrelationId(http),ct),http));",
+        "group.MapPost(\"/{portfolioId}/initiatives/{initiativeId}/status-updates\",async(stringportfolioId,stringinitiativeId,AddInitiativeStatusUpdateRequestrequest,[FromServices]PortfolioServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.AddStatusUpdateAsync(portfolioId,initiativeId,request,CorrelationId(http),ct),http));",
+        "group.MapPost(\"\",async(SavePortfolioRequestrequest,[FromServices]PortfolioServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.SaveAsync(null,request,CorrelationId(http),ct),http));",
+        "group.MapPut(\"/{portfolioId}\",async(stringportfolioId,SavePortfolioRequestrequest,[FromServices]PortfolioServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.SaveAsync(portfolioId,request,CorrelationId(http),ct),http));",
+        "group.MapDelete(\"/{portfolioId}\",async(stringportfolioId,[FromServices]PortfolioServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "{awaitservice.ArchiveAsync(portfolioId,CorrelationId(http),ct);returnOk(new{archived=true},http);});",
+        "group.MapGet(\"\",async(bool?includeArchived,int?page,int?pageSize,[FromServices]PortfolioServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.ListAsync(includeArchived??false,page??1,pageSize??50,ct),http));",
+        "group.MapGet(\"/{portfolioId}\",async(stringportfolioId,bool?includeArchived,[FromServices]PortfolioServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.GetAsync(portfolioId,includeArchived??false,ct),http));",
+        "group.MapGet(\"/{portfolioId}/roadmap\",async(stringportfolioId,[FromServices]PortfolioServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.GetRoadmapAsync(portfolioId,ct),http));",
+        "group.MapPost(\"\",async(SaveGoalRequestrequest,[FromServices]GoalServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.SaveAsync(null,request,CorrelationId(http),ct),http));",
+        "group.MapPut(\"/{goalId}\",async(stringgoalId,SaveGoalRequestrequest,[FromServices]GoalServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.SaveAsync(goalId,request,CorrelationId(http),ct),http));",
+        "group.MapPost(\"/{goalId}/key-results\",async(stringgoalId,SaveKeyResultRequestrequest,[FromServices]GoalServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.SaveKeyResultAsync(goalId,null,request,CorrelationId(http),ct),http));",
+        "group.MapPut(\"/{goalId}/key-results/{keyResultId}\",async(stringgoalId,stringkeyResultId,SaveKeyResultRequestrequest,[FromServices]GoalServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.SaveKeyResultAsync(goalId,keyResultId,request,CorrelationId(http),ct),http));",
+        "group.MapDelete(\"/{goalId}\",async(stringgoalId,[FromServices]GoalServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "{awaitservice.ArchiveAsync(goalId,CorrelationId(http),ct);returnOk(new{archived=true},http);});",
+        "group.MapPost(\"/{goalId}/key-results/{keyResultId}/progress-updates\",async(stringgoalId,stringkeyResultId,AddKeyResultProgressRequestrequest,[FromServices]GoalServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.AddKeyResultProgressAsync(goalId,keyResultId,request,CorrelationId(http),ct),http));",
+        "group.MapPost(\"/{goalId}/status-updates\",async(stringgoalId,AddGoalStatusUpdateRequestrequest,[FromServices]GoalServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.AddStatusUpdateAsync(goalId,request,CorrelationId(http),ct),http));",
+        "group.MapGet(\"\",async(bool?includeArchived,int?page,int?pageSize,[FromServices]GoalServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.ListAsync(includeArchived??false,page??1,pageSize??50,ct),http));",
+        "group.MapGet(\"/{goalId}\",async(stringgoalId,bool?includeArchived,[FromServices]GoalServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.GetAsync(goalId,includeArchived??false,ct),http));",
+        "group.MapGet(\"/{goalId}/rollup\",async(stringgoalId,[FromServices]GoalServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.GetRollupAsync(goalId,ct),http));",
+        "group.MapDelete(\"/{sprintId}/items/{workItemId}\",async(stringsprintId,stringworkItemId,SprintServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.UnplanAsync(sprintId,workItemId,CorrelationId(http),ct),http)).WithZumboPermission(PermissionCatalog.WorkItemUpdate);",
+        "group.MapGet(\"/projects/{projectId}\",async(stringprojectId,string?after,int?pageSize,SprintServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.ListAsync(projectId,after,pageSize??50,ct),http));",
+        "group.MapGet(\"/projects/{projectId}/backlog\",async(stringprojectId,string?after,int?pageSize,SprintServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.BacklogAsync(projectId,after,pageSize??50,ct),http));",
+        "group.MapGet(\"/projects/{projectId}/velocity\",async(stringprojectId,int?sprintCount,SprintServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.VelocityAsync(projectId,sprintCount??6,ct),http));",
+        "group.MapGet(\"/reports/sprint-burndown/{projectId}/{sprintId}\",async(stringprojectId,stringsprintId,DateOnlystartDate,DateOnlyendDate,SprintServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "ReportOk(awaitservice.BurndownSnapshotAsync(projectId,sprintId,startDate,endDate,ct),http)).RequireRateLimiting(\"report\");",
+        "group.MapGet(\"/reports/sprint-velocity/{projectId}\",async(stringprojectId,int?sprintCount,SprintServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "ReportOk(awaitservice.VelocitySnapshotAsync(projectId,sprintCount??6,ct),http)).RequireRateLimiting(\"report\");",
+        "group.MapGet(\"/{projectId}\",async(stringprojectId,WorkItemTypeSchemaServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.GetAsync(projectId,ct),http));",
+        "group.MapGet(\"/{projectId}/reports/custom-fields/{fieldKey}\",async(stringprojectId,stringfieldKey,WorkItemTypeSchemaServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.GetCustomFieldDistributionAsync(projectId,fieldKey,ct),http));",
+        "group.MapGet(\"/{projectId}/reports/issue-types\",async(stringprojectId,WorkItemTypeSchemaServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.GetIssueTypeDistributionAsync(projectId,ct),http));",
+        "group.MapGet(\"/{sprintId}\",async(stringsprintId,SprintServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.GetAsync(sprintId,ct),http));",
+        "group.MapGet(\"/{sprintId}/burndown\",async(stringsprintId,DateOnly?startDate,DateOnly?endDate,SprintServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "{varsprint=awaitservice.GetAsync(sprintId,ct);returnOk(awaitservice.BurndownAsync(sprint.ProjectId,sprintId,startDate,endDate,ct),http);});",
+        "group.MapPost(\"\",async(CreateSprintRequestrequest,SprintServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Created(awaitservice.CreateAsync(request,CorrelationId(http),ct),http)).WithZumboPermission(PermissionCatalog.WorkItemUpdate);",
+        "group.MapPost(\"/{sprintId}/complete\",async(stringsprintId,CompleteSprintRequestrequest,SprintServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.CompleteAsync(sprintId,request,CorrelationId(http),ct),http)).WithZumboPermission(PermissionCatalog.WorkItemUpdate);",
+        "group.MapPost(\"/{sprintId}/start\",async(stringsprintId,SprintServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.StartAsync(sprintId,CorrelationId(http),ct),http)).WithZumboPermission(PermissionCatalog.WorkItemUpdate);",
+        "group.MapPut(\"/{projectId}\",async(stringprojectId,UpsertWorkItemTypeSchemaRequestrequest,WorkItemTypeSchemaServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.UpsertAsync(projectId,request,CorrelationId(http),ct),http)).WithZumboPermission(PermissionCatalog.WorkItemUpdate);",
+        "group.MapPut(\"/{sprintId}/items/{workItemId}\",async(stringsprintId,stringworkItemId,PlanSprintWorkItemRequestrequest,SprintServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.PlanAsync(sprintId,workItemId,request,CorrelationId(http),ct),http)).WithZumboPermission(PermissionCatalog.WorkItemUpdate);",
+        "group.MapGet(\"/templates\",async(stringprojectId,int?page,int?pageSize,bool?includeArchived,WorkItemTemplateRecurrenceServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.ListTemplatesAsync(projectId,page??1,pageSize??50,includeArchived??false,ct),http));",
+        "group.MapGet(\"/recurrences\",async(stringprojectId,int?page,int?pageSize,bool?includeArchived,WorkItemTemplateRecurrenceServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.ListRecurrencesAsync(projectId,page??1,pageSize??50,includeArchived??false,ct),http));",
+        "group.MapGet(\"/recurrences/{recurrenceId}/occurrences\",async(stringrecurrenceId,int?page,int?pageSize,WorkItemTemplateRecurrenceServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.ListOccurrencesAsync(recurrenceId,page??1,pageSize??50,ct),http));",
+        "group.MapPost(\"/recurrences/preview\",async(PreviewWorkItemRecurrenceRequestrequest,WorkItemTemplateRecurrenceServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.PreviewRecurrenceAsync(request,ct),http)).WithZumboPermission(PermissionCatalog.WorkItemCreate);",
+        "group.MapPost(\"/recurrences\",async(CreateWorkItemRecurrenceRequestrequest,WorkItemTemplateRecurrenceServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Created(awaitservice.CreateRecurrenceAsync(request,CorrelationId(http),ct),http)).WithZumboPermission(PermissionCatalog.WorkItemCreate);",
+        "group.MapPatch(\"/recurrences/{recurrenceId}/state\",async(stringrecurrenceId,SetWorkItemRecurrenceStateRequestrequest,WorkItemTemplateRecurrenceServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.SetRecurrenceStateAsync(recurrenceId,request.Active,CorrelationId(http),ct),http)).WithZumboPermission(PermissionCatalog.WorkItemUpdate);",
+        "group.MapDelete(\"/recurrences/{recurrenceId}\",async(stringrecurrenceId,WorkItemTemplateRecurrenceServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "{awaitservice.ArchiveRecurrenceAsync(recurrenceId,CorrelationId(http),ct);returnResults.NoContent();}).WithZumboPermission(PermissionCatalog.WorkItemUpdate);",
+        "group.MapPost(\"/templates\",async(CreateWorkItemTemplateRequestrequest,WorkItemTemplateRecurrenceServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Created(awaitservice.CreateTemplateAsync(request,CorrelationId(http),ct),http)).WithZumboPermission(PermissionCatalog.WorkItemCreate);",
+        "group.MapPut(\"/templates/{templateId}\",async(stringtemplateId,UpdateWorkItemTemplateRequestrequest,WorkItemTemplateRecurrenceServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.UpdateTemplateAsync(templateId,request,CorrelationId(http),ct),http)).WithZumboPermission(PermissionCatalog.WorkItemUpdate);",
+        "group.MapDelete(\"/templates/{templateId}\",async(stringtemplateId,WorkItemTemplateRecurrenceServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "{awaitservice.ArchiveTemplateAsync(templateId,CorrelationId(http),ct);returnResults.NoContent();}).WithZumboPermission(PermissionCatalog.WorkItemUpdate);",
+        "group.MapPost(\"/recurrences/process-due\",async(WorkItemTemplateRecurrenceServiceservice,CancellationTokenct)=>"
+        + "Results.Ok(new{scheduled=awaitservice.ScheduleDueAsync(ct)})).WithZumboPermission(PermissionCatalog.OperationsManage,isGlobal:true);",
+        "group.MapGet(\"/{documentId}\",async(stringdocumentId,bool?includeArchived,[FromServices]KnowledgeServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.GetAsync(documentId,includeArchived??false,ct),http));",
+        "group.MapGet(\"\",async(string?query,string?scopeType,string?scopeId,bool?includeArchived,int?page,int?pageSize,[FromServices]KnowledgeServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.SearchAsync(query,scopeType,scopeId,includeArchived??false,page??1,pageSize??50,ct),http)).RequireRateLimiting(\"search\");",
+        "group.MapGet(\"/scope-link-options\",async(stringscopeType,stringscopeId,string?query,[FromServices]KnowledgeServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.GetLinkOptionsAsync(scopeType,scopeId,query,ct),http)).RequireRateLimiting(\"search\");",
+        "group.MapGet(\"/{documentId}/versions/{number:int}\",async(stringdocumentId,intnumber,[FromServices]KnowledgeServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.GetVersionAsync(documentId,number,ct),http));",
+        "group.MapPost(\"/{documentId}/comments\",async(stringdocumentId,AddKnowledgeCommentRequestrequest,[FromServices]KnowledgeServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.AddCommentAsync(documentId,request,CorrelationId(http),ct),http));",
+        "group.MapPatch(\"/{documentId}/comments/{commentId}/resolve\",async(stringdocumentId,stringcommentId,[FromServices]KnowledgeServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.ResolveCommentAsync(documentId,commentId,CorrelationId(http),ct),http));",
+        "group.MapPost(\"\",async(CreateKnowledgeDocumentRequestrequest,[FromServices]KnowledgeServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.CreateAsync(request,CorrelationId(http),ct),http));",
+        "group.MapPut(\"/{documentId}\",async(stringdocumentId,CreateKnowledgeVersionRequestrequest,[FromServices]KnowledgeServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaitservice.AddVersionAsync(documentId,request,CorrelationId(http),ct),http));",
+        "group.MapDelete(\"/{documentId}\",async(stringdocumentId,[FromServices]KnowledgeServiceservice,HttpContexthttp,CancellationTokenct)=>"
+        + "{awaitservice.ArchiveAsync(documentId,CorrelationId(http),ct);returnOk(new{archived=true},http);});",
         "group.MapPost(\"/login\",async(LoginRequestrequest,IdentityServiceservice,HttpContexthttp,CancellationTokenct)=>"
         + "Ok(awaitservice.LoginAsync(request,ct),http)).RequireRateLimiting(\"login\");",
         "group.MapPost(\"/logout\",async(LogoutRequestrequest,IdentityServiceservice,HttpContexthttp,CancellationTokenct)=>"
@@ -925,6 +1442,130 @@ public sealed class RefactorRuntimeContractTests
 
     private static readonly string[] PortFocusedVerticalSliceEndpointMappings =
     [
+        "group.MapGet(\"/delivery/status\",async(stringorganizationId,GetNotificationDeliveryMetricsHandlerhandler,CancellationTokenct)=>"
+        + "Results.Ok(awaithandler.HandleAsync(newGetNotificationDeliveryMetricsQuery(organizationId),ct))).WithZumboPermission(PermissionCatalog.OperationsManage,isGlobal:true).RequireRateLimiting(\"report\");",
+        "group.MapGet(\"/delivery/dead-letters\",async(stringorganizationId,int?pageSize,ListNotificationDeadLettersHandlerhandler,CancellationTokenct)=>"
+        + "Results.Ok(awaithandler.HandleAsync(newListNotificationDeadLettersQuery(organizationId,Math.Clamp(pageSize??20,1,50)),ct))).WithZumboPermission(PermissionCatalog.OperationsManage,isGlobal:true).RequireRateLimiting(\"report\");",
+        "group.MapPost(\"/delivery/{notificationId}/replay\",async(stringnotificationId,stringorganizationId,ReplayNotificationDeadLetterHandlerhandler,INotificationAuditWriteraudit,HttpContexthttp,CancellationTokenct)=>"
+        + "{if(!awaithandler.HandleAsync(newReplayNotificationDeadLetterCommand(organizationId,notificationId),ct)){returnResults.NotFound();}awaitaudit.WriteAsync(\"NotificationDeliveryReplayed\",notificationId,\"DeadLetter\",\"Pending\",CorrelationId(http),ct);returnResults.Ok();}).WithZumboPermission(PermissionCatalog.OperationsManage,isGlobal:true).RequireRateLimiting(\"bulk\");",
+        "group.MapGet(\"/preferences/me\",async(GetNotificationPreferencesHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newGetNotificationPreferencesQuery(),ct),http));",
+        "group.MapPut(\"/preferences/me\",async(UpdateNotificationPreferencesRequestrequest,UpdateNotificationPreferencesHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newUpdateNotificationPreferencesCommand(request),ct),http)).WithZumboPermission(PermissionCatalog.NotificationManage);",
+        "group.MapPost(\"/{portfolioId}/dependencies\",async(stringportfolioId,SavePortfolioDependencyRequestrequest,[FromServices]SavePortfolioDependencyHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newSavePortfolioDependencyCommand(portfolioId,null,request,CorrelationId(http)),ct),http));",
+        "group.MapPut(\"/{portfolioId}/dependencies/{dependencyId}\",async(stringportfolioId,stringdependencyId,SavePortfolioDependencyRequestrequest,[FromServices]SavePortfolioDependencyHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newSavePortfolioDependencyCommand(portfolioId,dependencyId,request,CorrelationId(http)),ct),http));",
+        "group.MapPost(\"/{portfolioId}/initiatives\",async(stringportfolioId,SaveInitiativeRequestrequest,[FromServices]SaveInitiativeHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newSaveInitiativeCommand(portfolioId,null,request,CorrelationId(http)),ct),http));",
+        "group.MapPut(\"/{portfolioId}/initiatives/{initiativeId}\",async(stringportfolioId,stringinitiativeId,SaveInitiativeRequestrequest,[FromServices]SaveInitiativeHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newSaveInitiativeCommand(portfolioId,initiativeId,request,CorrelationId(http)),ct),http));",
+        "group.MapPost(\"/{portfolioId}/initiatives/{initiativeId}/status-updates\",async(stringportfolioId,stringinitiativeId,AddInitiativeStatusUpdateRequestrequest,[FromServices]AddInitiativeStatusUpdateHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newAddInitiativeStatusUpdateCommand(portfolioId,initiativeId,request,CorrelationId(http)),ct),http));",
+        "group.MapPost(\"\",async(SavePortfolioRequestrequest,[FromServices]SavePortfolioHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newSavePortfolioCommand(null,request,CorrelationId(http)),ct),http));",
+        "group.MapPut(\"/{portfolioId}\",async(stringportfolioId,SavePortfolioRequestrequest,[FromServices]SavePortfolioHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newSavePortfolioCommand(portfolioId,request,CorrelationId(http)),ct),http));",
+        "group.MapDelete(\"/{portfolioId}\",async(stringportfolioId,[FromServices]ArchivePortfolioHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "{awaithandler.HandleAsync(newArchivePortfolioCommand(portfolioId,CorrelationId(http)),ct);returnOk(new{archived=true},http);});",
+        "group.MapGet(\"\",async(bool?includeArchived,int?page,int?pageSize,[FromServices]ListPortfoliosHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newListPortfoliosQuery(includeArchived??false,page??1,pageSize??50),ct),http));",
+        "group.MapGet(\"/{portfolioId}\",async(stringportfolioId,bool?includeArchived,[FromServices]GetPortfolioHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newGetPortfolioQuery(portfolioId,includeArchived??false),ct),http));",
+        "group.MapGet(\"/{portfolioId}/roadmap\",async(stringportfolioId,[FromServices]GetPortfolioRoadmapHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newGetPortfolioRoadmapQuery(portfolioId),ct),http));",
+        "group.MapPost(\"\",async(SaveGoalRequestrequest,[FromServices]SaveGoalHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newSaveGoalCommand(null,request,CorrelationId(http)),ct),http));",
+        "group.MapPut(\"/{goalId}\",async(stringgoalId,SaveGoalRequestrequest,[FromServices]SaveGoalHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newSaveGoalCommand(goalId,request,CorrelationId(http)),ct),http));",
+        "group.MapPost(\"/{goalId}/key-results\",async(stringgoalId,SaveKeyResultRequestrequest,[FromServices]SaveKeyResultHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newSaveKeyResultCommand(goalId,null,request,CorrelationId(http)),ct),http));",
+        "group.MapPut(\"/{goalId}/key-results/{keyResultId}\",async(stringgoalId,stringkeyResultId,SaveKeyResultRequestrequest,[FromServices]SaveKeyResultHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newSaveKeyResultCommand(goalId,keyResultId,request,CorrelationId(http)),ct),http));",
+        "group.MapDelete(\"/{goalId}\",async(stringgoalId,[FromServices]ArchiveGoalHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "{awaithandler.HandleAsync(newArchiveGoalCommand(goalId,CorrelationId(http)),ct);returnOk(new{archived=true},http);});",
+        "group.MapPost(\"/{goalId}/key-results/{keyResultId}/progress-updates\",async(stringgoalId,stringkeyResultId,AddKeyResultProgressRequestrequest,[FromServices]AddKeyResultProgressHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newAddKeyResultProgressCommand(goalId,keyResultId,request,CorrelationId(http)),ct),http));",
+        "group.MapPost(\"/{goalId}/status-updates\",async(stringgoalId,AddGoalStatusUpdateRequestrequest,[FromServices]AddGoalStatusUpdateHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newAddGoalStatusUpdateCommand(goalId,request,CorrelationId(http)),ct),http));",
+        "group.MapGet(\"\",async(bool?includeArchived,int?page,int?pageSize,[FromServices]ListGoalsHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newListGoalsQuery(includeArchived??false,page??1,pageSize??50),ct),http));",
+        "group.MapGet(\"/{goalId}\",async(stringgoalId,bool?includeArchived,[FromServices]GetGoalHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newGetGoalQuery(goalId,includeArchived??false),ct),http));",
+        "group.MapGet(\"/{goalId}/rollup\",async(stringgoalId,[FromServices]GetGoalRollupHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newGetGoalRollupQuery(goalId),ct),http));",
+        "group.MapDelete(\"/{sprintId}/items/{workItemId}\",async(stringsprintId,stringworkItemId,UnplanSprintWorkItemHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newUnplanSprintWorkItemCommand(sprintId,workItemId,CorrelationId(http)),ct),http)).WithZumboPermission(PermissionCatalog.WorkItemUpdate);",
+        "group.MapGet(\"/projects/{projectId}\",async(stringprojectId,string?after,int?pageSize,ListSprintsHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newListSprintsQuery(projectId,after,pageSize??50),ct),http));",
+        "group.MapGet(\"/projects/{projectId}/backlog\",async(stringprojectId,string?after,int?pageSize,ListSprintBacklogHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newListSprintBacklogQuery(projectId,after,pageSize??50),ct),http));",
+        "group.MapGet(\"/projects/{projectId}/velocity\",async(stringprojectId,int?sprintCount,GetSprintVelocityHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok((awaithandler.HandleAsync(newGetSprintVelocityQuery(projectId,sprintCount??6),ct)).Data,http));",
+        "group.MapGet(\"/reports/sprint-burndown/{projectId}/{sprintId}\",async(stringprojectId,stringsprintId,DateOnlystartDate,DateOnlyendDate,GetSprintBurndownHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "ReportOk(awaithandler.HandleAsync(newGetSprintBurndownQuery(projectId,sprintId,startDate,endDate),ct),http)).RequireRateLimiting(\"report\");",
+        "group.MapGet(\"/reports/sprint-velocity/{projectId}\",async(stringprojectId,int?sprintCount,GetSprintVelocityHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "ReportOk(awaithandler.HandleAsync(newGetSprintVelocityQuery(projectId,sprintCount??6),ct),http)).RequireRateLimiting(\"report\");",
+        "group.MapGet(\"/{projectId}\",async(stringprojectId,GetWorkItemTypeSchemaHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newGetWorkItemTypeSchemaQuery(projectId),ct),http));",
+        "group.MapGet(\"/{projectId}/reports/custom-fields/{fieldKey}\",async(stringprojectId,stringfieldKey,GetCustomFieldDistributionHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newGetCustomFieldDistributionQuery(projectId,fieldKey),ct),http));",
+        "group.MapGet(\"/{projectId}/reports/issue-types\",async(stringprojectId,GetIssueTypeDistributionHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newGetIssueTypeDistributionQuery(projectId),ct),http));",
+        "group.MapGet(\"/{sprintId}\",async(stringsprintId,GetSprintHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newGetSprintQuery(sprintId),ct),http));",
+        "group.MapGet(\"/{sprintId}/burndown\",async(stringsprintId,DateOnly?startDate,DateOnly?endDate,GetSprintHandlergetSprint,GetSprintBurndownHandlerburndown,HttpContexthttp,CancellationTokenct)=>"
+        + "{varsprint=awaitgetSprint.HandleAsync(newGetSprintQuery(sprintId),ct);varsnapshot=awaitburndown.HandleAsync(newGetSprintBurndownQuery(sprint.ProjectId,sprintId,startDate,endDate),ct);returnOk(snapshot.Data,http);});",
+        "group.MapPost(\"\",async(CreateSprintRequestrequest,CreateSprintHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Created(awaithandler.HandleAsync(newCreateSprintCommand(request,CorrelationId(http)),ct),http)).WithZumboPermission(PermissionCatalog.WorkItemUpdate);",
+        "group.MapPost(\"/{sprintId}/complete\",async(stringsprintId,CompleteSprintRequestrequest,CompleteSprintHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newCompleteSprintCommand(sprintId,request,CorrelationId(http)),ct),http)).WithZumboPermission(PermissionCatalog.WorkItemUpdate);",
+        "group.MapPost(\"/{sprintId}/start\",async(stringsprintId,StartSprintHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newStartSprintCommand(sprintId,CorrelationId(http)),ct),http)).WithZumboPermission(PermissionCatalog.WorkItemUpdate);",
+        "group.MapPut(\"/{projectId}\",async(stringprojectId,UpsertWorkItemTypeSchemaRequestrequest,UpsertWorkItemTypeSchemaHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newUpsertWorkItemTypeSchemaCommand(projectId,request,CorrelationId(http)),ct),http)).WithZumboPermission(PermissionCatalog.WorkItemUpdate);",
+        "group.MapPut(\"/{sprintId}/items/{workItemId}\",async(stringsprintId,stringworkItemId,PlanSprintWorkItemRequestrequest,PlanSprintWorkItemHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newPlanSprintWorkItemCommand(sprintId,workItemId,request,CorrelationId(http)),ct),http)).WithZumboPermission(PermissionCatalog.WorkItemUpdate);",
+        "group.MapGet(\"/templates\",async(stringprojectId,int?page,int?pageSize,bool?includeArchived,ListWorkItemTemplatesHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newListWorkItemTemplatesQuery(projectId,page??1,pageSize??50,includeArchived??false),ct),http));",
+        "group.MapGet(\"/recurrences\",async(stringprojectId,int?page,int?pageSize,bool?includeArchived,ListWorkItemRecurrencesHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newListWorkItemRecurrencesQuery(projectId,page??1,pageSize??50,includeArchived??false),ct),http));",
+        "group.MapGet(\"/recurrences/{recurrenceId}/occurrences\",async(stringrecurrenceId,int?page,int?pageSize,ListRecurrenceOccurrencesHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newListRecurrenceOccurrencesQuery(recurrenceId,page??1,pageSize??50),ct),http));",
+        "group.MapPost(\"/recurrences/preview\",async(PreviewWorkItemRecurrenceRequestrequest,PreviewWorkItemRecurrenceHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newPreviewWorkItemRecurrenceQuery(request),ct),http)).WithZumboPermission(PermissionCatalog.WorkItemCreate);",
+        "group.MapPost(\"/recurrences\",async(CreateWorkItemRecurrenceRequestrequest,CreateWorkItemRecurrenceHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Created(awaithandler.HandleAsync(newCreateWorkItemRecurrenceCommand(request,CorrelationId(http)),ct),http)).WithZumboPermission(PermissionCatalog.WorkItemCreate);",
+        "group.MapPatch(\"/recurrences/{recurrenceId}/state\",async(stringrecurrenceId,SetWorkItemRecurrenceStateRequestrequest,SetWorkItemRecurrenceStateHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newSetWorkItemRecurrenceStateCommand(recurrenceId,request.Active,CorrelationId(http)),ct),http)).WithZumboPermission(PermissionCatalog.WorkItemUpdate);",
+        "group.MapDelete(\"/recurrences/{recurrenceId}\",async(stringrecurrenceId,ArchiveWorkItemRecurrenceHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "{awaithandler.HandleAsync(newArchiveWorkItemRecurrenceCommand(recurrenceId,CorrelationId(http)),ct);returnResults.NoContent();}).WithZumboPermission(PermissionCatalog.WorkItemUpdate);",
+        "group.MapPost(\"/templates\",async(CreateWorkItemTemplateRequestrequest,CreateWorkItemTemplateHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Created(awaithandler.HandleAsync(newCreateWorkItemTemplateCommand(request,CorrelationId(http)),ct),http)).WithZumboPermission(PermissionCatalog.WorkItemCreate);",
+        "group.MapPut(\"/templates/{templateId}\",async(stringtemplateId,UpdateWorkItemTemplateRequestrequest,UpdateWorkItemTemplateHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newUpdateWorkItemTemplateCommand(templateId,request,CorrelationId(http)),ct),http)).WithZumboPermission(PermissionCatalog.WorkItemUpdate);",
+        "group.MapDelete(\"/templates/{templateId}\",async(stringtemplateId,ArchiveWorkItemTemplateHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "{awaithandler.HandleAsync(newArchiveWorkItemTemplateCommand(templateId,CorrelationId(http)),ct);returnResults.NoContent();}).WithZumboPermission(PermissionCatalog.WorkItemUpdate);",
+        "group.MapPost(\"/recurrences/process-due\",async(ScheduleDueRecurrencesHandlerhandler,CancellationTokenct)=>"
+        + "Results.Ok(new{scheduled=awaithandler.HandleAsync(newScheduleDueRecurrencesCommand(),ct)})).WithZumboPermission(PermissionCatalog.OperationsManage,isGlobal:true);",
+        "group.MapGet(\"/{documentId}\",async(stringdocumentId,bool?includeArchived,[FromServices]GetKnowledgeDocumentHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newGetKnowledgeDocumentQuery(documentId,includeArchived??false),ct),http));",
+        "group.MapGet(\"\",async(string?query,string?scopeType,string?scopeId,bool?includeArchived,int?page,int?pageSize,[FromServices]SearchKnowledgeDocumentsHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newSearchKnowledgeDocumentsQuery(query,scopeType,scopeId,includeArchived??false,page??1,pageSize??50),ct),http)).RequireRateLimiting(\"search\");",
+        "group.MapGet(\"/scope-link-options\",async(stringscopeType,stringscopeId,string?query,[FromServices]GetKnowledgeLinkOptionsHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newGetKnowledgeLinkOptionsQuery(scopeType,scopeId,query),ct),http)).RequireRateLimiting(\"search\");",
+        "group.MapGet(\"/{documentId}/versions/{number:int}\",async(stringdocumentId,intnumber,[FromServices]GetKnowledgeVersionHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newGetKnowledgeVersionQuery(documentId,number),ct),http));",
+        "group.MapPost(\"/{documentId}/comments\",async(stringdocumentId,AddKnowledgeCommentRequestrequest,[FromServices]AddKnowledgeCommentHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newAddKnowledgeCommentCommand(documentId,request,CorrelationId(http)),ct),http));",
+        "group.MapPatch(\"/{documentId}/comments/{commentId}/resolve\",async(stringdocumentId,stringcommentId,[FromServices]ResolveKnowledgeCommentHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newResolveKnowledgeCommentCommand(documentId,commentId,CorrelationId(http)),ct),http));",
+        "group.MapPost(\"\",async(CreateKnowledgeDocumentRequestrequest,[FromServices]CreateKnowledgeDocumentHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newCreateKnowledgeDocumentCommand(request,CorrelationId(http)),ct),http));",
+        "group.MapPut(\"/{documentId}\",async(stringdocumentId,CreateKnowledgeVersionRequestrequest,[FromServices]AddKnowledgeVersionHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "Ok(awaithandler.HandleAsync(newAddKnowledgeVersionCommand(documentId,request,CorrelationId(http)),ct),http));",
+        "group.MapDelete(\"/{documentId}\",async(stringdocumentId,[FromServices]ArchiveKnowledgeDocumentHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
+        + "{awaithandler.HandleAsync(newArchiveKnowledgeDocumentCommand(documentId,CorrelationId(http)),ct);returnOk(new{archived=true},http);});",
         "group.MapPost(\"/login\",async(LoginRequestrequest,LoginHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
         + "Ok(awaithandler.HandleAsync(request,ct),http)).RequireRateLimiting(\"login\");",
         "group.MapPost(\"/logout\",async(LogoutRequestrequest,LogoutHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
@@ -1181,6 +1822,26 @@ public sealed class RefactorRuntimeContractTests
     private static string RepositoryDirectory => Directory.GetParent(ProjectDirectory)!.FullName;
 
     [Fact]
+    public void RefactorSnapshot_PreservesDiRegistrationContracts()
+    {
+        var baselineFiles = RefactorSourceReader.ReadGit(
+            RepositoryDirectory,
+            RefactorSemanticInventory.BaselineCommit);
+        var targetFiles = RefactorSourceReader.ReadWorkingTree(ProjectDirectory);
+        var baselineRegistrations = DiContracts(baselineFiles);
+        var targetRegistrations = DiContracts(targetFiles);
+
+        Assert.Equal(274, baselineRegistrations.Count);
+
+        AssertExactWithAllowedReplacements(
+            "DI registrations",
+            baselineRegistrations,
+            targetRegistrations,
+            ReplacedVerticalSliceDiRegistrations,
+            PortFocusedVerticalSliceDiRegistrations);
+    }
+
+    [Fact]
     public void RefactorSnapshot_PreservesRuntimeContractsAndSeparatesIntentionalTimeoutChanges()
     {
         var baselineFiles = RefactorSourceReader.ReadGit(
@@ -1267,10 +1928,14 @@ public sealed class RefactorRuntimeContractTests
             },
             intentionalRuntimeContractReplacements = new[]
             {
+                "The template and recurrence read, preview, create, state, and archive handlers are scoped through port-focused constructors; their endpoints resolve them directly while the corresponding WorkItemTemplateRecurrenceService methods remain compatibility facades preserving the original public contracts.",
                 "RegisterUserHandler and SearchUsersHandler remain scoped self-services; explicit factories select their port-focused constructors while compatibility constructors remain available.",
                 "CreateOrganizationHandler and ListOrganizationsHandler remain scoped self-services; explicit factories select their port-focused constructors while compatibility constructors remain available.",
                 "CreateTeamHandler and ListTeamsHandler remain scoped self-services; explicit factories select their port-focused constructors while compatibility constructors remain available.",
                 "CreateProjectHandler and ListProjectsHandler remain scoped self-services; explicit factories select their port-focused constructors while compatibility constructors remain available.",
+                "All nine Knowledge handlers are scoped through port-focused constructors; their routes resolve them directly while the corresponding KnowledgeService methods remain responsibility-grouped compatibility facades preserving their original public contracts.",
+                "All eight Goal handlers are scoped through port-focused constructors; all ten Goal routes resolve them directly while the corresponding GoalService methods remain compatibility facades preserving their original public contracts.",
+                "All eight Portfolio handlers are scoped through port-focused constructors; all eleven Portfolio routes resolve them directly while the corresponding PortfolioService methods remain compatibility facades preserving their original public contracts.",
                 "CreateBoardHandler and ListBoardsByProjectHandler remain scoped self-services; explicit factories select their port-focused constructors while compatibility constructors remain available.",
                 "UpsertWorkflowHandler and GetWorkflowHandler remain scoped self-services; explicit factories select their port-focused constructors while compatibility constructors remain available.",
                 "CreateWorkItemHandler and SearchWorkItemsHandler remain scoped self-services; explicit factories select their port-focused constructors while compatibility constructors remain available.",
@@ -1315,7 +1980,7 @@ public sealed class RefactorRuntimeContractTests
                 "The flow-time report route resolves FlowTimeHandler directly; its route, nullable date binding, rate limit, report headers, view authorization, default range and exact validation messages, UTC day boundaries, cache key and TTL, completed-item cursor paging, organization-scoped activity timeline and legacy fallback, reopened-work cycle start, lead and cycle samples, average and median rounding, response and snapshot mapping, dashboard and unit compatibility callers, public facades, and scoped registration remain preserved.",
                 "The completion-rate report route resolves CompletionRateHandler directly; its route, nullable date binding, rate limit, report headers, view authorization, default range and exact validation messages, UTC day boundaries, cache key and TTL, created-item cursor paging, completion cutoff, empty-set behavior, two-decimal percentage, response and snapshot mapping, dashboard, API and unit compatibility callers, public facades, and scoped registration remain preserved.",
                 "The team-performance report route resolves TeamPerformanceHandler directly; its route, nullable date binding, rate limit, report headers, view authorization, default range and exact validation messages, UTC day boundaries, cache key and TTL, team-policy call order, explicit team-assignment cursor paging, organization-scoped activity read and legacy fallback, team-name ordering, completion cutoff and percentage, average lead-time rounding, logged-hours aggregation, response and snapshot mapping, dashboard, API and unit compatibility callers, public facades, and scoped registration remain preserved.",
-                "ListNotificationsHandler and MarkNotificationAsReadHandler remain scoped self-services; explicit factories select their port-focused constructors while compatibility constructors remain available.",
+                "The notification list, read-state, preference, creation, delivery-metrics, dead-letter list, dead-letter replay, and email dispatch handlers remain scoped self-services; explicit factories select their port-focused constructors while compatibility constructors remain available, and the hosted dispatcher resolves the dispatch handler directly.",
                 "WriteAuditLogHandler and QueryAuditLogHandler remain scoped self-services; explicit factories select their port-focused constructors while compatibility constructors remain available.",
                 "The capacity-plan archive route resolves ArchiveCapacityPlanHandler directly; its route, authorization, transaction filter, correlation ID, owner and visibility checks, optimistic concurrency, audit, response mapping, compatibility facade, and scoped registration remain preserved.",
                 "The capacity-plan read route resolves GetCapacityPlanHandler directly; its route, authorization, transaction filter, archived binding, tenant and viewer masking, project visibility, response mapping, compatibility facade, and scoped registration remain preserved.",
@@ -1398,45 +2063,161 @@ public sealed class RefactorRuntimeContractTests
         IReadOnlyList<RefactorSourceReader.SourceFile> files)
     {
         var roots = Parsed(files, file =>
-                file.Path.StartsWith("Backend/src/Zumbo.Persistence.PostgreSql/PostgreSqlMigrations", StringComparison.Ordinal))
+                file.Path.StartsWith(
+                    "Backend/src/Zumbo.Persistence.PostgreSql/",
+                    StringComparison.Ordinal)
+                && (file.Path.Contains("/PostgreSqlMigrations", StringComparison.Ordinal)
+                    || file.Path.Contains(
+                        "/Infrastructure/Persistence/Migrations/",
+                        StringComparison.Ordinal)))
             .ToArray();
         var migrationInvocations = roots
             .SelectMany(source => source.Root.DescendantNodes().OfType<InvocationExpressionSyntax>())
-            .Where(invocation => InvocationName(invocation) == "Create"
-                && invocation.Expression.ToString().Contains("Migration", StringComparison.Ordinal))
+            .Where(invocation => invocation.Expression.ToString() == "Migration.Create")
             .ToArray();
-        var referencedSqlNames = migrationInvocations
-            .SelectMany(invocation => invocation.ArgumentList.Arguments.Skip(2).Select(argument => argument.Expression.ToString()))
-            .ToHashSet(StringComparer.Ordinal);
-        var initializers = roots
-            .SelectMany(source => source.Root.DescendantNodes().OfType<VariableDeclaratorSyntax>())
-            .Where(variable => variable.Initializer is not null
-                && referencedSqlNames.Contains(variable.Identifier.ValueText))
-            .GroupBy(variable => variable.Identifier.ValueText, StringComparer.Ordinal)
-            .ToDictionary(
-                group => group.Key,
-                group => group.Select(variable => Normalize(variable.Initializer!.Value))
-                    .Distinct(StringComparer.Ordinal)
-                    .Single(),
-                StringComparer.Ordinal);
 
         return migrationInvocations
             .Select(invocation =>
             {
                 var arguments = invocation.ArgumentList.Arguments;
                 Assert.Equal(4, arguments.Count);
-                var upName = arguments[2].Expression.ToString();
-                var downName = arguments[3].Expression.ToString();
                 return string.Join('|',
                     Normalize(arguments[0].Expression),
                     Normalize(arguments[1].Expression),
-                    upName,
-                    initializers[upName],
-                    downName,
-                    initializers[downName]);
+                    ResolveMigrationSql(arguments[2].Expression, roots),
+                    ResolveMigrationSql(arguments[3].Expression, roots));
             })
             .OrderBy(item => long.Parse(item[..item.IndexOf('|')]))
             .ToArray();
+    }
+
+    private static string ResolveMigrationSql(
+        ExpressionSyntax expression,
+        IReadOnlyList<ParsedSource> roots,
+        TypeDeclarationSyntax? preferredType = null)
+    {
+        if (expression is IdentifierNameSyntax identifier)
+        {
+            var declaration = FindMigrationVariable(
+                identifier.Identifier.ValueText,
+                roots,
+                preferredType);
+            return ResolveMigrationSql(
+                declaration.Initializer!.Value,
+                roots,
+                declaration.FirstAncestorOrSelf<TypeDeclarationSyntax>());
+        }
+
+        if (expression is MemberAccessExpressionSyntax member
+            && member.Name.Identifier.ValueText is "UpSql" or "DownSql")
+        {
+            var sqlIndex = member.Name.Identifier.ValueText == "UpSql" ? 2 : 3;
+            if (member.Expression is IdentifierNameSyntax localIdentifier)
+            {
+                var declaration = FindMigrationVariable(
+                    localIdentifier.Identifier.ValueText,
+                    roots,
+                    preferredType);
+                if (declaration.Initializer!.Value is InvocationExpressionSyntax factory)
+                {
+                    var argumentIndex = sqlIndex - 2;
+                    return ResolveMigrationSql(
+                        factory.ArgumentList.Arguments[argumentIndex].Expression,
+                        roots,
+                        factory.FirstAncestorOrSelf<TypeDeclarationSyntax>());
+                }
+
+                return ResolveMigrationDefinitionProperty(
+                    declaration.Initializer.Value,
+                    sqlIndex,
+                    roots,
+                    declaration.FirstAncestorOrSelf<TypeDeclarationSyntax>());
+            }
+
+            if (member.Expression is MemberAccessExpressionSyntax definitionAccess
+                && definitionAccess.Name.Identifier.ValueText == "Definition")
+            {
+                var typeName = definitionAccess.Expression.ToString();
+                var definitionType = roots
+                    .SelectMany(source => source.Root.DescendantNodes()
+                        .OfType<TypeDeclarationSyntax>())
+                    .Single(type => type.Identifier.ValueText == typeName);
+                var definition = Assert.Single(
+                    definitionType.Members.OfType<PropertyDeclarationSyntax>(),
+                    property => property.Identifier.ValueText == "Definition"
+                        && property.Initializer is not null);
+                return ResolveMigrationDefinitionProperty(
+                    definition.Initializer!.Value,
+                    sqlIndex,
+                    roots,
+                    definitionType);
+            }
+
+            if (member.Expression is IdentifierNameSyntax typeIdentifier)
+            {
+                var definitionType = roots
+                    .SelectMany(source => source.Root.DescendantNodes()
+                        .OfType<TypeDeclarationSyntax>())
+                    .Single(type => type.Identifier.ValueText
+                        == typeIdentifier.Identifier.ValueText);
+                var declaration = FindMigrationVariable(
+                    member.Name.Identifier.ValueText,
+                    roots,
+                    definitionType);
+                return ResolveMigrationSql(
+                    declaration.Initializer!.Value,
+                    roots,
+                    definitionType);
+            }
+        }
+
+        return Normalize(expression);
+    }
+
+    private static string ResolveMigrationDefinitionProperty(
+        ExpressionSyntax definition,
+        int argumentIndex,
+        IReadOnlyList<ParsedSource> roots,
+        TypeDeclarationSyntax? preferredType)
+    {
+        var arguments = definition switch
+        {
+            ObjectCreationExpressionSyntax creation => creation.ArgumentList!.Arguments,
+            ImplicitObjectCreationExpressionSyntax creation => creation.ArgumentList.Arguments,
+            _ => throw new Xunit.Sdk.XunitException(
+                $"Unsupported migration definition initializer: {definition}")
+        };
+        Assert.Equal(4, arguments.Count);
+        return ResolveMigrationSql(
+            arguments[argumentIndex].Expression,
+            roots,
+            preferredType);
+    }
+
+    private static VariableDeclaratorSyntax FindMigrationVariable(
+        string name,
+        IReadOnlyList<ParsedSource> roots,
+        TypeDeclarationSyntax? preferredType)
+    {
+        var candidates = roots
+            .SelectMany(source => source.Root.DescendantNodes()
+                .OfType<VariableDeclaratorSyntax>())
+            .Where(variable => variable.Identifier.ValueText == name
+                && variable.Initializer is not null)
+            .ToArray();
+        if (preferredType is not null)
+        {
+            var scoped = candidates.Where(variable =>
+                    variable.FirstAncestorOrSelf<TypeDeclarationSyntax>()?
+                        .Identifier.ValueText == preferredType.Identifier.ValueText)
+                .ToArray();
+            if (scoped.Length == 1)
+            {
+                return scoped[0];
+            }
+        }
+
+        return Assert.Single(candidates);
     }
 
     private static IReadOnlyList<string> MongoContracts(
@@ -1468,20 +2249,40 @@ public sealed class RefactorRuntimeContractTests
     private static IReadOnlyList<string> MessagingContracts(
         IReadOnlyList<RefactorSourceReader.SourceFile> files) =>
         Parsed(files, _ => true)
-            .SelectMany(source => source.Root.DescendantNodes().OfType<TypeDeclarationSyntax>())
-            .Where(type => MessagingType(type.Identifier.ValueText))
-            .SelectMany(type => type.Members
+            .SelectMany(source => source.Root.DescendantNodes()
+                .OfType<TypeDeclarationSyntax>()
+                .Select(type => (source.File.Path, Type: type)))
+            .Where(item => MessagingType(item.Type.Identifier.ValueText)
+                && !ApplicationFeatureUseCaseType(item.Path, item.Type))
+            .SelectMany(item => item.Type.Members
                 .Where(member => member is not BaseTypeDeclarationSyntax)
-                .Select(member => $"{QualifiedTypeName(type)}|{Normalize(member)}"))
+                .Select(member => $"{QualifiedTypeName(item.Type)}|{Normalize(member)}"))
             .Order(StringComparer.Ordinal)
             .ToArray();
 
     private static bool MessagingType(string name) =>
-        name.Contains("Event", StringComparison.Ordinal)
-        || name.Contains("Message", StringComparison.Ordinal)
-        || name.Contains("Inbox", StringComparison.Ordinal)
-        || name.Contains("Outbox", StringComparison.Ordinal)
-        || name.Contains("DeadLetter", StringComparison.Ordinal);
+        !name.EndsWith("Endpoint", StringComparison.Ordinal)
+        && (name.Contains("Event", StringComparison.Ordinal)
+            || name.Contains("Message", StringComparison.Ordinal)
+            || name.Contains("Inbox", StringComparison.Ordinal)
+            || name.Contains("Outbox", StringComparison.Ordinal)
+            || name.Contains("DeadLetter", StringComparison.Ordinal));
+
+    private static bool ApplicationFeatureUseCaseType(string path, TypeDeclarationSyntax type)
+    {
+        var normalizedPath = path.Replace('\\', '/');
+        if (!normalizedPath.Contains("/Application/Features/", StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        var name = type.Identifier.ValueText;
+        return name.EndsWith("Handler", StringComparison.Ordinal)
+            || name.EndsWith("Command", StringComparison.Ordinal)
+            || name.EndsWith("Query", StringComparison.Ordinal)
+            || name.EndsWith("Slice", StringComparison.Ordinal)
+            || name.EndsWith("Policy", StringComparison.Ordinal);
+    }
 
     private static string QualifiedTypeName(TypeDeclarationSyntax type)
     {

@@ -2,13 +2,21 @@ using Zumbo.Modules.WorkItems;
 using Zumbo.BuildingBlocks.Application.Messaging;
 using Zumbo.BuildingBlocks.Application.Security;
 using Zumbo.SharedKernel;
+using Zumbo.Api.Presentation.Endpoints.WorkItems.Activity;
 using Zumbo.Api.Presentation.Endpoints.WorkItems.Attachments;
 using Zumbo.Api.Presentation.Endpoints.WorkItems.Approvals;
+using Zumbo.Api.Presentation.Endpoints.WorkItems.BulkOperations;
 using Zumbo.Api.Presentation.Endpoints.WorkItems.Checklist;
 using Zumbo.Api.Presentation.Endpoints.WorkItems.Comments;
 using Zumbo.Api.Presentation.Endpoints.WorkItems.Labels;
 using Zumbo.Api.Presentation.Endpoints.WorkItems.Planning;
+using Zumbo.Api.Presentation.Endpoints.WorkItems.Realtime;
+using Zumbo.Api.Presentation.Endpoints.WorkItems.Recurrences;
 using Zumbo.Api.Presentation.Endpoints.WorkItems.Relations;
+using Zumbo.Api.Presentation.Endpoints.WorkItems.Reports;
+using Zumbo.Api.Presentation.Endpoints.WorkItems.Search;
+using Zumbo.Api.Presentation.Endpoints.WorkItems.Schema;
+using Zumbo.Api.Presentation.Endpoints.WorkItems.Sprints;
 using Zumbo.Api.Presentation.Endpoints.WorkItems.Worklogs;
 using Zumbo.Api.Presentation.Endpoints.WorkItems.WorkItemsCore;
 
@@ -25,77 +33,77 @@ internal static partial class WorkItemEndpoints
             .WithZumboPermission(PermissionCatalog.WorkItemView);
         group.AddEndpointFilter<WorkItemTransactionFilter>();
 
-        MapGetDurableMessagingMetrics(group);
+        GetDurableMessagingMetricsEndpoint.Map(group);
 
-        MapGetDurableMessagingDeadLetters(group);
+        ListDurableMessageDeadLettersEndpoint.Map(group);
 
-        MapPostDurableMessagingDeadLetterByMessageIdReplay(group);
+        ReplayDurableMessageDeadLetterEndpoint.Map(group);
 
-        MapPostSearchRebuild(group);
+        RebuildSearchIndexEndpoint.Map(group);
 
-        MapPostSearchReconcile(group);
+        ReconcileSearchIndexEndpoint.Map(group);
 
-        MapPostSearch(group);
+        SearchWorkItemsPageEndpoint.Map(group);
 
         SearchWorkItemsEndpoint.Map(group);
 
         GetWorkItemEndpoint.Map(group);
 
-        MapGetByIdCollaboration(group);
+        GetCollaborationEndpoint.Map(group);
 
-        MapPutByIdWatch(group);
+        SetWatchEndpoint.Map(group);
 
-        MapPutByIdVote(group);
+        SetVoteEndpoint.Map(group);
 
-        MapGetByIdActivity(group);
+        GetWorkItemActivityEndpoint.Map(group);
 
-        MapGetTemplates(group);
+        ListTemplatesEndpoint.Map(group);
 
-        MapPostTemplates(group);
+        CreateTemplateEndpoint.Map(group);
 
-        MapPutTemplatesByTemplateId(group);
+        UpdateTemplateEndpoint.Map(group);
 
-        MapDeleteTemplatesByTemplateId(group);
+        DeleteTemplateEndpoint.Map(group);
 
-        MapGetRecurrences(group);
+        ListRecurrencesEndpoint.Map(group);
 
-        MapPostRecurrences(group);
+        CreateRecurrenceEndpoint.Map(group);
 
-        MapPostRecurrencesPreview(group);
+        PreviewRecurrenceEndpoint.Map(group);
 
-        MapPatchRecurrencesByRecurrenceIdState(group);
+        SetRecurrenceStateEndpoint.Map(group);
 
-        MapDeleteRecurrencesByRecurrenceId(group);
+        DeleteRecurrenceEndpoint.Map(group);
 
-        MapGetRecurrencesByRecurrenceIdOccurrences(group);
+        ListRecurrenceOccurrencesEndpoint.Map(group);
 
-        MapPostRecurrencesProcessDue(group);
+        ProcessDueRecurrencesEndpoint.Map(group);
 
         CreateWorkItemEndpoint.Map(group);
 
-        MapPostBulkJobsImport(group);
+        CreateBulkImportJobEndpoint.Map(group);
 
-        MapPostBulkJobsExport(group);
+        CreateBulkExportJobEndpoint.Map(group);
 
-        MapPostBulkJobs(group);
+        CreateBulkJobEndpoint.Map(group);
 
-        MapGetBulkJobs(group);
+        ListBulkJobsEndpoint.Map(group);
 
-        MapGetBulkJobsByJobId(group);
+        GetBulkJobEndpoint.Map(group);
 
-        MapPostBulkJobsByJobIdCancel(group);
+        CancelBulkJobEndpoint.Map(group);
 
-        MapPostBulkJobsByJobIdRetry(group);
+        RetryBulkJobEndpoint.Map(group);
 
-        MapGetBulkJobsByJobIdResult(group);
+        GetBulkJobResultEndpoint.Map(group);
 
-        MapGetBulkJobsByJobIdErrors(group);
+        ListBulkJobErrorsEndpoint.Map(group);
 
-        MapPostBulkMove(group);
+        BulkMoveWorkItemsEndpoint.Map(group);
 
-        MapPostBulkAssign(group);
+        BulkAssignWorkItemsEndpoint.Map(group);
 
-        MapPostBulkArchive(group);
+        BulkArchiveWorkItemsEndpoint.Map(group);
 
         UpdateWorkItemEndpoint.Map(group);
 
@@ -107,7 +115,7 @@ internal static partial class WorkItemEndpoints
 
         SetPlanningEndpoint.Map(group);
 
-        MapPutByIdCustomFields(group);
+        SetWorkItemCustomFieldsEndpoint.Map(group);
 
         SetParentEndpoint.Map(group);
 
@@ -151,7 +159,7 @@ internal static partial class WorkItemEndpoints
 
         ListApprovalsEndpoint.Map(group);
 
-        MapGetByIdTimeline(group);
+        GetWorkItemTimelineEndpoint.Map(group);
 
         LinkWorkItemEndpoint.Map(group);
 
@@ -161,22 +169,22 @@ internal static partial class WorkItemEndpoints
 
         RestoreWorkItemEndpoint.Map(group);
 
-        MapGetReportsProjectSummaryByProjectId(group);
+        GetProjectSummaryReportEndpoint.Map(group);
 
-        MapGetReportsStatusDistributionByProjectId(group);
+        GetStatusDistributionReportEndpoint.Map(group);
 
-        MapGetReportsUserWorkloadByProjectId(group);
+        GetUserWorkloadReportEndpoint.Map(group);
 
-        MapGetReportsDueDateRisksByProjectId(group);
+        GetDueDateRisksReportEndpoint.Map(group);
 
-        MapGetReportsSprintBurndownByProjectIdBySprintId(group);
+        GetSprintBurndownReportEndpoint.Map(group);
 
-        MapGetReportsSprintVelocityByProjectId(group);
+        GetSprintVelocityReportEndpoint.Map(group);
 
-        MapGetReportsFlowTimeByProjectId(group);
+        GetFlowTimeReportEndpoint.Map(group);
 
-        MapGetReportsCompletionRateByProjectId(group);
+        GetCompletionRateReportEndpoint.Map(group);
 
-        MapGetReportsTeamPerformanceByProjectId(group);
+        GetTeamPerformanceReportEndpoint.Map(group);
     }
 }

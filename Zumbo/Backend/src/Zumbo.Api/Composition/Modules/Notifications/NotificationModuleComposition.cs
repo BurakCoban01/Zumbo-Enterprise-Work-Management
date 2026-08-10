@@ -1,4 +1,7 @@
+using Microsoft.Extensions.Options;
+using Zumbo.BuildingBlocks.Application.Messaging;
 using Zumbo.BuildingBlocks.Application.Persistence;
+using Zumbo.BuildingBlocks.Application.Concurrency;
 using Zumbo.BuildingBlocks.Application.Security;
 using Zumbo.Modules.Notifications;
 using Zumbo.SharedKernel;
@@ -36,6 +39,46 @@ internal static class NotificationModuleComposition
         services.AddScoped<MarkNotificationAsReadHandler>(provider => new MarkNotificationAsReadHandler(
             provider.GetRequiredService<IDocumentRepository<NotificationDocument>>(),
             provider.GetRequiredService<ICurrentUser>()));
+        services.AddScoped<GetNotificationPreferencesHandler>(provider =>
+            new GetNotificationPreferencesHandler(
+                provider.GetRequiredService<IDocumentRepository<NotificationPreferenceDocument>>(),
+                provider.GetRequiredService<IDistributedLockProvider>(),
+                provider.GetRequiredService<IOptions<DistributedLockOptions>>(),
+                provider.GetRequiredService<ICurrentUser>()));
+        services.AddScoped<UpdateNotificationPreferencesHandler>(provider =>
+            new UpdateNotificationPreferencesHandler(
+                provider.GetRequiredService<IDocumentRepository<NotificationPreferenceDocument>>(),
+                provider.GetRequiredService<IDistributedLockProvider>(),
+                provider.GetRequiredService<IOptions<DistributedLockOptions>>(),
+                provider.GetRequiredService<IClock>(),
+                provider.GetRequiredService<ICurrentUser>()));
+        services.AddScoped<GetNotificationDeliveryMetricsHandler>(provider =>
+            new GetNotificationDeliveryMetricsHandler(
+                provider.GetRequiredService<IDocumentRepository<NotificationDocument>>(),
+                provider.GetRequiredService<IClock>()));
+        services.AddScoped<ListNotificationDeadLettersHandler>(provider =>
+            new ListNotificationDeadLettersHandler(
+                provider.GetRequiredService<IDocumentRepository<NotificationDocument>>()));
+        services.AddScoped<ReplayNotificationDeadLetterHandler>(provider =>
+            new ReplayNotificationDeadLetterHandler(
+                provider.GetRequiredService<IDocumentRepository<NotificationDocument>>(),
+                provider.GetRequiredService<IClock>()));
+        services.AddScoped<CreateNotificationHandler>(provider =>
+            new CreateNotificationHandler(
+                provider.GetRequiredService<IDocumentRepository<NotificationDocument>>(),
+                provider.GetRequiredService<IDocumentRepository<NotificationPreferenceDocument>>(),
+                provider.GetRequiredService<INotificationUserDirectory>(),
+                provider.GetRequiredService<IOptions<EmailNotificationOptions>>(),
+                provider.GetRequiredService<IDistributedLockProvider>(),
+                provider.GetRequiredService<IOptions<DistributedLockOptions>>(),
+                provider.GetRequiredService<IClock>()));
+        services.AddScoped<DispatchNotificationEmailsHandler>(provider =>
+            new DispatchNotificationEmailsHandler(
+                provider.GetRequiredService<IDocumentRepository<NotificationDocument>>(),
+                provider.GetRequiredService<IEmailNotificationSender>(),
+                provider.GetRequiredService<IOptions<EmailNotificationOptions>>(),
+                provider.GetRequiredService<IClock>(),
+                provider.GetService<IDurableMessageJitter>()));
         if (configuration.GetValue("BackgroundJobs:Enabled", true))
         {
             services.AddHostedService<NotificationEmailDispatcherHostedService>();

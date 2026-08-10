@@ -101,8 +101,9 @@ internal static class RefactorValidationReportBuilder
                 .Where(type => type.Files.Contains(oldPath, StringComparer.Ordinal))
                 .ToArray();
             var newPaths = types
-                .Where(type => targetTypes.ContainsKey(type.Key))
-                .SelectMany(type => targetTypes[type.Key].Files)
+                .Select(type => comparison.RelocatedTypes.GetValueOrDefault(type.Key) ?? type.Key)
+                .Where(targetTypes.ContainsKey)
+                .SelectMany(targetKey => targetTypes[targetKey].Files)
                 .Distinct(StringComparer.Ordinal)
                 .Order(StringComparer.Ordinal)
                 .ToArray();
@@ -157,8 +158,25 @@ internal static class RefactorValidationReportBuilder
                 targetTypes = comparison.Target.Types.Count,
                 baselineMembers = comparison.Baseline.MemberCount,
                 targetMembers = comparison.Target.MemberCount,
-                matchedMembers = comparison.MatchedMembers
+                matchedMembers = comparison.MatchedMembers,
+                addedTypes = comparison.AddedTypes.Count,
+                addedMembers = comparison.AddedMembers.Count
             },
+            addedTypes = comparison.AddedTypes.Select(type => new
+            {
+                id = type.Key,
+                files = type.Files,
+                kind = type.Kind,
+                signature = type.Signature,
+                memberCount = type.Members.Count
+            }),
+            addedMembers = comparison.AddedMembers.Select(member => new
+            {
+                type = member.Type,
+                member = member.Member,
+                file = member.File,
+                signature = member.Signature
+            }),
             comparison.MissingTypes,
             comparison.TypeSignatureDifferences,
             comparison.MissingMembers,

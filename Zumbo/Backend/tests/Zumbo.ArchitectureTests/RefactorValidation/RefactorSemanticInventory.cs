@@ -15,19 +15,54 @@ internal static class RefactorSemanticInventory
     internal static Snapshot ReadWorkingTree(string projectDirectory)
         => BuildSnapshot("working-tree", RefactorSourceReader.ReadWorkingTree(projectDirectory));
 
-    internal static Comparison Compare(Snapshot baseline, Snapshot target)
+    internal static Comparison Compare(
+        Snapshot baseline,
+        Snapshot target,
+        IReadOnlyDictionary<string, string>? relocatedTypes = null)
     {
         var targetTypes = target.Types.ToDictionary(type => type.Key, StringComparer.Ordinal);
+        var baselineTypeKeys = baseline.Types.Select(type => type.Key).ToHashSet(StringComparer.Ordinal);
+        foreach (var (baselineKey, targetKey) in relocatedTypes ?? new Dictionary<string, string>())
+        {
+            if (!baselineTypeKeys.Contains(baselineKey))
+            {
+                throw new InvalidOperationException($"Relocated baseline type does not exist: {baselineKey}");
+            }
+
+            if (!targetTypes.ContainsKey(targetKey))
+            {
+                throw new InvalidOperationException($"Relocated target type does not exist: {targetKey}");
+            }
+
+            if (!string.Equals(
+                    baselineKey[(baselineKey.IndexOf('|') + 1)..],
+                    targetKey[(targetKey.IndexOf('|') + 1)..],
+                    StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException(
+                    $"Relocated type must preserve its full type name: {baselineKey} -> {targetKey}");
+            }
+        }
+
         var missingTypes = new List<TypeDifference>();
         var typeSignatureDifferences = new List<TypeDifference>();
         var missingMembers = new List<MemberDifference>();
         var memberSignatureDifferences = new List<MemberDifference>();
         var bodyDifferences = new List<MemberDifference>();
+        var addedMembers = new List<AddedMember>();
         var matchedMembers = 0;
+        var matchedTargetTypeKeys = baseline.Types
+            .Select(type => relocatedTypes?.GetValueOrDefault(type.Key) ?? type.Key)
+            .ToHashSet(StringComparer.Ordinal);
+        var addedTypes = target.Types
+            .Where(type => !matchedTargetTypeKeys.Contains(type.Key))
+            .OrderBy(type => type.Key, StringComparer.Ordinal)
+            .ToArray();
 
         foreach (var baselineType in baseline.Types)
         {
-            if (!targetTypes.TryGetValue(baselineType.Key, out var targetType))
+            var targetKey = relocatedTypes?.GetValueOrDefault(baselineType.Key) ?? baselineType.Key;
+            if (!targetTypes.TryGetValue(targetKey, out var targetType))
             {
                 missingTypes.Add(new TypeDifference(
                     baselineType.Key,
@@ -97,12 +132,27 @@ internal static class RefactorSemanticInventory
                     candidate));
                 candidates.RemoveAt(0);
             }
+
+            addedMembers.AddRange(targetMembers.Values
+                .SelectMany(candidates => candidates)
+                .Select(member => new AddedMember(
+                    targetType.Key,
+                    member.Key,
+                    member.File,
+                    member.Signature)));
         }
 
         return new Comparison(
             baseline,
             target,
+            new Dictionary<string, string>(relocatedTypes ?? new Dictionary<string, string>(), StringComparer.Ordinal),
             matchedMembers,
+            addedTypes,
+            addedMembers
+                .OrderBy(item => item.Type, StringComparer.Ordinal)
+                .ThenBy(item => item.Member, StringComparer.Ordinal)
+                .ThenBy(item => item.File, StringComparer.Ordinal)
+                .ToArray(),
             missingTypes.OrderBy(item => item.Id, StringComparer.Ordinal).ToArray(),
             typeSignatureDifferences.OrderBy(item => item.Id, StringComparer.Ordinal).ToArray(),
             missingMembers.OrderBy(item => item.Id, StringComparer.Ordinal).ToArray(),
@@ -152,8 +202,15 @@ internal static class RefactorSemanticInventory
                 project,
                 fullName,
                 TypeKind(declaration),
-                TypeSignature(declaration));
+                TypeSignature(declaration),
+                declaration.BaseList is not null);
             builders.Add(key, builder);
+        }
+        else
+        {
+            builder.ConsiderSignature(
+                TypeSignature(declaration),
+                declaration.BaseList is not null);
         }
 
         builder.Files.Add(path);
@@ -408,6 +465,8 @@ internal static class RefactorSemanticInventory
 
     internal sealed record MemberElement(string Key, string Signature, string Behavior, string File);
 
+    internal sealed record AddedMember(string Type, string Member, string File, string Signature);
+
     internal sealed record TypeDifference(
         string Id,
         IReadOnlyList<string> BaselineFiles,
@@ -442,7 +501,10 @@ internal static class RefactorSemanticInventory
     internal sealed record Comparison(
         Snapshot Baseline,
         Snapshot Target,
+        IReadOnlyDictionary<string, string> RelocatedTypes,
         int MatchedMembers,
+        IReadOnlyList<TypeElement> AddedTypes,
+        IReadOnlyList<AddedMember> AddedMembers,
         IReadOnlyList<TypeDifference> MissingTypes,
         IReadOnlyList<TypeDifference> TypeSignatureDifferences,
         IReadOnlyList<MemberDifference> MissingMembers,
@@ -454,10 +516,23 @@ internal static class RefactorSemanticInventory
         string project,
         string fullName,
         string kind,
-        string signature)
+        string signature,
+        bool hasBaseList)
     {
+        private string signature = signature;
+        private bool hasBaseList = hasBaseList;
+
         internal HashSet<string> Files { get; } = new(StringComparer.Ordinal);
         internal List<MemberElement> Members { get; } = [];
+
+        internal void ConsiderSignature(string candidate, bool candidateHasBaseList)
+        {
+            if (!hasBaseList && candidateHasBaseList)
+            {
+                signature = candidate;
+                hasBaseList = true;
+            }
+        }
 
         internal TypeElement Build() => new(
             key,

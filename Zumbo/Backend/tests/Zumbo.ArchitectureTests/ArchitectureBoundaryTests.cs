@@ -112,7 +112,9 @@ public sealed class ArchitectureBoundaryTests
     {
         var actual = ModuleProjectFiles()
             .SelectMany(project => ProjectReferences(project)
-                .Where(reference => reference.StartsWith("Zumbo.Modules.", StringComparison.Ordinal))
+                .Where(reference =>
+                    reference.StartsWith("Zumbo.Modules.", StringComparison.Ordinal)
+                    && !reference.EndsWith(".Contracts", StringComparison.Ordinal))
                 .Select(reference => $"{ProjectName(project)}->{reference}"));
 
         AssertExactSet(ExpectedCrossModuleViolations, actual);
@@ -208,6 +210,546 @@ public sealed class ArchitectureBoundaryTests
     }
 
     [Fact]
+    public void PostgreSqlMigrations_AreOrderedDefinitionTypesWithCompatibilityRunner()
+    {
+        var persistenceDirectory = Path.Combine(SourceDirectory, "Zumbo.Persistence.PostgreSql");
+        var migrationsDirectory = Path.Combine(
+            persistenceDirectory,
+            "Infrastructure",
+            "Persistence",
+            "Migrations");
+        var definitionsDirectory = Path.Combine(migrationsDirectory, "Definitions");
+        var definitionFiles = Directory.GetFiles(
+                definitionsDirectory,
+                "V*.cs",
+                SearchOption.TopDirectoryOnly)
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+
+        Assert.Equal(37, definitionFiles.Length);
+        Assert.Equal(
+            Enumerable.Range(1, 37).Select(version => $"V{version:000}").ToArray(),
+            definitionFiles.Select(path => (Path.GetFileName(path)!)[..4]).ToArray());
+        Assert.All(definitionFiles, path =>
+        {
+            Assert.True(path.Length <= 225, $"Migration definition path exceeds budget: {path}");
+            Assert.Contains(
+                "PostgreSqlMigrationDefinition",
+                File.ReadAllText(path),
+                StringComparison.Ordinal);
+        });
+
+        var abstractionsDirectory = Path.Combine(migrationsDirectory, "Abstractions");
+        Assert.Equal(
+            [
+                "IPostgreSqlMigrationRunner.cs",
+                "PostgreSqlMigrationDefinition.cs",
+                "PostgreSqlMigrationInfo.cs",
+                "PostgreSqlMigrationStatus.cs"
+            ],
+            Directory.GetFiles(abstractionsDirectory, "*.cs", SearchOption.TopDirectoryOnly)
+                .Select(path => Path.GetFileName(path)!)
+                .Order(StringComparer.Ordinal)
+                .ToArray());
+        var abstraction = File.ReadAllText(Path.Combine(
+            abstractionsDirectory,
+            "PostgreSqlMigrationDefinition.cs"));
+        Assert.Contains("long Version", abstraction, StringComparison.Ordinal);
+
+        var runnerDirectory = Path.Combine(migrationsDirectory, "Runner");
+        Assert.Equal(
+            [
+                "PostgreSqlMigrationRunner.Apply.cs",
+                "PostgreSqlMigrationRunner.Inspection.cs",
+                "PostgreSqlMigrationRunner.Ledger.cs",
+                "PostgreSqlMigrationRunner.Locking.cs",
+                "PostgreSqlMigrationRunner.Registry.cs",
+                "PostgreSqlMigrationRunner.Rollback.cs",
+                "PostgreSqlMigrationRunner.Sql.cs",
+                "PostgreSqlMigrationRunner.cs"
+            ],
+            Directory.GetFiles(runnerDirectory, "*.cs", SearchOption.TopDirectoryOnly)
+                .Select(path => Path.GetFileName(path)!)
+                .Order(StringComparer.Ordinal)
+                .ToArray());
+        Assert.All(
+            Directory.GetFiles(migrationsDirectory, "*.cs", SearchOption.AllDirectories),
+            path => Assert.True(path.Length <= 225, $"Migration path exceeds budget: {path}"));
+
+        var legacyMigrations = Path.Combine(
+            persistenceDirectory,
+            "PostgreSqlMigrations");
+        Assert.Empty(
+            Directory.Exists(legacyMigrations)
+                ? Directory.GetFiles(legacyMigrations, "*.cs", SearchOption.AllDirectories)
+                : []);
+
+        var registryPath = Path.Combine(
+            runnerDirectory,
+            "PostgreSqlMigrationRunner.Registry.cs");
+        Assert.Equal(
+            37,
+            File.ReadLines(registryPath).Count(line => line.TrimStart().StartsWith(
+                "Migration.Create(",
+                StringComparison.Ordinal)));
+    }
+
+    [Fact]
+    public void MongoMigrations_AreGroupedByAdapterResponsibility()
+    {
+        var apiDirectory = Path.Combine(SourceDirectory, "Zumbo.Api");
+        var migrationsDirectory = Path.Combine(
+            apiDirectory,
+            "Infrastructure",
+            "Persistence",
+            "MongoDb",
+            "Migrations");
+
+        Assert.Equal(
+            [
+                "IMongoMigrationExecutionContext.cs",
+                "MongoIndexSpecification.cs",
+                "MongoMigrationOptions.cs",
+                "MongoMigrationOutcome.cs",
+                "MongoMigrationRunReport.cs",
+                "MongoMigrationStates.cs"
+            ],
+            FileNames(Path.Combine(migrationsDirectory, "Abstractions")));
+        Assert.Equal(
+            [
+                "MongoMigrationLedgerDocument.cs",
+                "MongoRankMigrationBackupDocument.cs"
+            ],
+            FileNames(Path.Combine(migrationsDirectory, "Documents")));
+        Assert.Equal(25, FileNames(Path.Combine(
+            migrationsDirectory,
+            "Definitions",
+            "Indexes")).Length);
+        Assert.Equal(
+            [
+                "MongoApiKeyVersionBackfill.cs",
+                "MongoLegacyMarkerCleanup.cs",
+                "MongoMigrationRunner.ApiKeyVersionBackfill.cs",
+                "MongoMigrationRunner.LegacyMarkerCleanup.cs",
+                "MongoMigrationRunner.OrganizationBackfill.cs",
+                "MongoMigrationRunner.ProjectLifecycleBackfill.cs",
+                "MongoMigrationRunner.RankBackfill.cs",
+                "MongoMigrationRunner.RefreshSessionBackfill.cs",
+                "MongoMigrationRunner.SprintLifecycleBackfill.cs",
+                "MongoMigrationRunner.TeamInviteBackfill.cs",
+                "MongoMigrationRunner.TypeSchemaBackfill.cs",
+                "MongoMigrationRunner.UserVersionBackfill.cs",
+                "MongoMigrationRunner.WorkItemActivityBackfill.cs",
+                "MongoMigrationRunner.WorkItemGraphBackfill.cs",
+                "MongoMigrationRunner.WorkflowLifecycleBackfill.cs",
+                "MongoOrganizationVersionBackfill.cs",
+                "MongoProjectLifecycleBackfill.cs",
+                "MongoRankBackfill.cs",
+                "MongoRefreshSessionBackfill.cs",
+                "MongoSprintLifecycleBackfill.cs",
+                "MongoTeamInviteBackfill.cs",
+                "MongoUserVersionBackfill.cs",
+                "MongoWorkItemActivityBackfill.cs",
+                "MongoWorkItemGraphBackfill.cs",
+                "MongoWorkItemTypeSchemaBackfill.cs",
+                "MongoWorkflowLifecycleBackfill.cs"
+            ],
+            FileNames(Path.Combine(migrationsDirectory, "Definitions", "Backfills")));
+        Assert.Equal(
+            [
+                "MongoMigrationRunner.Bson.cs",
+                "MongoMigrationRunner.Context.cs",
+                "MongoMigrationRunner.Indexes.cs",
+                "MongoMigrationRunner.Ledger.cs",
+                "MongoMigrationRunner.Rollback.cs",
+                "MongoMigrationRunner.cs"
+            ],
+            FileNames(Path.Combine(migrationsDirectory, "Runner")));
+
+        Assert.All(
+            Directory.GetFiles(migrationsDirectory, "*.cs", SearchOption.AllDirectories),
+            path => Assert.True(path.Length <= 225, $"Mongo migration path exceeds budget: {path}"));
+        var legacyMigrations = Path.Combine(apiDirectory, "MongoMigrations");
+        Assert.Empty(
+            Directory.Exists(legacyMigrations)
+                ? Directory.GetFiles(legacyMigrations, "*.cs", SearchOption.AllDirectories)
+                : []);
+
+        var runnerPath = Path.Combine(
+            migrationsDirectory,
+            "Runner",
+            "MongoMigrationRunner.cs");
+        Assert.Equal(
+            38,
+            File.ReadLines(runnerPath).Count(line => line.TrimStart().StartsWith(
+                "public const string ",
+                StringComparison.Ordinal)));
+    }
+
+    [Fact]
+    public void OpenSearchWorkItemSearchAdapter_IsGroupedByResponsibility()
+    {
+        var searchDirectory = Path.Combine(
+            SourceDirectory,
+            "Zumbo.Modules.WorkItems",
+            "Infrastructure",
+            "Search",
+            "Adapters");
+
+        Assert.Equal(
+            [
+                "OpenSearchWorkItemSearchIndex.BulkWriter.cs",
+                "OpenSearchWorkItemSearchIndex.Contracts.cs",
+                "OpenSearchWorkItemSearchIndex.IndexManagement.cs",
+                "OpenSearchWorkItemSearchIndex.Query.cs",
+                "OpenSearchWorkItemSearchIndex.Resilience.cs",
+                "OpenSearchWorkItemSearchIndex.Transport.cs",
+                "OpenSearchWorkItemSearchIndex.Validation.cs",
+                "OpenSearchWorkItemSearchIndex.cs"
+            ],
+            Directory.GetFiles(
+                    searchDirectory,
+                    "OpenSearchWorkItemSearchIndex*.cs",
+                    SearchOption.TopDirectoryOnly)
+                .Select(path => Path.GetFileName(path)!)
+                .Order(StringComparer.Ordinal)
+                .ToArray());
+
+        var legacyFragmentDirectory = Path.Combine(
+            searchDirectory,
+            "OpenSearchWorkItemSearchIndex");
+        Assert.Empty(
+            Directory.Exists(legacyFragmentDirectory)
+                ? Directory.GetFiles(legacyFragmentDirectory, "*.cs", SearchOption.AllDirectories)
+                : []);
+        Assert.True(File.Exists(Path.Combine(searchDirectory, "OpenSearchTransport.cs")));
+        Assert.True(File.Exists(Path.Combine(searchDirectory, "OpenSearchQueryClient.cs")));
+        Assert.True(File.Exists(Path.Combine(searchDirectory, "OpenSearchResponseParser.cs")));
+        Assert.True(File.Exists(Path.Combine(searchDirectory, "OpenSearchIndexManager.cs")));
+        Assert.True(File.Exists(Path.Combine(searchDirectory, "OpenSearchBulkWriter.cs")));
+        Assert.True(File.Exists(Path.Combine(searchDirectory, "OpenSearchValidation.cs")));
+        Assert.All(
+            Directory.GetFiles(
+                searchDirectory,
+                "OpenSearchWorkItemSearchIndex*.cs",
+                SearchOption.TopDirectoryOnly),
+            path => Assert.True(path.Length <= 225, $"OpenSearch adapter path exceeds budget: {path}"));
+
+        var legacyDirectory = Path.Combine(
+            SourceDirectory,
+            "Zumbo.BuildingBlocks.Infrastructure",
+            "Search",
+            "WorkItemSearch");
+        Assert.Empty(
+            Directory.Exists(legacyDirectory)
+                ? Directory.GetFiles(legacyDirectory, "*.cs", SearchOption.AllDirectories)
+                : []);
+
+        var forwardedTypes = Assembly.Load("Zumbo.BuildingBlocks.Infrastructure")
+            .GetForwardedTypes()
+            .OrderBy(type => type.FullName, StringComparer.Ordinal)
+            .ToArray();
+        Assert.Equal(
+            [
+                "Zumbo.BuildingBlocks.Infrastructure.Search.InMemoryWorkItemSearchIndex",
+                "Zumbo.BuildingBlocks.Infrastructure.Search.OpenSearchOptions",
+                "Zumbo.BuildingBlocks.Infrastructure.Search.OpenSearchWorkItemSearchIndex"
+            ],
+            forwardedTypes.Select(type => type.FullName!).ToArray());
+        Assert.All(
+            forwardedTypes,
+            type => Assert.Equal("Zumbo.Modules.WorkItems", type.Assembly.GetName().Name));
+    }
+
+    [Fact]
+    public void WorkItemSearchContracts_AreOwnedByWorkItemsContractsAssembly()
+    {
+        var contractDirectory = Path.Combine(SourceDirectory, "Zumbo.Modules.WorkItems.Contracts", "Search");
+        Assert.Equal(
+            [
+                "IWorkItemSearchIndex.cs",
+                "SearchOptions.cs",
+                "WorkItemSearchQuery.cs",
+                "WorkItemSearchRebuildResult.cs",
+                "WorkItemSearchRecord.cs",
+                "WorkItemSearchResult.cs",
+                "WorkItemSearchUnavailableException.cs"
+            ],
+            Directory.GetFiles(contractDirectory, "*.cs", SearchOption.TopDirectoryOnly)
+                .Select(path => Path.GetFileName(path)!)
+                .Order(StringComparer.Ordinal)
+                .ToArray());
+
+        var legacyDirectory = Path.Combine(
+            SourceDirectory,
+            "Zumbo.BuildingBlocks.Application",
+            "Search",
+            "Contracts",
+            "WorkItemSearch");
+        Assert.Empty(
+            Directory.Exists(legacyDirectory)
+                ? Directory.GetFiles(legacyDirectory, "*.cs", SearchOption.AllDirectories)
+                : []);
+
+        var forwardedTypes = Assembly.Load("Zumbo.BuildingBlocks.Application")
+            .GetForwardedTypes()
+            .Where(type => type.Namespace == "Zumbo.BuildingBlocks.Application.Search")
+            .OrderBy(type => type.FullName, StringComparer.Ordinal)
+            .ToArray();
+        Assert.Equal(
+            [
+                "Zumbo.BuildingBlocks.Application.Search.IWorkItemSearchIndex",
+                "Zumbo.BuildingBlocks.Application.Search.SearchOptions",
+                "Zumbo.BuildingBlocks.Application.Search.WorkItemSearchQuery",
+                "Zumbo.BuildingBlocks.Application.Search.WorkItemSearchRebuildResult",
+                "Zumbo.BuildingBlocks.Application.Search.WorkItemSearchRecord",
+                "Zumbo.BuildingBlocks.Application.Search.WorkItemSearchResult",
+                "Zumbo.BuildingBlocks.Application.Search.WorkItemSearchUnavailableException"
+            ],
+            forwardedTypes.Select(type => type.FullName!).ToArray());
+        Assert.All(
+            forwardedTypes,
+            type => Assert.Equal("Zumbo.Modules.WorkItems.Contracts", type.Assembly.GetName().Name));
+    }
+
+    [Fact]
+    public void IdentitySecurityContracts_AreOwnedByIdentityContractsAssembly()
+    {
+        var contractDirectory = Path.Combine(SourceDirectory, "Zumbo.Modules.Identity.Contracts", "Security");
+        Assert.Equal(
+            [
+                "ApiKeyScopes.cs",
+                "IPasswordHasher.cs",
+                "ITokenIssuer.cs",
+                "JwtOptions.cs",
+                "PermissionCatalog.cs",
+                "TokenUser.cs"
+            ],
+            Directory.GetFiles(contractDirectory, "*.cs", SearchOption.TopDirectoryOnly)
+                .Select(path => Path.GetFileName(path)!)
+                .Order(StringComparer.Ordinal)
+                .ToArray());
+
+        var legacyContractDirectory = Path.Combine(
+            SourceDirectory,
+            "Zumbo.BuildingBlocks.Application",
+            "Security",
+            "Contracts",
+            "IdentitySecurity");
+        Assert.Empty(
+            Directory.Exists(legacyContractDirectory)
+                ? Directory.GetFiles(legacyContractDirectory, "*.cs", SearchOption.AllDirectories)
+                : []);
+        Assert.False(File.Exists(Path.Combine(
+            SourceDirectory,
+            "Zumbo.BuildingBlocks.Application",
+            "Security",
+            "PermissionCatalog.cs")));
+
+        var forwardedTypes = Assembly.Load("Zumbo.BuildingBlocks.Application")
+            .GetForwardedTypes()
+            .Where(type => type.Assembly.GetName().Name == "Zumbo.Modules.Identity.Contracts")
+            .OrderBy(type => type.FullName, StringComparer.Ordinal)
+            .ToArray();
+        Assert.Equal(
+            [
+                "Zumbo.BuildingBlocks.Application.Security.ApiKeyScopes",
+                "Zumbo.BuildingBlocks.Application.Security.IPasswordHasher",
+                "Zumbo.BuildingBlocks.Application.Security.ITokenIssuer",
+                "Zumbo.BuildingBlocks.Application.Security.JwtOptions",
+                "Zumbo.BuildingBlocks.Application.Security.PermissionCatalog",
+                "Zumbo.BuildingBlocks.Application.Security.TokenUser"
+            ],
+            forwardedTypes.Select(type => type.FullName!).ToArray());
+    }
+
+    [Fact]
+    public void ProjectResourcePolicyContracts_AreOwnedByProjectsContractsAssembly()
+    {
+        var contractDirectory = Path.Combine(SourceDirectory, "Zumbo.Modules.Projects.Contracts", "Security");
+        Assert.Equal(
+            [
+                "IProjectResourcePolicy.cs",
+                "ProjectResourceAuthorization.cs"
+            ],
+            Directory.GetFiles(contractDirectory, "*.cs", SearchOption.TopDirectoryOnly)
+                .Select(path => Path.GetFileName(path)!)
+                .Order(StringComparer.Ordinal)
+                .ToArray());
+
+        var legacyDirectory = Path.Combine(
+            SourceDirectory,
+            "Zumbo.BuildingBlocks.Application",
+            "Security",
+            "ProjectResourcePolicy");
+        Assert.Empty(
+            Directory.Exists(legacyDirectory)
+                ? Directory.GetFiles(legacyDirectory, "*.cs", SearchOption.AllDirectories)
+                : []);
+
+        var forwardedTypes = Assembly.Load("Zumbo.BuildingBlocks.Application")
+            .GetForwardedTypes()
+            .Where(type => type.Assembly.GetName().Name == "Zumbo.Modules.Projects.Contracts")
+            .OrderBy(type => type.FullName, StringComparer.Ordinal)
+            .ToArray();
+        Assert.Equal(
+            [
+                "Zumbo.BuildingBlocks.Application.Security.IProjectResourcePolicy",
+                "Zumbo.BuildingBlocks.Application.Security.ProjectResourceAuthorization"
+            ],
+            forwardedTypes.Select(type => type.FullName!).ToArray());
+    }
+
+    [Fact]
+    public void PostgreSqlExpressionTranslator_IsGroupedByResponsibility()
+    {
+        var translatorDirectory = Path.Combine(
+            SourceDirectory,
+            "Zumbo.Persistence.PostgreSql",
+            "PostgreSqlExpressionTranslator");
+
+        Assert.Equal(
+            [
+                "PostgreSqlExpressionTranslator.EntryPoints.cs",
+                "PostgreSqlExpressionTranslator.ExpressionUtilities.cs",
+                "PostgreSqlExpressionTranslator.Parameters.cs",
+                "PostgreSqlExpressionTranslator.Predicate.cs",
+                "PostgreSqlExpressionTranslator.ScalarJson.cs",
+                "PostgreSqlExpressionTranslator.Unsupported.cs"
+            ],
+            Directory.GetFiles(translatorDirectory, "*.cs", SearchOption.TopDirectoryOnly)
+                .Select(path => Path.GetFileName(path)!)
+                .Order(StringComparer.Ordinal)
+                .ToArray());
+
+        Assert.All(
+            Directory.GetFiles(translatorDirectory, "*.cs", SearchOption.TopDirectoryOnly),
+            path => Assert.True(path.Length <= 225, $"PostgreSQL translator path exceeds budget: {path}"));
+        var persistenceDirectory = Path.GetDirectoryName(translatorDirectory)!;
+        Assert.True(File.Exists(Path.Combine(persistenceDirectory, "PostgreSqlExpressionUtilities.cs")));
+        Assert.True(File.Exists(Path.Combine(persistenceDirectory, "PostgreSqlJsonTranslation.cs")));
+        Assert.True(File.Exists(Path.Combine(persistenceDirectory, "PostgreSqlParameterFindingVisitor.cs")));
+        Assert.True(File.Exists(Path.Combine(persistenceDirectory, "PostgreSqlParameterCollector.cs")));
+        Assert.True(File.Exists(Path.Combine(persistenceDirectory, "PostgreSqlPredicateTranslator.cs")));
+        Assert.True(File.Exists(Path.Combine(persistenceDirectory, "PostgreSqlTranslationState.cs")));
+        Assert.True(File.Exists(Path.Combine(persistenceDirectory, "PostgreSqlTranslationScope.cs")));
+        Assert.True(File.Exists(Path.Combine(persistenceDirectory, "PostgreSqlSqlValue.cs")));
+    }
+
+    [Fact]
+    public void PrivacyDataProcessorAdapter_IsGroupedByResponsibility()
+    {
+        var adapterDirectory = Path.Combine(
+            SourceDirectory,
+            "Zumbo.Api",
+            "Infrastructure",
+            "Adapters",
+            "Platform",
+            "PlatformCore");
+        var fragmentDirectory = Path.Combine(adapterDirectory, "PrivacyDataProcessorAdapter");
+
+        Assert.Equal(
+            [
+                "PrivacyDataProcessorAdapter.Anonymize.cs",
+                "PrivacyDataProcessorAdapter.Export.cs",
+                "PrivacyDataProcessorAdapter.Guard.cs",
+                "PrivacyDataProcessorAdapter.References.cs",
+                "PrivacyDataProcessorAdapter.Streaming.cs"
+            ],
+            Directory.GetFiles(
+                    fragmentDirectory,
+                    "PrivacyDataProcessorAdapter.*.cs",
+                    SearchOption.TopDirectoryOnly)
+                .Select(path => Path.GetFileName(path)!)
+                .Order(StringComparer.Ordinal)
+                .ToArray());
+
+        Assert.Equal(
+            [
+                "PrivacyAnonymizationComponent.cs",
+                "PrivacyAnonymizationGuard.cs",
+                "PrivacyDataExportComponent.cs",
+                "PrivacyDocumentAccess.cs",
+                "PrivacyReferenceDescriptions.cs",
+                "PrivacyStreamExportComponent.cs",
+                "PrivacyStreamSerialization.cs"
+            ],
+            Directory.GetFiles(fragmentDirectory, "Privacy*.cs", SearchOption.TopDirectoryOnly)
+                .Where(path => !Path.GetFileName(path).StartsWith(
+                    "PrivacyDataProcessorAdapter.",
+                    StringComparison.Ordinal))
+                .Select(path => Path.GetFileName(path)!)
+                .Order(StringComparer.Ordinal)
+                .ToArray());
+
+        Assert.True(File.Exists(Path.Combine(adapterDirectory, "PrivacyDataProcessorAdapter.cs")));
+        Assert.All(
+            Directory.GetFiles(fragmentDirectory, "*.cs", SearchOption.TopDirectoryOnly),
+            path => Assert.True(path.Length <= 225, $"Privacy adapter path exceeds budget: {path}"));
+
+        var misplacedReference = Path.Combine(
+            adapterDirectory,
+            "..",
+            "..",
+            "WorkItems",
+            "WorkItemsCore",
+            "PrivacyDataProcessorAdapter.DescribeWorkItemReference.cs");
+        Assert.False(File.Exists(misplacedReference));
+    }
+
+    [Fact]
+    public void ApiHostRegistration_IsGroupedByResponsibility()
+    {
+        var hostingDirectory = Path.Combine(SourceDirectory, "Zumbo.Api", "Composition", "Hosting");
+
+        Assert.Equal(
+            [
+                "ApiHostRegistration.Foundation.cs",
+                "ApiHostRegistration.Operations.cs",
+                "ApiHostRegistration.Security.cs",
+                "ApiHostRegistration.Storage.cs",
+                "ApiHostRegistration.Traffic.cs",
+                "ApiHostRegistration.cs"
+            ],
+            Directory.GetFiles(
+                    hostingDirectory,
+                    "ApiHostRegistration*.cs",
+                    SearchOption.TopDirectoryOnly)
+                .Select(path => Path.GetFileName(path)!)
+                .Order(StringComparer.Ordinal)
+                .ToArray());
+
+        var legacyDirectory = Path.Combine(hostingDirectory, "ApiHostRegistration");
+        Assert.Empty(
+            Directory.Exists(legacyDirectory)
+                ? Directory.GetFiles(legacyDirectory, "*.cs", SearchOption.AllDirectories)
+                : []);
+        Assert.All(
+            Directory.GetFiles(
+                hostingDirectory,
+                "ApiHostRegistration*.cs",
+                SearchOption.TopDirectoryOnly),
+            path => Assert.True(path.Length <= 225, $"API host registration path exceeds budget: {path}"));
+
+        var registrarDirectory = Path.Combine(hostingDirectory, "Registrars");
+        Assert.Equal(
+            [
+                "ApiHostFoundationRegistrar.cs",
+                "ApiHostOperationsRegistrar.cs",
+                "ApiHostSecurityRegistrar.cs",
+                "ApiHostStorageRegistrar.cs",
+                "ApiHostTrafficRegistrar.cs"
+            ],
+            Directory.GetFiles(registrarDirectory, "*.cs", SearchOption.TopDirectoryOnly)
+                .Select(path => Path.GetFileName(path)!)
+                .Order(StringComparer.Ordinal)
+                .ToArray());
+        Assert.All(
+            Directory.GetFiles(registrarDirectory, "*.cs", SearchOption.TopDirectoryOnly),
+            path => Assert.True(path.Length <= 225, $"API host registrar path exceeds budget: {path}"));
+    }
+
+    [Fact]
     public void ApiPipeline_PreservesExactMiddlewareOrder()
     {
         var pipeline = Path.Combine(
@@ -265,15 +807,19 @@ public sealed class ArchitectureBoundaryTests
             ["TeamsEndpoints.cs"] = "Zumbo.Modules.Teams",
             ["WebhookEndpoints.cs"] = "Zumbo.Modules.WorkItems",
             ["WorkflowEndpoints.cs"] = "Zumbo.Modules.Workflows",
-            ["WorkItemEndpoints.cs"] = "Zumbo.Modules.WorkItems",
             ["WorkItemTypeSchemaEndpoints.cs"] = "Zumbo.Modules.WorkItems"
         };
         var endpointDirectory = Path.Combine(SourceDirectory, "Zumbo.Api", "Presentation", "Endpoints");
 
-        AssertExactSet(expected.Keys, Directory.GetFiles(endpointDirectory, "*.cs").Select(Path.GetFileName).OfType<string>());
+        AssertExactSet(
+            expected.Keys,
+            Directory.GetFiles(endpointDirectory, "*Endpoints.cs", SearchOption.AllDirectories)
+                .Select(Path.GetFileName)
+                .OfType<string>()
+                .Where(fileName => !fileName.StartsWith("WorkItemEndpoints.", StringComparison.Ordinal)));
         foreach (var (fileName, owningModule) in expected)
         {
-            var moduleUsings = File.ReadLines(Path.Combine(endpointDirectory, fileName))
+            var moduleUsings = File.ReadLines(EndpointHostPath(fileName))
                 .Select(line => line.Trim())
                 .Where(line => line.StartsWith("using Zumbo.Modules.", StringComparison.Ordinal))
                 .Select(line => line["using ".Length..^1])
@@ -420,18 +966,25 @@ public sealed class ArchitectureBoundaryTests
             "Zumbo.Modules.Boards->Zumbo.BuildingBlocks.Application",
             "Zumbo.Modules.Boards->Zumbo.SharedKernel",
             "Zumbo.Modules.Identity->Zumbo.BuildingBlocks.Application",
+            "Zumbo.Modules.Identity->Zumbo.Modules.Identity.Contracts",
             "Zumbo.Modules.Identity->Zumbo.SharedKernel",
             "Zumbo.Modules.Notifications->Zumbo.BuildingBlocks.Application",
             "Zumbo.Modules.Notifications->Zumbo.SharedKernel",
             "Zumbo.Modules.Organizations->Zumbo.BuildingBlocks.Application",
+            "Zumbo.Modules.Organizations->Zumbo.Modules.Identity.Contracts",
             "Zumbo.Modules.Organizations->Zumbo.SharedKernel",
             "Zumbo.Modules.Projects->Zumbo.BuildingBlocks.Application",
+            "Zumbo.Modules.Projects->Zumbo.Modules.Identity.Contracts",
             "Zumbo.Modules.Projects->Zumbo.SharedKernel",
             "Zumbo.Modules.Teams->Zumbo.BuildingBlocks.Application",
+            "Zumbo.Modules.Teams->Zumbo.Modules.Identity.Contracts",
             "Zumbo.Modules.Teams->Zumbo.SharedKernel",
             "Zumbo.Modules.Workflows->Zumbo.BuildingBlocks.Application",
             "Zumbo.Modules.Workflows->Zumbo.SharedKernel",
             "Zumbo.Modules.WorkItems->Zumbo.BuildingBlocks.Application",
+            "Zumbo.Modules.WorkItems->Zumbo.Modules.Identity.Contracts",
+            "Zumbo.Modules.WorkItems->Zumbo.Modules.Projects.Contracts",
+            "Zumbo.Modules.WorkItems->Zumbo.Modules.WorkItems.Contracts",
             "Zumbo.Modules.WorkItems->Zumbo.SharedKernel"
         };
 
@@ -549,12 +1102,7 @@ public sealed class ArchitectureBoundaryTests
         Assert.Contains("registerUserHandler.HandleAsync", registerFacade, StringComparison.Ordinal);
         Assert.Contains("searchUsersHandler.HandleAsync", searchFacade, StringComparison.Ordinal);
 
-        var composition = File.ReadAllText(Path.Combine(
-            SourceDirectory,
-            "Zumbo.Api",
-            "Presentation",
-            "Endpoints",
-            "IdentityEndpoints.cs"));
+        var composition = File.ReadAllText(EndpointHostPath("IdentityEndpoints.cs"));
         Assert.Contains("AddScoped<RegisterUserHandler>(provider =>", composition, StringComparison.Ordinal);
         Assert.Contains("AddScoped<SearchUsersHandler>(provider =>", composition, StringComparison.Ordinal);
     }
@@ -601,12 +1149,7 @@ public sealed class ArchitectureBoundaryTests
         Assert.Contains("createOrganizationHandler.HandleAsync", facade, StringComparison.Ordinal);
         Assert.Contains("listOrganizationsHandler.HandleAsync", facade, StringComparison.Ordinal);
 
-        var endpointHost = File.ReadAllText(Path.Combine(
-            SourceDirectory,
-            "Zumbo.Api",
-            "Presentation",
-            "Endpoints",
-            "OrganizationsEndpoints.cs"));
+        var endpointHost = File.ReadAllText(EndpointHostPath("OrganizationsEndpoints.cs"));
         Assert.Contains("services.AddOrganizationServices()", endpointHost, StringComparison.Ordinal);
         Assert.DoesNotContain("IDocumentRepository", endpointHost, StringComparison.Ordinal);
         Assert.DoesNotContain("OrganizationDocument", endpointHost, StringComparison.Ordinal);
@@ -665,12 +1208,7 @@ public sealed class ArchitectureBoundaryTests
         Assert.Contains("createTeamHandler.HandleAsync", facade, StringComparison.Ordinal);
         Assert.Contains("listTeamsHandler.HandleAsync", facade, StringComparison.Ordinal);
 
-        var endpointHost = File.ReadAllText(Path.Combine(
-            SourceDirectory,
-            "Zumbo.Api",
-            "Presentation",
-            "Endpoints",
-            "TeamsEndpoints.cs"));
+        var endpointHost = File.ReadAllText(EndpointHostPath("TeamsEndpoints.cs"));
         Assert.Contains("services.AddTeamServices()", endpointHost, StringComparison.Ordinal);
         Assert.DoesNotContain("IDocumentRepository", endpointHost, StringComparison.Ordinal);
         Assert.DoesNotContain("TeamDocument", endpointHost, StringComparison.Ordinal);
@@ -733,12 +1271,7 @@ public sealed class ArchitectureBoundaryTests
         Assert.Contains("createProjectHandler.HandleAsync", facade, StringComparison.Ordinal);
         Assert.Contains("listProjectsHandler.HandleAsync", facade, StringComparison.Ordinal);
 
-        var endpointHost = File.ReadAllText(Path.Combine(
-            SourceDirectory,
-            "Zumbo.Api",
-            "Presentation",
-            "Endpoints",
-            "ProjectsEndpoints.cs"));
+        var endpointHost = File.ReadAllText(EndpointHostPath("ProjectsEndpoints.cs"));
         Assert.Contains("services.AddProjectServices()", endpointHost, StringComparison.Ordinal);
         Assert.DoesNotContain("IDocumentRepository", endpointHost, StringComparison.Ordinal);
         Assert.DoesNotContain("ProjectDocument", endpointHost, StringComparison.Ordinal);
@@ -752,6 +1285,314 @@ public sealed class ArchitectureBoundaryTests
             "ProjectModuleComposition.cs"));
         Assert.Contains("AddScoped<CreateProjectHandler>(provider =>", composition, StringComparison.Ordinal);
         Assert.Contains("AddScoped<ListProjectsHandler>(provider =>", composition, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void KnowledgeDocumentRead_IsAPortFocusedVerticalSliceWithCompatibilityFacade()
+    {
+        var moduleDirectory = Path.Combine(SourceDirectory, "Zumbo.Modules.Projects");
+        var featureDirectory = Path.Combine(moduleDirectory, "Application", "Features", "Knowledge");
+        Assert.True(File.Exists(Path.Combine(featureDirectory, "GetKnowledgeDocumentQuery.cs")));
+        Assert.True(File.Exists(Path.Combine(featureDirectory, "GetKnowledgeDocumentHandler.cs")));
+        Assert.True(File.Exists(Path.Combine(featureDirectory, "GetKnowledgeDocumentSlice.cs")));
+        foreach (var file in new[]
+        {
+            "GetKnowledgeVersionQuery.cs",
+            "GetKnowledgeVersionHandler.cs",
+            "GetKnowledgeVersionSlice.cs",
+            "GetKnowledgeLinkOptionsQuery.cs",
+            "GetKnowledgeLinkOptionsHandler.cs",
+            "GetKnowledgeLinkOptionsSlice.cs",
+            "SearchKnowledgeDocumentsQuery.cs",
+            "SearchKnowledgeDocumentsHandler.cs",
+            "SearchKnowledgeDocumentsSlice.cs",
+            "KnowledgeReadAccess.cs",
+            "KnowledgeQueryInput.cs",
+            "KnowledgeResponseMapper.cs",
+            "KnowledgeMutationPersistence.cs",
+            "AddKnowledgeCommentCommand.cs",
+            "AddKnowledgeCommentHandler.cs",
+            "AddKnowledgeCommentSlice.cs",
+            "ResolveKnowledgeCommentCommand.cs",
+            "ResolveKnowledgeCommentHandler.cs",
+            "ResolveKnowledgeCommentSlice.cs",
+            "KnowledgeVersionPolicy.cs",
+            "CreateKnowledgeDocumentCommand.cs",
+            "CreateKnowledgeDocumentHandler.cs",
+            "CreateKnowledgeDocumentSlice.cs",
+            "AddKnowledgeVersionCommand.cs",
+            "AddKnowledgeVersionHandler.cs",
+            "AddKnowledgeVersionSlice.cs",
+            "ArchiveKnowledgeDocumentCommand.cs",
+            "ArchiveKnowledgeDocumentHandler.cs",
+            "ArchiveKnowledgeDocumentSlice.cs"
+        })
+        {
+            Assert.True(File.Exists(Path.Combine(featureDirectory, file)), $"Missing Knowledge slice file: {file}");
+        }
+
+        var slice = File.ReadAllText(Path.Combine(featureDirectory, "GetKnowledgeDocumentSlice.cs"));
+        Assert.Contains("KnowledgeReadAccess", slice, StringComparison.Ordinal);
+        Assert.Contains("KnowledgeResponseMapper.ToDocument", slice, StringComparison.Ordinal);
+
+        var access = File.ReadAllText(Path.Combine(featureDirectory, "KnowledgeReadAccess.cs"));
+        Assert.Contains("IDocumentRepository<KnowledgeDocument>", access, StringComparison.Ordinal);
+        Assert.Contains("IKnowledgeDirectory", access, StringComparison.Ordinal);
+        Assert.Contains("ICurrentUser", access, StringComparison.Ordinal);
+        Assert.Contains("KNOWLEDGE_DOCUMENT_NOT_FOUND", access, StringComparison.Ordinal);
+
+        var facadeDirectory = Path.Combine(
+            moduleDirectory,
+            "Application",
+            "Compatibility",
+            "Knowledge",
+            "KnowledgeService");
+        var facadeDelegations = new (string File, string Delegation)[]
+        {
+            ("KnowledgeService.Reads.cs", "getKnowledgeDocumentHandler.HandleAsync"),
+            ("KnowledgeService.Reads.cs", "getKnowledgeVersionHandler.HandleAsync"),
+            ("KnowledgeService.Reads.cs", "getKnowledgeLinkOptionsHandler.HandleAsync"),
+            ("KnowledgeService.Reads.cs", "searchKnowledgeDocumentsHandler.HandleAsync"),
+            ("KnowledgeService.Comments.cs", "addKnowledgeCommentHandler.HandleAsync"),
+            ("KnowledgeService.Comments.cs", "resolveKnowledgeCommentHandler.HandleAsync"),
+            ("KnowledgeService.Lifecycle.cs", "createKnowledgeDocumentHandler.HandleAsync"),
+            ("KnowledgeService.Lifecycle.cs", "addKnowledgeVersionHandler.HandleAsync"),
+            ("KnowledgeService.Lifecycle.cs", "archiveKnowledgeDocumentHandler.HandleAsync")
+        };
+        foreach (var (file, delegation) in facadeDelegations)
+        {
+            var facade = File.ReadAllText(Path.Combine(facadeDirectory, file));
+            Assert.Contains(delegation, facade, StringComparison.Ordinal);
+        }
+        Assert.InRange(Directory.GetFiles(facadeDirectory, "*.cs").Length, 1, 6);
+
+        var endpointHost = File.ReadAllText(EndpointHostPath("KnowledgeEndpoints.cs"));
+        Assert.Contains("AddScoped<GetKnowledgeDocumentHandler>(provider =>", endpointHost, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<GetKnowledgeVersionHandler>(provider =>", endpointHost, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<GetKnowledgeLinkOptionsHandler>(provider =>", endpointHost, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<SearchKnowledgeDocumentsHandler>(provider =>", endpointHost, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<AddKnowledgeCommentHandler>(provider =>", endpointHost, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<ResolveKnowledgeCommentHandler>(provider =>", endpointHost, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<CreateKnowledgeDocumentHandler>(provider =>", endpointHost, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<AddKnowledgeVersionHandler>(provider =>", endpointHost, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<ArchiveKnowledgeDocumentHandler>(provider =>", endpointHost, StringComparison.Ordinal);
+        Assert.Contains("[FromServices] GetKnowledgeDocumentHandler handler", endpointHost, StringComparison.Ordinal);
+        Assert.Contains("[FromServices] GetKnowledgeVersionHandler handler", endpointHost, StringComparison.Ordinal);
+        Assert.Contains("[FromServices] GetKnowledgeLinkOptionsHandler handler", endpointHost, StringComparison.Ordinal);
+        Assert.Contains("[FromServices] SearchKnowledgeDocumentsHandler handler", endpointHost, StringComparison.Ordinal);
+        Assert.Contains("[FromServices] AddKnowledgeCommentHandler handler", endpointHost, StringComparison.Ordinal);
+        Assert.Contains("[FromServices] ResolveKnowledgeCommentHandler handler", endpointHost, StringComparison.Ordinal);
+        Assert.Contains("[FromServices] CreateKnowledgeDocumentHandler handler", endpointHost, StringComparison.Ordinal);
+        Assert.Contains("[FromServices] AddKnowledgeVersionHandler handler", endpointHost, StringComparison.Ordinal);
+        Assert.Contains("[FromServices] ArchiveKnowledgeDocumentHandler handler", endpointHost, StringComparison.Ordinal);
+        Assert.Contains("handler.HandleAsync", endpointHost, StringComparison.Ordinal);
+        Assert.DoesNotContain("service.GetAsync(", endpointHost, StringComparison.Ordinal);
+        Assert.DoesNotContain("service.GetVersionAsync(", endpointHost, StringComparison.Ordinal);
+        Assert.DoesNotContain("service.GetLinkOptionsAsync(", endpointHost, StringComparison.Ordinal);
+        Assert.DoesNotContain("service.SearchAsync(", endpointHost, StringComparison.Ordinal);
+        Assert.DoesNotContain("service.AddCommentAsync(", endpointHost, StringComparison.Ordinal);
+        Assert.DoesNotContain("service.ResolveCommentAsync(", endpointHost, StringComparison.Ordinal);
+        Assert.DoesNotContain("service.CreateAsync(", endpointHost, StringComparison.Ordinal);
+        Assert.DoesNotContain("service.AddVersionAsync(", endpointHost, StringComparison.Ordinal);
+        Assert.DoesNotContain("service.ArchiveAsync(", endpointHost, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void WorkItemTemplateList_IsAPortFocusedVerticalSliceWithCompatibilityFacade()
+    {
+        var moduleDirectory = Path.Combine(SourceDirectory, "Zumbo.Modules.WorkItems");
+        var featureDirectory = Path.Combine(moduleDirectory, "Application", "Features", "Recurrences");
+        Assert.True(File.Exists(Path.Combine(featureDirectory, "ListWorkItemTemplatesQuery.cs")));
+        Assert.True(File.Exists(Path.Combine(featureDirectory, "ListWorkItemTemplatesHandler.cs")));
+        Assert.True(File.Exists(Path.Combine(featureDirectory, "ListWorkItemTemplatesSlice.cs")));
+        Assert.True(File.Exists(Path.Combine(featureDirectory, "WorkItemTemplateResponseMapper.cs")));
+        foreach (var file in new[]
+        {
+            "RecurrenceReadAccess.cs",
+            "RecurrenceResponseMapper.cs",
+            "ListWorkItemRecurrencesQuery.cs",
+            "ListWorkItemRecurrencesHandler.cs",
+            "ListWorkItemRecurrencesSlice.cs",
+            "ListRecurrenceOccurrencesQuery.cs",
+            "ListRecurrenceOccurrencesHandler.cs",
+            "ListRecurrenceOccurrencesSlice.cs",
+            "PreviewWorkItemRecurrenceQuery.cs",
+            "PreviewWorkItemRecurrenceHandler.cs",
+            "PreviewWorkItemRecurrenceSlice.cs",
+            "WorkItemTemplateReadAccess.cs",
+            "ValidatedRecurrenceSchedule.cs",
+            "RecurrenceSchedulePolicy.cs",
+            "CreateWorkItemRecurrenceCommand.cs",
+            "CreateWorkItemRecurrenceHandler.cs",
+            "CreateWorkItemRecurrenceSlice.cs",
+            "RecurrenceMutationAccess.cs",
+            "SetWorkItemRecurrenceStateCommand.cs",
+            "SetWorkItemRecurrenceStateHandler.cs",
+            "SetWorkItemRecurrenceStateSlice.cs",
+            "ArchiveWorkItemRecurrenceCommand.cs",
+            "ArchiveWorkItemRecurrenceHandler.cs",
+            "ArchiveWorkItemRecurrenceSlice.cs",
+            "NormalizedWorkItemTemplate.cs",
+            "WorkItemTemplateNormalizationPolicy.cs",
+            "WorkItemTemplateMutationAccess.cs",
+            "CreateWorkItemTemplateCommand.cs",
+            "CreateWorkItemTemplateHandler.cs",
+            "CreateWorkItemTemplateSlice.cs",
+            "WorkItemTemplateUpdateAccess.cs",
+            "UpdateWorkItemTemplateCommand.cs",
+            "UpdateWorkItemTemplateHandler.cs",
+            "UpdateWorkItemTemplateSlice.cs",
+            "ArchiveWorkItemTemplateCommand.cs",
+            "ArchiveWorkItemTemplateHandler.cs",
+            "ArchiveWorkItemTemplateSlice.cs",
+            "ScheduleDueRecurrencesCommand.cs",
+            "RecurrenceOccurrenceIdentity.cs",
+            "RecurrenceSchedulerAccess.cs",
+            "ScheduleDueRecurrencesHandler.cs",
+            "ScheduleDueRecurrencesSlice.cs"
+        })
+        {
+            Assert.True(File.Exists(Path.Combine(featureDirectory, file)), $"Missing recurrence feature file: {file}");
+        }
+
+        var facadeDirectory = Path.Combine(
+            moduleDirectory,
+            "Application",
+            "Compatibility",
+            "Recurrences",
+            "WorkItemTemplateRecurrenceService");
+        var facadeFiles = Directory.GetFiles(facadeDirectory, "*.cs", SearchOption.TopDirectoryOnly);
+        Assert.Equal(6, facadeFiles.Length);
+        Assert.All(facadeFiles, file => Assert.Contains(
+            Path.GetFileName(file),
+            new[]
+            {
+                "TemplateFacade.cs",
+                "RecurrenceFacade.cs",
+                "SchedulerFacade.cs",
+                "SharedSupport.cs",
+                "TemplateSupport.cs",
+                "RecurrenceSupport.cs"
+            }));
+        var facade = string.Join(
+            Environment.NewLine,
+            facadeFiles.Select(File.ReadAllText));
+        foreach (var delegation in new[]
+        {
+            "listWorkItemTemplatesHandler.HandleAsync",
+            "listWorkItemRecurrencesHandler.HandleAsync",
+            "listRecurrenceOccurrencesHandler.HandleAsync",
+            "previewWorkItemRecurrenceHandler.HandleAsync",
+            "createWorkItemRecurrenceHandler.HandleAsync",
+            "setWorkItemRecurrenceStateHandler.HandleAsync",
+            "archiveWorkItemRecurrenceHandler.HandleAsync",
+            "createWorkItemTemplateHandler.HandleAsync",
+            "updateWorkItemTemplateHandler.HandleAsync",
+            "archiveWorkItemTemplateHandler.HandleAsync",
+            "scheduleDueRecurrencesHandler.HandleAsync"
+        })
+        {
+            Assert.Contains(delegation, facade, StringComparison.Ordinal);
+        }
+
+        var endpoint = File.ReadAllText(Path.Combine(
+            SourceDirectory,
+            "Zumbo.Api",
+            "Presentation",
+            "Endpoints",
+            "WorkItems",
+            "Recurrences",
+            "ListTemplatesEndpoint.cs"));
+        Assert.Contains("ListWorkItemTemplatesHandler handler", endpoint, StringComparison.Ordinal);
+        Assert.DoesNotContain("service.ListTemplatesAsync(", endpoint, StringComparison.Ordinal);
+
+        var recurrenceEndpointDirectory = Path.GetDirectoryName(Path.Combine(
+            SourceDirectory,
+            "Zumbo.Api",
+            "Presentation",
+            "Endpoints",
+            "WorkItems",
+            "Recurrences",
+            "ListTemplatesEndpoint.cs"))!;
+        var recurrenceEndpoint = File.ReadAllText(Path.Combine(
+            recurrenceEndpointDirectory,
+            "ListRecurrencesEndpoint.cs"));
+        Assert.Contains("ListWorkItemRecurrencesHandler handler", recurrenceEndpoint, StringComparison.Ordinal);
+        Assert.DoesNotContain("service.ListRecurrencesAsync(", recurrenceEndpoint, StringComparison.Ordinal);
+        var occurrenceEndpoint = File.ReadAllText(Path.Combine(
+            recurrenceEndpointDirectory,
+            "ListRecurrenceOccurrencesEndpoint.cs"));
+        Assert.Contains("ListRecurrenceOccurrencesHandler handler", occurrenceEndpoint, StringComparison.Ordinal);
+        Assert.DoesNotContain("service.ListOccurrencesAsync(", occurrenceEndpoint, StringComparison.Ordinal);
+        var previewEndpoint = File.ReadAllText(Path.Combine(
+            recurrenceEndpointDirectory,
+            "PreviewRecurrenceEndpoint.cs"));
+        Assert.Contains("PreviewWorkItemRecurrenceHandler handler", previewEndpoint, StringComparison.Ordinal);
+        Assert.DoesNotContain("service.PreviewRecurrenceAsync(", previewEndpoint, StringComparison.Ordinal);
+        var createRecurrenceEndpoint = File.ReadAllText(Path.Combine(
+            recurrenceEndpointDirectory,
+            "CreateRecurrenceEndpoint.cs"));
+        Assert.Contains("CreateWorkItemRecurrenceHandler handler", createRecurrenceEndpoint, StringComparison.Ordinal);
+        Assert.DoesNotContain("service.CreateRecurrenceAsync(", createRecurrenceEndpoint, StringComparison.Ordinal);
+        var createTemplateEndpoint = File.ReadAllText(Path.Combine(
+            recurrenceEndpointDirectory,
+            "CreateTemplateEndpoint.cs"));
+        Assert.Contains("CreateWorkItemTemplateHandler handler", createTemplateEndpoint, StringComparison.Ordinal);
+        Assert.DoesNotContain("service.CreateTemplateAsync(", createTemplateEndpoint, StringComparison.Ordinal);
+        var updateTemplateEndpoint = File.ReadAllText(Path.Combine(
+            recurrenceEndpointDirectory,
+            "UpdateTemplateEndpoint.cs"));
+        Assert.Contains("UpdateWorkItemTemplateHandler handler", updateTemplateEndpoint, StringComparison.Ordinal);
+        Assert.DoesNotContain("service.UpdateTemplateAsync(", updateTemplateEndpoint, StringComparison.Ordinal);
+        var archiveTemplateEndpoint = File.ReadAllText(Path.Combine(
+            recurrenceEndpointDirectory,
+            "DeleteTemplateEndpoint.cs"));
+        Assert.Contains("ArchiveWorkItemTemplateHandler handler", archiveTemplateEndpoint, StringComparison.Ordinal);
+        Assert.DoesNotContain("service.ArchiveTemplateAsync(", archiveTemplateEndpoint, StringComparison.Ordinal);
+        var schedulerEndpoint = File.ReadAllText(Path.Combine(
+            recurrenceEndpointDirectory,
+            "ProcessDueRecurrencesEndpoint.cs"));
+        Assert.Contains("ScheduleDueRecurrencesHandler handler", schedulerEndpoint, StringComparison.Ordinal);
+        Assert.DoesNotContain("service.ScheduleDueAsync(", schedulerEndpoint, StringComparison.Ordinal);
+
+        var schedulerHostedService = File.ReadAllText(Path.Combine(
+            SourceDirectory,
+            "Zumbo.Api",
+            "Infrastructure",
+            "BackgroundServices",
+            "Recurrences",
+            "WorkItemRecurrenceSchedulerHostedService.cs"));
+        Assert.Contains("GetRequiredService<ScheduleDueRecurrencesHandler>()", schedulerHostedService, StringComparison.Ordinal);
+        Assert.DoesNotContain("GetRequiredService<WorkItemTemplateRecurrenceService>()", schedulerHostedService, StringComparison.Ordinal);
+        var stateEndpoint = File.ReadAllText(Path.Combine(
+            recurrenceEndpointDirectory,
+            "SetRecurrenceStateEndpoint.cs"));
+        Assert.Contains("SetWorkItemRecurrenceStateHandler handler", stateEndpoint, StringComparison.Ordinal);
+        Assert.DoesNotContain("service.SetRecurrenceStateAsync(", stateEndpoint, StringComparison.Ordinal);
+        var archiveEndpoint = File.ReadAllText(Path.Combine(
+            recurrenceEndpointDirectory,
+            "DeleteRecurrenceEndpoint.cs"));
+        Assert.Contains("ArchiveWorkItemRecurrenceHandler handler", archiveEndpoint, StringComparison.Ordinal);
+        Assert.DoesNotContain("service.ArchiveRecurrenceAsync(", archiveEndpoint, StringComparison.Ordinal);
+
+        var composition = File.ReadAllText(Path.Combine(
+            SourceDirectory,
+            "Zumbo.Api",
+            "Composition",
+            "Modules",
+            "WorkItems",
+            "WorkItemModuleComposition.cs"));
+        Assert.Contains("AddScoped<ListWorkItemTemplatesHandler>(provider =>", composition, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<ListWorkItemRecurrencesHandler>(provider =>", composition, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<ListRecurrenceOccurrencesHandler>(provider =>", composition, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<PreviewWorkItemRecurrenceHandler>(provider =>", composition, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<CreateWorkItemRecurrenceHandler>(provider =>", composition, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<SetWorkItemRecurrenceStateHandler>(provider =>", composition, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<ArchiveWorkItemRecurrenceHandler>(provider =>", composition, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<CreateWorkItemTemplateHandler>(provider =>", composition, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<UpdateWorkItemTemplateHandler>(provider =>", composition, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<ArchiveWorkItemTemplateHandler>(provider =>", composition, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<ScheduleDueRecurrencesHandler>(provider =>", composition, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -845,12 +1686,7 @@ public sealed class ArchitectureBoundaryTests
         Assert.Contains("addColumnHandler.HandleAsync", columnsFacade, StringComparison.Ordinal);
         Assert.Contains("updateColumnHandler.HandleAsync", columnsFacade, StringComparison.Ordinal);
 
-        var endpointHost = File.ReadAllText(Path.Combine(
-            SourceDirectory,
-            "Zumbo.Api",
-            "Presentation",
-            "Endpoints",
-            "BoardsEndpoints.cs"));
+        var endpointHost = File.ReadAllText(EndpointHostPath("BoardsEndpoints.cs"));
         Assert.Contains("services.AddBoardServices()", endpointHost, StringComparison.Ordinal);
         Assert.DoesNotContain("IDocumentRepository", endpointHost, StringComparison.Ordinal);
         Assert.DoesNotContain("BoardDocument", endpointHost, StringComparison.Ordinal);
@@ -923,12 +1759,7 @@ public sealed class ArchitectureBoundaryTests
         Assert.Contains("upsertWorkflowHandler.HandleAsync", facade, StringComparison.Ordinal);
         Assert.Contains("getWorkflowHandler.HandleAsync", facade, StringComparison.Ordinal);
 
-        var endpointHost = File.ReadAllText(Path.Combine(
-            SourceDirectory,
-            "Zumbo.Api",
-            "Presentation",
-            "Endpoints",
-            "WorkflowEndpoints.cs"));
+        var endpointHost = File.ReadAllText(EndpointHostPath("WorkflowEndpoints.cs"));
         Assert.Contains("services.AddWorkflowServices(configuration)", endpointHost, StringComparison.Ordinal);
         Assert.DoesNotContain("IDocumentRepository", endpointHost, StringComparison.Ordinal);
         Assert.DoesNotContain("WorkflowDefinitionDocument", endpointHost, StringComparison.Ordinal);
@@ -1019,10 +1850,10 @@ public sealed class ArchitectureBoundaryTests
         var composition = File.ReadAllText(Path.Combine(
             SourceDirectory,
             "Zumbo.Api",
-            "Presentation",
-            "Endpoints",
-            "WorkItemEndpoints",
-            "WorkItemEndpoints.AddWorkItemsModule.cs"));
+            "Composition",
+            "Modules",
+            "WorkItems",
+            "WorkItemModuleComposition.cs"));
         Assert.Contains("services.AddWorkItemCoreCreateAndReadHandlers();", composition, StringComparison.Ordinal);
         Assert.Contains(
             "services.AddWorkItemIntakeServices();",
@@ -1107,8 +1938,6 @@ public sealed class ArchitectureBoundaryTests
 
         Assert.Contains("services.AddWorkItemApprovalRequestHandler();", composition, StringComparison.Ordinal);
         Assert.Contains("services.AddWorkItemApprovalDecisionHandler();", composition, StringComparison.Ordinal);
-        Assert.DoesNotContain("IDocumentRepository", composition, StringComparison.Ordinal);
-        Assert.DoesNotContain("WorkItemDocument", composition, StringComparison.Ordinal);
         var approvalComposition = File.ReadAllText(Path.Combine(
             SourceDirectory,
             "Zumbo.Api",
@@ -1179,13 +2008,450 @@ public sealed class ArchitectureBoundaryTests
             "Zumbo.Api",
             "Presentation",
             "Endpoints",
-            "WorkItemEndpoints",
-            "MapWorkItemEndpoints",
-            "WorkItemEndpoints.MapPostSearch.cs"));
+            "WorkItems",
+            "Search",
+            "SearchWorkItemsPageEndpoint.cs"));
         Assert.Contains("SearchWorkItemsHandler handler", searchEndpoint, StringComparison.Ordinal);
         Assert.Contains("handler.HandlePageAsync(request, ct)", searchEndpoint, StringComparison.Ordinal);
         Assert.DoesNotContain("WorkItemService service", searchEndpoint, StringComparison.Ordinal);
         Assert.DoesNotContain("service.SearchPageAsync", searchEndpoint, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void WorkItemSchemaUseCases_ArePortFocusedVerticalSlicesWithCompatibilityFacade()
+    {
+        var moduleDirectory = Path.Combine(SourceDirectory, "Zumbo.Modules.WorkItems");
+        var featureDirectory = Path.Combine(moduleDirectory, "Application", "Features", "Schema");
+        foreach (var file in new[]
+        {
+            "GetWorkItemTypeSchemaQuery.cs",
+            "GetWorkItemTypeSchemaHandler.cs",
+            "GetWorkItemTypeSchemaSlice.cs",
+            "GetIssueTypeDistributionQuery.cs",
+            "GetIssueTypeDistributionHandler.cs",
+            "GetIssueTypeDistributionSlice.cs",
+            "GetCustomFieldDistributionQuery.cs",
+            "GetCustomFieldDistributionHandler.cs",
+            "GetCustomFieldDistributionSlice.cs",
+            "WorkItemTypeSchemaReadAccess.cs",
+            "WorkItemTypeSchemaResponseMapper.cs",
+            "UpsertWorkItemTypeSchemaCommand.cs",
+            "UpsertWorkItemTypeSchemaHandler.cs",
+            "UpsertWorkItemTypeSchemaSlice.cs",
+            "WorkItemTypeSchemaDefinitionPolicy.cs",
+            "ValidateWorkItemShapeQuery.cs",
+            "ValidateWorkItemShapeHandler.cs",
+            "ValidateWorkItemShapeSlice.cs",
+            "GetIssueTypeHierarchyQuery.cs",
+            "GetIssueTypeHierarchyHandler.cs",
+            "GetIssueTypeHierarchySlice.cs",
+            "ValidateWorkItemSearchFilterQuery.cs",
+            "ValidateWorkItemSearchFilterHandler.cs",
+            "ValidateWorkItemSearchFilterSlice.cs",
+            "WorkItemTypeSchemaPolicyAccess.cs",
+            "WorkItemTypeSchemaPolicyAdapter.cs"
+        })
+        {
+            Assert.True(File.Exists(Path.Combine(featureDirectory, file)), $"Missing schema read file: {file}");
+        }
+
+        var facadeDirectory = Path.Combine(
+            moduleDirectory,
+            "Application",
+            "Compatibility",
+            "Schema",
+            "WorkItemTypeSchemaService");
+        var facadeFiles = Directory.GetFiles(facadeDirectory, "*.cs", SearchOption.TopDirectoryOnly);
+        Assert.Equal(5, facadeFiles.Length);
+        AssertExactSet(
+            new[]
+            {
+                "Facade.cs",
+                "PersistenceSupport.cs",
+                "DefinitionSupport.cs",
+                "ValidationSupport.cs",
+                "MappingSupport.cs"
+            },
+            facadeFiles.Select(Path.GetFileName)!);
+        var facade = string.Join(Environment.NewLine, facadeFiles.Select(File.ReadAllText));
+        foreach (var delegation in new[]
+        {
+            "getWorkItemTypeSchemaHandler.HandleAsync",
+            "getIssueTypeDistributionHandler.HandleAsync",
+            "getCustomFieldDistributionHandler.HandleAsync",
+            "upsertWorkItemTypeSchemaHandler.HandleAsync",
+            "validateWorkItemShapeHandler.HandleAsync",
+            "getIssueTypeHierarchyHandler.HandleAsync",
+            "validateWorkItemSearchFilterHandler.HandleAsync"
+        })
+        {
+            Assert.Contains(delegation, facade, StringComparison.Ordinal);
+        }
+
+        var endpoint = File.ReadAllText(Path.Combine(
+            SourceDirectory,
+            "Zumbo.Api",
+            "Presentation",
+            "Endpoints",
+            "WorkItems",
+            "Schema",
+            "WorkItemTypeSchemaEndpoints.cs"));
+        Assert.Contains("GetWorkItemTypeSchemaHandler handler", endpoint, StringComparison.Ordinal);
+        Assert.Contains("GetIssueTypeDistributionHandler handler", endpoint, StringComparison.Ordinal);
+        Assert.Contains("GetCustomFieldDistributionHandler handler", endpoint, StringComparison.Ordinal);
+        Assert.Contains("UpsertWorkItemTypeSchemaHandler handler", endpoint, StringComparison.Ordinal);
+        Assert.DoesNotContain("service.GetAsync(projectId", endpoint, StringComparison.Ordinal);
+        Assert.DoesNotContain("service.GetIssueTypeDistributionAsync", endpoint, StringComparison.Ordinal);
+        Assert.DoesNotContain("service.GetCustomFieldDistributionAsync", endpoint, StringComparison.Ordinal);
+        Assert.DoesNotContain("service.UpsertAsync", endpoint, StringComparison.Ordinal);
+
+        var composition = File.ReadAllText(Path.Combine(
+            SourceDirectory,
+            "Zumbo.Api",
+            "Composition",
+            "Modules",
+            "WorkItems",
+            "WorkItemModuleComposition.cs"));
+        Assert.Contains("AddScoped<GetWorkItemTypeSchemaHandler>(provider =>", composition, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<GetIssueTypeDistributionHandler>(provider =>", composition, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<GetCustomFieldDistributionHandler>(provider =>", composition, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<UpsertWorkItemTypeSchemaHandler>(provider =>", composition, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<ValidateWorkItemShapeHandler>(provider =>", composition, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<GetIssueTypeHierarchyHandler>(provider =>", composition, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<ValidateWorkItemSearchFilterHandler>(provider =>", composition, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<IWorkItemTypeSchemaPolicy, WorkItemTypeSchemaPolicyAdapter>()", composition, StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "provider.GetRequiredService<WorkItemTypeSchemaService>()",
+            composition,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void PortfolioUseCases_ArePortFocusedVerticalSlicesWithCompatibilityFacade()
+    {
+        var moduleDirectory = Path.Combine(SourceDirectory, "Zumbo.Modules.Projects");
+        var featureDirectory = Path.Combine(moduleDirectory, "Application", "Features", "Portfolio");
+        foreach (var file in new[]
+        {
+            "ListPortfoliosQuery.cs",
+            "ListPortfoliosHandler.cs",
+            "ListPortfoliosSlice.cs",
+            "GetPortfolioQuery.cs",
+            "GetPortfolioHandler.cs",
+            "GetPortfolioSlice.cs",
+            "GetPortfolioRoadmapQuery.cs",
+            "GetPortfolioRoadmapHandler.cs",
+            "GetPortfolioRoadmapSlice.cs",
+            "PortfolioReadAccess.cs",
+            "PortfolioResponseMapper.cs",
+            "PortfolioMutationPersistence.cs",
+            "PortfolioValidation.cs",
+            "PortfolioMutationMapper.cs",
+            "SavePortfolioCommand.cs",
+            "SavePortfolioHandler.cs",
+            "SavePortfolioSlice.cs",
+            "ArchivePortfolioCommand.cs",
+            "ArchivePortfolioHandler.cs",
+            "ArchivePortfolioSlice.cs",
+            "SaveInitiativeCommand.cs",
+            "SaveInitiativeHandler.cs",
+            "SaveInitiativeSlice.cs",
+            "AddInitiativeStatusUpdateCommand.cs",
+            "AddInitiativeStatusUpdateHandler.cs",
+            "AddInitiativeStatusUpdateSlice.cs",
+            "SavePortfolioDependencyCommand.cs",
+            "SavePortfolioDependencyHandler.cs",
+            "SavePortfolioDependencySlice.cs"
+        })
+        {
+            Assert.True(File.Exists(Path.Combine(featureDirectory, file)), $"Missing portfolio read file: {file}");
+        }
+
+        var facadeDirectory = Path.Combine(
+            moduleDirectory,
+            "Application",
+            "Compatibility",
+            "Portfolio",
+            "PortfolioService");
+        Assert.Equal(7, Directory.GetFiles(facadeDirectory, "*.cs").Length);
+        foreach (var (file, delegation) in new[]
+        {
+            ("ReadsFacade.cs", "new ListPortfoliosHandler(portfolios, currentUser).HandleAsync"),
+            ("ReadsFacade.cs", "new GetPortfolioHandler(portfolios, currentUser).HandleAsync"),
+            ("ReadsFacade.cs", "new GetPortfolioRoadmapHandler("),
+            ("LifecycleFacade.cs", "new SavePortfolioHandler("),
+            ("LifecycleFacade.cs", "new ArchivePortfolioHandler("),
+            ("InitiativesFacade.cs", "new SaveInitiativeHandler("),
+            ("InitiativesFacade.cs", "new AddInitiativeStatusUpdateHandler("),
+            ("DependenciesFacade.cs", "new SavePortfolioDependencyHandler(")
+        })
+        {
+            Assert.Contains(
+                delegation,
+                File.ReadAllText(Path.Combine(facadeDirectory, file)),
+                StringComparison.Ordinal);
+        }
+
+        var endpoint = File.ReadAllText(Path.Combine(
+            SourceDirectory,
+            "Zumbo.Api",
+            "Presentation",
+            "Endpoints",
+            "Projects",
+            "Portfolio",
+            "PortfolioEndpoints.cs"));
+        Assert.Contains("ListPortfoliosHandler handler", endpoint, StringComparison.Ordinal);
+        Assert.Contains("GetPortfolioHandler handler", endpoint, StringComparison.Ordinal);
+        Assert.Contains("GetPortfolioRoadmapHandler handler", endpoint, StringComparison.Ordinal);
+        Assert.Contains("SavePortfolioHandler handler", endpoint, StringComparison.Ordinal);
+        Assert.Contains("ArchivePortfolioHandler handler", endpoint, StringComparison.Ordinal);
+        Assert.Contains("SaveInitiativeHandler handler", endpoint, StringComparison.Ordinal);
+        Assert.Contains("AddInitiativeStatusUpdateHandler handler", endpoint, StringComparison.Ordinal);
+        Assert.Contains("SavePortfolioDependencyHandler handler", endpoint, StringComparison.Ordinal);
+        Assert.DoesNotContain("service.ListAsync(", endpoint, StringComparison.Ordinal);
+        Assert.DoesNotContain("service.GetAsync(", endpoint, StringComparison.Ordinal);
+        Assert.DoesNotContain("service.GetRoadmapAsync(", endpoint, StringComparison.Ordinal);
+        Assert.DoesNotContain("service.SaveAsync(", endpoint, StringComparison.Ordinal);
+        Assert.DoesNotContain("service.ArchiveAsync(", endpoint, StringComparison.Ordinal);
+        Assert.DoesNotContain("service.SaveInitiativeAsync(", endpoint, StringComparison.Ordinal);
+        Assert.DoesNotContain("service.AddStatusUpdateAsync(", endpoint, StringComparison.Ordinal);
+        Assert.DoesNotContain("service.SaveDependencyAsync(", endpoint, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<ListPortfoliosHandler>(provider =>", endpoint, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<GetPortfolioHandler>(provider =>", endpoint, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<GetPortfolioRoadmapHandler>(provider =>", endpoint, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<SavePortfolioHandler>(provider =>", endpoint, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<ArchivePortfolioHandler>(provider =>", endpoint, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<SaveInitiativeHandler>(provider =>", endpoint, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<AddInitiativeStatusUpdateHandler>(provider =>", endpoint, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<SavePortfolioDependencyHandler>(provider =>", endpoint, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void GoalUseCases_ArePortFocusedVerticalSlicesWithCompatibilityFacade()
+    {
+        var moduleDirectory = Path.Combine(SourceDirectory, "Zumbo.Modules.Projects");
+        var featureDirectory = Path.Combine(moduleDirectory, "Application", "Features", "Goals");
+        foreach (var file in new[]
+        {
+            "GetGoalQuery.cs",
+            "GetGoalHandler.cs",
+            "GetGoalSlice.cs",
+            "ListGoalsQuery.cs",
+            "ListGoalsHandler.cs",
+            "ListGoalsSlice.cs",
+            "GetGoalRollupQuery.cs",
+            "GetGoalRollupHandler.cs",
+            "GetGoalRollupSlice.cs",
+            "GoalReadAccess.cs",
+            "GoalResponseMapper.cs",
+            "GoalMutationPersistence.cs",
+            "GoalValidation.cs",
+            "AddKeyResultProgressCommand.cs",
+            "AddKeyResultProgressHandler.cs",
+            "AddKeyResultProgressSlice.cs",
+            "AddGoalStatusUpdateCommand.cs",
+            "AddGoalStatusUpdateHandler.cs",
+            "AddGoalStatusUpdateSlice.cs",
+            "GoalRequestNormalizer.cs",
+            "NormalizedGoalRequest.cs",
+            "GoalMutationMapper.cs",
+            "SaveGoalCommand.cs",
+            "SaveGoalHandler.cs",
+            "SaveGoalSlice.cs",
+            "SaveKeyResultCommand.cs",
+            "SaveKeyResultHandler.cs",
+            "SaveKeyResultSlice.cs",
+            "ArchiveGoalCommand.cs",
+            "ArchiveGoalHandler.cs",
+            "ArchiveGoalSlice.cs"
+        })
+        {
+            Assert.True(File.Exists(Path.Combine(featureDirectory, file)), $"Missing goal read file: {file}");
+        }
+
+        var facadeDirectory = Path.Combine(
+            moduleDirectory,
+            "Application",
+            "Compatibility",
+            "Goals",
+            "GoalService");
+        Assert.Equal(7, Directory.GetFiles(facadeDirectory, "*.cs").Length);
+        foreach (var (file, delegation) in new[]
+        {
+            ("ReadsFacade.cs", "new GetGoalHandler(goals, currentUser).HandleAsync"),
+            ("ReadsFacade.cs", "new ListGoalsHandler(goals, currentUser).HandleAsync"),
+            ("ReadsFacade.cs", "new GetGoalRollupHandler(goals, directory, currentUser, clock).HandleAsync"),
+            ("UpdatesFacade.cs", "new AddKeyResultProgressHandler("),
+            ("UpdatesFacade.cs", "new AddGoalStatusUpdateHandler("),
+            ("LifecycleFacade.cs", "new SaveGoalHandler("),
+            ("LifecycleFacade.cs", "new SaveKeyResultHandler("),
+            ("LifecycleFacade.cs", "new ArchiveGoalHandler(")
+        })
+        {
+            Assert.Contains(
+                delegation,
+                File.ReadAllText(Path.Combine(facadeDirectory, file)),
+                StringComparison.Ordinal);
+        }
+
+        var endpoint = File.ReadAllText(Path.Combine(
+            SourceDirectory,
+            "Zumbo.Api",
+            "Presentation",
+            "Endpoints",
+            "Projects",
+            "Goals",
+            "GoalEndpoints.cs"));
+        Assert.Contains("ListGoalsHandler handler", endpoint, StringComparison.Ordinal);
+        Assert.Contains("GetGoalHandler handler", endpoint, StringComparison.Ordinal);
+        Assert.Contains("GetGoalRollupHandler handler", endpoint, StringComparison.Ordinal);
+        Assert.Contains("AddKeyResultProgressHandler handler", endpoint, StringComparison.Ordinal);
+        Assert.Contains("AddGoalStatusUpdateHandler handler", endpoint, StringComparison.Ordinal);
+        Assert.Contains("SaveGoalHandler handler", endpoint, StringComparison.Ordinal);
+        Assert.Contains("SaveKeyResultHandler handler", endpoint, StringComparison.Ordinal);
+        Assert.Contains("ArchiveGoalHandler handler", endpoint, StringComparison.Ordinal);
+        Assert.DoesNotContain("service.ListAsync(", endpoint, StringComparison.Ordinal);
+        Assert.DoesNotContain("service.GetAsync(", endpoint, StringComparison.Ordinal);
+        Assert.DoesNotContain("service.GetRollupAsync(", endpoint, StringComparison.Ordinal);
+        Assert.DoesNotContain("service.AddKeyResultProgressAsync(", endpoint, StringComparison.Ordinal);
+        Assert.DoesNotContain("service.AddStatusUpdateAsync(", endpoint, StringComparison.Ordinal);
+        Assert.DoesNotContain("service.SaveAsync(", endpoint, StringComparison.Ordinal);
+        Assert.DoesNotContain("service.SaveKeyResultAsync(", endpoint, StringComparison.Ordinal);
+        Assert.DoesNotContain("service.ArchiveAsync(", endpoint, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<ListGoalsHandler>(provider =>", endpoint, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<GetGoalHandler>(provider =>", endpoint, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<GetGoalRollupHandler>(provider =>", endpoint, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<AddKeyResultProgressHandler>(provider =>", endpoint, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<AddGoalStatusUpdateHandler>(provider =>", endpoint, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<SaveGoalHandler>(provider =>", endpoint, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<SaveKeyResultHandler>(provider =>", endpoint, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<ArchiveGoalHandler>(provider =>", endpoint, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void SprintUseCases_ArePortFocusedVerticalSlicesWithCompatibilityFacade()
+    {
+        var moduleDirectory = Path.Combine(SourceDirectory, "Zumbo.Modules.WorkItems");
+        var featureDirectory = Path.Combine(moduleDirectory, "Application", "Features", "Sprints");
+        foreach (var file in new[]
+        {
+            "GetSprintQuery.cs",
+            "GetSprintHandler.cs",
+            "GetSprintSlice.cs",
+            "ListSprintsQuery.cs",
+            "ListSprintsHandler.cs",
+            "ListSprintsSlice.cs",
+            "ListSprintBacklogQuery.cs",
+            "ListSprintBacklogHandler.cs",
+            "ListSprintBacklogSlice.cs",
+            "SprintReadAccess.cs",
+            "SprintResponseMapper.cs",
+            "GetSprintBurndownQuery.cs",
+            "GetSprintBurndownHandler.cs",
+            "GetSprintBurndownSlice.cs",
+            "GetSprintVelocityQuery.cs",
+            "GetSprintVelocityHandler.cs",
+            "GetSprintVelocitySlice.cs",
+            "CreateSprintCommand.cs",
+            "CreateSprintHandler.cs",
+            "CreateSprintSlice.cs",
+            "StartSprintCommand.cs",
+            "StartSprintHandler.cs",
+            "StartSprintSlice.cs",
+            "CompleteSprintCommand.cs",
+            "CompleteSprintHandler.cs",
+            "CompleteSprintSlice.cs",
+            "PlanSprintWorkItemCommand.cs",
+            "PlanSprintWorkItemHandler.cs",
+            "PlanSprintWorkItemSlice.cs",
+            "UnplanSprintWorkItemCommand.cs",
+            "UnplanSprintWorkItemHandler.cs",
+            "UnplanSprintWorkItemSlice.cs"
+        })
+        {
+            Assert.True(File.Exists(Path.Combine(featureDirectory, file)), $"Missing sprint read file: {file}");
+        }
+
+        var facadeDirectory = Path.Combine(
+            moduleDirectory,
+            "Application",
+            "Compatibility",
+            "Sprints",
+            "SprintService");
+        Assert.Equal(7, Directory.GetFiles(facadeDirectory, "*.cs").Length);
+        foreach (var (file, delegation) in new[]
+        {
+            ("ReadsFacade.cs", "getSprintHandler.HandleAsync"),
+            ("ReadsFacade.cs", "listSprintsHandler.HandleAsync"),
+            ("ReadsFacade.cs", "listSprintBacklogHandler.HandleAsync"),
+            ("ReportsFacade.cs", "getSprintBurndownHandler.HandleAsync"),
+            ("ReportsFacade.cs", "getSprintVelocityHandler.HandleAsync"),
+            ("LifecycleFacade.cs", "createSprintHandler.HandleAsync"),
+            ("LifecycleFacade.cs", "startSprintHandler.HandleAsync"),
+            ("LifecycleFacade.cs", "completeSprintHandler.HandleAsync"),
+            ("AssignmentFacade.cs", "planSprintWorkItemHandler.HandleAsync"),
+            ("AssignmentFacade.cs", "unplanSprintWorkItemHandler.HandleAsync")
+        })
+        {
+            Assert.Contains(
+                delegation,
+                File.ReadAllText(Path.Combine(facadeDirectory, file)),
+                StringComparison.Ordinal);
+        }
+
+        var endpoint = File.ReadAllText(Path.Combine(
+            SourceDirectory,
+            "Zumbo.Api",
+            "Presentation",
+            "Endpoints",
+            "WorkItems",
+            "PlatformCore",
+            "SprintEndpoints.cs"));
+        Assert.Contains("GetSprintHandler handler", endpoint, StringComparison.Ordinal);
+        Assert.Contains("ListSprintsHandler handler", endpoint, StringComparison.Ordinal);
+        Assert.Contains("ListSprintBacklogHandler handler", endpoint, StringComparison.Ordinal);
+        Assert.Contains("GetSprintBurndownHandler burndown", endpoint, StringComparison.Ordinal);
+        Assert.Contains("GetSprintVelocityHandler handler", endpoint, StringComparison.Ordinal);
+        Assert.Contains("CreateSprintHandler handler", endpoint, StringComparison.Ordinal);
+        Assert.Contains("StartSprintHandler handler", endpoint, StringComparison.Ordinal);
+        Assert.Contains("CompleteSprintHandler handler", endpoint, StringComparison.Ordinal);
+        Assert.Contains("PlanSprintWorkItemHandler handler", endpoint, StringComparison.Ordinal);
+        Assert.Contains("UnplanSprintWorkItemHandler handler", endpoint, StringComparison.Ordinal);
+        Assert.DoesNotContain("service.ListAsync(projectId", endpoint, StringComparison.Ordinal);
+        Assert.DoesNotContain("service.BacklogAsync(projectId", endpoint, StringComparison.Ordinal);
+        Assert.DoesNotContain("service.CreateAsync(request", endpoint, StringComparison.Ordinal);
+        Assert.DoesNotContain("service.StartAsync(sprintId", endpoint, StringComparison.Ordinal);
+        Assert.DoesNotContain("service.CompleteAsync(sprintId", endpoint, StringComparison.Ordinal);
+        Assert.DoesNotContain("service.PlanAsync(sprintId", endpoint, StringComparison.Ordinal);
+        Assert.DoesNotContain("service.UnplanAsync(sprintId", endpoint, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<GetSprintHandler>(provider =>", endpoint, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<ListSprintsHandler>(provider =>", endpoint, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<ListSprintBacklogHandler>(provider =>", endpoint, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<GetSprintBurndownHandler>(provider =>", endpoint, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<GetSprintVelocityHandler>(provider =>", endpoint, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<CreateSprintHandler>(provider =>", endpoint, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<StartSprintHandler>(provider =>", endpoint, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<CompleteSprintHandler>(provider =>", endpoint, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<PlanSprintWorkItemHandler>(provider =>", endpoint, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<UnplanSprintWorkItemHandler>(provider =>", endpoint, StringComparison.Ordinal);
+
+        var reportDirectory = Path.Combine(
+            SourceDirectory,
+            "Zumbo.Api",
+            "Presentation",
+            "Endpoints",
+            "WorkItems",
+            "Sprints");
+        var burndownReport = File.ReadAllText(Path.Combine(
+            reportDirectory,
+            "GetSprintBurndownReportEndpoint.cs"));
+        Assert.Contains("GetSprintBurndownHandler handler", burndownReport, StringComparison.Ordinal);
+        Assert.DoesNotContain("SprintService service", burndownReport, StringComparison.Ordinal);
+        var velocityReport = File.ReadAllText(Path.Combine(
+            reportDirectory,
+            "GetSprintVelocityReportEndpoint.cs"));
+        Assert.Contains("GetSprintVelocityHandler handler", velocityReport, StringComparison.Ordinal);
+        Assert.DoesNotContain("SprintService service", velocityReport, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -1232,18 +2498,7 @@ public sealed class ArchitectureBoundaryTests
         Assert.Contains("EditCommentEndpoint.Map(group);", routeHost, StringComparison.Ordinal);
         Assert.Contains("DeleteCommentEndpoint.Map(group);", routeHost, StringComparison.Ordinal);
 
-        var compatibility = File.ReadAllText(Path.Combine(
-            SourceDirectory,
-            "Zumbo.Api",
-            "Presentation",
-            "Endpoints",
-            "WorkItemEndpoints",
-            "WorkItemEndpoints.Comments.cs"));
-        Assert.Contains("private static void MapPostByIdComments", compatibility, StringComparison.Ordinal);
-        Assert.Contains("private static void MapGetByIdComments", compatibility, StringComparison.Ordinal);
-        Assert.Contains("private static void MapGetByIdCommentsByCommentIdRevisions", compatibility, StringComparison.Ordinal);
-        Assert.Contains("private static void MapPutByIdCommentsByCommentId", compatibility, StringComparison.Ordinal);
-        Assert.Contains("private static void MapDeleteByIdCommentsByCommentId", compatibility, StringComparison.Ordinal);
+        Assert.False(File.Exists(Path.Combine(SourceDirectory, "Zumbo.Api", "Presentation", "Endpoints", "WorkItemEndpoints", "WorkItemEndpoints.Comments.cs")));
     }
 
     [Fact]
@@ -1284,17 +2539,7 @@ public sealed class ArchitectureBoundaryTests
         Assert.Contains("AddLabelEndpoint.Map(group);", routeHost, StringComparison.Ordinal);
         Assert.Contains("RemoveLabelEndpoint.Map(group);", routeHost, StringComparison.Ordinal);
 
-        var compatibility = File.ReadAllText(Path.Combine(
-            SourceDirectory,
-            "Zumbo.Api",
-            "Presentation",
-            "Endpoints",
-            "WorkItemEndpoints",
-            "WorkItemEndpoints.Labels.cs"));
-        Assert.Contains("private static void MapPostByIdLabels", compatibility, StringComparison.Ordinal);
-        Assert.Contains("private static void MapDeleteByIdLabelsByLabel", compatibility, StringComparison.Ordinal);
-        Assert.Contains("AddLabelEndpoint.Map(group);", compatibility, StringComparison.Ordinal);
-        Assert.Contains("RemoveLabelEndpoint.Map(group);", compatibility, StringComparison.Ordinal);
+        Assert.False(File.Exists(Path.Combine(SourceDirectory, "Zumbo.Api", "Presentation", "Endpoints", "WorkItemEndpoints", "WorkItemEndpoints.Labels.cs")));
     }
 
     [Fact]
@@ -1335,17 +2580,7 @@ public sealed class ArchitectureBoundaryTests
         Assert.Contains("AddChecklistItemEndpoint.Map(group);", routeHost, StringComparison.Ordinal);
         Assert.Contains("SetChecklistItemCompletionEndpoint.Map(group);", routeHost, StringComparison.Ordinal);
 
-        var compatibility = File.ReadAllText(Path.Combine(
-            SourceDirectory,
-            "Zumbo.Api",
-            "Presentation",
-            "Endpoints",
-            "WorkItemEndpoints",
-            "WorkItemEndpoints.Checklist.cs"));
-        Assert.Contains("private static void MapPostByIdChecklist", compatibility, StringComparison.Ordinal);
-        Assert.Contains("private static void MapPatchByIdChecklistByItemId", compatibility, StringComparison.Ordinal);
-        Assert.Contains("AddChecklistItemEndpoint.Map(group);", compatibility, StringComparison.Ordinal);
-        Assert.Contains("SetChecklistItemCompletionEndpoint.Map(group);", compatibility, StringComparison.Ordinal);
+        Assert.False(File.Exists(Path.Combine(SourceDirectory, "Zumbo.Api", "Presentation", "Endpoints", "WorkItemEndpoints", "WorkItemEndpoints.Checklist.cs")));
     }
 
     [Fact]
@@ -1386,17 +2621,7 @@ public sealed class ArchitectureBoundaryTests
         Assert.Contains("LinkWorkItemEndpoint.Map(group);", routeHost, StringComparison.Ordinal);
         Assert.Contains("UnlinkWorkItemEndpoint.Map(group);", routeHost, StringComparison.Ordinal);
 
-        var compatibility = File.ReadAllText(Path.Combine(
-            SourceDirectory,
-            "Zumbo.Api",
-            "Presentation",
-            "Endpoints",
-            "WorkItemEndpoints",
-            "WorkItemEndpoints.Relations.cs"));
-        Assert.Contains("private static void MapPostByIdRelations", compatibility, StringComparison.Ordinal);
-        Assert.Contains("private static void MapDeleteByIdRelationsByRelatedWorkItemId", compatibility, StringComparison.Ordinal);
-        Assert.Contains("LinkWorkItemEndpoint.Map(group);", compatibility, StringComparison.Ordinal);
-        Assert.Contains("UnlinkWorkItemEndpoint.Map(group);", compatibility, StringComparison.Ordinal);
+        Assert.False(File.Exists(Path.Combine(SourceDirectory, "Zumbo.Api", "Presentation", "Endpoints", "WorkItemEndpoints", "WorkItemEndpoints.Relations.cs")));
     }
 
     [Fact]
@@ -1437,17 +2662,7 @@ public sealed class ArchitectureBoundaryTests
         Assert.Contains("AddWorkLogEndpoint.Map(group);", routeHost, StringComparison.Ordinal);
         Assert.Contains("ListWorkLogsEndpoint.Map(group);", routeHost, StringComparison.Ordinal);
 
-        var compatibility = File.ReadAllText(Path.Combine(
-            SourceDirectory,
-            "Zumbo.Api",
-            "Presentation",
-            "Endpoints",
-            "WorkItemEndpoints",
-            "WorkItemEndpoints.Worklogs.cs"));
-        Assert.Contains("private static void MapPostByIdWorklogs", compatibility, StringComparison.Ordinal);
-        Assert.Contains("private static void MapGetByIdWorklogs", compatibility, StringComparison.Ordinal);
-        Assert.Contains("AddWorkLogEndpoint.Map(group);", compatibility, StringComparison.Ordinal);
-        Assert.Contains("ListWorkLogsEndpoint.Map(group);", compatibility, StringComparison.Ordinal);
+        Assert.False(File.Exists(Path.Combine(SourceDirectory, "Zumbo.Api", "Presentation", "Endpoints", "WorkItemEndpoints", "WorkItemEndpoints.Worklogs.cs")));
     }
 
     [Fact]
@@ -1478,12 +2693,7 @@ public sealed class ArchitectureBoundaryTests
             Assert.Contains($"{endpointClass}.Map(group);", routeHost, StringComparison.Ordinal);
         }
 
-        var compatibility = File.ReadAllText(Path.Combine(SourceDirectory, "Zumbo.Api", "Presentation", "Endpoints", "WorkItemEndpoints", "WorkItemEndpoints.Attachments.cs"));
-        Assert.Contains("MapPostByIdAttachmentsUpload", compatibility, StringComparison.Ordinal);
-        Assert.Contains("MapGetByIdAttachments", compatibility, StringComparison.Ordinal);
-        Assert.Contains("MapGetByIdAttachmentsByAttachmentIdDownload", compatibility, StringComparison.Ordinal);
-        Assert.Contains("MapGetByIdAttachmentsByAttachmentIdPreview", compatibility, StringComparison.Ordinal);
-        Assert.Contains("MapDeleteByIdAttachmentsByAttachmentId", compatibility, StringComparison.Ordinal);
+        Assert.False(File.Exists(Path.Combine(SourceDirectory, "Zumbo.Api", "Presentation", "Endpoints", "WorkItemEndpoints", "WorkItemEndpoints.Attachments.cs")));
     }
 
     [Fact]
@@ -1512,10 +2722,302 @@ public sealed class ArchitectureBoundaryTests
             Assert.Contains($"{endpointClass}.Map(group);", routeHost, StringComparison.Ordinal);
         }
 
-        var compatibility = File.ReadAllText(Path.Combine(SourceDirectory, "Zumbo.Api", "Presentation", "Endpoints", "WorkItemEndpoints", "WorkItemEndpoints.Approvals.cs"));
-        Assert.Contains("MapPostByIdApprovals", compatibility, StringComparison.Ordinal);
-        Assert.Contains("MapPostByIdApprovalsByApprovalIdDecision", compatibility, StringComparison.Ordinal);
-        Assert.Contains("MapGetByIdApprovals", compatibility, StringComparison.Ordinal);
+        Assert.False(File.Exists(Path.Combine(SourceDirectory, "Zumbo.Api", "Presentation", "Endpoints", "WorkItemEndpoints", "WorkItemEndpoints.Approvals.cs")));
+    }
+
+    [Fact]
+    public void WorkItemSchemaAndDurableMessagingEndpoints_AreIndependentFeatureEndpointClasses()
+    {
+        var endpointFiles = new Dictionary<string, (string Directory, string Namespace, string ClassName)>
+        {
+            ["ListDurableMessageDeadLettersEndpoint.cs"] = ("WorkItemsCore", "Zumbo.Api.Presentation.Endpoints.WorkItems.WorkItemsCore", "ListDurableMessageDeadLettersEndpoint"),
+            ["ReplayDurableMessageDeadLetterEndpoint.cs"] = ("WorkItemsCore", "Zumbo.Api.Presentation.Endpoints.WorkItems.WorkItemsCore", "ReplayDurableMessageDeadLetterEndpoint"),
+            ["GetDurableMessagingMetricsEndpoint.cs"] = ("Reports", "Zumbo.Api.Presentation.Endpoints.WorkItems.Reports", "GetDurableMessagingMetricsEndpoint"),
+            ["SetWorkItemCustomFieldsEndpoint.cs"] = ("Schema", "Zumbo.Api.Presentation.Endpoints.WorkItems.Schema", "SetWorkItemCustomFieldsEndpoint")
+        };
+
+        foreach (var endpointFile in endpointFiles)
+        {
+            var source = File.ReadAllText(Path.Combine(
+                SourceDirectory,
+                "Zumbo.Api",
+                "Presentation",
+                "Endpoints",
+                "WorkItems",
+                endpointFile.Value.Directory,
+                endpointFile.Key));
+            Assert.Contains($"namespace {endpointFile.Value.Namespace};", source, StringComparison.Ordinal);
+            Assert.Contains($"internal static class {endpointFile.Value.ClassName}", source, StringComparison.Ordinal);
+            Assert.Contains("internal static void Map(RouteGroupBuilder group)", source, StringComparison.Ordinal);
+            Assert.DoesNotContain("partial class WorkItemEndpoints", source, StringComparison.Ordinal);
+        }
+
+        var routeHost = File.ReadAllText(Path.Combine(SourceDirectory, "Zumbo.Api", "Presentation", "Endpoints", "WorkItemEndpoints", "WorkItemEndpoints.MapWorkItemEndpoints.cs"));
+        foreach (var endpointClass in endpointFiles.Values.Select(value => value.ClassName))
+        {
+            Assert.Contains($"{endpointClass}.Map(group);", routeHost, StringComparison.Ordinal);
+        }
+
+        Assert.False(File.Exists(Path.Combine(SourceDirectory, "Zumbo.Api", "Presentation", "Endpoints", "WorkItemEndpoints", "WorkItemEndpoints.DurableMessaging.cs")));
+        Assert.False(File.Exists(Path.Combine(SourceDirectory, "Zumbo.Api", "Presentation", "Endpoints", "WorkItemEndpoints", "WorkItemEndpoints.Schema.cs")));
+    }
+
+    [Fact]
+    public void WorkItemEndpointHost_ContainsOnlyApprovedHostHelpers()
+    {
+        var endpointRoot = Path.Combine(SourceDirectory, "Zumbo.Api", "Presentation", "Endpoints");
+        var hostDirectory = Path.Combine(endpointRoot, "WorkItemEndpoints");
+        var expectedFiles = new[]
+        {
+            "WorkItemEndpoints.AddWorkItemsModule.cs",
+            "WorkItemEndpoints.IdempotencyKey.cs",
+            "WorkItemEndpoints.MapWorkItemEndpoints.cs",
+            "WorkItemEndpoints.ReportOk.cs"
+        };
+        var removedCompatibilityFiles = new[]
+        {
+            "WorkItemEndpoints.Activity.cs", "WorkItemEndpoints.Approvals.cs", "WorkItemEndpoints.Attachments.cs",
+            "WorkItemEndpoints.BulkOperations.cs", "WorkItemEndpoints.Checklist.cs", "WorkItemEndpoints.Comments.cs",
+            "WorkItemEndpoints.DurableMessaging.cs", "WorkItemEndpoints.Labels.cs", "WorkItemEndpoints.Planning.cs",
+            "WorkItemEndpoints.Realtime.cs", "WorkItemEndpoints.Recurrences.cs", "WorkItemEndpoints.Relations.cs",
+            "WorkItemEndpoints.Reports.cs", "WorkItemEndpoints.Schema.cs", "WorkItemEndpoints.Search.cs",
+            "WorkItemEndpoints.WorkItemsCore.cs", "WorkItemEndpoints.Worklogs.cs"
+        };
+        var actualFiles = Directory.GetFiles(hostDirectory, "*.cs", SearchOption.TopDirectoryOnly)
+            .Select(Path.GetFileName)
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+
+        Assert.Equal(expectedFiles.Order(StringComparer.Ordinal), actualFiles);
+        Assert.All(removedCompatibilityFiles, file => Assert.False(File.Exists(Path.Combine(hostDirectory, file))));
+        Assert.False(File.Exists(Path.Combine(endpointRoot, "WorkItemEndpoints.cs")));
+        Assert.Empty(Directory.Exists(Path.Combine(hostDirectory, "MapWorkItemEndpoints"))
+            ? Directory.GetFiles(Path.Combine(hostDirectory, "MapWorkItemEndpoints"), "*.cs", SearchOption.AllDirectories)
+            : []);
+
+        var routeHost = File.ReadAllText(Path.Combine(hostDirectory, "WorkItemEndpoints.MapWorkItemEndpoints.cs"));
+        var featureEndpointClasses = Directory
+            .GetFiles(Path.Combine(endpointRoot, "WorkItems"), "*.cs", SearchOption.AllDirectories)
+            .SelectMany(path => CSharpSyntaxTree.ParseText(File.ReadAllText(path))
+                .GetRoot().DescendantNodes().OfType<ClassDeclarationSyntax>())
+            .Where(type => type.Identifier.ValueText.EndsWith("Endpoint", StringComparison.Ordinal))
+            .Where(type => type.Members.OfType<MethodDeclarationSyntax>().Any(method => method.Identifier.ValueText == "Map"))
+            .Select(type => type.Identifier.ValueText)
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+
+        Assert.NotEmpty(featureEndpointClasses);
+        Assert.All(featureEndpointClasses, endpointClass =>
+            Assert.Contains($"{endpointClass}.Map(group);", routeHost, StringComparison.Ordinal));
+
+        var allowList = File.ReadAllText(Path.GetFullPath(Path.Combine(
+            BackendDirectory, "..", "docs", "architecture", "module-first-architecture-allowlist.json")));
+        Assert.DoesNotContain("WorkItemEndpoints/MapWorkItemEndpoints/", allowList, StringComparison.Ordinal);
+        Assert.All(removedCompatibilityFiles, file => Assert.DoesNotContain(file, allowList, StringComparison.Ordinal));
+    }
+    [Fact]
+    public void WorkItemReportEndpoints_AreIndependentFeatureEndpointClasses()
+    {
+        var reportDirectory = Path.Combine(SourceDirectory, "Zumbo.Api", "Presentation", "Endpoints", "WorkItems", "Reports");
+        var reportEndpointFiles = new Dictionary<string, string>
+        {
+            ["GetProjectSummaryReportEndpoint.cs"] = "GetProjectSummaryReportEndpoint",
+            ["GetStatusDistributionReportEndpoint.cs"] = "GetStatusDistributionReportEndpoint",
+            ["GetUserWorkloadReportEndpoint.cs"] = "GetUserWorkloadReportEndpoint",
+            ["GetDueDateRisksReportEndpoint.cs"] = "GetDueDateRisksReportEndpoint",
+            ["GetFlowTimeReportEndpoint.cs"] = "GetFlowTimeReportEndpoint",
+            ["GetCompletionRateReportEndpoint.cs"] = "GetCompletionRateReportEndpoint",
+            ["GetTeamPerformanceReportEndpoint.cs"] = "GetTeamPerformanceReportEndpoint"
+        };
+        var sprintDirectory = Path.Combine(SourceDirectory, "Zumbo.Api", "Presentation", "Endpoints", "WorkItems", "Sprints");
+        var sprintEndpointFiles = new Dictionary<string, string>
+        {
+            ["GetSprintBurndownReportEndpoint.cs"] = "GetSprintBurndownReportEndpoint",
+            ["GetSprintVelocityReportEndpoint.cs"] = "GetSprintVelocityReportEndpoint"
+        };
+
+        AssertEndpointClasses(reportDirectory, reportEndpointFiles, "Zumbo.Api.Presentation.Endpoints.WorkItems.Reports");
+        AssertEndpointClasses(sprintDirectory, sprintEndpointFiles, "Zumbo.Api.Presentation.Endpoints.WorkItems.Sprints");
+
+        var routeHost = File.ReadAllText(Path.Combine(SourceDirectory, "Zumbo.Api", "Presentation", "Endpoints", "WorkItemEndpoints", "WorkItemEndpoints.MapWorkItemEndpoints.cs"));
+        foreach (var endpointClass in reportEndpointFiles.Values.Concat(sprintEndpointFiles.Values))
+        {
+            Assert.Contains($"{endpointClass}.Map(group);", routeHost, StringComparison.Ordinal);
+        }
+
+        Assert.False(File.Exists(Path.Combine(SourceDirectory, "Zumbo.Api", "Presentation", "Endpoints", "WorkItemEndpoints", "WorkItemEndpoints.Reports.cs")));
+        static void AssertEndpointClasses(string directory, IReadOnlyDictionary<string, string> endpointFiles, string endpointNamespace)
+        {
+            foreach (var endpointFile in endpointFiles)
+            {
+                var source = File.ReadAllText(Path.Combine(directory, endpointFile.Key));
+                Assert.Contains($"namespace {endpointNamespace};", source, StringComparison.Ordinal);
+                Assert.Contains($"internal static class {endpointFile.Value}", source, StringComparison.Ordinal);
+                Assert.Contains("internal static void Map(RouteGroupBuilder group)", source, StringComparison.Ordinal);
+                Assert.DoesNotContain("partial class WorkItemEndpoints", source, StringComparison.Ordinal);
+            }
+        }
+    }
+
+    [Fact]
+    public void WorkItemSearchEndpoints_AreIndependentFeatureEndpointClasses()
+    {
+        var directory = Path.Combine(SourceDirectory, "Zumbo.Api", "Presentation", "Endpoints", "WorkItems", "Search");
+        var endpointFiles = new Dictionary<string, string>
+        {
+            ["SearchWorkItemsPageEndpoint.cs"] = "SearchWorkItemsPageEndpoint",
+            ["RebuildSearchIndexEndpoint.cs"] = "RebuildSearchIndexEndpoint",
+            ["ReconcileSearchIndexEndpoint.cs"] = "ReconcileSearchIndexEndpoint"
+        };
+
+        foreach (var endpointFile in endpointFiles)
+        {
+            var source = File.ReadAllText(Path.Combine(directory, endpointFile.Key));
+            Assert.Contains("namespace Zumbo.Api.Presentation.Endpoints.WorkItems.Search;", source, StringComparison.Ordinal);
+            Assert.Contains($"internal static class {endpointFile.Value}", source, StringComparison.Ordinal);
+            Assert.Contains("internal static void Map(RouteGroupBuilder group)", source, StringComparison.Ordinal);
+            Assert.DoesNotContain("partial class WorkItemEndpoints", source, StringComparison.Ordinal);
+        }
+
+        var routeHost = File.ReadAllText(Path.Combine(SourceDirectory, "Zumbo.Api", "Presentation", "Endpoints", "WorkItemEndpoints", "WorkItemEndpoints.MapWorkItemEndpoints.cs"));
+        foreach (var endpointClass in endpointFiles.Values)
+        {
+            Assert.Contains($"{endpointClass}.Map(group);", routeHost, StringComparison.Ordinal);
+        }
+
+        Assert.False(File.Exists(Path.Combine(SourceDirectory, "Zumbo.Api", "Presentation", "Endpoints", "WorkItemEndpoints", "WorkItemEndpoints.Search.cs")));
+    }
+
+    [Fact]
+    public void WorkItemRecurrenceEndpoints_AreIndependentFeatureEndpointClasses()
+    {
+        var directory = Path.Combine(SourceDirectory, "Zumbo.Api", "Presentation", "Endpoints", "WorkItems", "Recurrences");
+        var endpointFiles = new Dictionary<string, string>
+        {
+            ["ListRecurrencesEndpoint.cs"] = "ListRecurrencesEndpoint",
+            ["CreateRecurrenceEndpoint.cs"] = "CreateRecurrenceEndpoint",
+            ["DeleteRecurrenceEndpoint.cs"] = "DeleteRecurrenceEndpoint",
+            ["PreviewRecurrenceEndpoint.cs"] = "PreviewRecurrenceEndpoint",
+            ["ProcessDueRecurrencesEndpoint.cs"] = "ProcessDueRecurrencesEndpoint",
+            ["SetRecurrenceStateEndpoint.cs"] = "SetRecurrenceStateEndpoint",
+            ["ListRecurrenceOccurrencesEndpoint.cs"] = "ListRecurrenceOccurrencesEndpoint",
+            ["ListTemplatesEndpoint.cs"] = "ListTemplatesEndpoint",
+            ["CreateTemplateEndpoint.cs"] = "CreateTemplateEndpoint",
+            ["UpdateTemplateEndpoint.cs"] = "UpdateTemplateEndpoint",
+            ["DeleteTemplateEndpoint.cs"] = "DeleteTemplateEndpoint"
+        };
+
+        foreach (var endpointFile in endpointFiles)
+        {
+            var source = File.ReadAllText(Path.Combine(directory, endpointFile.Key));
+            Assert.Contains("namespace Zumbo.Api.Presentation.Endpoints.WorkItems.Recurrences;", source, StringComparison.Ordinal);
+            Assert.Contains($"internal static class {endpointFile.Value}", source, StringComparison.Ordinal);
+            Assert.Contains("internal static void Map(RouteGroupBuilder group)", source, StringComparison.Ordinal);
+            Assert.DoesNotContain("partial class WorkItemEndpoints", source, StringComparison.Ordinal);
+        }
+
+        var routeHost = File.ReadAllText(Path.Combine(SourceDirectory, "Zumbo.Api", "Presentation", "Endpoints", "WorkItemEndpoints", "WorkItemEndpoints.MapWorkItemEndpoints.cs"));
+        foreach (var endpointClass in endpointFiles.Values)
+        {
+            Assert.Contains($"{endpointClass}.Map(group);", routeHost, StringComparison.Ordinal);
+        }
+
+        Assert.False(File.Exists(Path.Combine(SourceDirectory, "Zumbo.Api", "Presentation", "Endpoints", "WorkItemEndpoints", "WorkItemEndpoints.Recurrences.cs")));
+    }
+
+    [Fact]
+    public void WorkItemBulkOperationEndpoints_AreIndependentFeatureEndpointClasses()
+    {
+        var directory = Path.Combine(SourceDirectory, "Zumbo.Api", "Presentation", "Endpoints", "WorkItems", "BulkOperations");
+        var endpointFiles = new Dictionary<string, string>
+        {
+            ["BulkMoveWorkItemsEndpoint.cs"] = "BulkMoveWorkItemsEndpoint",
+            ["BulkAssignWorkItemsEndpoint.cs"] = "BulkAssignWorkItemsEndpoint",
+            ["BulkArchiveWorkItemsEndpoint.cs"] = "BulkArchiveWorkItemsEndpoint",
+            ["CreateBulkJobEndpoint.cs"] = "CreateBulkJobEndpoint",
+            ["ListBulkJobsEndpoint.cs"] = "ListBulkJobsEndpoint",
+            ["GetBulkJobEndpoint.cs"] = "GetBulkJobEndpoint",
+            ["ListBulkJobErrorsEndpoint.cs"] = "ListBulkJobErrorsEndpoint",
+            ["GetBulkJobResultEndpoint.cs"] = "GetBulkJobResultEndpoint",
+            ["CancelBulkJobEndpoint.cs"] = "CancelBulkJobEndpoint",
+            ["RetryBulkJobEndpoint.cs"] = "RetryBulkJobEndpoint",
+            ["CreateBulkExportJobEndpoint.cs"] = "CreateBulkExportJobEndpoint",
+            ["CreateBulkImportJobEndpoint.cs"] = "CreateBulkImportJobEndpoint"
+        };
+
+        foreach (var endpointFile in endpointFiles)
+        {
+            var source = File.ReadAllText(Path.Combine(directory, endpointFile.Key));
+            Assert.Contains("namespace Zumbo.Api.Presentation.Endpoints.WorkItems.BulkOperations;", source, StringComparison.Ordinal);
+            Assert.Contains($"internal static class {endpointFile.Value}", source, StringComparison.Ordinal);
+            Assert.Contains("internal static void Map(RouteGroupBuilder group)", source, StringComparison.Ordinal);
+            Assert.DoesNotContain("partial class WorkItemEndpoints", source, StringComparison.Ordinal);
+        }
+
+        var routeHost = File.ReadAllText(Path.Combine(SourceDirectory, "Zumbo.Api", "Presentation", "Endpoints", "WorkItemEndpoints", "WorkItemEndpoints.MapWorkItemEndpoints.cs"));
+        foreach (var endpointClass in endpointFiles.Values)
+        {
+            Assert.Contains($"{endpointClass}.Map(group);", routeHost, StringComparison.Ordinal);
+        }
+
+        Assert.False(File.Exists(Path.Combine(SourceDirectory, "Zumbo.Api", "Presentation", "Endpoints", "WorkItemEndpoints", "WorkItemEndpoints.BulkOperations.cs")));
+    }
+
+    [Fact]
+    public void WorkItemRealtimeEndpoints_AreIndependentFeatureEndpointClasses()
+    {
+        var directory = Path.Combine(SourceDirectory, "Zumbo.Api", "Presentation", "Endpoints", "WorkItems", "Realtime");
+        var endpointFiles = new Dictionary<string, string>
+        {
+            ["GetCollaborationEndpoint.cs"] = "GetCollaborationEndpoint",
+            ["SetVoteEndpoint.cs"] = "SetVoteEndpoint",
+            ["SetWatchEndpoint.cs"] = "SetWatchEndpoint"
+        };
+
+        foreach (var endpointFile in endpointFiles)
+        {
+            var source = File.ReadAllText(Path.Combine(directory, endpointFile.Key));
+            Assert.Contains("namespace Zumbo.Api.Presentation.Endpoints.WorkItems.Realtime;", source, StringComparison.Ordinal);
+            Assert.Contains($"internal static class {endpointFile.Value}", source, StringComparison.Ordinal);
+            Assert.Contains("internal static void Map(RouteGroupBuilder group)", source, StringComparison.Ordinal);
+            Assert.DoesNotContain("partial class WorkItemEndpoints", source, StringComparison.Ordinal);
+        }
+
+        var routeHost = File.ReadAllText(Path.Combine(SourceDirectory, "Zumbo.Api", "Presentation", "Endpoints", "WorkItemEndpoints", "WorkItemEndpoints.MapWorkItemEndpoints.cs"));
+        foreach (var endpointClass in endpointFiles.Values)
+        {
+            Assert.Contains($"{endpointClass}.Map(group);", routeHost, StringComparison.Ordinal);
+        }
+
+        Assert.False(File.Exists(Path.Combine(SourceDirectory, "Zumbo.Api", "Presentation", "Endpoints", "WorkItemEndpoints", "WorkItemEndpoints.Realtime.cs")));
+    }
+
+    [Fact]
+    public void WorkItemActivityEndpoints_AreIndependentFeatureEndpointClasses()
+    {
+        var directory = Path.Combine(SourceDirectory, "Zumbo.Api", "Presentation", "Endpoints", "WorkItems", "Activity");
+        var endpointFiles = new Dictionary<string, string>
+        {
+            ["GetWorkItemActivityEndpoint.cs"] = "GetWorkItemActivityEndpoint",
+            ["GetWorkItemTimelineEndpoint.cs"] = "GetWorkItemTimelineEndpoint"
+        };
+
+        foreach (var endpointFile in endpointFiles)
+        {
+            var source = File.ReadAllText(Path.Combine(directory, endpointFile.Key));
+            Assert.Contains("namespace Zumbo.Api.Presentation.Endpoints.WorkItems.Activity;", source, StringComparison.Ordinal);
+            Assert.Contains($"internal static class {endpointFile.Value}", source, StringComparison.Ordinal);
+            Assert.Contains("internal static void Map(RouteGroupBuilder group)", source, StringComparison.Ordinal);
+            Assert.DoesNotContain("partial class WorkItemEndpoints", source, StringComparison.Ordinal);
+        }
+
+        var routeHost = File.ReadAllText(Path.Combine(SourceDirectory, "Zumbo.Api", "Presentation", "Endpoints", "WorkItemEndpoints", "WorkItemEndpoints.MapWorkItemEndpoints.cs"));
+        foreach (var endpointClass in endpointFiles.Values)
+        {
+            Assert.Contains($"{endpointClass}.Map(group);", routeHost, StringComparison.Ordinal);
+        }
+
+        Assert.False(File.Exists(Path.Combine(SourceDirectory, "Zumbo.Api", "Presentation", "Endpoints", "WorkItemEndpoints", "WorkItemEndpoints.Activity.cs")));
     }
 
     [Fact]
@@ -1546,12 +3048,7 @@ public sealed class ArchitectureBoundaryTests
             Assert.Contains($"{endpointClass}.Map(group);", routeHost, StringComparison.Ordinal);
         }
 
-        var compatibility = File.ReadAllText(Path.Combine(SourceDirectory, "Zumbo.Api", "Presentation", "Endpoints", "WorkItemEndpoints", "WorkItemEndpoints.Planning.cs"));
-        Assert.Contains("MapPatchByIdAssignee", compatibility, StringComparison.Ordinal);
-        Assert.Contains("MapPatchByIdParent", compatibility, StringComparison.Ordinal);
-        Assert.Contains("MapPatchByIdPlanning", compatibility, StringComparison.Ordinal);
-        Assert.Contains("MapPatchByIdRank", compatibility, StringComparison.Ordinal);
-        Assert.Contains("MapPatchByIdTeam", compatibility, StringComparison.Ordinal);
+        Assert.False(File.Exists(Path.Combine(SourceDirectory, "Zumbo.Api", "Presentation", "Endpoints", "WorkItemEndpoints", "WorkItemEndpoints.Planning.cs")));
     }
 
     [Fact]
@@ -1584,14 +3081,7 @@ public sealed class ArchitectureBoundaryTests
             Assert.Contains($"{endpointClass}.Map(group);", routeHost, StringComparison.Ordinal);
         }
 
-        var compatibility = File.ReadAllText(Path.Combine(SourceDirectory, "Zumbo.Api", "Presentation", "Endpoints", "WorkItemEndpoints", "WorkItemEndpoints.WorkItemsCore.cs"));
-        Assert.Contains("MapDeleteById", compatibility, StringComparison.Ordinal);
-        Assert.Contains("MapGetById", compatibility, StringComparison.Ordinal);
-        Assert.Contains("MapGetRoot", compatibility, StringComparison.Ordinal);
-        Assert.Contains("MapPatchByIdStatus", compatibility, StringComparison.Ordinal);
-        Assert.Contains("MapPostByIdRestore", compatibility, StringComparison.Ordinal);
-        Assert.Contains("MapPostRoot", compatibility, StringComparison.Ordinal);
-        Assert.Contains("MapPutById", compatibility, StringComparison.Ordinal);
+        Assert.False(File.Exists(Path.Combine(SourceDirectory, "Zumbo.Api", "Presentation", "Endpoints", "WorkItemEndpoints", "WorkItemEndpoints.WorkItemsCore.cs")));
     }
 
     [Fact]
@@ -1623,13 +3113,13 @@ public sealed class ArchitectureBoundaryTests
             "Zumbo.Api",
             "Presentation",
             "Endpoints",
-            "WorkItemEndpoints",
-            "MapWorkItemEndpoints");
+            "WorkItems",
+            "BulkOperations");
         foreach (var feature in new[] { "Move", "Assign", "Archive" })
         {
             var endpoint = File.ReadAllText(Path.Combine(
                 endpointDirectory,
-                $"WorkItemEndpoints.MapPostBulk{feature}.cs"));
+                $"Bulk{feature}WorkItemsEndpoint.cs"));
             Assert.Contains($"Bulk{feature}WorkItemsHandler handler", endpoint, StringComparison.Ordinal);
             Assert.Contains($"new Bulk{feature}WorkItemsCommand", endpoint, StringComparison.Ordinal);
             Assert.DoesNotContain("WorkItemService service", endpoint, StringComparison.Ordinal);
@@ -1687,10 +3177,10 @@ public sealed class ArchitectureBoundaryTests
         var moduleComposition = File.ReadAllText(Path.Combine(
             SourceDirectory,
             "Zumbo.Api",
-            "Presentation",
-            "Endpoints",
-            "WorkItemEndpoints",
-            "WorkItemEndpoints.AddWorkItemsModule.cs"));
+            "Composition",
+            "Modules",
+            "WorkItems",
+            "WorkItemModuleComposition.cs"));
         Assert.Contains("services.AddWorkItemBulkOperations();", moduleComposition, StringComparison.Ordinal);
 
         var bulkComposition = File.ReadAllText(Path.Combine(
@@ -1754,12 +3244,7 @@ public sealed class ArchitectureBoundaryTests
             composition,
             StringComparison.Ordinal);
 
-        var endpointHost = File.ReadAllText(Path.Combine(
-            SourceDirectory,
-            "Zumbo.Api",
-            "Presentation",
-            "Endpoints",
-            "AutomationEndpoints.cs"));
+        var endpointHost = File.ReadAllText(EndpointHostPath("AutomationEndpoints.cs"));
         Assert.Contains("services.AddWorkItemAutomationActionAdapter();", endpointHost, StringComparison.Ordinal);
         Assert.DoesNotContain("using Zumbo.Modules.WorkItems;", endpointHost, StringComparison.Ordinal);
         Assert.DoesNotContain(
@@ -1809,12 +3294,7 @@ public sealed class ArchitectureBoundaryTests
         Assert.Contains("AddScoped<DashboardRenderer>(provider => new DashboardRenderer(", composition, StringComparison.Ordinal);
         Assert.DoesNotContain("provider.GetRequiredService<WorkItemService>()", composition, StringComparison.Ordinal);
 
-        var endpointHost = File.ReadAllText(Path.Combine(
-            SourceDirectory,
-            "Zumbo.Api",
-            "Presentation",
-            "Endpoints",
-            "DashboardEndpoints.cs"));
+        var endpointHost = File.ReadAllText(EndpointHostPath("DashboardEndpoints.cs"));
         Assert.Contains("services.AddWorkItemDashboardRenderer();", endpointHost, StringComparison.Ordinal);
         Assert.DoesNotContain("services.AddScoped<DashboardRenderer>();", endpointHost, StringComparison.Ordinal);
     }
@@ -1858,11 +3338,14 @@ public sealed class ArchitectureBoundaryTests
     }
 
     [Fact]
-    public void NotificationListAndMarkRead_ArePortFocusedVerticalSlicesWithCompatibilityFacades()
+    public void NotificationCorePreferencesDeliveryAndCreation_ArePortFocusedVerticalSlicesWithCompatibilityFacades()
     {
         var moduleDirectory = Path.Combine(SourceDirectory, "Zumbo.Modules.Notifications");
         var listDirectory = Path.Combine(moduleDirectory, "Application", "Features", "NotificationsCore");
         var markReadDirectory = Path.Combine(moduleDirectory, "Application", "Features", "ReadState");
+        var preferencesDirectory = Path.Combine(moduleDirectory, "Application", "Features", "Preferences");
+        var deliveryDirectory = Path.Combine(moduleDirectory, "Application", "Features", "Delivery");
+        var creationDirectory = Path.Combine(moduleDirectory, "Application", "Features", "Creation");
         var representativeDirectory = Path.Combine(
             moduleDirectory,
             "Application",
@@ -1877,6 +3360,53 @@ public sealed class ArchitectureBoundaryTests
         Assert.True(File.Exists(Path.Combine(markReadDirectory, "MarkNotificationAsReadValidator.cs")));
         Assert.True(File.Exists(Path.Combine(markReadDirectory, "MarkNotificationAsReadHandler.cs")));
         Assert.True(File.Exists(Path.Combine(markReadDirectory, "MarkNotificationAsReadSlice.cs")));
+        foreach (var file in new[]
+        {
+            "GetNotificationPreferencesQuery.cs",
+            "GetNotificationPreferencesHandler.cs",
+            "GetNotificationPreferencesSlice.cs",
+            "UpdateNotificationPreferencesCommand.cs",
+            "UpdateNotificationPreferencesHandler.cs",
+            "UpdateNotificationPreferencesSlice.cs",
+            "NotificationPreferenceAccess.cs",
+            "NotificationPreferenceValidation.cs",
+            "NotificationPreferenceMapper.cs"
+        })
+        {
+            Assert.True(File.Exists(Path.Combine(preferencesDirectory, file)), $"Missing preference file: {file}");
+        }
+        foreach (var file in new[]
+        {
+            "GetNotificationDeliveryMetricsQuery.cs",
+            "GetNotificationDeliveryMetricsHandler.cs",
+            "GetNotificationDeliveryMetricsSlice.cs",
+            "ListNotificationDeadLettersQuery.cs",
+            "ListNotificationDeadLettersHandler.cs",
+            "ListNotificationDeadLettersSlice.cs",
+            "ReplayNotificationDeadLetterCommand.cs",
+            "ReplayNotificationDeadLetterHandler.cs",
+            "ReplayNotificationDeadLetterSlice.cs",
+            "NotificationDeliveryPolicy.cs",
+            "DispatchNotificationEmailsCommand.cs",
+            "DispatchNotificationEmailsHandler.cs",
+            "DispatchNotificationEmailsSlice.cs",
+            "NotificationEmailRetryPolicy.cs"
+        })
+        {
+            Assert.True(File.Exists(Path.Combine(deliveryDirectory, file)), $"Missing delivery file: {file}");
+        }
+        foreach (var file in new[]
+        {
+            "CreateNotificationCommand.cs",
+            "CreateNotificationHandler.cs",
+            "CreateNotificationSlice.cs",
+            "NotificationCreationPolicy.cs",
+            "NotificationCreationLockAccess.cs",
+            "NotificationDigestSchedule.cs"
+        })
+        {
+            Assert.True(File.Exists(Path.Combine(creationDirectory, file)), $"Missing creation file: {file}");
+        }
         Assert.Empty(
             Directory.Exists(representativeDirectory)
                 ? Directory.GetFiles(representativeDirectory, "*.cs", SearchOption.AllDirectories)
@@ -1896,25 +3426,70 @@ public sealed class ArchitectureBoundaryTests
             "Application",
             "Compatibility",
             "NotificationService",
-            "NotificationService.ListAsync.cs"));
-        var markReadFacade = File.ReadAllText(Path.Combine(
+            "NotificationService.Inbox.cs"));
+        Assert.Contains("listNotificationsHandler.HandleAsync", listFacade, StringComparison.Ordinal);
+        Assert.Contains("markNotificationAsReadHandler.HandleAsync", listFacade, StringComparison.Ordinal);
+        var creationSlice = File.ReadAllText(Path.Combine(creationDirectory, "CreateNotificationSlice.cs"));
+        var creationFacade = File.ReadAllText(Path.Combine(
             moduleDirectory,
             "Application",
             "Compatibility",
             "NotificationService",
-            "NotificationService.MarkAsReadAsync.cs"));
-        Assert.Contains("listNotificationsHandler.HandleAsync", listFacade, StringComparison.Ordinal);
-        Assert.Contains("markNotificationAsReadHandler.HandleAsync", markReadFacade, StringComparison.Ordinal);
+            "NotificationService.Creation.cs"));
+        Assert.DoesNotContain("NotificationService", creationSlice, StringComparison.Ordinal);
+        Assert.Contains("CreateNotificationHandler", creationFacade, StringComparison.Ordinal);
+        Assert.Contains("CreateNotificationCommand", creationFacade, StringComparison.Ordinal);
+        var dispatchFacade = File.ReadAllText(Path.Combine(
+            moduleDirectory,
+            "Application",
+            "Compatibility",
+            "NotificationService",
+            "NotificationService.Delivery.cs"));
+        Assert.Contains("DispatchNotificationEmailsHandler", dispatchFacade, StringComparison.Ordinal);
+        Assert.Contains("DispatchNotificationEmailsCommand", dispatchFacade, StringComparison.Ordinal);
 
-        var endpointHost = File.ReadAllText(Path.Combine(
+        var dispatcherHost = File.ReadAllText(Path.Combine(
             SourceDirectory,
             "Zumbo.Api",
-            "Presentation",
-            "Endpoints",
-            "NotificationEndpoints.cs"));
+            "Infrastructure",
+            "BackgroundServices",
+            "Delivery",
+            "NotificationEmailDispatcherHostedService.cs"));
+        Assert.Contains("GetRequiredService<DispatchNotificationEmailsHandler>", dispatcherHost, StringComparison.Ordinal);
+        Assert.DoesNotContain("GetRequiredService<NotificationService>", dispatcherHost, StringComparison.Ordinal);
+
+        var facadeFiles = Directory.GetFiles(
+            Path.Combine(moduleDirectory, "Application", "Compatibility", "NotificationService"),
+            "*.cs",
+            SearchOption.TopDirectoryOnly);
+        Assert.Equal(4, facadeFiles.Length);
+        Assert.Equal(
+            [
+                "NotificationService.Creation.cs",
+                "NotificationService.Delivery.cs",
+                "NotificationService.Inbox.cs",
+                "NotificationService.Preferences.cs"
+            ],
+            facadeFiles
+                .Select(path => Path.GetFileName(path)!)
+                .Order(StringComparer.Ordinal)
+                .ToArray());
+
+        var endpointHost = File.ReadAllText(EndpointHostPath("NotificationEndpoints.cs"));
         Assert.Contains("services.AddNotificationServices(configuration)", endpointHost, StringComparison.Ordinal);
         Assert.DoesNotContain("IDocumentRepository", endpointHost, StringComparison.Ordinal);
         Assert.DoesNotContain("NotificationDocument", endpointHost, StringComparison.Ordinal);
+        Assert.Contains("GetNotificationPreferencesHandler handler", endpointHost, StringComparison.Ordinal);
+        Assert.Contains("UpdateNotificationPreferencesHandler handler", endpointHost, StringComparison.Ordinal);
+        Assert.DoesNotContain("service.GetPreferencesAsync(", endpointHost, StringComparison.Ordinal);
+        Assert.DoesNotContain("service.UpdatePreferencesAsync(", endpointHost, StringComparison.Ordinal);
+        Assert.Contains("GetNotificationDeliveryMetricsHandler handler", endpointHost, StringComparison.Ordinal);
+        Assert.Contains("ListNotificationDeadLettersHandler handler", endpointHost, StringComparison.Ordinal);
+        Assert.Contains("ReplayNotificationDeadLetterHandler handler", endpointHost, StringComparison.Ordinal);
+        Assert.DoesNotContain("service.GetDeliveryMetricsAsync(", endpointHost, StringComparison.Ordinal);
+        Assert.DoesNotContain("service.ListDeadLettersAsync(", endpointHost, StringComparison.Ordinal);
+        Assert.DoesNotContain("service.ReplayDeadLetterAsync(", endpointHost, StringComparison.Ordinal);
+        Assert.Contains("NotificationDeliveryReplayed", endpointHost, StringComparison.Ordinal);
 
         var composition = File.ReadAllText(Path.Combine(
             SourceDirectory,
@@ -1925,6 +3500,13 @@ public sealed class ArchitectureBoundaryTests
             "NotificationModuleComposition.cs"));
         Assert.Contains("AddScoped<ListNotificationsHandler>(provider =>", composition, StringComparison.Ordinal);
         Assert.Contains("AddScoped<MarkNotificationAsReadHandler>(provider =>", composition, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<GetNotificationPreferencesHandler>(provider =>", composition, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<UpdateNotificationPreferencesHandler>(provider =>", composition, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<GetNotificationDeliveryMetricsHandler>(provider =>", composition, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<ListNotificationDeadLettersHandler>(provider =>", composition, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<ReplayNotificationDeadLetterHandler>(provider =>", composition, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<CreateNotificationHandler>(provider =>", composition, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<DispatchNotificationEmailsHandler>(provider =>", composition, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -1971,12 +3553,7 @@ public sealed class ArchitectureBoundaryTests
         Assert.Contains("writeAuditLogHandler.HandleUncheckedAsync", facade, StringComparison.Ordinal);
         Assert.Contains("queryAuditLogHandler.HandleAsync", facade, StringComparison.Ordinal);
 
-        var endpointHost = File.ReadAllText(Path.Combine(
-            SourceDirectory,
-            "Zumbo.Api",
-            "Presentation",
-            "Endpoints",
-            "AuditEndpoints.cs"));
+        var endpointHost = File.ReadAllText(EndpointHostPath("AuditEndpoints.cs"));
         Assert.Contains("services.AddAuditServices()", endpointHost, StringComparison.Ordinal);
         Assert.DoesNotContain("IDocumentRepository", endpointHost, StringComparison.Ordinal);
         Assert.DoesNotContain("AuditLogDocument", endpointHost, StringComparison.Ordinal);
@@ -2118,23 +3695,16 @@ public sealed class ArchitectureBoundaryTests
 
         var notificationAdapters = ReadSourceScope(
             Path.Combine(SourceDirectory, "Zumbo.Api", "NotificationAdapters"));
-        var notificationHost = File.ReadAllText(Path.Combine(
-            SourceDirectory,
-            "Zumbo.Api",
-            "Presentation",
-            "Endpoints",
-            "NotificationEndpoints.cs"));
-        var workItemHost = ReadSourceScope(
-            Path.Combine(SourceDirectory, "Zumbo.Api", "Presentation", "Endpoints", "WorkItemEndpoints"));
+        var notificationHost = File.ReadAllText(EndpointHostPath("NotificationEndpoints.cs"));
         var gateway = ReadSourceScope(Path.Combine(SourceDirectory, "Zumbo.Gateway", "GatewayHost"));
         Assert.DoesNotContain("Zumbo.Modules.WorkItems", notificationAdapters, StringComparison.Ordinal);
         var notificationComposition = ReadSourceScope(
             Path.Combine(SourceDirectory, "Zumbo.Api", "Composition", "Modules", "Notifications"));
-        Assert.DoesNotContain("DueDateReminderHostedService", notificationHost, StringComparison.Ordinal);
-        Assert.DoesNotContain("DueDateReminderHostedService", notificationComposition, StringComparison.Ordinal);
-        Assert.Contains("AddWorkItemBackgroundServices(configuration)", workItemHost, StringComparison.Ordinal);
         var workItemBackgroundComposition = ReadSourceScope(
             Path.Combine(SourceDirectory, "Zumbo.Api", "Composition", "Modules", "WorkItems"));
+        Assert.DoesNotContain("DueDateReminderHostedService", notificationHost, StringComparison.Ordinal);
+        Assert.DoesNotContain("DueDateReminderHostedService", notificationComposition, StringComparison.Ordinal);
+        Assert.Contains("AddWorkItemBackgroundServices(configuration)", workItemBackgroundComposition, StringComparison.Ordinal);
         Assert.Contains("AddHostedService<DueDateReminderHostedService>()", workItemBackgroundComposition, StringComparison.Ordinal);
         Assert.Contains("AddHostedService<WorkItemRecurrenceSchedulerHostedService>()", workItemBackgroundComposition, StringComparison.Ordinal);
         Assert.Contains("AddHostedService<WebhookDispatcherHostedService>()", workItemBackgroundComposition, StringComparison.Ordinal);
@@ -2149,6 +3719,12 @@ public sealed class ArchitectureBoundaryTests
             .SelectMany(directory => Directory.GetFiles(directory, "*.csproj"))
             .Order(StringComparer.Ordinal)
             .ToList();
+
+    private static string EndpointHostPath(string fileName)
+    {
+        var endpointDirectory = Path.Combine(SourceDirectory, "Zumbo.Api", "Presentation", "Endpoints");
+        return Assert.Single(Directory.GetFiles(endpointDirectory, fileName, SearchOption.AllDirectories));
+    }
 
     private static IReadOnlyList<string> ProjectReferences(string projectFile) =>
         XDocument.Load(projectFile)
@@ -2168,6 +3744,12 @@ public sealed class ArchitectureBoundaryTests
             .OfType<string>()
             .Order(StringComparer.Ordinal)
             .ToList();
+
+    private static string[] FileNames(string directory) =>
+        Directory.GetFiles(directory, "*.cs", SearchOption.TopDirectoryOnly)
+            .Select(path => Path.GetFileName(path)!)
+            .Order(StringComparer.Ordinal)
+            .ToArray();
 
     private static string ProjectName(string projectFile) => Path.GetFileNameWithoutExtension(projectFile);
 

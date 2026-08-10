@@ -3,6 +3,9 @@
   <ItemGroup>
     <ProjectReference Include="..\Zumbo.SharedKernel\Zumbo.SharedKernel.csproj" />
     <ProjectReference Include="..\Zumbo.BuildingBlocks.Application\Zumbo.BuildingBlocks.Application.csproj" />
+    <ProjectReference Include="..\Zumbo.Modules.Identity.Contracts\Zumbo.Modules.Identity.Contracts.csproj" />
+    <ProjectReference Include="..\Zumbo.Modules.Projects.Contracts\Zumbo.Modules.Projects.Contracts.csproj" />
+    <ProjectReference Include="..\Zumbo.Modules.WorkItems.Contracts\Zumbo.Modules.WorkItems.Contracts.csproj" />
   </ItemGroup>
 
   <ItemGroup>

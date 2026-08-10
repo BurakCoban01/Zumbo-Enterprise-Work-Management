@@ -50,11 +50,14 @@
     <ProjectReference Include="..\..\src\Zumbo.BuildingBlocks.Infrastructure\Zumbo.BuildingBlocks.Infrastructure.csproj" />
     <ProjectReference Include="..\..\src\Zumbo.SharedKernel\Zumbo.SharedKernel.csproj" />
     <ProjectReference Include="..\..\src\Zumbo.Modules.Identity\Zumbo.Modules.Identity.csproj" />
+    <ProjectReference Include="..\..\src\Zumbo.Modules.Identity.Contracts\Zumbo.Modules.Identity.Contracts.csproj" />
     <ProjectReference Include="..\..\src\Zumbo.Modules.Organizations\Zumbo.Modules.Organizations.csproj" />
     <ProjectReference Include="..\..\src\Zumbo.Modules.Teams\Zumbo.Modules.Teams.csproj" />
     <ProjectReference Include="..\..\src\Zumbo.Modules.Boards\Zumbo.Modules.Boards.csproj" />
     <ProjectReference Include="..\..\src\Zumbo.Modules.Projects\Zumbo.Modules.Projects.csproj" />
+    <ProjectReference Include="..\..\src\Zumbo.Modules.Projects.Contracts\Zumbo.Modules.Projects.Contracts.csproj" />
     <ProjectReference Include="..\..\src\Zumbo.Modules.WorkItems\Zumbo.Modules.WorkItems.csproj" />
+    <ProjectReference Include="..\..\src\Zumbo.Modules.WorkItems.Contracts\Zumbo.Modules.WorkItems.Contracts.csproj" />
     <ProjectReference Include="..\..\src\Zumbo.Modules.Workflows\Zumbo.Modules.Workflows.csproj" />
     <ProjectReference Include="..\..\src\Zumbo.Modules.Notifications\Zumbo.Modules.Notifications.csproj" />
     <ProjectReference Include="..\..\src\Zumbo.Modules.Audit\Zumbo.Modules.Audit.csproj" />

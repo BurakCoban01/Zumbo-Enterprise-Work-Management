@@ -1,0 +1,33 @@
+using Zumbo.Modules.WorkItems;
+
+namespace Zumbo.Api.Infrastructure.Adapters.Platform.PlatformCore.PrivacyDataProcessorAdapter;
+
+internal static class PrivacyReferenceDescriptions
+{
+    internal static string DescribeActivityReference(WorkItemUserActivityReference activity) =>
+        string.Join(',', new[]
+        {
+            activity.CommentAuthor ? "comment-author" : null,
+            activity.CommentRevision ? "comment-revision" : null,
+            activity.Mention ? "mention" : null,
+            activity.WorkLog ? "worklog" : null,
+            activity.Approval ? "approval" : null,
+            activity.Timeline ? "status-history" : null
+        }.Where(value => value is not null));
+
+    internal static string DescribeWorkItemReference(
+        WorkItemDocument item,
+        string userId,
+        WorkItemUserActivityReference? activity)
+    {
+        var references = new List<string>();
+        if (item.AssigneeUserId == userId) references.Add("assignee");
+        if (activity?.CommentAuthor == true || item.Comments.Any(x => x.AuthorUserId == userId)) references.Add("comment-author");
+        if (activity?.CommentRevision == true || item.Comments.Any(x => x.History.Any(r => r.EditedByUserId == userId))) references.Add("comment-revision");
+        if (activity?.Mention == true || item.Comments.Any(x => x.Mentions.Contains(userId))) references.Add("mention");
+        if (activity?.WorkLog == true || item.WorkLogs.Any(x => x.UserId == userId)) references.Add("worklog");
+        if (activity?.Approval == true || item.Approvals.Any(x => x.RequestedByUserId == userId || x.DecidedByUserId == userId)) references.Add("approval");
+        if (activity?.Timeline == true || item.StatusHistory.Any(x => x.ChangedByUserId == userId)) references.Add("status-history");
+        return string.Join(',', references);
+    }
+}

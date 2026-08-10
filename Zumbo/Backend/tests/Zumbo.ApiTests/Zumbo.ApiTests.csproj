@@ -23,6 +23,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Zumbo.Api\Zumbo.Api.csproj" />
+    <ProjectReference Include="..\..\src\Zumbo.Modules.Identity.Contracts\Zumbo.Modules.Identity.Contracts.csproj" />
     <ProjectReference Include="..\..\src\Zumbo.Modules.Workflows\Zumbo.Modules.Workflows.csproj" />
     <ProjectReference Include="..\..\src\Zumbo.Modules.Notifications\Zumbo.Modules.Notifications.csproj" />
   </ItemGroup>

@@ -18,5 +18,6 @@
     <ProjectReference Include="..\..\src\Zumbo.Modules.Organizations\Zumbo.Modules.Organizations.csproj" />
     <ProjectReference Include="..\..\src\Zumbo.Modules.Projects\Zumbo.Modules.Projects.csproj" />
     <ProjectReference Include="..\..\src\Zumbo.Modules.WorkItems\Zumbo.Modules.WorkItems.csproj" />
+    <ProjectReference Include="..\..\src\Zumbo.Modules.WorkItems.Contracts\Zumbo.Modules.WorkItems.Contracts.csproj" />
   </ItemGroup>
 </Project>

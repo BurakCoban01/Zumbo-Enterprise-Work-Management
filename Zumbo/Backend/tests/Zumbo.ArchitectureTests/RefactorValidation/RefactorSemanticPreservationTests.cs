@@ -2,11 +2,90 @@ namespace Zumbo.ArchitectureTests.RefactorValidation;
 
 public sealed class RefactorSemanticPreservationTests
 {
+    private static readonly IReadOnlyDictionary<string, string> AcceptedTypeRelocations =
+        new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["Zumbo.BuildingBlocks.Application|Zumbo.BuildingBlocks.Application.Security.IProjectResourcePolicy"] =
+                "Zumbo.Modules.Projects.Contracts|Zumbo.BuildingBlocks.Application.Security.IProjectResourcePolicy",
+            ["Zumbo.BuildingBlocks.Application|Zumbo.BuildingBlocks.Application.Security.ProjectResourceAuthorization"] =
+                "Zumbo.Modules.Projects.Contracts|Zumbo.BuildingBlocks.Application.Security.ProjectResourceAuthorization",
+            ["Zumbo.BuildingBlocks.Application|Zumbo.BuildingBlocks.Application.Security.ApiKeyScopes"] =
+                "Zumbo.Modules.Identity.Contracts|Zumbo.BuildingBlocks.Application.Security.ApiKeyScopes",
+            ["Zumbo.BuildingBlocks.Application|Zumbo.BuildingBlocks.Application.Security.IPasswordHasher"] =
+                "Zumbo.Modules.Identity.Contracts|Zumbo.BuildingBlocks.Application.Security.IPasswordHasher",
+            ["Zumbo.BuildingBlocks.Application|Zumbo.BuildingBlocks.Application.Security.ITokenIssuer"] =
+                "Zumbo.Modules.Identity.Contracts|Zumbo.BuildingBlocks.Application.Security.ITokenIssuer",
+            ["Zumbo.BuildingBlocks.Application|Zumbo.BuildingBlocks.Application.Security.JwtOptions"] =
+                "Zumbo.Modules.Identity.Contracts|Zumbo.BuildingBlocks.Application.Security.JwtOptions",
+            ["Zumbo.BuildingBlocks.Application|Zumbo.BuildingBlocks.Application.Security.PermissionCatalog"] =
+                "Zumbo.Modules.Identity.Contracts|Zumbo.BuildingBlocks.Application.Security.PermissionCatalog",
+            ["Zumbo.BuildingBlocks.Application|Zumbo.BuildingBlocks.Application.Security.TokenUser"] =
+                "Zumbo.Modules.Identity.Contracts|Zumbo.BuildingBlocks.Application.Security.TokenUser",
+            ["Zumbo.BuildingBlocks.Application|Zumbo.BuildingBlocks.Application.Search.IWorkItemSearchIndex"] =
+                "Zumbo.Modules.WorkItems.Contracts|Zumbo.BuildingBlocks.Application.Search.IWorkItemSearchIndex",
+            ["Zumbo.BuildingBlocks.Application|Zumbo.BuildingBlocks.Application.Search.SearchOptions"] =
+                "Zumbo.Modules.WorkItems.Contracts|Zumbo.BuildingBlocks.Application.Search.SearchOptions",
+            ["Zumbo.BuildingBlocks.Application|Zumbo.BuildingBlocks.Application.Search.WorkItemSearchQuery"] =
+                "Zumbo.Modules.WorkItems.Contracts|Zumbo.BuildingBlocks.Application.Search.WorkItemSearchQuery",
+            ["Zumbo.BuildingBlocks.Application|Zumbo.BuildingBlocks.Application.Search.WorkItemSearchRebuildResult"] =
+                "Zumbo.Modules.WorkItems.Contracts|Zumbo.BuildingBlocks.Application.Search.WorkItemSearchRebuildResult",
+            ["Zumbo.BuildingBlocks.Application|Zumbo.BuildingBlocks.Application.Search.WorkItemSearchRecord"] =
+                "Zumbo.Modules.WorkItems.Contracts|Zumbo.BuildingBlocks.Application.Search.WorkItemSearchRecord",
+            ["Zumbo.BuildingBlocks.Application|Zumbo.BuildingBlocks.Application.Search.WorkItemSearchResult"] =
+                "Zumbo.Modules.WorkItems.Contracts|Zumbo.BuildingBlocks.Application.Search.WorkItemSearchResult",
+            ["Zumbo.BuildingBlocks.Application|Zumbo.BuildingBlocks.Application.Search.WorkItemSearchUnavailableException"] =
+                "Zumbo.Modules.WorkItems.Contracts|Zumbo.BuildingBlocks.Application.Search.WorkItemSearchUnavailableException",
+            ["Zumbo.BuildingBlocks.Infrastructure|Zumbo.BuildingBlocks.Infrastructure.Search.InMemoryWorkItemSearchIndex"] =
+                "Zumbo.Modules.WorkItems|Zumbo.BuildingBlocks.Infrastructure.Search.InMemoryWorkItemSearchIndex",
+            ["Zumbo.BuildingBlocks.Infrastructure|Zumbo.BuildingBlocks.Infrastructure.Search.OpenSearchOptions"] =
+                "Zumbo.Modules.WorkItems|Zumbo.BuildingBlocks.Infrastructure.Search.OpenSearchOptions",
+            ["Zumbo.BuildingBlocks.Infrastructure|Zumbo.BuildingBlocks.Infrastructure.Search.OpenSearchWorkItemSearchIndex"] =
+                "Zumbo.Modules.WorkItems|Zumbo.BuildingBlocks.Infrastructure.Search.OpenSearchWorkItemSearchIndex",
+            ["Zumbo.BuildingBlocks.Infrastructure|Zumbo.BuildingBlocks.Infrastructure.Search.OpenSearchWorkItemSearchIndex+OpenSearchBulkResponse"] =
+                "Zumbo.Modules.WorkItems|Zumbo.BuildingBlocks.Infrastructure.Search.OpenSearchWorkItemSearchIndex+OpenSearchBulkResponse",
+            ["Zumbo.BuildingBlocks.Infrastructure|Zumbo.BuildingBlocks.Infrastructure.Search.OpenSearchWorkItemSearchIndex+OpenSearchCountResponse"] =
+                "Zumbo.Modules.WorkItems|Zumbo.BuildingBlocks.Infrastructure.Search.OpenSearchWorkItemSearchIndex+OpenSearchCountResponse",
+            ["Zumbo.BuildingBlocks.Infrastructure|Zumbo.BuildingBlocks.Infrastructure.Search.OpenSearchWorkItemSearchIndex+OpenSearchHit"] =
+                "Zumbo.Modules.WorkItems|Zumbo.BuildingBlocks.Infrastructure.Search.OpenSearchWorkItemSearchIndex+OpenSearchHit",
+            ["Zumbo.BuildingBlocks.Infrastructure|Zumbo.BuildingBlocks.Infrastructure.Search.OpenSearchWorkItemSearchIndex+OpenSearchHits"] =
+                "Zumbo.Modules.WorkItems|Zumbo.BuildingBlocks.Infrastructure.Search.OpenSearchWorkItemSearchIndex+OpenSearchHits",
+            ["Zumbo.BuildingBlocks.Infrastructure|Zumbo.BuildingBlocks.Infrastructure.Search.OpenSearchWorkItemSearchIndex+OpenSearchResponse"] =
+                "Zumbo.Modules.WorkItems|Zumbo.BuildingBlocks.Infrastructure.Search.OpenSearchWorkItemSearchIndex+OpenSearchResponse",
+            ["Zumbo.BuildingBlocks.Infrastructure|Zumbo.BuildingBlocks.Infrastructure.Search.OpenSearchWorkItemSearchIndex+OpenSearchTotal"] =
+                "Zumbo.Modules.WorkItems|Zumbo.BuildingBlocks.Infrastructure.Search.OpenSearchWorkItemSearchIndex+OpenSearchTotal"
+        };
+
     private static readonly IReadOnlyDictionary<string, string> AcceptedBodyDifferences =
         new Dictionary<string, string>(StringComparer.Ordinal)
         {
             ["Zumbo.Api|ApiHostRegistration|method:AddZumboHost:(thisWebApplicationBuilderbuilder):WebApplicationBuilder"] =
                 "The composition root now delegates, in original order, to responsibility-specific Configure* partial methods; the local dependency-health timeout hardening is classified separately in the runtime contract audit.",
+            ["Zumbo.Api|ApiHostRegistration|method:ValidateRegistrationProvisioning:(WebApplicationBuilderbuilder):void"] =
+                "The compatibility helper delegates to ApiHostFoundationRegistrar while preserving mode defaults, Development-only LocalDemo enforcement, ProductionLike validation, exact exceptions/messages and signature.",
+            ["Zumbo.Api|PrivacyDataProcessorAdapter|method:AnonymizeReferencesAsync:(stringuserId,stringorganizationId,stringpseudonym,stringusername,stringemail,CancellationTokenct):Task"] =
+                "The compatibility adapter delegates to PrivacyAnonymizationComponent while preserving reference selection, mutation order, pseudonymization, artifact cleanup, immutable audit handling, cancellation, and signature.",
+            ["Zumbo.Api|PrivacyDataProcessorAdapter|method:EnsureCanAnonymizeAsync:(stringuserId,stringorganizationId,CancellationTokenct):Task"] =
+                "The compatibility adapter delegates to PrivacyAnonymizationGuard while preserving organization, team and project ownership checks, exception codes/messages, cancellation, and signature.",
+            ["Zumbo.Api|PrivacyDataProcessorAdapter|method:ExportAsync:(stringuserId,stringorganizationId,CancellationTokenct):Task<IReadOnlyCollection<PrivacyDataGroup>>"] =
+                "The compatibility adapter delegates to PrivacyDataExportComponent while preserving filters, reference categories/order/details, cursor loading, export limits, cancellation, and signature.",
+            ["Zumbo.Api|PrivacyDataProcessorAdapter|method:WriteExportAsync:(stringuserId,stringorganizationId,UserProfileResponseprofile,Streamdestination,CancellationTokenct):Task<long>"] =
+                "The compatibility adapter delegates to PrivacyStreamExportComponent while preserving filters, reference order, UTF-8 stream settings, JSON shape, counts, flush, cancellation, and signature.",
+            ["Zumbo.Api|PrivacyDataProcessorAdapter|method:DescribeActivityReference:(WorkItemUserActivityReferenceactivity):string"] =
+                "The compatibility helper delegates to PrivacyReferenceDescriptions with the unchanged activity labels and ordinal output order.",
+            ["Zumbo.Api|PrivacyDataProcessorAdapter|method:DescribeWorkItemReference:(WorkItemDocumentitem,stringuserId,WorkItemUserActivityReference?activity):string"] =
+                "The compatibility helper delegates to PrivacyReferenceDescriptions with the unchanged work-item reference predicates, labels and order.",
+            ["Zumbo.Api|PrivacyDataProcessorAdapter|method:Group:(stringcategory,IEnumerable<PrivacyDataReference>source):PrivacyDataGroup"] =
+                "The compatibility helper delegates to PrivacyDataExportComponent with the unchanged limit-plus-one truncation and overflow flag behavior.",
+            ["Zumbo.Api|PrivacyDataProcessorAdapter|method:LoadAllAsync<TDocument>:(IDocumentRepository<TDocument>repository,Expression<Func<TDocument,bool>>filter,CancellationTokenct):Task<IReadOnlyList<TDocument>>"] =
+                "The compatibility helper delegates to PrivacyDocumentAccess with the unchanged cursor traversal, page size, item order and cancellation.",
+            ["Zumbo.Api|PrivacyDataProcessorAdapter|method:Scrub:(string?value,stringusername,stringemail):string?"] =
+                "The compatibility helper delegates to PrivacyAnonymizationComponent with unchanged null and ordinal-ignore-case replacement behavior.",
+            ["Zumbo.Api|PrivacyDataProcessorAdapter|method:WriteDocumentsAsync<TDocument>:(IDocumentRepository<TDocument>repository,Expression<Func<TDocument,bool>>filter,stringcategory,Func<TDocument,IEnumerable<PrivacyDataReference>>select,StreamWriterwriter,CancellationTokenct):Task<long>"] =
+                "The compatibility helper delegates cursor traversal to PrivacyDocumentAccess while preserving page size, document/reference order, category serialization, count and cancellation.",
+            ["Zumbo.Api|PrivacyDataProcessorAdapter|method:WriteLineAsync:(StreamWriterwriter,PrivacyStreamLineline,CancellationTokenct):Task"] =
+                "The compatibility helper delegates to PrivacyStreamSerialization with the unchanged web-default JSON options, line format and cancellation.",
+            ["Zumbo.Api|PrivacyDataProcessorAdapter|method:WriteReferenceAsync:(StreamWriterwriter,stringcategory,PrivacyDataReferencereference,CancellationTokenct):Task"] =
+                "The compatibility helper delegates to PrivacyStreamSerialization with the unchanged reference kind, category, resource, detail, null profile and field order.",
             ["Zumbo.Api|AutomationEndpoints|method:AddAutomationEngine:(thisIServiceCollectionservices,IConfiguration?configuration=null):IServiceCollection"] =
                 "Automation run query, replay, retry, resume, execution, action-execution, and schedule-claim handlers remain registered; the work-item action adapter registration delegates to WorkItems composition while its original constructor, hosted service, and other automation registrations remain preserved under the exact runtime contract audit.",
             ["Zumbo.Api|AutomationWorkItemActionExecutor|method:ExecuteAsync:(AutomationActionExecutionexecution,CancellationTokenct):Task"] =
@@ -26,85 +105,245 @@ public sealed class RefactorSemanticPreservationTests
             ["Zumbo.Modules.WorkItems|Zumbo.Modules.WorkItems.DashboardRenderer|method:RenderSourceAsync:(stringprojectId,stringtype,DashboardFilterRequestfilter,CancellationTokenct):Task<DashboardWidgetSourceResponse>"] =
                 "The dashboard renderer selects project-summary, status-distribution, user-workload, due-date-risk, flow-time, completion-rate, and team-performance handlers when composed through its new constructor while its preserved constructor retains WorkItemService fallback; query values, filtering, columns, rows, source metadata, cancellation, degradation, and unsupported-widget behavior remain unchanged.",
             ["Zumbo.Api|WorkItemEndpoints|method:MapWorkItemEndpoints:(thisRouteGroupBuilderapi):void"] =
-                "The route host delegates approval, attachment, checklist, comment, label, planning, relation, work-item core and worklog routes to independent feature endpoint classes while preserving the original private mapping members in responsibility-grouped compatibility partials; all other mappings retain their route-specific partial delegation, and HTTP route, metadata, authorization, request, response, and handler equivalence is verified by the runtime contract audit.",
-            ["Zumbo.Api|WorkItemEndpoints|method:MapDeleteById:(RouteGroupBuildergroup):void"] =
-                "The preserved private compatibility member delegates to ArchiveWorkItemEndpoint while retaining route binding, authorization, correlation, handler, cancellation, archive response, and HTTP behavior.",
-            ["Zumbo.Api|WorkItemEndpoints|method:MapGetById:(RouteGroupBuildergroup):void"] =
-                "The preserved private compatibility member delegates to GetWorkItemEndpoint while retaining route binding, handler, cancellation, query, and response behavior.",
-            ["Zumbo.Api|WorkItemEndpoints|method:MapGetRoot:(RouteGroupBuildergroup):void"] =
-                "The preserved private compatibility member delegates to SearchWorkItemsEndpoint while retaining query binding, defaults, handler, rate limiting, cancellation, and response behavior.",
-            ["Zumbo.Api|WorkItemEndpoints|method:MapPatchByIdStatus:(RouteGroupBuildergroup):void"] =
-                "The preserved private compatibility member delegates to MoveWorkItemEndpoint while retaining route and request binding, authorization, correlation, handler, cancellation, and response behavior.",
-            ["Zumbo.Api|WorkItemEndpoints|method:MapPostByIdRestore:(RouteGroupBuildergroup):void"] =
-                "The preserved private compatibility member delegates to RestoreWorkItemEndpoint while retaining route binding, authorization, correlation, handler, cancellation, and response behavior.",
-            ["Zumbo.Api|WorkItemEndpoints|method:MapPostRoot:(RouteGroupBuildergroup):void"] =
-                "The preserved private compatibility member delegates to CreateWorkItemEndpoint while retaining request binding, authorization, correlation, handler, cancellation, created response, and HTTP behavior.",
-            ["Zumbo.Api|WorkItemEndpoints|method:MapPutById:(RouteGroupBuildergroup):void"] =
-                "The preserved private compatibility member delegates to UpdateWorkItemEndpoint while retaining route and request binding, authorization, correlation, handler, cancellation, and response behavior.",
-            ["Zumbo.Api|WorkItemEndpoints|method:MapPatchByIdParent:(RouteGroupBuildergroup):void"] =
-                "The preserved private compatibility member delegates to SetParentEndpoint while retaining route and request binding, authorization, correlation, handler, cancellation, and response behavior.",
-            ["Zumbo.Api|WorkItemEndpoints|method:MapPatchByIdAssignee:(RouteGroupBuildergroup):void"] =
-                "The preserved private compatibility member delegates to AssignWorkItemEndpoint while retaining route and request binding, authorization, correlation, handler, cancellation, and response behavior.",
-            ["Zumbo.Api|WorkItemEndpoints|method:MapPatchByIdPlanning:(RouteGroupBuildergroup):void"] =
-                "The preserved private compatibility member delegates to SetPlanningEndpoint while retaining route and request binding, authorization, handler, cancellation, and response behavior.",
-            ["Zumbo.Api|WorkItemEndpoints|method:MapPatchByIdRank:(RouteGroupBuildergroup):void"] =
-                "The preserved private compatibility member delegates to ReorderWorkItemEndpoint while retaining route and request binding, authorization, correlation, handler, cancellation, and response behavior.",
-            ["Zumbo.Api|WorkItemEndpoints|method:MapPatchByIdTeam:(RouteGroupBuildergroup):void"] =
-                "The preserved private compatibility member delegates to SetTeamEndpoint while retaining route and request binding, authorization, correlation, handler, cancellation, and response behavior.",
-            ["Zumbo.Api|WorkItemEndpoints|method:MapPostByIdComments:(RouteGroupBuildergroup):void"] =
-                "The preserved private compatibility member delegates to AddCommentEndpoint while retaining its signature and exact route, authorization, binding, handler, correlation, cancellation, and response contract.",
-            ["Zumbo.Api|WorkItemEndpoints|method:MapGetByIdComments:(RouteGroupBuildergroup):void"] =
-                "The preserved private compatibility member delegates to ListCommentsEndpoint while retaining its signature and exact route, paging defaults, binding, query service, cancellation, and response contract.",
-            ["Zumbo.Api|WorkItemEndpoints|method:MapGetByIdCommentsByCommentIdRevisions:(RouteGroupBuildergroup):void"] =
-                "The preserved private compatibility member delegates to ListCommentRevisionsEndpoint while retaining its signature and exact route, paging defaults, binding, query service, cancellation, and response contract.",
-            ["Zumbo.Api|WorkItemEndpoints|method:MapPutByIdCommentsByCommentId:(RouteGroupBuildergroup):void"] =
-                "The preserved private compatibility member delegates to EditCommentEndpoint while retaining its signature and exact route, authorization, binding, handler, correlation, cancellation, and response contract.",
-            ["Zumbo.Api|WorkItemEndpoints|method:MapDeleteByIdCommentsByCommentId:(RouteGroupBuildergroup):void"] =
-                "The preserved private compatibility member delegates to DeleteCommentEndpoint while retaining its signature and exact route, authorization, binding, handler, correlation, cancellation, and response contract.",
-            ["Zumbo.Api|WorkItemEndpoints|method:MapPostByIdLabels:(RouteGroupBuildergroup):void"] =
-                "The preserved private compatibility member delegates to AddLabelEndpoint while retaining its signature and exact route, authorization, binding, handler, request, cancellation, and response contract.",
-            ["Zumbo.Api|WorkItemEndpoints|method:MapDeleteByIdLabelsByLabel:(RouteGroupBuildergroup):void"] =
-                "The preserved private compatibility member delegates to RemoveLabelEndpoint while retaining its signature and exact route, authorization, binding, handler, route label value, cancellation, and response contract.",
-            ["Zumbo.Api|WorkItemEndpoints|method:MapPostByIdChecklist:(RouteGroupBuildergroup):void"] =
-                "The preserved private compatibility member delegates to AddChecklistItemEndpoint while retaining its signature and exact route, authorization, request binding, handler, cancellation, and response contract.",
-            ["Zumbo.Api|WorkItemEndpoints|method:MapPatchByIdChecklistByItemId:(RouteGroupBuildergroup):void"] =
-                "The preserved private compatibility member delegates to SetChecklistItemCompletionEndpoint while retaining its signature and exact route, authorization, route and request binding, handler, cancellation, and response contract.",
-            ["Zumbo.Api|WorkItemEndpoints|method:MapPostByIdRelations:(RouteGroupBuildergroup):void"] =
-                "The preserved private compatibility member delegates to LinkWorkItemEndpoint while retaining its signature and exact route, authorization, request binding, handler, correlation, cancellation, and response contract.",
-            ["Zumbo.Api|WorkItemEndpoints|method:MapDeleteByIdRelationsByRelatedWorkItemId:(RouteGroupBuildergroup):void"] =
-                "The preserved private compatibility member delegates to UnlinkWorkItemEndpoint while retaining its signature and exact route, authorization, route and query binding, handler, correlation, cancellation, and response contract.",
-            ["Zumbo.Api|WorkItemEndpoints|method:MapPostByIdWorklogs:(RouteGroupBuildergroup):void"] =
-                "The preserved private compatibility member delegates to AddWorkLogEndpoint while retaining its signature and exact route, authorization, request binding, handler, cancellation, and response contract.",
-            ["Zumbo.Api|WorkItemEndpoints|method:MapGetByIdWorklogs:(RouteGroupBuildergroup):void"] =
-                "The preserved private compatibility member delegates to ListWorkLogsEndpoint while retaining its signature and exact route, paging defaults, binding, query service, cancellation, and response contract.",
-            ["Zumbo.Api|WorkItemEndpoints|method:MapPostByIdAttachmentsUpload:(RouteGroupBuildergroup):void"] =
-                "The preserved private compatibility member delegates to UploadAttachmentEndpoint while retaining upload binding, stream lifetime, authorization, antiforgery, rate limiting, correlation, cancellation, and response behavior.",
-            ["Zumbo.Api|WorkItemEndpoints|method:MapGetByIdAttachments:(RouteGroupBuildergroup):void"] =
-                "The preserved private compatibility member delegates to ListAttachmentsEndpoint while retaining route, paging defaults, query service, cancellation, and response behavior.",
-            ["Zumbo.Api|WorkItemEndpoints|method:MapGetByIdAttachmentsByAttachmentIdDownload:(RouteGroupBuildergroup):void"] =
-                "The preserved private compatibility member delegates to DownloadAttachmentEndpoint while retaining route binding, no-cache headers, file metadata, range processing, cancellation, and stream response behavior.",
-            ["Zumbo.Api|WorkItemEndpoints|method:MapGetByIdAttachmentsByAttachmentIdPreview:(RouteGroupBuildergroup):void"] =
-                "The preserved private compatibility member delegates to PreviewAttachmentEndpoint while retaining preview validation, disposal, security and cache headers, inline disposition, range processing, cancellation, and stream response behavior.",
-            ["Zumbo.Api|WorkItemEndpoints|method:MapDeleteByIdAttachmentsByAttachmentId:(RouteGroupBuildergroup):void"] =
-                "The preserved private compatibility member delegates to DeleteAttachmentEndpoint while retaining route binding, authorization, correlation, handler, cancellation, and response behavior.",
-            ["Zumbo.Api|WorkItemEndpoints|method:MapPostByIdApprovals:(RouteGroupBuildergroup):void"] =
-                "The preserved private compatibility member delegates to RequestApprovalEndpoint while retaining route and request binding, authorization, correlation, handler, cancellation, and response behavior.",
-            ["Zumbo.Api|WorkItemEndpoints|method:MapPostByIdApprovalsByApprovalIdDecision:(RouteGroupBuildergroup):void"] =
-                "The preserved private compatibility member delegates to DecideApprovalEndpoint while retaining route and request binding, authorization, correlation, handler, cancellation, and response behavior.",
-            ["Zumbo.Api|WorkItemEndpoints|method:MapGetByIdApprovals:(RouteGroupBuildergroup):void"] =
-                "The preserved private compatibility member delegates to ListApprovalsEndpoint while retaining route binding, paging defaults, query service, cancellation, and response behavior.",
+                "The route host delegates activity, approval, attachment, bulk operations, checklist, comment, durable messaging, label, planning, realtime collaboration, recurrence/template, relation, report, schema, search, sprint-report, work-item core and worklog routes directly to independent feature endpoint classes; obsolete current-only private compatibility wrappers are removed while HTTP route, metadata, authorization, request, response, and handler equivalence remains verified by the runtime contract audit.",
             ["Zumbo.Api|IdentityEndpoints|method:AddIdentityModule:(thisIServiceCollectionservices):IServiceCollection"] =
                 "Identity handler registrations remain scoped but now use explicit factories so the composition root selects port-focused vertical-slice constructors while legacy constructors remain available for source compatibility.",
             ["Zumbo.Api|IdentityEndpoints|method:MapIdentityEndpoints:(thisRouteGroupBuilderapi):void"] =
                 "The login route now resolves the independent Login handler while preserving its HTTP route, rate limiting, request binding, and response mapping through the exact runtime contract audit.",
             ["Zumbo.Persistence.PostgreSql|Zumbo.Persistence.PostgreSql.PostgreSqlMigrationRunner|method:BuildMigrations:():IReadOnlyList<Migration>"] =
-                "Migration SQL constants moved from one method body to private fields while the ordered 37 Migration.Create calls remain in BuildMigrations; IDs, names, SQL, and checksums are verified by the runtime contract audit.",
+                "The ordered registry retains all 37 explicit Migration.Create calls while immutable definition types own each migration's exact Up and Down SQL; the first three catalog-derived definitions preserve their existing generation order, and the runtime audit verifies IDs, names, SQL, order, and checksum inputs.",
+            ["Zumbo.Persistence.PostgreSql|Zumbo.Persistence.PostgreSql.PostgreSqlExpressionTranslator|method:StripConvert:(Expressionexpression):Expression"] =
+                "The compatibility helper delegates to PostgreSqlExpressionUtilities while preserving iterative convert, checked-convert and quote stripping.",
+            ["Zumbo.Persistence.PostgreSql|Zumbo.Persistence.PostgreSql.PostgreSqlExpressionTranslator|method:Evaluate:(Expressionexpression):object?"] =
+                "The compatibility helper delegates to PostgreSqlExpressionUtilities while preserving dependency rejection, compiled captured-value evaluation and exact DocumentQueryException wrapping.",
+            ["Zumbo.Persistence.PostgreSql|Zumbo.Persistence.PostgreSql.PostgreSqlExpressionTranslator|method:DependsOnParameter:(Expressionexpression):bool"] =
+                "The compatibility helper delegates to PostgreSqlExpressionUtilities and its top-level parameter visitor while preserving traversal and first-parameter detection semantics.",
+            ["Zumbo.Persistence.PostgreSql|Zumbo.Persistence.PostgreSql.PostgreSqlExpressionTranslator|method:GetMemberPath:(MemberExpressionmember,ParameterExpressionroot):IReadOnlyList<string>"] =
+                "The compatibility helper delegates to PostgreSqlExpressionUtilities while preserving nullable Value skipping, JSON member names, root validation, path order and exception text.",
+            ["Zumbo.Persistence.PostgreSql|Zumbo.Persistence.PostgreSql.PostgreSqlExpressionTranslator|method:UnwrapLambda:(Expressionexpression):LambdaExpression"] =
+                "The compatibility helper delegates to PostgreSqlExpressionUtilities while preserving conversion/quote handling and the exact unsupported-predicate exception.",
+            ["Zumbo.Persistence.PostgreSql|Zumbo.Persistence.PostgreSql.PostgreSqlExpressionTranslator|method:Unsupported:(Expressionexpression):DocumentQueryException"] =
+                "The compatibility helper delegates to PostgreSqlExpressionUtilities while preserving expression text, node type and DocumentQueryException contract.",
+            ["Zumbo.Persistence.PostgreSql|Zumbo.Persistence.PostgreSql.PostgreSqlExpressionTranslator|method:IsAny:(MethodCallExpressioncall):bool"] =
+                "The compatibility helper delegates to PostgreSqlExpressionUtilities while preserving Enumerable.Any declaration and argument-count classification.",
+            ["Zumbo.Persistence.PostgreSql|Zumbo.Persistence.PostgreSql.PostgreSqlExpressionTranslator|method:IsContains:(MethodCallExpressioncall):bool"] =
+                "The compatibility helper delegates to PostgreSqlExpressionUtilities while preserving Enumerable/IList Contains classification and string exclusion.",
+            ["Zumbo.Persistence.PostgreSql|Zumbo.Persistence.PostgreSql.PostgreSqlExpressionTranslator|method:IsComparison:(ExpressionTypetype):bool"] =
+                "The compatibility helper delegates to PostgreSqlExpressionUtilities while preserving the exact supported comparison node set.",
+            ["Zumbo.Persistence.PostgreSql|Zumbo.Persistence.PostgreSql.PostgreSqlExpressionTranslator|method:IsNull:(Expressionexpression):bool"] =
+                "The compatibility helper delegates to PostgreSqlExpressionUtilities while preserving dependency short-circuiting and captured null evaluation.",
+            ["Zumbo.Persistence.PostgreSql|Zumbo.Persistence.PostgreSql.PostgreSqlExpressionTranslator|method:NonNullable:(Typetype):Type"] =
+                "The compatibility helper delegates to PostgreSqlExpressionUtilities while preserving nullable underlying-type resolution.",
+            ["Zumbo.Persistence.PostgreSql|Zumbo.Persistence.PostgreSql.PostgreSqlExpressionTranslator|method:CastJsonText:(stringsql,Typetype):string"] =
+                "The compatibility helper delegates to PostgreSqlJsonTranslation while preserving scalar type selection, timestamp parser use, enum casts and unsupported-member exceptions.",
+            ["Zumbo.Persistence.PostgreSql|Zumbo.Persistence.PostgreSql.PostgreSqlExpressionTranslator|method:JsonName:(MemberInfomember):string"] =
+                "The compatibility helper delegates to PostgreSqlJsonTranslation while preserving JsonPropertyName precedence and member-name fallback.",
+            ["Zumbo.Persistence.PostgreSql|Zumbo.Persistence.PostgreSql.PostgreSqlExpressionTranslator|method:JsonText:(stringroot,IReadOnlyList<string>path):string"] =
+                "The compatibility helper delegates to PostgreSqlJsonTranslation while preserving the PostgreSQL JSON text-path operator and path-array formatting.",
+            ["Zumbo.Persistence.PostgreSql|Zumbo.Persistence.PostgreSql.PostgreSqlExpressionTranslator|method:JsonValue:(stringroot,IReadOnlyList<string>path):string"] =
+                "The compatibility helper delegates to PostgreSqlJsonTranslation while preserving the PostgreSQL JSON value-path operator and path-array formatting.",
+            ["Zumbo.Persistence.PostgreSql|Zumbo.Persistence.PostgreSql.PostgreSqlExpressionTranslator|method:PathArray:(IEnumerable<string>path):string"] =
+                "The compatibility helper delegates to PostgreSqlJsonTranslation while preserving path order, quoting and ordinal apostrophe escaping.",
+            ["Zumbo.Persistence.PostgreSql|Zumbo.Persistence.PostgreSql.PostgreSqlExpressionTranslator|property:Parameters:IReadOnlyList<NpgsqlParameter>"] =
+                "The compatibility property delegates to the lifetime-scoped PostgreSqlParameterCollector while preserving ordinal order and the read-only list contract.",
+            ["Zumbo.Persistence.PostgreSql|Zumbo.Persistence.PostgreSql.PostgreSqlExpressionTranslator|method:AddParameter:(object?value,TypeexpectedType):string"] =
+                "The compatibility helper delegates to PostgreSqlParameterCollector while preserving pN naming, normalization, null-to-DBNull behavior, NpgsqlParameter construction and insertion order.",
+            ["Zumbo.Persistence.PostgreSql|Zumbo.Persistence.PostgreSql.PostgreSqlExpressionTranslator|method:AddJsonParameter:(stringjson):string"] =
+                "The compatibility helper delegates to PostgreSqlParameterCollector while preserving pN naming, Jsonb type, exact JSON value, NpgsqlParameter construction and insertion order.",
+            ["Zumbo.Persistence.PostgreSql|Zumbo.Persistence.PostgreSql.PostgreSqlExpressionTranslator|method:AddParameters:(NpgsqlCommandcommand):void"] =
+                "The compatibility method delegates to PostgreSqlParameterCollector while preserving parameter object identity and ordinal command attachment.",
+            ["Zumbo.Persistence.PostgreSql|Zumbo.Persistence.PostgreSql.PostgreSqlExpressionTranslator|method:NormalizeParameter:(object?value,Typetype):object?"] =
+                "The compatibility helper delegates to PostgreSqlParameterCollector while preserving null, enum, DateTime kind, Guid, Uri and passthrough normalization behavior.",
+            ["Zumbo.Persistence.PostgreSql|Zumbo.Persistence.PostgreSql.PostgreSqlExpressionTranslator|method:TranslatePredicate<TDocument>:(Expression<Func<TDocument,bool>>expression):string"] =
+                "The public compatibility entry delegates to PostgreSqlPredicateTranslator while preserving null validation, document-column scope, traversal, SQL and parameter order.",
+            ["Zumbo.Persistence.PostgreSql|Zumbo.Persistence.PostgreSql.PostgreSqlExpressionTranslator|method:TranslateOrder<TDocument>:(Expression<Func<TDocument,object>>expression):string"] =
+                "The public compatibility entry delegates to PostgreSqlPredicateTranslator while preserving null validation, conversion stripping, document-column scope and scalar SQL.",
+            ["Zumbo.Persistence.PostgreSql|Zumbo.Persistence.PostgreSql.PostgreSqlExpressionTranslator|method:VisitPredicate:(Expressionexpression,Scopescope):string"] =
+                "The compatibility helper delegates to PostgreSqlPredicateTranslator while preserving dependency evaluation, boolean recursion, method dispatch, SQL parentheses and unsupported behavior.",
+            ["Zumbo.Persistence.PostgreSql|Zumbo.Persistence.PostgreSql.PostgreSqlExpressionTranslator|method:VisitComparison:(BinaryExpressionexpression,Scopescope):string"] =
+                "The compatibility helper delegates to PostgreSqlPredicateTranslator while preserving null handling, scalar preference, operators, SQL and exceptions.",
+            ["Zumbo.Persistence.PostgreSql|Zumbo.Persistence.PostgreSql.PostgreSqlExpressionTranslator|method:VisitBooleanMethod:(MethodCallExpressioncall,Scopescope):string"] =
+                "The compatibility helper delegates to PostgreSqlPredicateTranslator while preserving Any/string/Contains/object-equality dispatch order and SQL.",
+            ["Zumbo.Persistence.PostgreSql|Zumbo.Persistence.PostgreSql.PostgreSqlExpressionTranslator|method:VisitStringEquals:(MethodCallExpressioncall,Scopescope):string"] =
+                "The compatibility helper delegates to PostgreSqlPredicateTranslator while preserving ordinal and ordinal-ignore-case SQL plus unsupported comparison exceptions.",
+            ["Zumbo.Persistence.PostgreSql|Zumbo.Persistence.PostgreSql.PostgreSqlExpressionTranslator|method:VisitContains:(MethodCallExpressioncall,Scopescope):string"] =
+                "The compatibility helper delegates to PostgreSqlPredicateTranslator while preserving captured-list and document-JSON collection behavior, parameter order and exact failures.",
+            ["Zumbo.Persistence.PostgreSql|Zumbo.Persistence.PostgreSql.PostgreSqlExpressionTranslator|method:VisitAny:(MethodCallExpressioncall,Scopescope):string"] =
+                "The compatibility helper delegates to PostgreSqlPredicateTranslator with shared lifetime state while preserving JSON alias consumption, EXISTS SQL and nested predicate traversal.",
+            ["Zumbo.Persistence.PostgreSql|Zumbo.Persistence.PostgreSql.PostgreSqlExpressionTranslator|method:VisitScalar:(Expressionexpression,Scopescope,Type?preferredType=null):SqlValue"] =
+                "The compatibility helper delegates to PostgreSqlPredicateTranslator while preserving captured parameters, document columns, JSON casts, nullable handling, string methods and scalar result type.",
+            ["Zumbo.Persistence.PostgreSql|Zumbo.Persistence.PostgreSql.PostgreSqlExpressionTranslator|method:VisitJson:(Expressionexpression,Scopescope):string"] =
+                "The compatibility helper delegates to PostgreSqlPredicateTranslator while preserving convert stripping, element scope, member-path JSON SQL and unsupported behavior.",
+            ["Zumbo.Persistence.PostgreSql|Zumbo.Persistence.PostgreSql.PostgreSqlExpressionTranslator|field:jsonAliasIndex:int"] =
+                "The preserved compatibility field states its CLR-default zero initializer explicitly and uses a narrowly scoped unused-field warning suppression solely to retain the baseline member; active aliases use equivalent zero-based lifetime state.",
             ["Zumbo.BuildingBlocks.Infrastructure|Zumbo.BuildingBlocks.Infrastructure.Search.OpenSearchWorkItemSearchIndex|method:InitializeAsync:(CancellationTokencancellationToken=default):Task"] =
-                "Initialization now detects the pre-alias concrete index layout and delegates to a lossless, count-verified reindex migration before atomically installing the write alias; unit and live runtime checks cover both success and fail-closed behavior.",
+                "The public compatibility method delegates to OpenSearchIndexManager, which preserves configuration validation, versioned-index creation, pre-alias concrete-index detection, lossless count-verified migration, atomic write-alias installation, cancellation, and failure behavior.",
+            ["Zumbo.BuildingBlocks.Infrastructure|Zumbo.BuildingBlocks.Infrastructure.Search.OpenSearchWorkItemSearchIndex|ctor:(HttpClienthttpClient,IOptions<OpenSearchOptions>options,IExternalDependencyPolicyProvider?policyProvider)"] =
+                "The preserved constructor resolves the same OpenSearch policy and creates independent transport, index-manager, bulk-writer, query and response-parser components while retaining all baseline fields, options, signatures, constructor chaining, and the exact rebuild semaphore shared by migration and public rebuild.",
+            ["Zumbo.BuildingBlocks.Infrastructure|Zumbo.BuildingBlocks.Infrastructure.Search.OpenSearchWorkItemSearchIndex|method:CreateBulkPayload:(IEnumerable<WorkItemSearchRecord>records):string"] =
+                "The compatibility helper delegates to OpenSearchBulkWriter's unchanged ordinal record ordering, web-default action/document JSON serialization, identifiers, line order, and trailing newlines.",
+            ["Zumbo.BuildingBlocks.Infrastructure|Zumbo.BuildingBlocks.Infrastructure.Search.OpenSearchWorkItemSearchIndex|method:DeleteAsync:(stringid,CancellationTokencancellationToken=default):Task"] =
+                "The public compatibility method delegates to OpenSearchBulkWriter while preserving alias targeting, identifier escaping, not-found handling, transport, cancellation, response disposal, and signature.",
+            ["Zumbo.BuildingBlocks.Infrastructure|Zumbo.BuildingBlocks.Infrastructure.Search.OpenSearchWorkItemSearchIndex|method:IndexAsync:(WorkItemSearchRecordrecord,CancellationTokencancellationToken=default):Task"] =
+                "The public compatibility method delegates to OpenSearchBulkWriter while preserving scope validation order and message, alias targeting, identifier escaping, record serialization, transport, cancellation, response disposal, and signature.",
+            ["Zumbo.BuildingBlocks.Infrastructure|Zumbo.BuildingBlocks.Infrastructure.Search.OpenSearchWorkItemSearchIndex|method:RebuildAsync:(IReadOnlyCollection<WorkItemSearchRecord>records,CancellationTokencancellationToken=default):Task<WorkItemSearchRebuildResult>"] =
+                "The public compatibility method delegates to OpenSearchBulkWriter using the adapter's exact rebuild semaphore and index manager while preserving validation order, revision naming, deterministic NDJSON, bulk and count checks, alias replacement, removed-count clamp, cleanup, cancellation, disposal, exception behavior, semaphore release, and signature.",
+            ["Zumbo.BuildingBlocks.Infrastructure|Zumbo.BuildingBlocks.Infrastructure.Search.OpenSearchWorkItemSearchIndex|method:ValidateConfiguration:(OpenSearchOptionsoptions):void"] =
+                "The public compatibility method delegates to OpenSearchValidation while preserving URI parsing, scheme and insecure-HTTP rules, index-name checks, mapping/shard/replica bounds, credential pairing, timeout/circuit/reindex bounds, exception types, exact messages, and signature.",
+            ["Zumbo.BuildingBlocks.Infrastructure|Zumbo.BuildingBlocks.Infrastructure.Search.OpenSearchWorkItemSearchIndex|method:ValidateScope:(stringorganizationId,stringprojectId):void"] =
+                "The private compatibility helper delegates to OpenSearchValidation while preserving whitespace handling, validation order, ArgumentException type, exact message, and signature.",
+            ["Zumbo.BuildingBlocks.Infrastructure|Zumbo.BuildingBlocks.Infrastructure.Search.OpenSearchWorkItemSearchIndex|method:ChangeAliasAsync:(IReadOnlyCollection<string>oldIndexes,stringnewIndex,CancellationTokencancellationToken):Task"] =
+                "The compatibility helper delegates to OpenSearchIndexManager while preserving old-index filtering, ordered remove/add actions, write-index selection, URL, transport, cancellation, and response disposal.",
+            ["Zumbo.BuildingBlocks.Infrastructure|Zumbo.BuildingBlocks.Infrastructure.Search.OpenSearchWorkItemSearchIndex|method:CountAsync:(stringindexName,CancellationTokencancellationToken):Task<long>"] =
+                "The compatibility helper delegates to OpenSearchIndexManager while preserving the count URL, transport, web-default response projection, null fallback, cancellation, and response disposal.",
+            ["Zumbo.BuildingBlocks.Infrastructure|Zumbo.BuildingBlocks.Infrastructure.Search.OpenSearchWorkItemSearchIndex|method:EnsureIndexAsync:(stringindexName,CancellationTokencancellationToken):Task"] =
+                "The compatibility helper delegates to OpenSearchIndexManager while preserving the HEAD/create/confirm sequence, mapping body, race recovery, cancellation, exception behavior, and response disposal.",
+            ["Zumbo.BuildingBlocks.Infrastructure|Zumbo.BuildingBlocks.Infrastructure.Search.OpenSearchWorkItemSearchIndex|method:GetAliasIndexesAsync:(CancellationTokencancellationToken):Task<IReadOnlyList<string>>"] =
+                "The compatibility helper delegates to OpenSearchIndexManager while preserving alias lookup, not-found empty result, JSON parsing, ordinal ordering, cancellation, and disposal.",
+            ["Zumbo.BuildingBlocks.Infrastructure|Zumbo.BuildingBlocks.Infrastructure.Search.OpenSearchWorkItemSearchIndex|method:IndexDefinition:():object"] =
+                "The compatibility helper delegates to OpenSearchIndexManager's unchanged shard, replica, strict mapping, mapping-version metadata, field definitions, and property order.",
+            ["Zumbo.BuildingBlocks.Infrastructure|Zumbo.BuildingBlocks.Infrastructure.Search.OpenSearchWorkItemSearchIndex|method:MigrateLegacyConcreteIndexAsync:(CancellationTokencancellationToken):Task"] =
+                "The compatibility helper delegates to OpenSearchIndexManager using the adapter's exact rebuild semaphore while preserving migration naming, reindex request, before/after counts, atomic replacement, cleanup, timeout, cancellation, exception behavior, and semaphore release.",
+            ["Zumbo.BuildingBlocks.Infrastructure|Zumbo.BuildingBlocks.Infrastructure.Search.OpenSearchWorkItemSearchIndex|method:BuildLegacyMigrationIndexName:():string"] =
+                "The compatibility helper delegates to OpenSearchIndexManager's unchanged version, UTC timestamp, GUID, legacy suffix, and 255-character clamp.",
+            ["Zumbo.BuildingBlocks.Infrastructure|Zumbo.BuildingBlocks.Infrastructure.Search.OpenSearchWorkItemSearchIndex|method:ReadReindexTaskIdAsync:(HttpResponseMessageresponse,CancellationTokencancellationToken):Task<string>"] =
+                "The compatibility helper delegates to OpenSearchIndexManager's unchanged response parsing, task validation, cancellation, disposal, and exception contract.",
+            ["Zumbo.BuildingBlocks.Infrastructure|Zumbo.BuildingBlocks.Infrastructure.Search.OpenSearchWorkItemSearchIndex|method:WaitForReindexAsync:(stringtaskId,CancellationTokencancellationToken):Task"] =
+                "The compatibility helper delegates to OpenSearchIndexManager's unchanged ten-minute timeout, escaped task polling, unavailable retry, incomplete delay, task validation, cancellation, disposal, and timeout translation.",
+            ["Zumbo.BuildingBlocks.Infrastructure|Zumbo.BuildingBlocks.Infrastructure.Search.OpenSearchWorkItemSearchIndex|method:EnsureReindexTaskSucceeded:(JsonElementtask):void"] =
+                "The compatibility helper delegates to OpenSearchIndexManager's unchanged task-error and item-failure validation with exact exception contracts.",
+            ["Zumbo.BuildingBlocks.Infrastructure|Zumbo.BuildingBlocks.Infrastructure.Search.OpenSearchWorkItemSearchIndex|method:ReplaceLegacyConcreteIndexWithAliasAsync:(stringmigrationIndex,CancellationTokencancellationToken):Task"] =
+                "The compatibility helper delegates to OpenSearchIndexManager while preserving ordered remove-index/add-alias actions, write-index selection, URL, transport, cancellation, and disposal.",
+            ["Zumbo.BuildingBlocks.Infrastructure|Zumbo.BuildingBlocks.Infrastructure.Search.OpenSearchWorkItemSearchIndex|method:TryDeleteIndexAsync:(stringindexName,CancellationTokencancellationToken):Task"] =
+                "The compatibility helper delegates to OpenSearchIndexManager while preserving best-effort deletion, not-found handling, cancellation propagation, non-cancellation suppression, and disposal.",
+            ["Zumbo.BuildingBlocks.Infrastructure|Zumbo.BuildingBlocks.Infrastructure.Search.OpenSearchWorkItemSearchIndex|method:KeywordField:():object"] =
+                "The compatibility helper delegates to OpenSearchIndexManager's unchanged keyword type and ignore-above mapping.",
+            ["Zumbo.BuildingBlocks.Infrastructure|Zumbo.BuildingBlocks.Infrastructure.Search.OpenSearchWorkItemSearchIndex|method:SearchableKeywordField:():object"] =
+                "The compatibility helper delegates to OpenSearchIndexManager's unchanged text field with nested keyword mapping.",
+            ["Zumbo.BuildingBlocks.Infrastructure|Zumbo.BuildingBlocks.Infrastructure.Search.OpenSearchWorkItemSearchIndex|method:CloneAsync:(HttpRequestMessagesource,CancellationTokencancellationToken):Task<HttpRequestMessage>"] =
+                "The compatibility helper delegates to OpenSearchTransport while preserving request method, URI, version, policy, headers, content bytes, cancellation, and async signature.",
+            ["Zumbo.BuildingBlocks.Infrastructure|Zumbo.BuildingBlocks.Infrastructure.Search.OpenSearchWorkItemSearchIndex|method:JsonRequest:(HttpMethodmethod,stringurl,objectbody):HttpRequestMessage"] =
+                "The compatibility helper delegates to OpenSearchTransport's unchanged web-default JSON request construction.",
+            ["Zumbo.BuildingBlocks.Infrastructure|Zumbo.BuildingBlocks.Infrastructure.Search.OpenSearchWorkItemSearchIndex|method:SendAsync:(HttpRequestMessagerequest,boolallowNotFound=false,CancellationTokencancellationToken=default):Task<HttpResponseMessage>"] =
+                "The compatibility helper delegates to OpenSearchTransport while preserving policy selection, retry execution, exception translation, local-circuit fallback, cancellation, and response ownership.",
+            ["Zumbo.BuildingBlocks.Infrastructure|Zumbo.BuildingBlocks.Infrastructure.Search.OpenSearchWorkItemSearchIndex|method:SendAttemptAsync:(HttpRequestMessagerequest,boolallowNotFound,booluseLocalCircuit,CancellationTokencancellationToken):Task<HttpResponseMessage>"] =
+                "The compatibility helper delegates to OpenSearchTransport while preserving authentication, timeout, transient handling, not-found behavior, circuit updates, exception translation, cancellation, and response ownership.",
+            ["Zumbo.BuildingBlocks.Infrastructure|Zumbo.BuildingBlocks.Infrastructure.Search.OpenSearchWorkItemSearchIndex|method:IsTransient:(HttpStatusCodestatusCode):bool"] =
+                "The compatibility helper delegates to OpenSearchTransport's unchanged request-timeout, rate-limit, and server-error classification.",
+            ["Zumbo.BuildingBlocks.Infrastructure|Zumbo.BuildingBlocks.Infrastructure.Search.OpenSearchWorkItemSearchIndex|method:RegisterFailure:():void"] =
+                "The compatibility helper delegates to the transport-owned circuit state while preserving threshold and open-until timing behavior.",
+            ["Zumbo.BuildingBlocks.Infrastructure|Zumbo.BuildingBlocks.Infrastructure.Search.OpenSearchWorkItemSearchIndex|method:ResetCircuit:():void"] =
+                "The compatibility helper delegates to the transport-owned circuit state while preserving atomic failure-count and open-time reset behavior.",
+            ["Zumbo.BuildingBlocks.Infrastructure|Zumbo.BuildingBlocks.Infrastructure.Search.OpenSearchWorkItemSearchIndex|method:ThrowIfCircuitOpen:():void"] =
+                "The compatibility helper delegates to the transport-owned circuit state while preserving open rejection and elapsed-circuit reset behavior.",
+            ["Zumbo.BuildingBlocks.Infrastructure|Zumbo.BuildingBlocks.Infrastructure.Search.OpenSearchWorkItemSearchIndex|method:AddTermFilter:(List<object>filters,stringfield,string?value):void"] =
+                "The compatibility helper delegates to OpenSearchQueryClient's unchanged non-empty exact-term filter projection.",
+            ["Zumbo.BuildingBlocks.Infrastructure|Zumbo.BuildingBlocks.Infrastructure.Search.OpenSearchWorkItemSearchIndex|method:ExactCustomFieldValue:(stringkey,stringvalue):string"] =
+                "The compatibility helper delegates to OpenSearchQueryClient's unchanged trimmed unit-separator exact custom-field encoding.",
+            ["Zumbo.BuildingBlocks.Infrastructure|Zumbo.BuildingBlocks.Infrastructure.Search.OpenSearchWorkItemSearchIndex|method:SearchAsync:(WorkItemSearchQueryquery,CancellationTokencancellationToken=default):Task<WorkItemSearchResult>"] =
+                "The public compatibility method delegates to the query client and response parser while preserving scope validation, DSL field and filter order, text matching, paging clamps, transport cancellation, hit order, total count, and result contract.",
             ["Zumbo.Api|MongoMigrationRunner|method:ApplyIndexesAsync:(stringmigrationId,IReadOnlyList<MongoIndexSpecification>indexes,CancellationTokencancellationToken):Task<MongoMigrationOutcome>"] =
                 "Index application preserves catalog checksums while accepting semantically equivalent legacy names and skipping superseded identity and notification definitions whose dedicated later migrations own the valid replacements.",
             ["Zumbo.Api|MongoMigrationRunner|method:RunAsync:(CancellationTokencancellationToken=default):Task<MongoMigrationRunReport>"] =
                 "Startup now always runs idempotent compatibility migrations that normalize legacy user document versions and remove infrastructure-only migration markers; optional high-volume business backfills remain explicitly gated.",
+            ["Zumbo.Api|MongoMigrationRunner|method:BackfillUserVersionsAsync:(CancellationTokencancellationToken):Task<MongoMigrationOutcome>"] =
+                "The compatibility facade delegates user-version normalization to an independent Mongo migration definition through the narrow execution-context port while preserving the migration ID, checksum, filters, checkpoint order, lease, batch, dry-run, and outcome behavior.",
+            ["Zumbo.Api|MongoMigrationRunner|method:UserVersionFilter:(BsonValuecheckpoint):FilterDefinition<BsonDocument>"] =
+                "The compatibility helper delegates to the user-version definition's unchanged missing, null, non-positive, and checkpoint filter.",
+            ["Zumbo.Api|MongoMigrationRunner|method:UserVersionForId:(BsonValueid):FilterDefinition<BsonDocument>"] =
+                "The compatibility helper delegates to the user-version definition's unchanged identity and version guard filter.",
+            ["Zumbo.Api|MongoMigrationRunner|method:CleanupLegacyMigrationMarkersAsync:(CancellationTokencancellationToken):Task<MongoMigrationOutcome>"] =
+                "The compatibility facade delegates legacy marker cleanup to an independent Mongo migration definition through the narrow execution-context port while preserving targets, marker filters, dry-run counts, ledger, lease, updates, and outcomes.",
+            ["Zumbo.Api|MongoMigrationRunner|method:BackfillApiKeyVersionsAsync:(CancellationTokencancellationToken):Task<MongoMigrationOutcome>"] =
+                "The compatibility facade delegates API-key version and scalar UTC normalization to an independent Mongo definition while preserving migration identity, checksum, filters, checkpoint order, batch saves, lease, dry-run, and update behavior.",
+            ["Zumbo.Api|MongoMigrationRunner|method:ApiKeyVersionFilter:(BsonValuecheckpoint):FilterDefinition<BsonDocument>"] =
+                "The compatibility helper delegates to the API-key definition's unchanged version and scalar UTC candidate filter.",
+            ["Zumbo.Api|MongoMigrationRunner|method:ApiKeyVersionForId:(BsonValueid):FilterDefinition<BsonDocument>"] =
+                "The compatibility helper delegates to the API-key definition's unchanged identity and migration guard filter.",
+            ["Zumbo.Api|MongoMigrationRunner|method:BackfillOrganizationVersionsAsync:(CancellationTokencancellationToken):Task<MongoMigrationOutcome>"] =
+                "The compatibility facade delegates organization version/status normalization to an independent Mongo definition while preserving migration identity, checksum, filters, checkpoints, batching, lease, dry-run, and updates.",
+            ["Zumbo.Api|MongoMigrationRunner|method:OrganizationVersionFilter:(BsonValuecheckpoint):FilterDefinition<BsonDocument>"] =
+                "The compatibility helper delegates to the organization definition's unchanged missing, null, non-positive, and checkpoint filter.",
+            ["Zumbo.Api|MongoMigrationRunner|method:OrganizationVersionForId:(BsonValueid):FilterDefinition<BsonDocument>"] =
+                "The compatibility helper delegates to the organization definition's unchanged identity and version guard filter.",
+            ["Zumbo.Api|MongoMigrationRunner|method:ExpireLegacyTeamInvitesAsync:(CancellationTokencancellationToken):Task<MongoMigrationOutcome>"] =
+                "The compatibility facade delegates legacy team-invite expiry to an independent Mongo definition while preserving migration marker, version increment, invitation mutation, checkpoint, lease, batch, dry-run, and replace behavior.",
+            ["Zumbo.Api|MongoMigrationRunner|method:LegacyTeamInviteFilter:(BsonValuecheckpoint):FilterDefinition<BsonDocument>"] =
+                "The compatibility helper delegates to the team-invite definition's unchanged invited-without-hash and checkpoint filter.",
+            ["Zumbo.Api|MongoMigrationRunner|method:TeamVersionForId:(BsonValueid,longversion):FilterDefinition<BsonDocument>"] =
+                "The compatibility helper delegates to the team-invite definition's unchanged identity and optimistic version guard.",
+            ["Zumbo.Api|MongoMigrationRunner|method:BackfillProjectLifecycleAsync:(CancellationTokencancellationToken):Task<MongoMigrationOutcome>"] =
+                "The compatibility facade delegates project lifecycle normalization to an independent Mongo definition while preserving migration identity, checksum, defaults, optimistic version guard, checkpoints, lease, batching, dry-run, and outcomes.",
+            ["Zumbo.Api|MongoMigrationRunner|method:ProjectLifecycleFilter:(BsonValuecheckpoint):FilterDefinition<BsonDocument>"] =
+                "The compatibility helper delegates to the project lifecycle definition's unchanged candidate and checkpoint filter.",
+            ["Zumbo.Api|MongoMigrationRunner|method:ProjectVersionForId:(BsonValueid,longversion):FilterDefinition<BsonDocument>"] =
+                "The compatibility helper delegates to the project lifecycle definition's unchanged identity and optimistic version guard.",
+            ["Zumbo.Api|MongoMigrationRunner|method:AddProjectDefault:(BsonDocumentdocument,ICollection<UpdateDefinition<BsonDocument>>updates,stringfield,BsonValuevalue):void"] =
+                "The compatibility helper delegates to the project lifecycle definition's unchanged missing-or-null default update behavior.",
+            ["Zumbo.Api|MongoMigrationRunner|method:BackfillWorkflowLifecycleAsync:(CancellationTokencancellationToken):Task<MongoMigrationOutcome>"] =
+                "The compatibility facade delegates workflow lifecycle normalization to an independent Mongo definition while preserving status schemes, published version projection, optimistic version guard, checkpoints, lease, batching, dry-run, and outcomes.",
+            ["Zumbo.Api|MongoMigrationRunner|method:WorkflowLifecycleFilter:(BsonValuecheckpoint):FilterDefinition<BsonDocument>"] =
+                "The compatibility helper delegates to the workflow lifecycle definition's unchanged candidate and checkpoint filter.",
+            ["Zumbo.Api|MongoMigrationRunner|method:WorkflowVersionForId:(BsonValueid,longversion):FilterDefinition<BsonDocument>"] =
+                "The compatibility helper delegates to the workflow lifecycle definition's unchanged identity and optimistic version guard.",
+            ["Zumbo.Api|MongoMigrationRunner|method:BackfillSprintLifecycleAsync:(CancellationTokencancellationToken):Task<MongoMigrationOutcome>"] =
+                "The compatibility facade delegates sprint lifecycle normalization to an independent Mongo definition while preserving deterministic sprint creation, work-item updates, optimistic version guard, checkpoints, lease, batching, dry-run, and outcomes.",
+            ["Zumbo.Api|MongoMigrationRunner|method:SprintLifecycleFilter:(BsonValuecheckpoint):FilterDefinition<BsonDocument>"] =
+                "The compatibility helper delegates to the sprint lifecycle definition's unchanged legacy sprint and checkpoint filter.",
+            ["Zumbo.Api|MongoMigrationRunner|method:LegacySprintId:(stringprojectId,stringsprintId):string"] =
+                "The compatibility helper delegates to the sprint lifecycle definition's unchanged deterministic MD5 identifier generation.",
+            ["Zumbo.Api|MongoMigrationRunner|method:BackfillWorkItemTypeSchemasAsync:(CancellationTokencancellationToken):Task<MongoMigrationOutcome>"] =
+                "The compatibility facade delegates work-item type schema normalization to an independent Mongo definition while preserving default schema creation, custom type projection, optimistic version guard, checkpoints, lease, batching, dry-run, and outcomes.",
+            ["Zumbo.Api|MongoMigrationRunner|method:WorkItemTypeSchemaFilter:(BsonValuecheckpoint):FilterDefinition<BsonDocument>"] =
+                "The compatibility helper delegates to the type-schema definition's unchanged candidate and checkpoint filter.",
+            ["Zumbo.Api|MongoMigrationRunner|method:DefaultIssueTypes:():BsonArray"] =
+                "The compatibility helper delegates to the type-schema definition's unchanged default issue-type projection.",
+            ["Zumbo.Api|MongoMigrationRunner|method:DefaultIssueTypeLayouts:():BsonArray"] =
+                "The compatibility helper delegates to the type-schema definition's unchanged default layout projection.",
+            ["Zumbo.Api|MongoMigrationRunner|method:IssueType:(stringkey,stringname,stringhierarchy,intposition):BsonDocument"] =
+                "The compatibility helper delegates to the type-schema definition's unchanged issue-type document projection.",
+            ["Zumbo.Api|MongoMigrationRunner|method:BackfillWorkItemGraphAsync:(CancellationTokencancellationToken):Task<MongoMigrationOutcome>"] =
+                "The compatibility facade delegates work-item graph normalization to an independent Mongo definition while preserving relation parsing, deterministic edge upserts, dependency direction, checkpoints, lease, batching, dry-run, and outcomes.",
+            ["Zumbo.Api|MongoMigrationRunner|method:WorkItemGraphFilter:(BsonValuecheckpoint):FilterDefinition<BsonDocument>"] =
+                "The compatibility helper delegates to the graph definition's unchanged relation and checkpoint filter.",
+            ["Zumbo.Api|MongoMigrationRunner|method:WorkItemRelationEdgeId:(stringprojectId,stringsourceWorkItemId,stringtargetWorkItemId,stringrelationType):string"] =
+                "The compatibility helper delegates to the graph definition's unchanged deterministic MD5 edge identifier generation.",
+            ["Zumbo.Api|MongoMigrationRunner|method:NormalizeGraphRelationType:(string?relationType):string?"] =
+                "The compatibility helper delegates to the graph definition's unchanged relation-type normalization.",
+            ["Zumbo.Api|MongoMigrationRunner|method:BackfillRanksAsync:(CancellationTokencancellationToken):Task<MongoMigrationOutcome>"] =
+                "The compatibility facade delegates rank normalization to an independent Mongo definition while preserving migration identity, checksum, rollback reset, backup records, candidate guards, checkpoints, lease, batching, dry-run, and outcomes.",
+            ["Zumbo.Api|MongoMigrationRunner|method:RankCandidateFilter:(BsonValuecheckpoint):FilterDefinition<BsonDocument>"] =
+                "The compatibility helper delegates to the rank definition's unchanged missing-or-zero candidate and checkpoint filter.",
+            ["Zumbo.Api|MongoMigrationRunner|method:RankCandidateForId:(BsonValueid):FilterDefinition<BsonDocument>"] =
+                "The compatibility helper delegates to the rank definition's unchanged identity and missing-or-zero update guard.",
+            ["Zumbo.Api|MongoMigrationRunner|method:TryResolveRank:(BsonValuecreatedAt,outlongrank):bool"] =
+                "The preserved public helper delegates to the rank definition while retaining supported BSON representations, exception masking, positive bounds, signature, and result.",
+            ["Zumbo.Api|MongoMigrationRunner|method:ResolveDocumentTicks:(BsonDocumentdocument):long"] =
+                "The compatibility helper delegates to the rank definition's unchanged Ticks and BSON DateTime resolution behavior.",
+            ["Zumbo.Api|MongoMigrationRunner|method:BackfillRefreshSessionsAsync:(CancellationTokencancellationToken):Task<MongoMigrationOutcome>"] =
+                "The compatibility facade delegates refresh-session normalization to an independent Mongo definition while preserving migration identity, checksum, token projection, duplicate handling, ownership validation, per-user ledger saves, checkpoints, lease, batching, dry-run, and outcomes.",
+            ["Zumbo.Api|MongoMigrationRunner|method:RefreshSessionUserFilter:(BsonValuecheckpoint):FilterDefinition<BsonDocument>"] =
+                "The compatibility helper delegates to the refresh-session definition's unchanged legacy-token and checkpoint filter.",
+            ["Zumbo.Api|MongoMigrationRunner|method:TryCreateRefreshSession:(BsonValuevalue,stringuserId,stringorganizationId,outBsonDocumentsession):bool"] =
+                "The compatibility helper delegates to the refresh-session definition while preserving validation, UTC resolution, retention calculation, legacy BSON values, ownership fields, version, and result.",
+            ["Zumbo.Api|MongoMigrationRunner|method:EnsureRefreshSessionMatchesAsync:(IMongoCollection<BsonDocument>sessions,BsonDocumentexpected,CancellationTokencancellationToken):Task"] =
+                "The compatibility helper delegates to the refresh-session definition's unchanged ID-or-token lookup and incompatible ownership conflict behavior.",
+            ["Zumbo.Api|MongoMigrationRunner|method:BackfillWorkItemActivitiesAsync:(CancellationTokencancellationToken):Task<MongoMigrationOutcome>"] =
+                "The compatibility facade delegates work-item activity migration to an independent Mongo definition while preserving migration identity, checksum, tenant ownership, all activity projections, optimistic versioning, per-item ledger saves, checkpoints, lease, batching, dry-run, and outcomes.",
+            ["Zumbo.Api|MongoMigrationRunner|method:WorkItemActivityFilter:(BsonValuecheckpoint):FilterDefinition<BsonDocument>"] =
+                "The compatibility helper delegates to the activity definition's unchanged storage-version and checkpoint filter.",
+            ["Zumbo.Api|MongoMigrationRunner|method:WorkItemActivityVersionFilter:():FilterDefinition<BsonDocument>"] =
+                "The compatibility helper delegates to the activity definition's unchanged missing-or-legacy storage-version filter.",
+            ["Zumbo.Api|MongoMigrationRunner|method:HasMigratableActivities:(BsonDocumentworkItem):bool"] =
+                "The compatibility helper delegates to the activity definition while preserving legacy array, identifier, status, and timestamp eligibility checks.",
+            ["Zumbo.Api|MongoMigrationRunner|method:UpsertWorkItemActivitiesAsync:(BsonDocumentworkItem,stringorganizationId,stringprojectId,stringworkItemId,CancellationTokencancellationToken):Task"] =
+                "The compatibility helper delegates to the activity definition while preserving all six collection names, comment revisions, copied fields, timeline projections, deterministic identifiers, and write order.",
+            ["Zumbo.Api|MongoMigrationRunner|method:ActivityId:(paramsstring[]parts):string"] =
+                "The compatibility helper delegates to the activity definition's unchanged unit-separator, SHA256, lowercase hexadecimal, and 32-character identifier algorithm.",
+            ["Zumbo.Api|MongoMigrationRunner|method:CopyArrayAsync:(IMongoCollection<BsonDocument>target,BsonDocumentworkItem,stringfield,stringorganizationId,stringprojectId,stringworkItemId,IReadOnlyCollection<string>copiedFields,CancellationTokencancellationToken):Task"] =
+                "The compatibility helper delegates to the activity definition's unchanged source filtering, ownership projection, copied-field ordering, version, and replacement behavior.",
+            ["Zumbo.Api|MongoMigrationRunner|method:ReplaceMigratedActivityAsync:(IMongoCollection<BsonDocument>collection,BsonDocumentexpected,CancellationTokencancellationToken):Task"] =
+                "The compatibility helper delegates to the activity definition's unchanged ownership filter, upsert, duplicate-key masking, and tenant-conflict exception behavior.",
             ["Zumbo.Modules.Identity|Zumbo.Modules.Identity.IdentityService|method:RegisterAsync:(RegisterUserRequestrequest,CancellationTokenct):Task<AuthResponse>"] =
                 "The compatibility facade delegates registration to the port-focused RegisterUser slice; the original public signature remains available and registration behavior is covered by focused unit and API tests.",
             ["Zumbo.Modules.Identity|Zumbo.Modules.Identity.IdentityService|method:LoginAsync:(LoginRequestrequest,CancellationTokenct):Task<AuthResponse>"] =
@@ -377,6 +616,68 @@ public sealed class RefactorSemanticPreservationTests
                 "The endpoint handler selects the independent project-list query slice when composed from ports and retains its original facade constructor.",
             ["Zumbo.Modules.Projects|Zumbo.Modules.Projects.ProjectService|ctor:(IDocumentRepository<ProjectDocument>projects,IProjectMemberDirectorymemberDirectory,IProjectTeamDirectoryteamDirectory,IProjectTeamUsageCheckerteamUsageChecker,IProjectAuditWriteraudit,IClockclock,ICurrentUsercurrentUser,IExpectedVersionAccessor?expectedVersions=null,IProjectOrganizationDirectory?organizationDirectory=null,IOptions<ProjectLifecycleOptions>?lifecycleOptions=null)"] =
                 "The unchanged compatibility facade constructor now wires the port-focused create and list handlers from its existing dependencies; its public signature and all previous assignments remain intact.",
+            ["Zumbo.Modules.Projects|Zumbo.Modules.Projects.KnowledgeService|method:GetAsync:(stringdocumentId,boolincludeArchived,CancellationTokenct):Task<KnowledgeDocumentResponse>"] =
+                "The compatibility facade delegates document reads to the port-focused GetKnowledgeDocument slice while preserving active-versus-archived filtering, tenant masking, scope authorization, not-found contracts, response projection, cancellation, and its public signature.",
+            ["Zumbo.Modules.Projects|Zumbo.Modules.Projects.KnowledgeService|method:GetVersionAsync:(stringdocumentId,intnumber,CancellationTokenct):Task<KnowledgeVersionResponse>"] =
+                "The compatibility facade delegates version reads to the port-focused GetKnowledgeVersion slice while preserving archived-document access, tenant masking, scope authorization, exact version lookup, response projection, cancellation, and its public signature.",
+            ["Zumbo.Modules.Projects|Zumbo.Modules.Projects.KnowledgeService|method:GetLinkOptionsAsync:(stringscopeType,stringscopeId,string?query,CancellationTokenct):Task<KnowledgeLinkOptionsResponse>"] =
+                "The compatibility facade delegates link-option reads to the port-focused GetKnowledgeLinkOptions slice while preserving actor requirements, input normalization, scope authorization, tenant masking, directory projection, cancellation, and its public signature.",
+            ["Zumbo.Modules.Projects|Zumbo.Modules.Projects.KnowledgeService|method:SearchAsync:(string?query,string?scopeType,string?scopeId,boolincludeArchived,intpage,intpageSize,CancellationTokenct):Task<KnowledgeSearchResponse>"] =
+                "The compatibility facade delegates searches to the port-focused SearchKnowledgeDocuments slice while preserving cursor limits, tenant and archived filtering, scope visibility masking, ordering, paging, source status, cancellation, and its public signature.",
+            ["Zumbo.Modules.Projects|Zumbo.Modules.Projects.KnowledgeService|method:AddCommentAsync:(stringdocumentId,AddKnowledgeCommentRequestrequest,stringcorrelationId,CancellationTokenct):Task<KnowledgeDocumentResponse>"] =
+                "The compatibility facade delegates comment creation to the port-focused AddKnowledgeComment slice while preserving active-document and scope authorization, comment capability and limit checks, normalization, timestamps, optimistic persistence, audit ordering, response projection, cancellation, and its public signature.",
+            ["Zumbo.Modules.Projects|Zumbo.Modules.Projects.KnowledgeService|method:ResolveCommentAsync:(stringdocumentId,stringcommentId,stringcorrelationId,CancellationTokenct):Task<KnowledgeDocumentResponse>"] =
+                "The compatibility facade delegates comment resolution to the port-focused ResolveKnowledgeComment slice while preserving active-document and scope authorization, exact comment lookup, author-owner-manager policy, idempotency, timestamps, optimistic persistence, audit ordering, response projection, cancellation, and its public signature.",
+            ["Zumbo.Modules.Projects|Zumbo.Modules.Projects.KnowledgeService|method:CreateAsync:(CreateKnowledgeDocumentRequestrequest,stringcorrelationId,CancellationTokenct):Task<KnowledgeDocumentResponse>"] =
+                "The compatibility facade delegates document creation to the port-focused CreateKnowledgeDocument slice while preserving actor and scope authorization, normalization and markdown safety, link validation, timestamps, persistence, audit ordering, response projection, cancellation, and its public signature.",
+            ["Zumbo.Modules.Projects|Zumbo.Modules.Projects.KnowledgeService|method:AddVersionAsync:(stringdocumentId,CreateKnowledgeVersionRequestrequest,stringcorrelationId,CancellationTokenct):Task<KnowledgeDocumentResponse>"] =
+                "The compatibility facade delegates version creation to the port-focused AddKnowledgeVersion slice while preserving active-document and edit authorization, version limits, normalization and markdown safety, link validation, optimistic persistence, audit ordering, response projection, cancellation, and its public signature.",
+            ["Zumbo.Modules.Projects|Zumbo.Modules.Projects.KnowledgeService|method:ArchiveAsync:(stringdocumentId,stringcorrelationId,CancellationTokenct):Task"] =
+                "The compatibility facade delegates archival to the port-focused ArchiveKnowledgeDocument slice while preserving active-document and edit authorization, timestamps, optimistic persistence, audit ordering, cancellation, and its public signature.",
+            ["Zumbo.Api|KnowledgeEndpoints|method:AddKnowledgeModule:(thisIServiceCollectionservices):IServiceCollection"] =
+                "The preserved Knowledge registration member retains adapter and facade registrations in order and adds scoped explicit factories for all nine port-focused Knowledge handlers.",
+            ["Zumbo.Api|KnowledgeEndpoints|method:MapKnowledgeEndpoints:(thisRouteGroupBuilderapi):void"] =
+                "All nine Knowledge routes resolve their handlers directly while preserving routes, authorization, binding defaults, rate limits, correlation IDs, response mapping, cancellation, and compatibility facades.",
+            ["Zumbo.Modules.Projects|Zumbo.Modules.Projects.GoalService|method:GetAsync:(stringgoalId,boolincludeArchived,CancellationTokenct):Task<GoalResponse>"] =
+                "The compatibility facade delegates goal lookup to the port-focused query slice while preserving tenant and archive filtering, visibility masking, exact not-found contracts, response projection, cancellation, and its public signature.",
+            ["Zumbo.Modules.Projects|Zumbo.Modules.Projects.GoalService|method:ListAsync:(boolincludeArchived,intpage,intpageSize,CancellationTokenct):Task<GoalPageResponse>"] =
+                "The compatibility facade delegates goal listing to the port-focused query slice while preserving tenant and archive filtering, visibility masking, cursor traversal, ordering, paging clamps, response projection, cancellation, and its public signature.",
+            ["Zumbo.Modules.Projects|Zumbo.Modules.Projects.GoalService|method:GetRollupAsync:(stringgoalId,CancellationTokenct):Task<GoalRollupResponse>"] =
+                "The compatibility facade delegates goal rollup lookup to the port-focused query slice while preserving active-goal and visibility checks, linked-source reads, partial-source status, progress projection, observation time, cancellation, and its public signature.",
+            ["Zumbo.Modules.Projects|Zumbo.Modules.Projects.GoalService|method:AddKeyResultProgressAsync:(stringgoalId,stringkeyResultId,AddKeyResultProgressRequestrequest,stringcorrelationId,CancellationTokenct):Task<GoalResponse>"] =
+                "The compatibility facade delegates key-result progress publication to the port-focused command slice while preserving active-goal visibility, owner authorization, value and confidence validation, newest-first bounded history, timestamps, optimistic persistence, audit ordering and values, response projection, cancellation, and its public signature.",
+            ["Zumbo.Modules.Projects|Zumbo.Modules.Projects.GoalService|method:AddStatusUpdateAsync:(stringgoalId,AddGoalStatusUpdateRequestrequest,stringcorrelationId,CancellationTokenct):Task<GoalResponse>"] =
+                "The compatibility facade delegates status publication to the port-focused command slice while preserving active-goal owner authorization, status, health, confidence and note validation, newest-first bounded history, timestamps, optimistic persistence, audit ordering, response projection, cancellation, and its public signature.",
+            ["Zumbo.Modules.Projects|Zumbo.Modules.Projects.GoalService|method:SaveAsync:(string?goalId,SaveGoalRequestrequest,stringcorrelationId,CancellationTokenct):Task<GoalResponse>"] =
+                "The compatibility facade delegates goal create and update to the port-focused command slice while preserving request normalization, actor and source validation, ownership, timestamps, create-versus-replace persistence, shared expected-version consumption, audit ordering and values, response projection, cancellation, and its public signature.",
+            ["Zumbo.Modules.Projects|Zumbo.Modules.Projects.GoalService|method:SaveKeyResultAsync:(stringgoalId,string?keyResultId,SaveKeyResultRequestrequest,stringcorrelationId,CancellationTokenct):Task<GoalResponse>"] =
+                "The compatibility facade delegates key-result create and update to the port-focused command slice while preserving active-goal ownership, normalization, organization-user validation, fifty-result limit, initial-value semantics, exact lookup, timestamps, shared expected-version consumption, audit ordering and action names, response projection, cancellation, and its public signature.",
+            ["Zumbo.Modules.Projects|Zumbo.Modules.Projects.GoalService|method:ArchiveAsync:(stringgoalId,stringcorrelationId,CancellationTokenct):Task"] =
+                "The compatibility facade delegates goal archival to the port-focused command slice while preserving active-goal owner authorization, archived flag and timestamp, shared expected-version consumption, optimistic persistence, audit ordering and values, cancellation, and its public signature.",
+            ["Zumbo.Api|GoalEndpoints|method:AddGoalModule:(thisIServiceCollectionservices):IServiceCollection"] =
+                "Goal composition retains the directory, audit, and compatibility service registrations and adds explicit scoped factories for all eight port-focused Goal handlers.",
+            ["Zumbo.Api|GoalEndpoints|method:MapGoalEndpoints:(thisRouteGroupBuilderapi):void"] =
+                "All ten Goal routes resolve the eight port-focused handlers while preserving routes, group authorization and permission metadata, binding defaults, correlation IDs, response mapping, cancellation, and compatibility facades.",
+            ["Zumbo.Modules.Projects|Zumbo.Modules.Projects.PortfolioService|method:GetAsync:(stringportfolioId,boolincludeArchived,CancellationTokenct):Task<PortfolioResponse>"] =
+                "The compatibility facade delegates portfolio lookup to the port-focused query slice while preserving tenant and archive filtering, visibility masking, exact not-found contracts, response projection, cancellation, and its public signature.",
+            ["Zumbo.Modules.Projects|Zumbo.Modules.Projects.PortfolioService|method:ListAsync:(boolincludeArchived,intpage,intpageSize,CancellationTokenct):Task<PortfolioPageResponse>"] =
+                "The compatibility facade delegates portfolio listing to the port-focused query slice while preserving tenant and archive filtering, owner and viewer visibility, cursor traversal, ordering, paging clamps, response projection, cancellation, and its public signature.",
+            ["Zumbo.Modules.Projects|Zumbo.Modules.Projects.PortfolioService|method:GetRoadmapAsync:(stringportfolioId,CancellationTokenct):Task<PortfolioRoadmapResponse>"] =
+                "The compatibility facade delegates portfolio roadmap lookup to the port-focused query slice while preserving active-portfolio visibility, project-source reads, partial-source status, progress projection, observation time, cancellation, and its public signature.",
+            ["Zumbo.Modules.Projects|Zumbo.Modules.Projects.PortfolioService|method:SaveAsync:(string?portfolioId,SavePortfolioRequestrequest,stringcorrelationId,CancellationTokenct):Task<PortfolioResponse>"] =
+                "The compatibility facade delegates portfolio create and update to the port-focused command slice while preserving viewer normalization, directory validation, owner and tenant semantics, timestamps, shared expected-version consumption, optimistic persistence, audit order and values, response projection, cancellation, and its public signature.",
+            ["Zumbo.Modules.Projects|Zumbo.Modules.Projects.PortfolioService|method:ArchiveAsync:(stringportfolioId,stringcorrelationId,CancellationTokenct):Task"] =
+                "The compatibility facade delegates portfolio archival to the port-focused command slice while preserving active-portfolio owner authorization, archived flag and timestamp, shared expected-version consumption, optimistic persistence, audit ordering and values, cancellation, and its public signature.",
+            ["Zumbo.Modules.Projects|Zumbo.Modules.Projects.PortfolioService|method:SaveInitiativeAsync:(stringportfolioId,string?initiativeId,SaveInitiativeRequestrequest,stringcorrelationId,CancellationTokenct):Task<PortfolioResponse>"] =
+                "The compatibility facade delegates initiative create and update to the port-focused command slice while preserving portfolio ownership, normalization, directory validation order, hierarchy and size invariants, shared expected-version consumption, optimistic persistence, audit order and values, response projection, cancellation, and its public signature.",
+            ["Zumbo.Modules.Projects|Zumbo.Modules.Projects.PortfolioService|method:AddStatusUpdateAsync:(stringportfolioId,stringinitiativeId,AddInitiativeStatusUpdateRequestrequest,stringcorrelationId,CancellationTokenct):Task<PortfolioResponse>"] =
+                "The compatibility facade delegates initiative status publication to the port-focused command slice while preserving visibility and owner authorization, status normalization, newest-first history retention, timestamps, shared expected-version consumption, optimistic persistence, audit order and values, response projection, cancellation, and its public signature.",
+            ["Zumbo.Modules.Projects|Zumbo.Modules.Projects.PortfolioService|method:SaveDependencyAsync:(stringportfolioId,string?dependencyId,SavePortfolioDependencyRequestrequest,stringcorrelationId,CancellationTokenct):Task<PortfolioResponse>"] =
+                "The compatibility facade delegates portfolio dependency create and update to the port-focused command slice while preserving owner authorization, project validation, endpoint membership, count, uniqueness and cycle invariants, shared expected-version consumption, optimistic persistence, audit order and values, response projection, cancellation, and its public signature.",
+            ["Zumbo.Api|PortfolioEndpoints|method:AddPortfolioModule:(thisIServiceCollectionservices):IServiceCollection"] =
+                "Portfolio composition retains the directory, audit, and compatibility service registrations and adds explicit scoped factories for all eight port-focused handlers.",
+            ["Zumbo.Api|PortfolioEndpoints|method:MapPortfolioEndpoints:(thisRouteGroupBuilderapi):void"] =
+                "All eleven Portfolio routes resolve port-focused handlers while preserving routes, group authorization and permission metadata, binding defaults, correlation IDs, response mapping, cancellation, and compatibility facades.",
             ["Zumbo.Api|BoardsEndpoints|method:AddBoardsModule:(thisIServiceCollectionservices):IServiceCollection"] =
                 "The preserved endpoint-host registration member delegates to Boards composition; adapters, policy, facades, all feature handlers, registration order, lifetimes and explicit factories remain unchanged while compatibility constructors are preserved.",
             ["Zumbo.Api|BoardsEndpoints|method:MapBoardsEndpoints:(thisRouteGroupBuilderapi):void"] =
@@ -426,13 +727,87 @@ public sealed class RefactorSemanticPreservationTests
             ["Zumbo.Modules.Workflows|Zumbo.Modules.Workflows.WorkflowService|ctor:(IDocumentRepository<WorkflowDefinitionDocument>workflows,IWorkflowProjectAccessCheckeraccessChecker,IDistributedLockProviderdistributedLockProvider,IOptions<DistributedLockOptions>distributedLockOptions,IClockclock,IWorkflowAuditWriteraudit,IExpectedVersionAccessor?expectedVersions=null,IWorkflowPublicationGuard?publicationGuard=null)"] =
                 "The unchanged compatibility facade constructor now wires port-focused upsert and read handlers from its existing dependencies; its public signature and expected-version state remain intact.",
             ["Zumbo.Api|WorkItemEndpoints|method:AddWorkItemsModule:(thisIServiceCollectionservices,IConfiguration?configuration=null):IServiceCollection"] =
-                "Work-item create, intake work-item creation, search, bulk-job processing, comment, relation-parent/link/unlink, attachment-open/upload/delete, due-date-reminder, report-project-summary/status-distribution/user-workload/due-date-risks/flow-time/completion-rate/team-performance, webhook subscription-create/list/read/state/update/secret-rotation, delivery-test/queue/dispatch/metrics/list/read/replay, development connection-create/list/read/disconnect/delete, connection-mapping create/list/delete and work-item discovery, work-item-link listing/creation/deletion, webhook reception/processing, credential-rotation, development-webhook-secret-rotation, provider-health, and repository-discovery handlers remain scoped; the intake creator port selects CreateIntakeWorkItemHandler over the port-focused create handler, the bulk-job processor factory selects its create/move/assign/archive handler constructor, and WorkItemService remains a compatibility service; core create/read/lifecycle/label/update, checklist, worklog, planning, assignment, custom-fields, approvals, comment, relation, attachment, reminder, report, webhook, development-integration, publication, durable-handler, intake and conditional hosted-service registrations retain their order through their WorkItems composition classes, the webhook delivery adapter selects QueueDeliveryHandler explicitly, and hosted services remain registered.",
+                "The preserved endpoint-host compatibility member delegates to WorkItemModuleComposition; work-item create, intake work-item creation, search, bulk-job processing, comment, relation-parent/link/unlink, attachment-open/upload/delete, due-date-reminder, report-project-summary/status-distribution/user-workload/due-date-risks/flow-time/completion-rate/team-performance, webhook subscription-create/list/read/state/update/secret-rotation, delivery-test/queue/dispatch/metrics/list/read/replay, development connection-create/list/read/disconnect/delete, connection-mapping create/list/delete and work-item discovery, work-item-link listing/creation/deletion, webhook reception/processing, credential-rotation, development-webhook-secret-rotation, provider-health, and repository-discovery handlers remain scoped; the intake creator port selects CreateIntakeWorkItemHandler over the port-focused create handler, the bulk-job processor factory selects its create/move/assign/archive handler constructor, and WorkItemService remains a compatibility service; core create/read/lifecycle/label/update, checklist, worklog, planning, assignment, custom-fields, approvals, comment, relation, attachment, reminder, report, webhook, development-integration, publication, durable-handler, intake and conditional hosted-service registrations retain their order through their WorkItems composition classes, the webhook delivery adapter selects QueueDeliveryHandler explicitly, and hosted services remain registered.",
             ["Zumbo.Api|WebhookEndpoints|method:MapWebhookEndpoints:(thisRouteGroupBuilderapi):void"] =
                 "The webhook subscription-create/list/read/state/update/secret-rotation and delivery test/metrics/list/read/replay routes resolve independent handlers while preserving routes, authorization, tenant management and ownership checks, secret handling and overlap, validation, immutable payload, not-found and conflict behavior, state, metric, paging and replay semantics, response mapping, and compatibility facades under the exact runtime contract audit.",
             ["Zumbo.Modules.WorkItems|Zumbo.Modules.WorkItems.CreateWorkItemHandler|method:HandleAsync:(CreateWorkItemRequestrequest,stringcorrelationId,CancellationTokenct):Task<WorkItemResponse>"] =
                 "The endpoint handler selects the independent work-item creation slice when composed from ports and retains its original WorkItemService constructor as a compatibility path.",
             ["Zumbo.Modules.WorkItems|Zumbo.Modules.WorkItems.SearchWorkItemsHandler|method:HandleAsync:(WorkItemSearchRequestrequest,CancellationTokenct):Task<IReadOnlyList<WorkItemResponse>>"] =
                 "The endpoint handler selects the independent work-item search slice when composed from ports and retains its original WorkItemService constructor as a compatibility path.",
+            ["Zumbo.Modules.WorkItems|Zumbo.Modules.WorkItems.WorkItemTemplateRecurrenceService|method:ListTemplatesAsync:(stringprojectId,intpage,intpageSize,boolincludeArchived,CancellationTokenct):Task<WorkItemTemplatePage>"] =
+                "The compatibility facade delegates template listing to the port-focused ListWorkItemTemplates query slice while preserving current-user and view-permission checks, archived filtering, name ordering, paging clamps, total count, response projection, cancellation, and its public signature.",
+            ["Zumbo.Modules.WorkItems|Zumbo.Modules.WorkItems.WorkItemTemplateRecurrenceService|method:ListRecurrencesAsync:(stringprojectId,intpage,intpageSize,boolincludeArchived,CancellationTokenct):Task<WorkItemRecurrencePage>"] =
+                "The compatibility facade delegates recurrence listing to the port-focused ListWorkItemRecurrences query slice while preserving current-user and view-permission checks, project and archived filtering, CreatedAt ordering, paging clamps, generated counts, response projection, cancellation, and its public signature.",
+            ["Zumbo.Modules.WorkItems|Zumbo.Modules.WorkItems.WorkItemTemplateRecurrenceService|method:ListOccurrencesAsync:(stringrecurrenceId,intpage,intpageSize,CancellationTokenct):Task<WorkItemRecurrenceOccurrencePage>"] =
+                "The compatibility facade delegates occurrence listing to the port-focused ListRecurrenceOccurrences query slice while preserving archived-inclusive recurrence lookup before authorization, the exact not-found contract, project view authorization, ScheduledForUtc ordering, paging clamps, response projection, cancellation, and its public signature.",
+            ["Zumbo.Modules.WorkItems|Zumbo.Modules.WorkItems.WorkItemTemplateRecurrenceService|method:PreviewRecurrenceAsync:(PreviewWorkItemRecurrenceRequestrequest,CancellationTokenct):Task<WorkItemRecurrencePreviewResponse>"] =
+                "The compatibility facade delegates recurrence preview to the port-focused preview query slice while preserving create authorization, active-template lookup and ownership masking, schedule normalization and validation, preview bounds and generation order, response projection, cancellation, and its public signature.",
+            ["Zumbo.Modules.WorkItems|Zumbo.Modules.WorkItems.WorkItemTemplateRecurrenceService|method:CreateRecurrenceAsync:(CreateWorkItemRecurrenceRequestrequest,stringcorrelationId,CancellationTokenct):Task<WorkItemRecurrenceResponse>"] =
+                "The compatibility facade delegates recurrence creation to the port-focused command slice while preserving create authorization, active-template lookup and ownership masking, schedule validation, creator and timestamp values, persistence, audit values, generated-count response projection, cancellation, and its public signature.",
+            ["Zumbo.Modules.WorkItems|Zumbo.Modules.WorkItems.WorkItemTemplateRecurrenceService|method:SetRecurrenceStateAsync:(stringrecurrenceId,boolactive,stringcorrelationId,CancellationTokenct):Task<WorkItemRecurrenceResponse>"] =
+                "The compatibility facade delegates recurrence state mutation to the port-focused command slice while preserving distributed locking, active lookup, update authorization, unchanged and completed guards, timestamp, expected-version replacement, exact conflict contract, audit values, generated-count response projection, cancellation, and its public signature.",
+            ["Zumbo.Modules.WorkItems|Zumbo.Modules.WorkItems.WorkItemTemplateRecurrenceService|method:ArchiveRecurrenceAsync:(stringrecurrenceId,stringcorrelationId,CancellationTokenct):Task"] =
+                "The compatibility facade delegates recurrence archival to the port-focused command slice while preserving distributed locking, active lookup, update authorization, state mutation, timestamp, expected-version replacement, exact conflict contract, audit values, cancellation, and its public signature.",
+            ["Zumbo.Modules.WorkItems|Zumbo.Modules.WorkItems.WorkItemTemplateRecurrenceService|method:CreateTemplateAsync:(CreateWorkItemTemplateRequestrequest,stringcorrelationId,CancellationTokenct):Task<WorkItemTemplateResponse>"] =
+                "The compatibility facade delegates template creation to the port-focused command slice while preserving create authorization, normalization and all validation messages, board/type/team/assignee policy order, project lock, active-name uniqueness, timestamps and creator, persistence conflict translation, audit values, response projection, cancellation, and its public signature.",
+            ["Zumbo.Modules.WorkItems|Zumbo.Modules.WorkItems.WorkItemTemplateRecurrenceService|method:UpdateTemplateAsync:(stringtemplateId,UpdateWorkItemTemplateRequestrequest,stringcorrelationId,CancellationTokenct):Task<WorkItemTemplateResponse>"] =
+                "The compatibility facade delegates template update to the port-focused command slice while preserving template lock, active lookup, update authorization, normalization and policy order, active-name uniqueness, field mutation, timestamp, expected-version replacement and conflict contract, audit values, response projection, cancellation, and its public signature.",
+            ["Zumbo.Modules.WorkItems|Zumbo.Modules.WorkItems.WorkItemTemplateRecurrenceService|method:ArchiveTemplateAsync:(stringtemplateId,stringcorrelationId,CancellationTokenct):Task"] =
+                "The compatibility facade delegates template archival to the port-focused command slice while preserving template lock, active lookup, update authorization, active-recurrence guard, archived state and timestamp, expected-version replacement and conflict contract, audit values, cancellation, and its public signature.",
+            ["Zumbo.Modules.WorkItems|Zumbo.Modules.WorkItems.WorkItemTemplateRecurrenceService|method:ScheduleDueAsync:(CancellationTokenct):Task<int>"] =
+                "The compatibility facade delegates due recurrence scheduling to the port-focused command slice while preserving global and per-recurrence locks, one clock boundary, batch clamp and ordering, stale-candidate rechecks, template ownership and archive checks, deterministic occurrence idempotency, durable publication before recurrence advancement, completion rules, optimistic replacement, scheduled count, cancellation, and its public signature.",
+            ["Zumbo.Modules.WorkItems|Zumbo.Modules.WorkItems.WorkItemTemplateRecurrenceService|method:StableOccurrenceId:(stringrecurrenceId,DateTimeOffsetscheduledForUtc):string"] =
+                "The public compatibility helper delegates deterministic occurrence identity generation to the feature-owned identity policy while preserving UTC tick normalization, separator, SHA-256 encoding, lowercase truncation, and its public signature.",
+            ["Zumbo.Modules.WorkItems|Zumbo.Modules.WorkItems.WorkItemTypeSchemaService|method:GetAsync:(stringprojectId,CancellationTokenct):Task<WorkItemTypeSchemaResponse>"] =
+                "The compatibility facade delegates schema reads to the port-focused query slice while preserving current-user and project view authorization, persisted-or-default loading, default clock values, response projection, cancellation, and its public signature.",
+            ["Zumbo.Modules.WorkItems|Zumbo.Modules.WorkItems.WorkItemTypeSchemaService|method:GetIssueTypeDistributionAsync:(stringprojectId,CancellationTokenct):Task<WorkItemFieldDistributionResponse>"] =
+                "The compatibility facade delegates issue-type distribution reads to the port-focused query slice while preserving project view authorization, cursor batching and configured limits, archived filtering, missing counts, case-insensitive grouping, deterministic ordering, cancellation, and its public signature.",
+            ["Zumbo.Modules.WorkItems|Zumbo.Modules.WorkItems.WorkItemTypeSchemaService|method:GetCustomFieldDistributionAsync:(stringprojectId,stringfieldKey,CancellationTokenct):Task<WorkItemFieldDistributionResponse>"] =
+                "The compatibility facade delegates custom-field distribution reads to the port-focused query slice while preserving project view authorization, schema defaulting, key normalization and validation, cursor batching, archived filtering, missing counts, deterministic ordering, cancellation, and its public signature.",
+            ["Zumbo.Modules.WorkItems|Zumbo.Modules.WorkItems.WorkItemTypeSchemaService|method:UpsertAsync:(stringprojectId,UpsertWorkItemTypeSchemaRequestrequest,stringcorrelationId,CancellationTokenct):Task<WorkItemTypeSchemaResponse>"] =
+                "The compatibility facade delegates schema upsert to the port-focused command slice while preserving update authorization, normalization and validation messages, project locking, schema-version and timestamp rules, existing-item compatibility validation, expected-version create and replace conflicts, audit order and values, response projection, cancellation, and its public signature.",
+            ["Zumbo.Modules.WorkItems|Zumbo.Modules.WorkItems.WorkItemTypeSchemaService|method:ValidateAsync:(stringprojectId,stringissueTypeKey,IReadOnlyCollection<WorkItemCustomFieldValueRequest>?values,CancellationTokenct):Task<ValidatedWorkItemShape>"] =
+                "The compatibility facade delegates work-item shape validation to the schema policy query slice while preserving persisted-or-default schema loading, issue-type normalization, active-type validation, typed custom-field normalization, required-field and ordering rules, cancellation, and its public signature.",
+            ["Zumbo.Modules.WorkItems|Zumbo.Modules.WorkItems.WorkItemTypeSchemaService|method:HierarchyLevelAsync:(stringprojectId,stringissueTypeKey,CancellationTokenct):Task<string>"] =
+                "The compatibility facade delegates hierarchy lookup to the schema policy query slice while preserving persisted-or-default loading, issue-type aliases and active validation, hierarchy projection, cancellation, and its public signature.",
+            ["Zumbo.Modules.WorkItems|Zumbo.Modules.WorkItems.WorkItemTypeSchemaService|method:ValidateSearchFilterAsync:(stringprojectId,string?issueTypeKey,string?customFieldKey,string?customFieldValue,CancellationTokenct):Task<ValidatedWorkItemSearchFilter>"] =
+                "The compatibility facade delegates search-filter validation to the schema policy query slice while preserving optional issue-type normalization, indexed-field lookup, typed search-value normalization and exact validation errors, cancellation, and its public signature.",
+            ["Zumbo.Api|WorkItemTypeSchemaEndpoints|method:MapWorkItemTypeSchemaEndpoints:(thisRouteGroupBuilderapi):void"] =
+                "The schema route host resolves the three port-focused read handlers instead of the compatibility service while preserving route templates, binding, authorization metadata, transaction filter, permission requirements, cancellation, response envelopes, and the unchanged upsert route.",
+            ["Zumbo.Modules.WorkItems|Zumbo.Modules.WorkItems.SprintService|method:GetAsync:(stringsprintId,CancellationTokenct):Task<SprintResponse>"] =
+                "The compatibility facade delegates sprint lookup to the port-focused query slice while preserving lookup-before-authorization ordering, the exact not-found contract, project view authorization, response projection, cancellation, and its public signature.",
+            ["Zumbo.Modules.WorkItems|Zumbo.Modules.WorkItems.SprintService|method:ListAsync:(stringprojectId,string?after,intpageSize,CancellationTokenct):Task<SprintCursorPageResponse>"] =
+                "The compatibility facade delegates sprint listing to the port-focused query slice while preserving project view authorization, cursor normalization, page-size clamping, project filtering, response projection, next-cursor behavior, cancellation, and its public signature.",
+            ["Zumbo.Modules.WorkItems|Zumbo.Modules.WorkItems.SprintService|method:BacklogAsync:(stringprojectId,string?after,intpageSize,CancellationTokenct):Task<SprintBacklogPageResponse>"] =
+                "The compatibility facade delegates backlog listing to the port-focused query slice while preserving project view authorization, cursor normalization, page-size clamping, archived and sprint-assignment filtering, item projection, next-cursor behavior, cancellation, and its public signature.",
+            ["Zumbo.Api|SprintEndpoints|method:MapSprintEndpoints:(thisRouteGroupBuilderapi):void"] =
+                "The sprint route host resolves all read, report, lifecycle and assignment handlers directly while preserving route templates, binding defaults, group authorization and transaction metadata, cancellation, response envelopes, permissions, correlation IDs, and request versions.",
+            ["Zumbo.Api|SprintEndpoints|method:AddSprintsModule:(thisIServiceCollectionservices):IServiceCollection"] =
+                "Sprint composition registers the ten port-focused read, report, lifecycle and assignment handlers from their exact repository, authorization, lock, audit, cache, option, clock, expected-version and current-user dependencies while preserving option binding and validation, sprint policy and compatibility service registrations, lifetimes, and its return contract.",
+            ["Zumbo.Modules.WorkItems|Zumbo.Modules.WorkItems.SprintService|method:BurndownAsync:(stringprojectId,stringsprintId,DateOnly?requestedStart,DateOnly?requestedEnd,CancellationTokenct):Task<IReadOnlyList<SprintBurndownPointResponse>>"] =
+                "The compatibility facade delegates sprint burndown data to the report query handler while preserving snapshot execution, data projection, project and date validation, authorization, cache behavior, bounded pagination, completion-source selection, cancellation, and its public signature.",
+            ["Zumbo.Modules.WorkItems|Zumbo.Modules.WorkItems.SprintService|method:BurndownSnapshotAsync:(stringprojectId,stringsprintId,DateOnly?requestedStart,DateOnly?requestedEnd,CancellationTokenct):Task<WorkItemReportSnapshot<IReadOnlyList<SprintBurndownPointResponse>>>"] =
+                "The compatibility facade delegates sprint burndown snapshots to the report query handler while preserving sprint lookup and project mismatch ordering, authorization, date bounds, cache key and TTL, bounded pagination, completion calculations, snapshot metadata, cancellation, and its public signature.",
+            ["Zumbo.Modules.WorkItems|Zumbo.Modules.WorkItems.SprintService|method:VelocityAsync:(stringprojectId,intsprintCount,CancellationTokenct):Task<IReadOnlyList<SprintVelocityResponse>>"] =
+                "The compatibility facade delegates sprint velocity data to the report query handler while preserving snapshot execution, data projection, authorization, count clamping, completed-sprint ordering and projection, cache behavior, cancellation, and its public signature.",
+            ["Zumbo.Modules.WorkItems|Zumbo.Modules.WorkItems.SprintService|method:VelocitySnapshotAsync:(stringprojectId,intsprintCount,CancellationTokenct):Task<WorkItemReportSnapshot<IReadOnlyList<SprintVelocityResponse>>>"] =
+                "The compatibility facade delegates sprint velocity snapshots to the report query handler while preserving authorization-before-clamp ordering, count bounds, cache key and TTL, completed-sprint filtering and ordering, snapshot metadata, cancellation, and its public signature.",
+            ["Zumbo.Modules.WorkItems|Zumbo.Modules.WorkItems.SprintService|method:CreateAsync:(CreateSprintRequestrequest,stringcorrelationId,CancellationTokenct):Task<SprintResponse>"] =
+                "The compatibility facade delegates sprint creation to the lifecycle command handler while preserving validation, authorization-before-lock ordering, project lock bounds, name uniqueness, normalization, timestamps, persistence, audit, cache invalidation, response mapping, cancellation, and its public signature.",
+            ["Zumbo.Modules.WorkItems|Zumbo.Modules.WorkItems.SprintService|method:StartAsync:(stringsprintId,stringcorrelationId,CancellationTokenct):Task<SprintResponse>"] =
+                "The compatibility facade delegates sprint start to the lifecycle command handler while preserving lookup and authorization ordering, project locking, planned and single-active invariants, bounded work-item traversal, scope snapshots, aggregate transition, optimistic persistence, audit, cache invalidation, response mapping, cancellation, and its public signature.",
+            ["Zumbo.Modules.WorkItems|Zumbo.Modules.WorkItems.SprintService|method:CompleteAsync:(stringsprintId,CompleteSprintRequestrequest,stringcorrelationId,CancellationTokenct):Task<SprintResponse>"] =
+                "The compatibility facade delegates sprint completion to the lifecycle command handler while preserving lookup and authorization ordering, project locking, active and carryover invariants, bounded scope traversal, completion snapshots, optimistic carryover updates, aggregate transition, optimistic sprint persistence, audit, cache invalidation, response mapping, cancellation, and its public signature.",
+            ["Zumbo.Modules.WorkItems|Zumbo.Modules.WorkItems.SprintService|method:PlanAsync:(stringsprintId,stringworkItemId,PlanSprintWorkItemRequestrequest,stringcorrelationId,CancellationTokenct):Task<SprintPlannedItemResponse>"] =
+                "The compatibility facade delegates sprint assignment to the command handler while preserving estimate validation before lookup, authorization and project-lock ordering, planned-state and ownership invariants, optimistic request-version persistence, audit, cache invalidation, response mapping, cancellation, and its public signature.",
+            ["Zumbo.Modules.WorkItems|Zumbo.Modules.WorkItems.SprintService|method:UnplanAsync:(stringsprintId,stringworkItemId,stringcorrelationId,CancellationTokenct):Task<SprintPlannedItemResponse>"] =
+                "The compatibility facade delegates sprint unassignment to the command handler while preserving lookup, authorization and project-lock ordering, planned-state and membership invariants, optimistic request-version persistence, audit, cache invalidation, response mapping, cancellation, and its public signature.",
+            ["Zumbo.Api|GetSprintBurndownReportEndpoint|method:Map:(RouteGroupBuildergroup):void"] =
+                "The independent sprint burndown report endpoint resolves the feature report handler instead of the compatibility service while preserving route and date binding, report metadata headers, rate limiting, cancellation, and response behavior.",
+            ["Zumbo.Api|GetSprintVelocityReportEndpoint|method:Map:(RouteGroupBuildergroup):void"] =
+                "The independent sprint velocity report endpoint resolves the feature report handler instead of the compatibility service while preserving route and count binding, six-sprint default, report metadata headers, rate limiting, cancellation, and response behavior.",
+            ["Zumbo.Api|WorkItemRecurrenceSchedulerHostedService|method:ExecuteAsync:(CancellationTokenstoppingToken):Task"] =
+                "The hosted scheduler resolves the port-focused due-recurrence handler instead of the compatibility service while preserving enablement, interval bounds, scope and transaction lifetime, WorkItems transaction name, cancellation handling, logging, timer order, and protected method signature.",
             ["Zumbo.Modules.WorkItems|Zumbo.Modules.WorkItems.WorkItemService|method:CreateAsync:(CreateWorkItemRequestrequest,stringcorrelationId,CancellationTokenct,string?requestedId=null):Task<WorkItemResponse>"] =
                 "The compatibility facade delegates ordinary and requested-id work-item creation to the same port-focused slice while preserving its public signature; the explicit intake contract and preserved private core member also delegate through the handler without retaining persistence logic.",
             ["Zumbo.Modules.WorkItems|Zumbo.Modules.WorkItems.WorkItemService|method:CreateCoreAsync:(CreateWorkItemRequestrequest,stringorganizationId,stringcorrelationId,CancellationTokenct,string?requestedId,stringactorUserId,string?intakeSubmissionId,IReadOnlyCollection<StoredAttachment>initialAttachments,stringdescription=\"\"):Task<WorkItemResponse>"] =
@@ -453,6 +828,26 @@ public sealed class RefactorSemanticPreservationTests
                 "The compatibility facade delegates notification listing to the port-focused query slice while preserving its public signature, paging, ordering, and user isolation.",
             ["Zumbo.Modules.Notifications|Zumbo.Modules.Notifications.NotificationService|method:MarkAsReadAsync:(stringnotificationId,CancellationTokenct):Task"] =
                 "The compatibility facade delegates the idempotent mark-read mutation to its port-focused slice while preserving the original public signature and authorization behavior.",
+            ["Zumbo.Modules.Notifications|Zumbo.Modules.Notifications.NotificationService|method:GetPreferencesAsync:(CancellationTokenct):Task<NotificationPreferenceResponse>"] =
+                "The compatibility facade delegates current-user preference lookup to the port-focused query slice while preserving identity enforcement, default response values, repository filtering, mapping, cancellation, and its public signature.",
+            ["Zumbo.Modules.Notifications|Zumbo.Modules.Notifications.NotificationService|method:UpdatePreferencesAsync:(UpdateNotificationPreferencesRequestrequest,CancellationTokenct):Task<NotificationPreferenceResponse>"] =
+                "The compatibility facade delegates preference updates to the port-focused command slice while preserving normalization, bounds, lock acquisition, create-or-versioned-replace behavior, conflict contract, timestamps, mapping, cancellation, and its public signature.",
+            ["Zumbo.Modules.Notifications|Zumbo.Modules.Notifications.NotificationService|method:GetDeliveryMetricsAsync:(stringorganizationId,CancellationTokenct):Task<NotificationDeliveryMetrics>"] =
+                "The compatibility facade delegates delivery metrics to the port-focused query slice while preserving organization normalization, status counts, oldest-pending lookup, observation time, cancellation, and its public signature.",
+            ["Zumbo.Modules.Notifications|Zumbo.Modules.Notifications.NotificationService|method:ListDeadLettersAsync:(stringorganizationId,intpageSize,CancellationTokenct):Task<IReadOnlyList<NotificationDeadLetterSummary>>"] =
+                "The compatibility facade delegates dead-letter listing to the port-focused query slice while preserving organization and page validation, descending dead-letter ordering, bounded projection, cancellation, and its public signature.",
+            ["Zumbo.Modules.Notifications|Zumbo.Modules.Notifications.NotificationService|method:ReplayDeadLetterAsync:(stringorganizationId,stringnotificationId,CancellationTokenct):Task<bool>"] =
+                "The compatibility facade delegates dead-letter replay to the port-focused command slice while preserving exact tenant/status filtering, retry reset, timestamp, lease clearing, conditional replace result, cancellation, and its public signature.",
+            ["Zumbo.Modules.Notifications|Zumbo.Modules.Notifications.NotificationService|method:NotifyAsync:(stringuserId,stringtype,stringmessage,CancellationTokenct,string?deduplicationKey=null):Task"] =
+                "The compatibility facade delegates notification creation to the port-focused command slice while preserving empty-user handling, validation and normalization order, active-user and preference checks, deduplication locking and lookup, channel selection, digest scheduling, persistence values, cancellation, and its public signature.",
+            ["Zumbo.Modules.Notifications|Zumbo.Modules.Notifications.NotificationService|method:DispatchPendingEmailsAsync:(intbatchSize,CancellationTokenct,string?workerId=null):Task<int>"] =
+                "The compatibility facade delegates email dispatch to the port-focused command slice while preserving due and expired-lease selection, batch bounds, worker identity, conditional claims, digest grouping, sender values, sent finalization, retry and dead-letter transitions, jitter policy, cancellation, delivered count, and its public signature.",
+            ["Zumbo.Api|NotificationEmailDispatcherHostedService|method:ExecuteAsync:(CancellationTokenstoppingToken):Task"] =
+                "The hosted dispatcher resolves the port-focused delivery handler instead of the compatibility facade while preserving the enablement guard, timer bounds, scope lifetime, batch bounds, stable worker identity, cancellation handling, error logging, and iteration schedule.",
+            ["Zumbo.Api|NotificationModuleComposition|method:AddNotificationServices:(thisIServiceCollectionservices,IConfigurationconfiguration):IServiceCollection"] =
+                "Notifications composition retains options, adapters, sender, facade and hosted service while adding explicit port-focused preference, creation, delivery-operation, and dispatch handler factories with scoped lifetimes.",
+            ["Zumbo.Api|NotificationEndpoints|method:MapNotificationEndpoints:(thisRouteGroupBuilderapi):void"] =
+                "The preference and delivery-operation routes resolve port-focused handlers while preserving routes, authorization, global permission and rate-limit metadata, request defaults, response mapping, successful-replay audit ordering, and cancellation.",
             ["Zumbo.Api|AuditEndpoints|method:AddAuditModule:(thisIServiceCollectionservices):IServiceCollection"] =
                 "The preserved endpoint-host registration member delegates to Audit composition; options, adapters, facade, write and query handler lifetimes and explicit port-focused factories remain unchanged while compatibility constructors are preserved.",
             ["Zumbo.Modules.Audit|Zumbo.Modules.Audit.WriteAuditLogHandler|method:HandleAsync:(WriteAuditLogCommandcommand,CancellationTokenct):Task<WriteAuditLogResponse>"] =
@@ -481,7 +876,7 @@ public sealed class RefactorSemanticPreservationTests
             RepositoryDirectory,
             RefactorSemanticInventory.BaselineCommit);
         var target = RefactorSemanticInventory.ReadWorkingTree(ProjectDirectory);
-        var comparison = RefactorSemanticInventory.Compare(baseline, target);
+        var comparison = RefactorSemanticInventory.Compare(baseline, target, AcceptedTypeRelocations);
         var reports = RefactorValidationReportBuilder.Build(comparison, AcceptedBodyDifferences);
 
         if (Environment.GetEnvironmentVariable("ZUMBO_UPDATE_REFACTOR_REPORTS") == "1")

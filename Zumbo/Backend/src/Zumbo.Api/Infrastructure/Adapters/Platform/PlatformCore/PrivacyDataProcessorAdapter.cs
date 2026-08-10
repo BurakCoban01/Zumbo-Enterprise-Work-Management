@@ -1,6 +1,7 @@
 using System.Linq.Expressions;
 using System.Text;
 using System.Text.Json;
+using Zumbo.Api.Infrastructure.Adapters.Platform.PlatformCore.PrivacyDataProcessorAdapter;
 using Zumbo.BuildingBlocks.Application.Persistence;
 using Zumbo.Modules.Audit;
 using Zumbo.Modules.Identity;
@@ -34,4 +35,67 @@ public sealed partial class PrivacyDataProcessorAdapter(
 {
     private const int ExportLimit = 5000;
     private static readonly JsonSerializerOptions StreamJson = new(JsonSerializerDefaults.Web);
+
+    private readonly PrivacyDataExportComponent dataExport = new(
+        organizations,
+        teams,
+        projects,
+        workItems,
+        workItemActivities,
+        workItemCollaborations,
+        workItemEventActivities,
+        workItemTemplates,
+        workItemRecurrences,
+        workItemBulkJobs,
+        intakeForms,
+        intakeFormVersions,
+        intakeSubmissions,
+        developmentConnections,
+        notifications,
+        auditLogs,
+        ExportLimit);
+
+    private readonly PrivacyStreamExportComponent streamExport = new(
+        organizations,
+        teams,
+        projects,
+        workItems,
+        workItemActivities,
+        workItemCollaborations,
+        workItemEventActivities,
+        workItemTemplates,
+        workItemRecurrences,
+        workItemBulkJobs,
+        intakeForms,
+        intakeFormVersions,
+        intakeSubmissions,
+        developmentConnections,
+        notifications,
+        auditLogs,
+        StreamJson);
+
+    private readonly PrivacyAnonymizationComponent anonymization = new(
+        organizations,
+        teams,
+        projects,
+        workItems,
+        workItemActivities,
+        workItemCollaborations,
+        workItemEventActivities,
+        workItemTemplates,
+        workItemRecurrences,
+        workItemBulkJobs,
+        workItemBulkJobItems,
+        workItemBulkArtifacts,
+        intakeForms,
+        intakeFormVersions,
+        intakeSubmissions,
+        developmentConnections,
+        notifications,
+        notificationPreferences);
+
+    private readonly PrivacyAnonymizationGuard anonymizationGuard = new(
+        organizations,
+        teams,
+        projects);
 }
