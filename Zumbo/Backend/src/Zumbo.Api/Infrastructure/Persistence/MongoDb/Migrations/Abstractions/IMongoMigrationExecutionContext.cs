@@ -1,6 +1,8 @@
 using MongoDB.Bson;
 using Zumbo.BuildingBlocks.Infrastructure.Persistence;
 
+namespace Zumbo.Api.Infrastructure.Persistence.MongoDb.Migrations.Abstractions;
+
 internal interface IMongoMigrationExecutionContext
 {
     IMongoDbService Mongo { get; }

@@ -112,7 +112,9 @@ public sealed class ArchitectureBoundaryTests
     {
         var actual = ModuleProjectFiles()
             .SelectMany(project => ProjectReferences(project)
-                .Where(reference => reference.StartsWith("Zumbo.Modules.", StringComparison.Ordinal))
+                .Where(reference =>
+                    reference.StartsWith("Zumbo.Modules.", StringComparison.Ordinal)
+                    && !reference.EndsWith(".Contracts", StringComparison.Ordinal))
                 .Select(reference => $"{ProjectName(project)}->{reference}"));
 
         AssertExactSet(ExpectedCrossModuleViolations, actual);
@@ -389,9 +391,10 @@ public sealed class ArchitectureBoundaryTests
     {
         var searchDirectory = Path.Combine(
             SourceDirectory,
-            "Zumbo.BuildingBlocks.Infrastructure",
+            "Zumbo.Modules.WorkItems",
+            "Infrastructure",
             "Search",
-            "WorkItemSearch");
+            "Adapters");
 
         Assert.Equal(
             [
@@ -431,6 +434,170 @@ public sealed class ArchitectureBoundaryTests
                 "OpenSearchWorkItemSearchIndex*.cs",
                 SearchOption.TopDirectoryOnly),
             path => Assert.True(path.Length <= 225, $"OpenSearch adapter path exceeds budget: {path}"));
+
+        var legacyDirectory = Path.Combine(
+            SourceDirectory,
+            "Zumbo.BuildingBlocks.Infrastructure",
+            "Search",
+            "WorkItemSearch");
+        Assert.Empty(
+            Directory.Exists(legacyDirectory)
+                ? Directory.GetFiles(legacyDirectory, "*.cs", SearchOption.AllDirectories)
+                : []);
+
+        var forwardedTypes = Assembly.Load("Zumbo.BuildingBlocks.Infrastructure")
+            .GetForwardedTypes()
+            .OrderBy(type => type.FullName, StringComparer.Ordinal)
+            .ToArray();
+        Assert.Equal(
+            [
+                "Zumbo.BuildingBlocks.Infrastructure.Search.InMemoryWorkItemSearchIndex",
+                "Zumbo.BuildingBlocks.Infrastructure.Search.OpenSearchOptions",
+                "Zumbo.BuildingBlocks.Infrastructure.Search.OpenSearchWorkItemSearchIndex"
+            ],
+            forwardedTypes.Select(type => type.FullName!).ToArray());
+        Assert.All(
+            forwardedTypes,
+            type => Assert.Equal("Zumbo.Modules.WorkItems", type.Assembly.GetName().Name));
+    }
+
+    [Fact]
+    public void WorkItemSearchContracts_AreOwnedByWorkItemsContractsAssembly()
+    {
+        var contractDirectory = Path.Combine(SourceDirectory, "Zumbo.Modules.WorkItems.Contracts", "Search");
+        Assert.Equal(
+            [
+                "IWorkItemSearchIndex.cs",
+                "SearchOptions.cs",
+                "WorkItemSearchQuery.cs",
+                "WorkItemSearchRebuildResult.cs",
+                "WorkItemSearchRecord.cs",
+                "WorkItemSearchResult.cs",
+                "WorkItemSearchUnavailableException.cs"
+            ],
+            Directory.GetFiles(contractDirectory, "*.cs", SearchOption.TopDirectoryOnly)
+                .Select(path => Path.GetFileName(path)!)
+                .Order(StringComparer.Ordinal)
+                .ToArray());
+
+        var legacyDirectory = Path.Combine(
+            SourceDirectory,
+            "Zumbo.BuildingBlocks.Application",
+            "Search",
+            "Contracts",
+            "WorkItemSearch");
+        Assert.Empty(
+            Directory.Exists(legacyDirectory)
+                ? Directory.GetFiles(legacyDirectory, "*.cs", SearchOption.AllDirectories)
+                : []);
+
+        var forwardedTypes = Assembly.Load("Zumbo.BuildingBlocks.Application")
+            .GetForwardedTypes()
+            .Where(type => type.Namespace == "Zumbo.BuildingBlocks.Application.Search")
+            .OrderBy(type => type.FullName, StringComparer.Ordinal)
+            .ToArray();
+        Assert.Equal(
+            [
+                "Zumbo.BuildingBlocks.Application.Search.IWorkItemSearchIndex",
+                "Zumbo.BuildingBlocks.Application.Search.SearchOptions",
+                "Zumbo.BuildingBlocks.Application.Search.WorkItemSearchQuery",
+                "Zumbo.BuildingBlocks.Application.Search.WorkItemSearchRebuildResult",
+                "Zumbo.BuildingBlocks.Application.Search.WorkItemSearchRecord",
+                "Zumbo.BuildingBlocks.Application.Search.WorkItemSearchResult",
+                "Zumbo.BuildingBlocks.Application.Search.WorkItemSearchUnavailableException"
+            ],
+            forwardedTypes.Select(type => type.FullName!).ToArray());
+        Assert.All(
+            forwardedTypes,
+            type => Assert.Equal("Zumbo.Modules.WorkItems.Contracts", type.Assembly.GetName().Name));
+    }
+
+    [Fact]
+    public void IdentitySecurityContracts_AreOwnedByIdentityContractsAssembly()
+    {
+        var contractDirectory = Path.Combine(SourceDirectory, "Zumbo.Modules.Identity.Contracts", "Security");
+        Assert.Equal(
+            [
+                "ApiKeyScopes.cs",
+                "IPasswordHasher.cs",
+                "ITokenIssuer.cs",
+                "JwtOptions.cs",
+                "PermissionCatalog.cs",
+                "TokenUser.cs"
+            ],
+            Directory.GetFiles(contractDirectory, "*.cs", SearchOption.TopDirectoryOnly)
+                .Select(path => Path.GetFileName(path)!)
+                .Order(StringComparer.Ordinal)
+                .ToArray());
+
+        var legacyContractDirectory = Path.Combine(
+            SourceDirectory,
+            "Zumbo.BuildingBlocks.Application",
+            "Security",
+            "Contracts",
+            "IdentitySecurity");
+        Assert.Empty(
+            Directory.Exists(legacyContractDirectory)
+                ? Directory.GetFiles(legacyContractDirectory, "*.cs", SearchOption.AllDirectories)
+                : []);
+        Assert.False(File.Exists(Path.Combine(
+            SourceDirectory,
+            "Zumbo.BuildingBlocks.Application",
+            "Security",
+            "PermissionCatalog.cs")));
+
+        var forwardedTypes = Assembly.Load("Zumbo.BuildingBlocks.Application")
+            .GetForwardedTypes()
+            .Where(type => type.Assembly.GetName().Name == "Zumbo.Modules.Identity.Contracts")
+            .OrderBy(type => type.FullName, StringComparer.Ordinal)
+            .ToArray();
+        Assert.Equal(
+            [
+                "Zumbo.BuildingBlocks.Application.Security.ApiKeyScopes",
+                "Zumbo.BuildingBlocks.Application.Security.IPasswordHasher",
+                "Zumbo.BuildingBlocks.Application.Security.ITokenIssuer",
+                "Zumbo.BuildingBlocks.Application.Security.JwtOptions",
+                "Zumbo.BuildingBlocks.Application.Security.PermissionCatalog",
+                "Zumbo.BuildingBlocks.Application.Security.TokenUser"
+            ],
+            forwardedTypes.Select(type => type.FullName!).ToArray());
+    }
+
+    [Fact]
+    public void ProjectResourcePolicyContracts_AreOwnedByProjectsContractsAssembly()
+    {
+        var contractDirectory = Path.Combine(SourceDirectory, "Zumbo.Modules.Projects.Contracts", "Security");
+        Assert.Equal(
+            [
+                "IProjectResourcePolicy.cs",
+                "ProjectResourceAuthorization.cs"
+            ],
+            Directory.GetFiles(contractDirectory, "*.cs", SearchOption.TopDirectoryOnly)
+                .Select(path => Path.GetFileName(path)!)
+                .Order(StringComparer.Ordinal)
+                .ToArray());
+
+        var legacyDirectory = Path.Combine(
+            SourceDirectory,
+            "Zumbo.BuildingBlocks.Application",
+            "Security",
+            "ProjectResourcePolicy");
+        Assert.Empty(
+            Directory.Exists(legacyDirectory)
+                ? Directory.GetFiles(legacyDirectory, "*.cs", SearchOption.AllDirectories)
+                : []);
+
+        var forwardedTypes = Assembly.Load("Zumbo.BuildingBlocks.Application")
+            .GetForwardedTypes()
+            .Where(type => type.Assembly.GetName().Name == "Zumbo.Modules.Projects.Contracts")
+            .OrderBy(type => type.FullName, StringComparer.Ordinal)
+            .ToArray();
+        Assert.Equal(
+            [
+                "Zumbo.BuildingBlocks.Application.Security.IProjectResourcePolicy",
+                "Zumbo.BuildingBlocks.Application.Security.ProjectResourceAuthorization"
+            ],
+            forwardedTypes.Select(type => type.FullName!).ToArray());
     }
 
     [Fact]
@@ -799,18 +966,25 @@ public sealed class ArchitectureBoundaryTests
             "Zumbo.Modules.Boards->Zumbo.BuildingBlocks.Application",
             "Zumbo.Modules.Boards->Zumbo.SharedKernel",
             "Zumbo.Modules.Identity->Zumbo.BuildingBlocks.Application",
+            "Zumbo.Modules.Identity->Zumbo.Modules.Identity.Contracts",
             "Zumbo.Modules.Identity->Zumbo.SharedKernel",
             "Zumbo.Modules.Notifications->Zumbo.BuildingBlocks.Application",
             "Zumbo.Modules.Notifications->Zumbo.SharedKernel",
             "Zumbo.Modules.Organizations->Zumbo.BuildingBlocks.Application",
+            "Zumbo.Modules.Organizations->Zumbo.Modules.Identity.Contracts",
             "Zumbo.Modules.Organizations->Zumbo.SharedKernel",
             "Zumbo.Modules.Projects->Zumbo.BuildingBlocks.Application",
+            "Zumbo.Modules.Projects->Zumbo.Modules.Identity.Contracts",
             "Zumbo.Modules.Projects->Zumbo.SharedKernel",
             "Zumbo.Modules.Teams->Zumbo.BuildingBlocks.Application",
+            "Zumbo.Modules.Teams->Zumbo.Modules.Identity.Contracts",
             "Zumbo.Modules.Teams->Zumbo.SharedKernel",
             "Zumbo.Modules.Workflows->Zumbo.BuildingBlocks.Application",
             "Zumbo.Modules.Workflows->Zumbo.SharedKernel",
             "Zumbo.Modules.WorkItems->Zumbo.BuildingBlocks.Application",
+            "Zumbo.Modules.WorkItems->Zumbo.Modules.Identity.Contracts",
+            "Zumbo.Modules.WorkItems->Zumbo.Modules.Projects.Contracts",
+            "Zumbo.Modules.WorkItems->Zumbo.Modules.WorkItems.Contracts",
             "Zumbo.Modules.WorkItems->Zumbo.SharedKernel"
         };
 
@@ -2324,18 +2498,7 @@ public sealed class ArchitectureBoundaryTests
         Assert.Contains("EditCommentEndpoint.Map(group);", routeHost, StringComparison.Ordinal);
         Assert.Contains("DeleteCommentEndpoint.Map(group);", routeHost, StringComparison.Ordinal);
 
-        var compatibility = File.ReadAllText(Path.Combine(
-            SourceDirectory,
-            "Zumbo.Api",
-            "Presentation",
-            "Endpoints",
-            "WorkItemEndpoints",
-            "WorkItemEndpoints.Comments.cs"));
-        Assert.Contains("private static void MapPostByIdComments", compatibility, StringComparison.Ordinal);
-        Assert.Contains("private static void MapGetByIdComments", compatibility, StringComparison.Ordinal);
-        Assert.Contains("private static void MapGetByIdCommentsByCommentIdRevisions", compatibility, StringComparison.Ordinal);
-        Assert.Contains("private static void MapPutByIdCommentsByCommentId", compatibility, StringComparison.Ordinal);
-        Assert.Contains("private static void MapDeleteByIdCommentsByCommentId", compatibility, StringComparison.Ordinal);
+        Assert.False(File.Exists(Path.Combine(SourceDirectory, "Zumbo.Api", "Presentation", "Endpoints", "WorkItemEndpoints", "WorkItemEndpoints.Comments.cs")));
     }
 
     [Fact]
@@ -2376,17 +2539,7 @@ public sealed class ArchitectureBoundaryTests
         Assert.Contains("AddLabelEndpoint.Map(group);", routeHost, StringComparison.Ordinal);
         Assert.Contains("RemoveLabelEndpoint.Map(group);", routeHost, StringComparison.Ordinal);
 
-        var compatibility = File.ReadAllText(Path.Combine(
-            SourceDirectory,
-            "Zumbo.Api",
-            "Presentation",
-            "Endpoints",
-            "WorkItemEndpoints",
-            "WorkItemEndpoints.Labels.cs"));
-        Assert.Contains("private static void MapPostByIdLabels", compatibility, StringComparison.Ordinal);
-        Assert.Contains("private static void MapDeleteByIdLabelsByLabel", compatibility, StringComparison.Ordinal);
-        Assert.Contains("AddLabelEndpoint.Map(group);", compatibility, StringComparison.Ordinal);
-        Assert.Contains("RemoveLabelEndpoint.Map(group);", compatibility, StringComparison.Ordinal);
+        Assert.False(File.Exists(Path.Combine(SourceDirectory, "Zumbo.Api", "Presentation", "Endpoints", "WorkItemEndpoints", "WorkItemEndpoints.Labels.cs")));
     }
 
     [Fact]
@@ -2427,17 +2580,7 @@ public sealed class ArchitectureBoundaryTests
         Assert.Contains("AddChecklistItemEndpoint.Map(group);", routeHost, StringComparison.Ordinal);
         Assert.Contains("SetChecklistItemCompletionEndpoint.Map(group);", routeHost, StringComparison.Ordinal);
 
-        var compatibility = File.ReadAllText(Path.Combine(
-            SourceDirectory,
-            "Zumbo.Api",
-            "Presentation",
-            "Endpoints",
-            "WorkItemEndpoints",
-            "WorkItemEndpoints.Checklist.cs"));
-        Assert.Contains("private static void MapPostByIdChecklist", compatibility, StringComparison.Ordinal);
-        Assert.Contains("private static void MapPatchByIdChecklistByItemId", compatibility, StringComparison.Ordinal);
-        Assert.Contains("AddChecklistItemEndpoint.Map(group);", compatibility, StringComparison.Ordinal);
-        Assert.Contains("SetChecklistItemCompletionEndpoint.Map(group);", compatibility, StringComparison.Ordinal);
+        Assert.False(File.Exists(Path.Combine(SourceDirectory, "Zumbo.Api", "Presentation", "Endpoints", "WorkItemEndpoints", "WorkItemEndpoints.Checklist.cs")));
     }
 
     [Fact]
@@ -2478,17 +2621,7 @@ public sealed class ArchitectureBoundaryTests
         Assert.Contains("LinkWorkItemEndpoint.Map(group);", routeHost, StringComparison.Ordinal);
         Assert.Contains("UnlinkWorkItemEndpoint.Map(group);", routeHost, StringComparison.Ordinal);
 
-        var compatibility = File.ReadAllText(Path.Combine(
-            SourceDirectory,
-            "Zumbo.Api",
-            "Presentation",
-            "Endpoints",
-            "WorkItemEndpoints",
-            "WorkItemEndpoints.Relations.cs"));
-        Assert.Contains("private static void MapPostByIdRelations", compatibility, StringComparison.Ordinal);
-        Assert.Contains("private static void MapDeleteByIdRelationsByRelatedWorkItemId", compatibility, StringComparison.Ordinal);
-        Assert.Contains("LinkWorkItemEndpoint.Map(group);", compatibility, StringComparison.Ordinal);
-        Assert.Contains("UnlinkWorkItemEndpoint.Map(group);", compatibility, StringComparison.Ordinal);
+        Assert.False(File.Exists(Path.Combine(SourceDirectory, "Zumbo.Api", "Presentation", "Endpoints", "WorkItemEndpoints", "WorkItemEndpoints.Relations.cs")));
     }
 
     [Fact]
@@ -2529,17 +2662,7 @@ public sealed class ArchitectureBoundaryTests
         Assert.Contains("AddWorkLogEndpoint.Map(group);", routeHost, StringComparison.Ordinal);
         Assert.Contains("ListWorkLogsEndpoint.Map(group);", routeHost, StringComparison.Ordinal);
 
-        var compatibility = File.ReadAllText(Path.Combine(
-            SourceDirectory,
-            "Zumbo.Api",
-            "Presentation",
-            "Endpoints",
-            "WorkItemEndpoints",
-            "WorkItemEndpoints.Worklogs.cs"));
-        Assert.Contains("private static void MapPostByIdWorklogs", compatibility, StringComparison.Ordinal);
-        Assert.Contains("private static void MapGetByIdWorklogs", compatibility, StringComparison.Ordinal);
-        Assert.Contains("AddWorkLogEndpoint.Map(group);", compatibility, StringComparison.Ordinal);
-        Assert.Contains("ListWorkLogsEndpoint.Map(group);", compatibility, StringComparison.Ordinal);
+        Assert.False(File.Exists(Path.Combine(SourceDirectory, "Zumbo.Api", "Presentation", "Endpoints", "WorkItemEndpoints", "WorkItemEndpoints.Worklogs.cs")));
     }
 
     [Fact]
@@ -2570,12 +2693,7 @@ public sealed class ArchitectureBoundaryTests
             Assert.Contains($"{endpointClass}.Map(group);", routeHost, StringComparison.Ordinal);
         }
 
-        var compatibility = File.ReadAllText(Path.Combine(SourceDirectory, "Zumbo.Api", "Presentation", "Endpoints", "WorkItemEndpoints", "WorkItemEndpoints.Attachments.cs"));
-        Assert.Contains("MapPostByIdAttachmentsUpload", compatibility, StringComparison.Ordinal);
-        Assert.Contains("MapGetByIdAttachments", compatibility, StringComparison.Ordinal);
-        Assert.Contains("MapGetByIdAttachmentsByAttachmentIdDownload", compatibility, StringComparison.Ordinal);
-        Assert.Contains("MapGetByIdAttachmentsByAttachmentIdPreview", compatibility, StringComparison.Ordinal);
-        Assert.Contains("MapDeleteByIdAttachmentsByAttachmentId", compatibility, StringComparison.Ordinal);
+        Assert.False(File.Exists(Path.Combine(SourceDirectory, "Zumbo.Api", "Presentation", "Endpoints", "WorkItemEndpoints", "WorkItemEndpoints.Attachments.cs")));
     }
 
     [Fact]
@@ -2604,10 +2722,7 @@ public sealed class ArchitectureBoundaryTests
             Assert.Contains($"{endpointClass}.Map(group);", routeHost, StringComparison.Ordinal);
         }
 
-        var compatibility = File.ReadAllText(Path.Combine(SourceDirectory, "Zumbo.Api", "Presentation", "Endpoints", "WorkItemEndpoints", "WorkItemEndpoints.Approvals.cs"));
-        Assert.Contains("MapPostByIdApprovals", compatibility, StringComparison.Ordinal);
-        Assert.Contains("MapPostByIdApprovalsByApprovalIdDecision", compatibility, StringComparison.Ordinal);
-        Assert.Contains("MapGetByIdApprovals", compatibility, StringComparison.Ordinal);
+        Assert.False(File.Exists(Path.Combine(SourceDirectory, "Zumbo.Api", "Presentation", "Endpoints", "WorkItemEndpoints", "WorkItemEndpoints.Approvals.cs")));
     }
 
     [Fact]
@@ -2643,100 +2758,63 @@ public sealed class ArchitectureBoundaryTests
             Assert.Contains($"{endpointClass}.Map(group);", routeHost, StringComparison.Ordinal);
         }
 
-        var durableCompatibility = File.ReadAllText(Path.Combine(SourceDirectory, "Zumbo.Api", "Presentation", "Endpoints", "WorkItemEndpoints", "WorkItemEndpoints.DurableMessaging.cs"));
-        Assert.Contains("MapGetDurableMessagingMetrics", durableCompatibility, StringComparison.Ordinal);
-        Assert.Contains("MapGetDurableMessagingDeadLetters", durableCompatibility, StringComparison.Ordinal);
-        Assert.Contains("MapPostDurableMessagingDeadLetterByMessageIdReplay", durableCompatibility, StringComparison.Ordinal);
-
-        var schemaCompatibility = File.ReadAllText(Path.Combine(SourceDirectory, "Zumbo.Api", "Presentation", "Endpoints", "WorkItemEndpoints", "WorkItemEndpoints.Schema.cs"));
-        Assert.Contains("MapPutByIdCustomFields", schemaCompatibility, StringComparison.Ordinal);
+        Assert.False(File.Exists(Path.Combine(SourceDirectory, "Zumbo.Api", "Presentation", "Endpoints", "WorkItemEndpoints", "WorkItemEndpoints.DurableMessaging.cs")));
+        Assert.False(File.Exists(Path.Combine(SourceDirectory, "Zumbo.Api", "Presentation", "Endpoints", "WorkItemEndpoints", "WorkItemEndpoints.Schema.cs")));
     }
 
     [Fact]
-    public void WorkItemEndpointHost_ContainsOnlyApprovedHostHelpersAndCompatibilityFacades()
+    public void WorkItemEndpointHost_ContainsOnlyApprovedHostHelpers()
     {
         var endpointRoot = Path.Combine(SourceDirectory, "Zumbo.Api", "Presentation", "Endpoints");
         var hostDirectory = Path.Combine(endpointRoot, "WorkItemEndpoints");
-        var hostAndHelperFiles = new[]
+        var expectedFiles = new[]
         {
             "WorkItemEndpoints.AddWorkItemsModule.cs",
             "WorkItemEndpoints.IdempotencyKey.cs",
             "WorkItemEndpoints.MapWorkItemEndpoints.cs",
             "WorkItemEndpoints.ReportOk.cs"
         };
-        var compatibilityFiles = new[]
+        var removedCompatibilityFiles = new[]
         {
-            "WorkItemEndpoints.Activity.cs",
-            "WorkItemEndpoints.Approvals.cs",
-            "WorkItemEndpoints.Attachments.cs",
-            "WorkItemEndpoints.BulkOperations.cs",
-            "WorkItemEndpoints.Checklist.cs",
-            "WorkItemEndpoints.Comments.cs",
-            "WorkItemEndpoints.DurableMessaging.cs",
-            "WorkItemEndpoints.Labels.cs",
-            "WorkItemEndpoints.Planning.cs",
-            "WorkItemEndpoints.Realtime.cs",
-            "WorkItemEndpoints.Recurrences.cs",
-            "WorkItemEndpoints.Relations.cs",
-            "WorkItemEndpoints.Reports.cs",
-            "WorkItemEndpoints.Schema.cs",
-            "WorkItemEndpoints.Search.cs",
-            "WorkItemEndpoints.WorkItemsCore.cs",
-            "WorkItemEndpoints.Worklogs.cs"
+            "WorkItemEndpoints.Activity.cs", "WorkItemEndpoints.Approvals.cs", "WorkItemEndpoints.Attachments.cs",
+            "WorkItemEndpoints.BulkOperations.cs", "WorkItemEndpoints.Checklist.cs", "WorkItemEndpoints.Comments.cs",
+            "WorkItemEndpoints.DurableMessaging.cs", "WorkItemEndpoints.Labels.cs", "WorkItemEndpoints.Planning.cs",
+            "WorkItemEndpoints.Realtime.cs", "WorkItemEndpoints.Recurrences.cs", "WorkItemEndpoints.Relations.cs",
+            "WorkItemEndpoints.Reports.cs", "WorkItemEndpoints.Schema.cs", "WorkItemEndpoints.Search.cs",
+            "WorkItemEndpoints.WorkItemsCore.cs", "WorkItemEndpoints.Worklogs.cs"
         };
-        var expectedFiles = hostAndHelperFiles
-            .Concat(compatibilityFiles)
-            .Order(StringComparer.Ordinal)
-            .ToArray();
         var actualFiles = Directory.GetFiles(hostDirectory, "*.cs", SearchOption.TopDirectoryOnly)
             .Select(Path.GetFileName)
             .Order(StringComparer.Ordinal)
             .ToArray();
 
-        Assert.Equal(expectedFiles, actualFiles);
+        Assert.Equal(expectedFiles.Order(StringComparer.Ordinal), actualFiles);
+        Assert.All(removedCompatibilityFiles, file => Assert.False(File.Exists(Path.Combine(hostDirectory, file))));
         Assert.False(File.Exists(Path.Combine(endpointRoot, "WorkItemEndpoints.cs")));
         Assert.Empty(Directory.Exists(Path.Combine(hostDirectory, "MapWorkItemEndpoints"))
             ? Directory.GetFiles(Path.Combine(hostDirectory, "MapWorkItemEndpoints"), "*.cs", SearchOption.AllDirectories)
             : []);
 
-        foreach (var compatibilityFile in compatibilityFiles)
-        {
-            var source = File.ReadAllText(Path.Combine(hostDirectory, compatibilityFile));
-            Assert.Contains("partial class WorkItemEndpoints", source, StringComparison.Ordinal);
-            Assert.DoesNotContain("group.Map", source, StringComparison.Ordinal);
-        }
-
-        var routeHost = File.ReadAllText(Path.Combine(
-            hostDirectory,
-            "WorkItemEndpoints.MapWorkItemEndpoints.cs"));
+        var routeHost = File.ReadAllText(Path.Combine(hostDirectory, "WorkItemEndpoints.MapWorkItemEndpoints.cs"));
         var featureEndpointClasses = Directory
             .GetFiles(Path.Combine(endpointRoot, "WorkItems"), "*.cs", SearchOption.AllDirectories)
             .SelectMany(path => CSharpSyntaxTree.ParseText(File.ReadAllText(path))
-                .GetRoot()
-                .DescendantNodes()
-                .OfType<ClassDeclarationSyntax>())
+                .GetRoot().DescendantNodes().OfType<ClassDeclarationSyntax>())
             .Where(type => type.Identifier.ValueText.EndsWith("Endpoint", StringComparison.Ordinal))
-            .Where(type => type.Members
-                .OfType<MethodDeclarationSyntax>()
-                .Any(method => method.Identifier.ValueText == "Map"))
+            .Where(type => type.Members.OfType<MethodDeclarationSyntax>().Any(method => method.Identifier.ValueText == "Map"))
             .Select(type => type.Identifier.ValueText)
             .Order(StringComparer.Ordinal)
             .ToArray();
 
         Assert.NotEmpty(featureEndpointClasses);
-        Assert.All(
-            featureEndpointClasses,
-            endpointClass => Assert.Contains($"{endpointClass}.Map(group);", routeHost, StringComparison.Ordinal));
+        Assert.All(featureEndpointClasses, endpointClass =>
+            Assert.Contains($"{endpointClass}.Map(group);", routeHost, StringComparison.Ordinal));
 
         var allowList = File.ReadAllText(Path.GetFullPath(Path.Combine(
-            BackendDirectory,
-            "..",
-            "docs",
-            "architecture",
-            "module-first-architecture-allowlist.json")));
+            BackendDirectory, "..", "docs", "architecture", "module-first-architecture-allowlist.json")));
         Assert.DoesNotContain("WorkItemEndpoints/MapWorkItemEndpoints/", allowList, StringComparison.Ordinal);
+        Assert.All(removedCompatibilityFiles, file => Assert.DoesNotContain(file, allowList, StringComparison.Ordinal));
     }
-
     [Fact]
     public void WorkItemReportEndpoints_AreIndependentFeatureEndpointClasses()
     {
@@ -2767,17 +2845,7 @@ public sealed class ArchitectureBoundaryTests
             Assert.Contains($"{endpointClass}.Map(group);", routeHost, StringComparison.Ordinal);
         }
 
-        var compatibility = File.ReadAllText(Path.Combine(SourceDirectory, "Zumbo.Api", "Presentation", "Endpoints", "WorkItemEndpoints", "WorkItemEndpoints.Reports.cs"));
-        Assert.Contains("MapGetReportsProjectSummaryByProjectId", compatibility, StringComparison.Ordinal);
-        Assert.Contains("MapGetReportsStatusDistributionByProjectId", compatibility, StringComparison.Ordinal);
-        Assert.Contains("MapGetReportsUserWorkloadByProjectId", compatibility, StringComparison.Ordinal);
-        Assert.Contains("MapGetReportsDueDateRisksByProjectId", compatibility, StringComparison.Ordinal);
-        Assert.Contains("MapGetReportsFlowTimeByProjectId", compatibility, StringComparison.Ordinal);
-        Assert.Contains("MapGetReportsCompletionRateByProjectId", compatibility, StringComparison.Ordinal);
-        Assert.Contains("MapGetReportsTeamPerformanceByProjectId", compatibility, StringComparison.Ordinal);
-        Assert.Contains("MapGetReportsSprintBurndownByProjectIdBySprintId", compatibility, StringComparison.Ordinal);
-        Assert.Contains("MapGetReportsSprintVelocityByProjectId", compatibility, StringComparison.Ordinal);
-
+        Assert.False(File.Exists(Path.Combine(SourceDirectory, "Zumbo.Api", "Presentation", "Endpoints", "WorkItemEndpoints", "WorkItemEndpoints.Reports.cs")));
         static void AssertEndpointClasses(string directory, IReadOnlyDictionary<string, string> endpointFiles, string endpointNamespace)
         {
             foreach (var endpointFile in endpointFiles)
@@ -2817,10 +2885,7 @@ public sealed class ArchitectureBoundaryTests
             Assert.Contains($"{endpointClass}.Map(group);", routeHost, StringComparison.Ordinal);
         }
 
-        var compatibility = File.ReadAllText(Path.Combine(SourceDirectory, "Zumbo.Api", "Presentation", "Endpoints", "WorkItemEndpoints", "WorkItemEndpoints.Search.cs"));
-        Assert.Contains("MapPostSearch", compatibility, StringComparison.Ordinal);
-        Assert.Contains("MapPostSearchRebuild", compatibility, StringComparison.Ordinal);
-        Assert.Contains("MapPostSearchReconcile", compatibility, StringComparison.Ordinal);
+        Assert.False(File.Exists(Path.Combine(SourceDirectory, "Zumbo.Api", "Presentation", "Endpoints", "WorkItemEndpoints", "WorkItemEndpoints.Search.cs")));
     }
 
     [Fact]
@@ -2857,18 +2922,7 @@ public sealed class ArchitectureBoundaryTests
             Assert.Contains($"{endpointClass}.Map(group);", routeHost, StringComparison.Ordinal);
         }
 
-        var compatibility = File.ReadAllText(Path.Combine(SourceDirectory, "Zumbo.Api", "Presentation", "Endpoints", "WorkItemEndpoints", "WorkItemEndpoints.Recurrences.cs"));
-        Assert.Contains("MapGetRecurrences", compatibility, StringComparison.Ordinal);
-        Assert.Contains("MapPostRecurrences", compatibility, StringComparison.Ordinal);
-        Assert.Contains("MapDeleteRecurrencesByRecurrenceId", compatibility, StringComparison.Ordinal);
-        Assert.Contains("MapPostRecurrencesPreview", compatibility, StringComparison.Ordinal);
-        Assert.Contains("MapPostRecurrencesProcessDue", compatibility, StringComparison.Ordinal);
-        Assert.Contains("MapPatchRecurrencesByRecurrenceIdState", compatibility, StringComparison.Ordinal);
-        Assert.Contains("MapGetRecurrencesByRecurrenceIdOccurrences", compatibility, StringComparison.Ordinal);
-        Assert.Contains("MapGetTemplates", compatibility, StringComparison.Ordinal);
-        Assert.Contains("MapPostTemplates", compatibility, StringComparison.Ordinal);
-        Assert.Contains("MapPutTemplatesByTemplateId", compatibility, StringComparison.Ordinal);
-        Assert.Contains("MapDeleteTemplatesByTemplateId", compatibility, StringComparison.Ordinal);
+        Assert.False(File.Exists(Path.Combine(SourceDirectory, "Zumbo.Api", "Presentation", "Endpoints", "WorkItemEndpoints", "WorkItemEndpoints.Recurrences.cs")));
     }
 
     [Fact]
@@ -2906,19 +2960,7 @@ public sealed class ArchitectureBoundaryTests
             Assert.Contains($"{endpointClass}.Map(group);", routeHost, StringComparison.Ordinal);
         }
 
-        var compatibility = File.ReadAllText(Path.Combine(SourceDirectory, "Zumbo.Api", "Presentation", "Endpoints", "WorkItemEndpoints", "WorkItemEndpoints.BulkOperations.cs"));
-        Assert.Contains("MapPostBulkMove", compatibility, StringComparison.Ordinal);
-        Assert.Contains("MapPostBulkAssign", compatibility, StringComparison.Ordinal);
-        Assert.Contains("MapPostBulkArchive", compatibility, StringComparison.Ordinal);
-        Assert.Contains("MapPostBulkJobs", compatibility, StringComparison.Ordinal);
-        Assert.Contains("MapGetBulkJobs", compatibility, StringComparison.Ordinal);
-        Assert.Contains("MapGetBulkJobsByJobId", compatibility, StringComparison.Ordinal);
-        Assert.Contains("MapGetBulkJobsByJobIdErrors", compatibility, StringComparison.Ordinal);
-        Assert.Contains("MapGetBulkJobsByJobIdResult", compatibility, StringComparison.Ordinal);
-        Assert.Contains("MapPostBulkJobsByJobIdCancel", compatibility, StringComparison.Ordinal);
-        Assert.Contains("MapPostBulkJobsByJobIdRetry", compatibility, StringComparison.Ordinal);
-        Assert.Contains("MapPostBulkJobsExport", compatibility, StringComparison.Ordinal);
-        Assert.Contains("MapPostBulkJobsImport", compatibility, StringComparison.Ordinal);
+        Assert.False(File.Exists(Path.Combine(SourceDirectory, "Zumbo.Api", "Presentation", "Endpoints", "WorkItemEndpoints", "WorkItemEndpoints.BulkOperations.cs")));
     }
 
     [Fact]
@@ -2947,10 +2989,7 @@ public sealed class ArchitectureBoundaryTests
             Assert.Contains($"{endpointClass}.Map(group);", routeHost, StringComparison.Ordinal);
         }
 
-        var compatibility = File.ReadAllText(Path.Combine(SourceDirectory, "Zumbo.Api", "Presentation", "Endpoints", "WorkItemEndpoints", "WorkItemEndpoints.Realtime.cs"));
-        Assert.Contains("MapGetByIdCollaboration", compatibility, StringComparison.Ordinal);
-        Assert.Contains("MapPutByIdVote", compatibility, StringComparison.Ordinal);
-        Assert.Contains("MapPutByIdWatch", compatibility, StringComparison.Ordinal);
+        Assert.False(File.Exists(Path.Combine(SourceDirectory, "Zumbo.Api", "Presentation", "Endpoints", "WorkItemEndpoints", "WorkItemEndpoints.Realtime.cs")));
     }
 
     [Fact]
@@ -2978,9 +3017,7 @@ public sealed class ArchitectureBoundaryTests
             Assert.Contains($"{endpointClass}.Map(group);", routeHost, StringComparison.Ordinal);
         }
 
-        var compatibility = File.ReadAllText(Path.Combine(SourceDirectory, "Zumbo.Api", "Presentation", "Endpoints", "WorkItemEndpoints", "WorkItemEndpoints.Activity.cs"));
-        Assert.Contains("MapGetByIdActivity", compatibility, StringComparison.Ordinal);
-        Assert.Contains("MapGetByIdTimeline", compatibility, StringComparison.Ordinal);
+        Assert.False(File.Exists(Path.Combine(SourceDirectory, "Zumbo.Api", "Presentation", "Endpoints", "WorkItemEndpoints", "WorkItemEndpoints.Activity.cs")));
     }
 
     [Fact]
@@ -3011,12 +3048,7 @@ public sealed class ArchitectureBoundaryTests
             Assert.Contains($"{endpointClass}.Map(group);", routeHost, StringComparison.Ordinal);
         }
 
-        var compatibility = File.ReadAllText(Path.Combine(SourceDirectory, "Zumbo.Api", "Presentation", "Endpoints", "WorkItemEndpoints", "WorkItemEndpoints.Planning.cs"));
-        Assert.Contains("MapPatchByIdAssignee", compatibility, StringComparison.Ordinal);
-        Assert.Contains("MapPatchByIdParent", compatibility, StringComparison.Ordinal);
-        Assert.Contains("MapPatchByIdPlanning", compatibility, StringComparison.Ordinal);
-        Assert.Contains("MapPatchByIdRank", compatibility, StringComparison.Ordinal);
-        Assert.Contains("MapPatchByIdTeam", compatibility, StringComparison.Ordinal);
+        Assert.False(File.Exists(Path.Combine(SourceDirectory, "Zumbo.Api", "Presentation", "Endpoints", "WorkItemEndpoints", "WorkItemEndpoints.Planning.cs")));
     }
 
     [Fact]
@@ -3049,14 +3081,7 @@ public sealed class ArchitectureBoundaryTests
             Assert.Contains($"{endpointClass}.Map(group);", routeHost, StringComparison.Ordinal);
         }
 
-        var compatibility = File.ReadAllText(Path.Combine(SourceDirectory, "Zumbo.Api", "Presentation", "Endpoints", "WorkItemEndpoints", "WorkItemEndpoints.WorkItemsCore.cs"));
-        Assert.Contains("MapDeleteById", compatibility, StringComparison.Ordinal);
-        Assert.Contains("MapGetById", compatibility, StringComparison.Ordinal);
-        Assert.Contains("MapGetRoot", compatibility, StringComparison.Ordinal);
-        Assert.Contains("MapPatchByIdStatus", compatibility, StringComparison.Ordinal);
-        Assert.Contains("MapPostByIdRestore", compatibility, StringComparison.Ordinal);
-        Assert.Contains("MapPostRoot", compatibility, StringComparison.Ordinal);
-        Assert.Contains("MapPutById", compatibility, StringComparison.Ordinal);
+        Assert.False(File.Exists(Path.Combine(SourceDirectory, "Zumbo.Api", "Presentation", "Endpoints", "WorkItemEndpoints", "WorkItemEndpoints.WorkItemsCore.cs")));
     }
 
     [Fact]

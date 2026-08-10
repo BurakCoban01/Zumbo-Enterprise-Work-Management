@@ -1,3 +1,5 @@
+using Zumbo.Api.Composition.Hosting.Registrars;
+
 internal static partial class ApiHostRegistration
 {
     internal static WebApplicationBuilder AddZumboHost(this WebApplicationBuilder builder)

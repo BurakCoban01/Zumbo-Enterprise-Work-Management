@@ -1,6 +1,8 @@
 using System.Text.Json;
 using Zumbo.Modules.Identity;
 
+namespace Zumbo.Api.Infrastructure.Adapters.Platform.PlatformCore.PrivacyDataProcessorAdapter;
+
 internal static class PrivacyStreamSerialization
 {
     internal static Task WriteReferenceAsync(

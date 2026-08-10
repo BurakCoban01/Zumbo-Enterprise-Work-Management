@@ -1,6 +1,8 @@
 using MongoDB.Bson;
 using Zumbo.BuildingBlocks.Infrastructure.Persistence;
 
+using Zumbo.Api.Infrastructure.Persistence.MongoDb.Migrations.Abstractions;
+
 public sealed partial class MongoMigrationRunner
 {
     private IMongoMigrationExecutionContext CreateExecutionContext() =>

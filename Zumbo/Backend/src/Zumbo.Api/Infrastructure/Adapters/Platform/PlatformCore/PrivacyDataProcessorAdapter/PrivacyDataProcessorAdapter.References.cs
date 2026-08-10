@@ -1,6 +1,7 @@
 using System.Linq.Expressions;
 using System.Text;
 using System.Text.Json;
+using Zumbo.Api.Infrastructure.Adapters.Platform.PlatformCore.PrivacyDataProcessorAdapter;
 using Zumbo.BuildingBlocks.Application.Persistence;
 using Zumbo.Modules.Audit;
 using Zumbo.Modules.Identity;

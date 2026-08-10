@@ -1,6 +1,8 @@
 using MongoDB.Bson;
 using MongoDB.Driver;
 
+using Zumbo.Api.Infrastructure.Persistence.MongoDb.Migrations.Definitions.Backfills;
+
 public sealed partial class MongoMigrationRunner
 {
     private async Task<MongoMigrationOutcome> BackfillProjectLifecycleAsync(

@@ -7,6 +7,8 @@ using Zumbo.Modules.Projects;
 using Zumbo.Modules.Teams;
 using Zumbo.Modules.WorkItems;
 
+namespace Zumbo.Api.Infrastructure.Adapters.Platform.PlatformCore.PrivacyDataProcessorAdapter;
+
 internal sealed class PrivacyDataExportComponent(
     IDocumentRepository<OrganizationDocument> organizations,
     IDocumentRepository<TeamDocument> teams,

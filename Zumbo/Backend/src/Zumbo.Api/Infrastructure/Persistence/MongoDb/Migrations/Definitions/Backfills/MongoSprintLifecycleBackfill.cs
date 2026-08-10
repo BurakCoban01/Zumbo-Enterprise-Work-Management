@@ -3,6 +3,10 @@ using System.Text;
 using MongoDB.Bson;
 using MongoDB.Driver;
 
+using Zumbo.Api.Infrastructure.Persistence.MongoDb.Migrations.Abstractions;
+
+namespace Zumbo.Api.Infrastructure.Persistence.MongoDb.Migrations.Definitions.Backfills;
+
 internal sealed class MongoSprintLifecycleBackfill(
     IMongoMigrationExecutionContext context,
     string migrationId,

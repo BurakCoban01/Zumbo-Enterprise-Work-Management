@@ -3,6 +3,8 @@ using Zumbo.BuildingBlocks.Application.Persistence;
 using Zumbo.Modules.Identity;
 using Zumbo.SharedKernel;
 
+namespace Zumbo.Api.Infrastructure.Adapters.Platform.PlatformCore.PrivacyDataProcessorAdapter;
+
 internal static class PrivacyDocumentAccess
 {
     internal static async Task<IReadOnlyList<TDocument>> LoadAllAsync<TDocument>(

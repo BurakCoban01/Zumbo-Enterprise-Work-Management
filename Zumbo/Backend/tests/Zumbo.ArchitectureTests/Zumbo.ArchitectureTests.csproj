@@ -27,6 +27,7 @@
     <ProjectReference Include="..\..\src\Zumbo.Modules.Identity\Zumbo.Modules.Identity.csproj" />
     <ProjectReference Include="..\..\src\Zumbo.Modules.WorkItems\Zumbo.Modules.WorkItems.csproj" />
     <ProjectReference Include="..\..\src\Zumbo.Api\Zumbo.Api.csproj" />
+    <ProjectReference Include="..\..\src\Zumbo.Modules.Identity.Contracts\Zumbo.Modules.Identity.Contracts.csproj" />
   </ItemGroup>
 
 </Project>

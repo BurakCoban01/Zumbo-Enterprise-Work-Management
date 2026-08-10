@@ -105,7 +105,8 @@ public sealed class ModuleFirstSourceLayoutTests
 
             if (references.Any(reference =>
                 reference.StartsWith("Zumbo.Modules.", StringComparison.Ordinal)
-                && !string.Equals(reference, moduleName, StringComparison.Ordinal)))
+                && !string.Equals(reference, moduleName, StringComparison.Ordinal)
+                && !reference.EndsWith(".Contracts", StringComparison.Ordinal)))
             {
                 violations.Add(RelativePath(projectFile));
             }

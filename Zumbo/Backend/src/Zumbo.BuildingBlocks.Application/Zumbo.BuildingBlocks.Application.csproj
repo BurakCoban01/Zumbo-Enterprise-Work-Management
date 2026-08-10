@@ -6,4 +6,10 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\Zumbo.Modules.Identity.Contracts\Zumbo.Modules.Identity.Contracts.csproj" />
+    <ProjectReference Include="..\Zumbo.Modules.Projects.Contracts\Zumbo.Modules.Projects.Contracts.csproj" />
+    <ProjectReference Include="..\Zumbo.Modules.WorkItems.Contracts\Zumbo.Modules.WorkItems.Contracts.csproj" />
+  </ItemGroup>
+
 </Project>

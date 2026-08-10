@@ -13,11 +13,12 @@ namespace Zumbo.Persistence.PostgreSql;
 internal sealed partial class PostgreSqlExpressionTranslator(JsonSerializerOptions jsonOptions)
 {
     private readonly List<NpgsqlParameter> parameters = [];
+#pragma warning disable CS0414 // Retained baseline field for lossless refactor verification.
     private int jsonAliasIndex = 0;
+#pragma warning restore CS0414
     private readonly PostgreSqlTranslationState translationState = new(jsonOptions);
     private PostgreSqlParameterCollector parameterCollector => translationState.ParameterCollector;
     private PostgreSqlPredicateTranslator predicateTranslator => translationState.PredicateTranslator;
-    private int CompatibilityJsonAliasIndex => jsonAliasIndex;
 
     public IReadOnlyList<NpgsqlParameter> Parameters => parameterCollector.Parameters;
 }

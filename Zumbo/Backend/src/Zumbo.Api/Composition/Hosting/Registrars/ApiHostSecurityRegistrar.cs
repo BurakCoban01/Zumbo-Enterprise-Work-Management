@@ -29,6 +29,8 @@ using Zumbo.SharedKernel;
 using MongoDurableTransactionRunner = Zumbo.BuildingBlocks.Infrastructure.Persistence.MongoDurableTransactionRunner;
 using MongoTransactionContext = Zumbo.BuildingBlocks.Infrastructure.Persistence.MongoTransactionContext;
 
+namespace Zumbo.Api.Composition.Hosting.Registrars;
+
 internal static class ApiHostSecurityRegistrar
 {
     internal static void ConfigureAuthentication(WebApplicationBuilder builder)

@@ -4,6 +4,8 @@ using Zumbo.Modules.Projects;
 using Zumbo.Modules.Teams;
 using Zumbo.SharedKernel;
 
+namespace Zumbo.Api.Infrastructure.Adapters.Platform.PlatformCore.PrivacyDataProcessorAdapter;
+
 internal sealed class PrivacyAnonymizationGuard(
     IDocumentRepository<OrganizationDocument> organizations,
     IDocumentRepository<TeamDocument> teams,

@@ -1,5 +1,7 @@
 using Zumbo.Modules.WorkItems;
 
+namespace Zumbo.Api.Infrastructure.Adapters.Platform.PlatformCore.PrivacyDataProcessorAdapter;
+
 internal static class PrivacyReferenceDescriptions
 {
     internal static string DescribeActivityReference(WorkItemUserActivityReference activity) =>

@@ -25,10 +25,13 @@
     <ProjectReference Include="..\Zumbo.BuildingBlocks.Infrastructure\Zumbo.BuildingBlocks.Infrastructure.csproj" />
     <ProjectReference Include="..\Zumbo.Persistence.PostgreSql\Zumbo.Persistence.PostgreSql.csproj" />
     <ProjectReference Include="..\Zumbo.Modules.Identity\Zumbo.Modules.Identity.csproj" />
+    <ProjectReference Include="..\Zumbo.Modules.Identity.Contracts\Zumbo.Modules.Identity.Contracts.csproj" />
     <ProjectReference Include="..\Zumbo.Modules.Teams\Zumbo.Modules.Teams.csproj" />
     <ProjectReference Include="..\Zumbo.Modules.Projects\Zumbo.Modules.Projects.csproj" />
+    <ProjectReference Include="..\Zumbo.Modules.Projects.Contracts\Zumbo.Modules.Projects.Contracts.csproj" />
     <ProjectReference Include="..\Zumbo.Modules.Boards\Zumbo.Modules.Boards.csproj" />
     <ProjectReference Include="..\Zumbo.Modules.WorkItems\Zumbo.Modules.WorkItems.csproj" />
+    <ProjectReference Include="..\Zumbo.Modules.WorkItems.Contracts\Zumbo.Modules.WorkItems.Contracts.csproj" />
     <ProjectReference Include="..\Zumbo.Modules.Notifications\Zumbo.Modules.Notifications.csproj" />
     <ProjectReference Include="..\Zumbo.Modules.Audit\Zumbo.Modules.Audit.csproj" />
     <ProjectReference Include="..\Zumbo.Modules.Organizations\Zumbo.Modules.Organizations.csproj" />

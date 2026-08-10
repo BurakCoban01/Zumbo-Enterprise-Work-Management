@@ -2,6 +2,59 @@ namespace Zumbo.ArchitectureTests.RefactorValidation;
 
 public sealed class RefactorSemanticPreservationTests
 {
+    private static readonly IReadOnlyDictionary<string, string> AcceptedTypeRelocations =
+        new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["Zumbo.BuildingBlocks.Application|Zumbo.BuildingBlocks.Application.Security.IProjectResourcePolicy"] =
+                "Zumbo.Modules.Projects.Contracts|Zumbo.BuildingBlocks.Application.Security.IProjectResourcePolicy",
+            ["Zumbo.BuildingBlocks.Application|Zumbo.BuildingBlocks.Application.Security.ProjectResourceAuthorization"] =
+                "Zumbo.Modules.Projects.Contracts|Zumbo.BuildingBlocks.Application.Security.ProjectResourceAuthorization",
+            ["Zumbo.BuildingBlocks.Application|Zumbo.BuildingBlocks.Application.Security.ApiKeyScopes"] =
+                "Zumbo.Modules.Identity.Contracts|Zumbo.BuildingBlocks.Application.Security.ApiKeyScopes",
+            ["Zumbo.BuildingBlocks.Application|Zumbo.BuildingBlocks.Application.Security.IPasswordHasher"] =
+                "Zumbo.Modules.Identity.Contracts|Zumbo.BuildingBlocks.Application.Security.IPasswordHasher",
+            ["Zumbo.BuildingBlocks.Application|Zumbo.BuildingBlocks.Application.Security.ITokenIssuer"] =
+                "Zumbo.Modules.Identity.Contracts|Zumbo.BuildingBlocks.Application.Security.ITokenIssuer",
+            ["Zumbo.BuildingBlocks.Application|Zumbo.BuildingBlocks.Application.Security.JwtOptions"] =
+                "Zumbo.Modules.Identity.Contracts|Zumbo.BuildingBlocks.Application.Security.JwtOptions",
+            ["Zumbo.BuildingBlocks.Application|Zumbo.BuildingBlocks.Application.Security.PermissionCatalog"] =
+                "Zumbo.Modules.Identity.Contracts|Zumbo.BuildingBlocks.Application.Security.PermissionCatalog",
+            ["Zumbo.BuildingBlocks.Application|Zumbo.BuildingBlocks.Application.Security.TokenUser"] =
+                "Zumbo.Modules.Identity.Contracts|Zumbo.BuildingBlocks.Application.Security.TokenUser",
+            ["Zumbo.BuildingBlocks.Application|Zumbo.BuildingBlocks.Application.Search.IWorkItemSearchIndex"] =
+                "Zumbo.Modules.WorkItems.Contracts|Zumbo.BuildingBlocks.Application.Search.IWorkItemSearchIndex",
+            ["Zumbo.BuildingBlocks.Application|Zumbo.BuildingBlocks.Application.Search.SearchOptions"] =
+                "Zumbo.Modules.WorkItems.Contracts|Zumbo.BuildingBlocks.Application.Search.SearchOptions",
+            ["Zumbo.BuildingBlocks.Application|Zumbo.BuildingBlocks.Application.Search.WorkItemSearchQuery"] =
+                "Zumbo.Modules.WorkItems.Contracts|Zumbo.BuildingBlocks.Application.Search.WorkItemSearchQuery",
+            ["Zumbo.BuildingBlocks.Application|Zumbo.BuildingBlocks.Application.Search.WorkItemSearchRebuildResult"] =
+                "Zumbo.Modules.WorkItems.Contracts|Zumbo.BuildingBlocks.Application.Search.WorkItemSearchRebuildResult",
+            ["Zumbo.BuildingBlocks.Application|Zumbo.BuildingBlocks.Application.Search.WorkItemSearchRecord"] =
+                "Zumbo.Modules.WorkItems.Contracts|Zumbo.BuildingBlocks.Application.Search.WorkItemSearchRecord",
+            ["Zumbo.BuildingBlocks.Application|Zumbo.BuildingBlocks.Application.Search.WorkItemSearchResult"] =
+                "Zumbo.Modules.WorkItems.Contracts|Zumbo.BuildingBlocks.Application.Search.WorkItemSearchResult",
+            ["Zumbo.BuildingBlocks.Application|Zumbo.BuildingBlocks.Application.Search.WorkItemSearchUnavailableException"] =
+                "Zumbo.Modules.WorkItems.Contracts|Zumbo.BuildingBlocks.Application.Search.WorkItemSearchUnavailableException",
+            ["Zumbo.BuildingBlocks.Infrastructure|Zumbo.BuildingBlocks.Infrastructure.Search.InMemoryWorkItemSearchIndex"] =
+                "Zumbo.Modules.WorkItems|Zumbo.BuildingBlocks.Infrastructure.Search.InMemoryWorkItemSearchIndex",
+            ["Zumbo.BuildingBlocks.Infrastructure|Zumbo.BuildingBlocks.Infrastructure.Search.OpenSearchOptions"] =
+                "Zumbo.Modules.WorkItems|Zumbo.BuildingBlocks.Infrastructure.Search.OpenSearchOptions",
+            ["Zumbo.BuildingBlocks.Infrastructure|Zumbo.BuildingBlocks.Infrastructure.Search.OpenSearchWorkItemSearchIndex"] =
+                "Zumbo.Modules.WorkItems|Zumbo.BuildingBlocks.Infrastructure.Search.OpenSearchWorkItemSearchIndex",
+            ["Zumbo.BuildingBlocks.Infrastructure|Zumbo.BuildingBlocks.Infrastructure.Search.OpenSearchWorkItemSearchIndex+OpenSearchBulkResponse"] =
+                "Zumbo.Modules.WorkItems|Zumbo.BuildingBlocks.Infrastructure.Search.OpenSearchWorkItemSearchIndex+OpenSearchBulkResponse",
+            ["Zumbo.BuildingBlocks.Infrastructure|Zumbo.BuildingBlocks.Infrastructure.Search.OpenSearchWorkItemSearchIndex+OpenSearchCountResponse"] =
+                "Zumbo.Modules.WorkItems|Zumbo.BuildingBlocks.Infrastructure.Search.OpenSearchWorkItemSearchIndex+OpenSearchCountResponse",
+            ["Zumbo.BuildingBlocks.Infrastructure|Zumbo.BuildingBlocks.Infrastructure.Search.OpenSearchWorkItemSearchIndex+OpenSearchHit"] =
+                "Zumbo.Modules.WorkItems|Zumbo.BuildingBlocks.Infrastructure.Search.OpenSearchWorkItemSearchIndex+OpenSearchHit",
+            ["Zumbo.BuildingBlocks.Infrastructure|Zumbo.BuildingBlocks.Infrastructure.Search.OpenSearchWorkItemSearchIndex+OpenSearchHits"] =
+                "Zumbo.Modules.WorkItems|Zumbo.BuildingBlocks.Infrastructure.Search.OpenSearchWorkItemSearchIndex+OpenSearchHits",
+            ["Zumbo.BuildingBlocks.Infrastructure|Zumbo.BuildingBlocks.Infrastructure.Search.OpenSearchWorkItemSearchIndex+OpenSearchResponse"] =
+                "Zumbo.Modules.WorkItems|Zumbo.BuildingBlocks.Infrastructure.Search.OpenSearchWorkItemSearchIndex+OpenSearchResponse",
+            ["Zumbo.BuildingBlocks.Infrastructure|Zumbo.BuildingBlocks.Infrastructure.Search.OpenSearchWorkItemSearchIndex+OpenSearchTotal"] =
+                "Zumbo.Modules.WorkItems|Zumbo.BuildingBlocks.Infrastructure.Search.OpenSearchWorkItemSearchIndex+OpenSearchTotal"
+        };
+
     private static readonly IReadOnlyDictionary<string, string> AcceptedBodyDifferences =
         new Dictionary<string, string>(StringComparer.Ordinal)
         {
@@ -52,161 +105,7 @@ public sealed class RefactorSemanticPreservationTests
             ["Zumbo.Modules.WorkItems|Zumbo.Modules.WorkItems.DashboardRenderer|method:RenderSourceAsync:(stringprojectId,stringtype,DashboardFilterRequestfilter,CancellationTokenct):Task<DashboardWidgetSourceResponse>"] =
                 "The dashboard renderer selects project-summary, status-distribution, user-workload, due-date-risk, flow-time, completion-rate, and team-performance handlers when composed through its new constructor while its preserved constructor retains WorkItemService fallback; query values, filtering, columns, rows, source metadata, cancellation, degradation, and unsupported-widget behavior remain unchanged.",
             ["Zumbo.Api|WorkItemEndpoints|method:MapWorkItemEndpoints:(thisRouteGroupBuilderapi):void"] =
-                "The route host delegates activity, approval, attachment, bulk operations, checklist, comment, durable messaging, label, planning, realtime collaboration, recurrence/template, relation, report, schema, search, sprint-report, work-item core and worklog routes to independent feature endpoint classes while preserving the original private mapping members in responsibility-grouped compatibility partials; all other mappings retain their route-specific partial delegation, and HTTP route, metadata, authorization, request, response, and handler equivalence is verified by the runtime contract audit.",
-            ["Zumbo.Api|WorkItemEndpoints|method:MapGetDurableMessagingDeadLetters:(RouteGroupBuildergroup):void"] =
-                "The preserved private compatibility member delegates to ListDurableMessageDeadLettersEndpoint while retaining route, clamped page size, outbox abstraction, global operations permission, report rate limit, cancellation, and response behavior.",
-            ["Zumbo.Api|WorkItemEndpoints|method:MapGetDurableMessagingMetrics:(RouteGroupBuildergroup):void"] =
-                "The preserved private compatibility member delegates to GetDurableMessagingMetricsEndpoint while retaining route, outbox and clock abstractions, global operations permission, cancellation, and metrics response behavior.",
-            ["Zumbo.Api|WorkItemEndpoints|method:MapPostDurableMessagingDeadLetterByMessageIdReplay:(RouteGroupBuildergroup):void"] =
-                "The preserved private compatibility member delegates to ReplayDurableMessageDeadLetterEndpoint while retaining route and message binding, replay transition, conditional audit, correlation, clock, global operations permission, cancellation, and response behavior.",
-            ["Zumbo.Api|WorkItemEndpoints|method:MapPutByIdCustomFields:(RouteGroupBuildergroup):void"] =
-                "The preserved private compatibility member delegates to SetWorkItemCustomFieldsEndpoint while retaining route and request binding, correlation, handler command, update permission, cancellation, and response behavior.",
-            ["Zumbo.Api|WorkItemEndpoints|method:MapGetReportsProjectSummaryByProjectId:(RouteGroupBuildergroup):void"] =
-                "The preserved private compatibility member delegates to GetProjectSummaryReportEndpoint while retaining route and project binding, report handler/query, report metadata headers, rate limit, cancellation, and response behavior.",
-            ["Zumbo.Api|WorkItemEndpoints|method:MapGetReportsStatusDistributionByProjectId:(RouteGroupBuildergroup):void"] =
-                "The preserved private compatibility member delegates to GetStatusDistributionReportEndpoint while retaining route and project binding, report handler/query, report metadata headers, rate limit, cancellation, and response behavior.",
-            ["Zumbo.Api|WorkItemEndpoints|method:MapGetReportsUserWorkloadByProjectId:(RouteGroupBuildergroup):void"] =
-                "The preserved private compatibility member delegates to GetUserWorkloadReportEndpoint while retaining route and project binding, report handler/query, report metadata headers, rate limit, cancellation, and response behavior.",
-            ["Zumbo.Api|WorkItemEndpoints|method:MapGetReportsDueDateRisksByProjectId:(RouteGroupBuildergroup):void"] =
-                "The preserved private compatibility member delegates to GetDueDateRisksReportEndpoint while retaining route, project and day binding, fourteen-day default, report metadata headers, rate limit, cancellation, and response behavior.",
-            ["Zumbo.Api|WorkItemEndpoints|method:MapGetReportsFlowTimeByProjectId:(RouteGroupBuildergroup):void"] =
-                "The preserved private compatibility member delegates to GetFlowTimeReportEndpoint while retaining route, project and date binding, report handler/query, report metadata headers, rate limit, cancellation, and response behavior.",
-            ["Zumbo.Api|WorkItemEndpoints|method:MapGetReportsCompletionRateByProjectId:(RouteGroupBuildergroup):void"] =
-                "The preserved private compatibility member delegates to GetCompletionRateReportEndpoint while retaining route, project and date binding, report handler/query, report metadata headers, rate limit, cancellation, and response behavior.",
-            ["Zumbo.Api|WorkItemEndpoints|method:MapGetReportsTeamPerformanceByProjectId:(RouteGroupBuildergroup):void"] =
-                "The preserved private compatibility member delegates to GetTeamPerformanceReportEndpoint while retaining route, project and date binding, report handler/query, report metadata headers, rate limit, cancellation, and response behavior.",
-            ["Zumbo.Api|WorkItemEndpoints|method:MapGetReportsSprintBurndownByProjectIdBySprintId:(RouteGroupBuildergroup):void"] =
-                "The preserved private compatibility member delegates to GetSprintBurndownReportEndpoint while retaining route, project, sprint and date binding, report handler/query, report metadata headers, rate limit, cancellation, and response behavior.",
-            ["Zumbo.Api|WorkItemEndpoints|method:MapGetReportsSprintVelocityByProjectId:(RouteGroupBuildergroup):void"] =
-                "The preserved private compatibility member delegates to GetSprintVelocityReportEndpoint while retaining route, project and sprint-count binding, six-sprint default, report handler/query, report metadata headers, rate limit, cancellation, and response behavior.",
-            ["Zumbo.Api|WorkItemEndpoints|method:MapPostSearch:(RouteGroupBuildergroup):void"] =
-                "The preserved private compatibility member delegates to SearchWorkItemsPageEndpoint while retaining route, request binding, search handler, search rate limit, cancellation, and response behavior.",
-            ["Zumbo.Api|WorkItemEndpoints|method:MapPostSearchRebuild:(RouteGroupBuildergroup):void"] =
-                "The preserved private compatibility member delegates to RebuildSearchIndexEndpoint while retaining route, rebuild and audit behavior, global operations permission, bulk rate limit, correlation, cancellation, and response behavior.",
-            ["Zumbo.Api|WorkItemEndpoints|method:MapPostSearchReconcile:(RouteGroupBuildergroup):void"] =
-                "The preserved private compatibility member delegates to ReconcileSearchIndexEndpoint while retaining route, reconcile audit behavior, global operations permission, bulk rate limit, correlation, cancellation, and response behavior.",
-            ["Zumbo.Api|WorkItemEndpoints|method:MapGetRecurrences:(RouteGroupBuildergroup):void"] =
-                "The preserved private compatibility member delegates to ListRecurrencesEndpoint while retaining route, project and paging binding, defaults, archived filtering, service, cancellation, and response behavior.",
-            ["Zumbo.Api|WorkItemEndpoints|method:MapPostRecurrences:(RouteGroupBuildergroup):void"] =
-                "The preserved private compatibility member delegates to CreateRecurrenceEndpoint while retaining route, request and correlation binding, create permission, service, cancellation, and created response behavior.",
-            ["Zumbo.Api|WorkItemEndpoints|method:MapDeleteRecurrencesByRecurrenceId:(RouteGroupBuildergroup):void"] =
-                "The preserved private compatibility member delegates to DeleteRecurrenceEndpoint while retaining route and recurrence binding, correlation ID, update permission, archive service call, cancellation, and no-content behavior.",
-            ["Zumbo.Api|WorkItemEndpoints|method:MapPostRecurrencesPreview:(RouteGroupBuildergroup):void"] =
-                "The preserved private compatibility member delegates to PreviewRecurrenceEndpoint while retaining route, request binding, create permission, service, cancellation, and response behavior.",
-            ["Zumbo.Api|WorkItemEndpoints|method:MapPostRecurrencesProcessDue:(RouteGroupBuildergroup):void"] =
-                "The preserved private compatibility member delegates to ProcessDueRecurrencesEndpoint while retaining route, globally scoped operations permission, scheduling service, cancellation, and scheduled-count response behavior.",
-            ["Zumbo.Api|WorkItemEndpoints|method:MapPatchRecurrencesByRecurrenceIdState:(RouteGroupBuildergroup):void"] =
-                "The preserved private compatibility member delegates to SetRecurrenceStateEndpoint while retaining route, recurrence and request binding, correlation ID, update permission, service, cancellation, and response behavior.",
-            ["Zumbo.Api|WorkItemEndpoints|method:MapGetRecurrencesByRecurrenceIdOccurrences:(RouteGroupBuildergroup):void"] =
-                "The preserved private compatibility member delegates to ListRecurrenceOccurrencesEndpoint while retaining route, recurrence and paging binding, defaults, service, cancellation, and response behavior.",
-            ["Zumbo.Api|WorkItemEndpoints|method:MapGetTemplates:(RouteGroupBuildergroup):void"] =
-                "The preserved private compatibility member delegates to ListTemplatesEndpoint while retaining route, project and paging binding, defaults, archived filtering, service, cancellation, and response behavior.",
-            ["Zumbo.Api|WorkItemEndpoints|method:MapPostTemplates:(RouteGroupBuildergroup):void"] =
-                "The preserved private compatibility member delegates to CreateTemplateEndpoint while retaining route, request and correlation binding, create permission, service, cancellation, and created response behavior.",
-            ["Zumbo.Api|WorkItemEndpoints|method:MapPutTemplatesByTemplateId:(RouteGroupBuildergroup):void"] =
-                "The preserved private compatibility member delegates to UpdateTemplateEndpoint while retaining route, template and request binding, correlation ID, update permission, service, cancellation, and response behavior.",
-            ["Zumbo.Api|WorkItemEndpoints|method:MapDeleteTemplatesByTemplateId:(RouteGroupBuildergroup):void"] =
-                "The preserved private compatibility member delegates to DeleteTemplateEndpoint while retaining route and template binding, correlation ID, update permission, archive service call, cancellation, and no-content behavior.",
-            ["Zumbo.Api|WorkItemEndpoints|method:MapPostBulkMove:(RouteGroupBuildergroup):void"] =
-                "The preserved private compatibility member delegates to BulkMoveWorkItemsEndpoint while retaining the exact route, request and correlation binding, handler, move permission, bulk rate limit, cancellation, and response contract.",
-            ["Zumbo.Api|WorkItemEndpoints|method:MapPostBulkAssign:(RouteGroupBuildergroup):void"] =
-                "The preserved private compatibility member delegates to BulkAssignWorkItemsEndpoint while retaining the exact route, request and correlation binding, handler, assign permission, bulk rate limit, cancellation, and response contract.",
-            ["Zumbo.Api|WorkItemEndpoints|method:MapPostBulkArchive:(RouteGroupBuildergroup):void"] =
-                "The preserved private compatibility member delegates to BulkArchiveWorkItemsEndpoint while retaining the exact route, request and correlation binding, handler, delete permission, bulk rate limit, cancellation, and response contract.",
-            ["Zumbo.Api|WorkItemEndpoints|method:MapPostBulkJobs:(RouteGroupBuildergroup):void"] =
-                "The preserved private compatibility member delegates to CreateBulkJobEndpoint while retaining the exact route, request, idempotency and correlation binding, service, update permission, bulk rate limit, cancellation, and created response contract.",
-            ["Zumbo.Api|WorkItemEndpoints|method:MapGetBulkJobs:(RouteGroupBuildergroup):void"] =
-                "The preserved private compatibility member delegates to ListBulkJobsEndpoint while retaining the exact route, project and paging binding, defaults, service, cancellation, and response contract.",
-            ["Zumbo.Api|WorkItemEndpoints|method:MapGetBulkJobsByJobId:(RouteGroupBuildergroup):void"] =
-                "The preserved private compatibility member delegates to GetBulkJobEndpoint while retaining the exact route, job binding, service, cancellation, and response contract.",
-            ["Zumbo.Api|WorkItemEndpoints|method:MapGetBulkJobsByJobIdErrors:(RouteGroupBuildergroup):void"] =
-                "The preserved private compatibility member delegates to ListBulkJobErrorsEndpoint while retaining the exact route, error artifact selection, file metadata, disabled range processing, service, and cancellation contract.",
-            ["Zumbo.Api|WorkItemEndpoints|method:MapGetBulkJobsByJobIdResult:(RouteGroupBuildergroup):void"] =
-                "The preserved private compatibility member delegates to GetBulkJobResultEndpoint while retaining the exact route, result artifact selection, file metadata, disabled range processing, service, and cancellation contract.",
-            ["Zumbo.Api|WorkItemEndpoints|method:MapPostBulkJobsByJobIdCancel:(RouteGroupBuildergroup):void"] =
-                "The preserved private compatibility member delegates to CancelBulkJobEndpoint while retaining the exact route, job and correlation binding, service, update permission, cancellation, and response contract.",
-            ["Zumbo.Api|WorkItemEndpoints|method:MapPostBulkJobsByJobIdRetry:(RouteGroupBuildergroup):void"] =
-                "The preserved private compatibility member delegates to RetryBulkJobEndpoint while retaining the exact route, job and correlation binding, service, update permission, cancellation, and response contract.",
-            ["Zumbo.Api|WorkItemEndpoints|method:MapPostBulkJobsExport:(RouteGroupBuildergroup):void"] =
-                "The preserved private compatibility member delegates to CreateBulkExportJobEndpoint while retaining the exact route, request, idempotency and correlation binding, service, view permission, bulk rate limit, cancellation, and created response contract.",
-            ["Zumbo.Api|WorkItemEndpoints|method:MapPostBulkJobsImport:(RouteGroupBuildergroup):void"] =
-                "The preserved private compatibility member delegates to CreateBulkImportJobEndpoint while retaining the exact route, request, idempotency and correlation binding, service, create permission, bulk rate limit, cancellation, and created response contract.",
-            ["Zumbo.Api|WorkItemEndpoints|method:MapGetByIdCollaboration:(RouteGroupBuildergroup):void"] =
-                "The preserved private compatibility member delegates to GetCollaborationEndpoint while retaining its signature, exact route, binding, collaboration query service, cancellation, and response contract.",
-            ["Zumbo.Api|WorkItemEndpoints|method:MapPutByIdVote:(RouteGroupBuildergroup):void"] =
-                "The preserved private compatibility member delegates to SetVoteEndpoint while retaining its signature, exact route, request binding, vote state, correlation ID, collaboration service, cancellation, and response contract.",
-            ["Zumbo.Api|WorkItemEndpoints|method:MapPutByIdWatch:(RouteGroupBuildergroup):void"] =
-                "The preserved private compatibility member delegates to SetWatchEndpoint while retaining its signature, exact route, request binding, watch state, correlation ID, collaboration service, cancellation, and response contract.",
-            ["Zumbo.Api|WorkItemEndpoints|method:MapGetByIdActivity:(RouteGroupBuildergroup):void"] =
-                "The preserved private compatibility member delegates to GetWorkItemActivityEndpoint while retaining its signature, exact route, paging defaults, binding, collaboration query service, cancellation, and response contract.",
-            ["Zumbo.Api|WorkItemEndpoints|method:MapGetByIdTimeline:(RouteGroupBuildergroup):void"] =
-                "The preserved private compatibility member delegates to GetWorkItemTimelineEndpoint while retaining its signature, exact route, paging defaults, binding, activity query service, cancellation, and response contract.",
-            ["Zumbo.Api|WorkItemEndpoints|method:MapDeleteById:(RouteGroupBuildergroup):void"] =
-                "The preserved private compatibility member delegates to ArchiveWorkItemEndpoint while retaining route binding, authorization, correlation, handler, cancellation, archive response, and HTTP behavior.",
-            ["Zumbo.Api|WorkItemEndpoints|method:MapGetById:(RouteGroupBuildergroup):void"] =
-                "The preserved private compatibility member delegates to GetWorkItemEndpoint while retaining route binding, handler, cancellation, query, and response behavior.",
-            ["Zumbo.Api|WorkItemEndpoints|method:MapGetRoot:(RouteGroupBuildergroup):void"] =
-                "The preserved private compatibility member delegates to SearchWorkItemsEndpoint while retaining query binding, defaults, handler, rate limiting, cancellation, and response behavior.",
-            ["Zumbo.Api|WorkItemEndpoints|method:MapPatchByIdStatus:(RouteGroupBuildergroup):void"] =
-                "The preserved private compatibility member delegates to MoveWorkItemEndpoint while retaining route and request binding, authorization, correlation, handler, cancellation, and response behavior.",
-            ["Zumbo.Api|WorkItemEndpoints|method:MapPostByIdRestore:(RouteGroupBuildergroup):void"] =
-                "The preserved private compatibility member delegates to RestoreWorkItemEndpoint while retaining route binding, authorization, correlation, handler, cancellation, and response behavior.",
-            ["Zumbo.Api|WorkItemEndpoints|method:MapPostRoot:(RouteGroupBuildergroup):void"] =
-                "The preserved private compatibility member delegates to CreateWorkItemEndpoint while retaining request binding, authorization, correlation, handler, cancellation, created response, and HTTP behavior.",
-            ["Zumbo.Api|WorkItemEndpoints|method:MapPutById:(RouteGroupBuildergroup):void"] =
-                "The preserved private compatibility member delegates to UpdateWorkItemEndpoint while retaining route and request binding, authorization, correlation, handler, cancellation, and response behavior.",
-            ["Zumbo.Api|WorkItemEndpoints|method:MapPatchByIdParent:(RouteGroupBuildergroup):void"] =
-                "The preserved private compatibility member delegates to SetParentEndpoint while retaining route and request binding, authorization, correlation, handler, cancellation, and response behavior.",
-            ["Zumbo.Api|WorkItemEndpoints|method:MapPatchByIdAssignee:(RouteGroupBuildergroup):void"] =
-                "The preserved private compatibility member delegates to AssignWorkItemEndpoint while retaining route and request binding, authorization, correlation, handler, cancellation, and response behavior.",
-            ["Zumbo.Api|WorkItemEndpoints|method:MapPatchByIdPlanning:(RouteGroupBuildergroup):void"] =
-                "The preserved private compatibility member delegates to SetPlanningEndpoint while retaining route and request binding, authorization, handler, cancellation, and response behavior.",
-            ["Zumbo.Api|WorkItemEndpoints|method:MapPatchByIdRank:(RouteGroupBuildergroup):void"] =
-                "The preserved private compatibility member delegates to ReorderWorkItemEndpoint while retaining route and request binding, authorization, correlation, handler, cancellation, and response behavior.",
-            ["Zumbo.Api|WorkItemEndpoints|method:MapPatchByIdTeam:(RouteGroupBuildergroup):void"] =
-                "The preserved private compatibility member delegates to SetTeamEndpoint while retaining route and request binding, authorization, correlation, handler, cancellation, and response behavior.",
-            ["Zumbo.Api|WorkItemEndpoints|method:MapPostByIdComments:(RouteGroupBuildergroup):void"] =
-                "The preserved private compatibility member delegates to AddCommentEndpoint while retaining its signature and exact route, authorization, binding, handler, correlation, cancellation, and response contract.",
-            ["Zumbo.Api|WorkItemEndpoints|method:MapGetByIdComments:(RouteGroupBuildergroup):void"] =
-                "The preserved private compatibility member delegates to ListCommentsEndpoint while retaining its signature and exact route, paging defaults, binding, query service, cancellation, and response contract.",
-            ["Zumbo.Api|WorkItemEndpoints|method:MapGetByIdCommentsByCommentIdRevisions:(RouteGroupBuildergroup):void"] =
-                "The preserved private compatibility member delegates to ListCommentRevisionsEndpoint while retaining its signature and exact route, paging defaults, binding, query service, cancellation, and response contract.",
-            ["Zumbo.Api|WorkItemEndpoints|method:MapPutByIdCommentsByCommentId:(RouteGroupBuildergroup):void"] =
-                "The preserved private compatibility member delegates to EditCommentEndpoint while retaining its signature and exact route, authorization, binding, handler, correlation, cancellation, and response contract.",
-            ["Zumbo.Api|WorkItemEndpoints|method:MapDeleteByIdCommentsByCommentId:(RouteGroupBuildergroup):void"] =
-                "The preserved private compatibility member delegates to DeleteCommentEndpoint while retaining its signature and exact route, authorization, binding, handler, correlation, cancellation, and response contract.",
-            ["Zumbo.Api|WorkItemEndpoints|method:MapPostByIdLabels:(RouteGroupBuildergroup):void"] =
-                "The preserved private compatibility member delegates to AddLabelEndpoint while retaining its signature and exact route, authorization, binding, handler, request, cancellation, and response contract.",
-            ["Zumbo.Api|WorkItemEndpoints|method:MapDeleteByIdLabelsByLabel:(RouteGroupBuildergroup):void"] =
-                "The preserved private compatibility member delegates to RemoveLabelEndpoint while retaining its signature and exact route, authorization, binding, handler, route label value, cancellation, and response contract.",
-            ["Zumbo.Api|WorkItemEndpoints|method:MapPostByIdChecklist:(RouteGroupBuildergroup):void"] =
-                "The preserved private compatibility member delegates to AddChecklistItemEndpoint while retaining its signature and exact route, authorization, request binding, handler, cancellation, and response contract.",
-            ["Zumbo.Api|WorkItemEndpoints|method:MapPatchByIdChecklistByItemId:(RouteGroupBuildergroup):void"] =
-                "The preserved private compatibility member delegates to SetChecklistItemCompletionEndpoint while retaining its signature and exact route, authorization, route and request binding, handler, cancellation, and response contract.",
-            ["Zumbo.Api|WorkItemEndpoints|method:MapPostByIdRelations:(RouteGroupBuildergroup):void"] =
-                "The preserved private compatibility member delegates to LinkWorkItemEndpoint while retaining its signature and exact route, authorization, request binding, handler, correlation, cancellation, and response contract.",
-            ["Zumbo.Api|WorkItemEndpoints|method:MapDeleteByIdRelationsByRelatedWorkItemId:(RouteGroupBuildergroup):void"] =
-                "The preserved private compatibility member delegates to UnlinkWorkItemEndpoint while retaining its signature and exact route, authorization, route and query binding, handler, correlation, cancellation, and response contract.",
-            ["Zumbo.Api|WorkItemEndpoints|method:MapPostByIdWorklogs:(RouteGroupBuildergroup):void"] =
-                "The preserved private compatibility member delegates to AddWorkLogEndpoint while retaining its signature and exact route, authorization, request binding, handler, cancellation, and response contract.",
-            ["Zumbo.Api|WorkItemEndpoints|method:MapGetByIdWorklogs:(RouteGroupBuildergroup):void"] =
-                "The preserved private compatibility member delegates to ListWorkLogsEndpoint while retaining its signature and exact route, paging defaults, binding, query service, cancellation, and response contract.",
-            ["Zumbo.Api|WorkItemEndpoints|method:MapPostByIdAttachmentsUpload:(RouteGroupBuildergroup):void"] =
-                "The preserved private compatibility member delegates to UploadAttachmentEndpoint while retaining upload binding, stream lifetime, authorization, antiforgery, rate limiting, correlation, cancellation, and response behavior.",
-            ["Zumbo.Api|WorkItemEndpoints|method:MapGetByIdAttachments:(RouteGroupBuildergroup):void"] =
-                "The preserved private compatibility member delegates to ListAttachmentsEndpoint while retaining route, paging defaults, query service, cancellation, and response behavior.",
-            ["Zumbo.Api|WorkItemEndpoints|method:MapGetByIdAttachmentsByAttachmentIdDownload:(RouteGroupBuildergroup):void"] =
-                "The preserved private compatibility member delegates to DownloadAttachmentEndpoint while retaining route binding, no-cache headers, file metadata, range processing, cancellation, and stream response behavior.",
-            ["Zumbo.Api|WorkItemEndpoints|method:MapGetByIdAttachmentsByAttachmentIdPreview:(RouteGroupBuildergroup):void"] =
-                "The preserved private compatibility member delegates to PreviewAttachmentEndpoint while retaining preview validation, disposal, security and cache headers, inline disposition, range processing, cancellation, and stream response behavior.",
-            ["Zumbo.Api|WorkItemEndpoints|method:MapDeleteByIdAttachmentsByAttachmentId:(RouteGroupBuildergroup):void"] =
-                "The preserved private compatibility member delegates to DeleteAttachmentEndpoint while retaining route binding, authorization, correlation, handler, cancellation, and response behavior.",
-            ["Zumbo.Api|WorkItemEndpoints|method:MapPostByIdApprovals:(RouteGroupBuildergroup):void"] =
-                "The preserved private compatibility member delegates to RequestApprovalEndpoint while retaining route and request binding, authorization, correlation, handler, cancellation, and response behavior.",
-            ["Zumbo.Api|WorkItemEndpoints|method:MapPostByIdApprovalsByApprovalIdDecision:(RouteGroupBuildergroup):void"] =
-                "The preserved private compatibility member delegates to DecideApprovalEndpoint while retaining route and request binding, authorization, correlation, handler, cancellation, and response behavior.",
-            ["Zumbo.Api|WorkItemEndpoints|method:MapGetByIdApprovals:(RouteGroupBuildergroup):void"] =
-                "The preserved private compatibility member delegates to ListApprovalsEndpoint while retaining route binding, paging defaults, query service, cancellation, and response behavior.",
+                "The route host delegates activity, approval, attachment, bulk operations, checklist, comment, durable messaging, label, planning, realtime collaboration, recurrence/template, relation, report, schema, search, sprint-report, work-item core and worklog routes directly to independent feature endpoint classes; obsolete current-only private compatibility wrappers are removed while HTTP route, metadata, authorization, request, response, and handler equivalence remains verified by the runtime contract audit.",
             ["Zumbo.Api|IdentityEndpoints|method:AddIdentityModule:(thisIServiceCollectionservices):IServiceCollection"] =
                 "Identity handler registrations remain scoped but now use explicit factories so the composition root selects port-focused vertical-slice constructors while legacy constructors remain available for source compatibility.",
             ["Zumbo.Api|IdentityEndpoints|method:MapIdentityEndpoints:(thisRouteGroupBuilderapi):void"] =
@@ -276,7 +175,7 @@ public sealed class RefactorSemanticPreservationTests
             ["Zumbo.Persistence.PostgreSql|Zumbo.Persistence.PostgreSql.PostgreSqlExpressionTranslator|method:VisitJson:(Expressionexpression,Scopescope):string"] =
                 "The compatibility helper delegates to PostgreSqlPredicateTranslator while preserving convert stripping, element scope, member-path JSON SQL and unsupported behavior.",
             ["Zumbo.Persistence.PostgreSql|Zumbo.Persistence.PostgreSql.PostgreSqlExpressionTranslator|field:jsonAliasIndex:int"] =
-                "The preserved compatibility field now states its CLR-default zero initializer explicitly and is read by a compatibility accessor solely to retain the baseline member without compiler warnings; active aliases use equivalent zero-based lifetime state.",
+                "The preserved compatibility field states its CLR-default zero initializer explicitly and uses a narrowly scoped unused-field warning suppression solely to retain the baseline member; active aliases use equivalent zero-based lifetime state.",
             ["Zumbo.BuildingBlocks.Infrastructure|Zumbo.BuildingBlocks.Infrastructure.Search.OpenSearchWorkItemSearchIndex|method:InitializeAsync:(CancellationTokencancellationToken=default):Task"] =
                 "The public compatibility method delegates to OpenSearchIndexManager, which preserves configuration validation, versioned-index creation, pre-alias concrete-index detection, lossless count-verified migration, atomic write-alias installation, cancellation, and failure behavior.",
             ["Zumbo.BuildingBlocks.Infrastructure|Zumbo.BuildingBlocks.Infrastructure.Search.OpenSearchWorkItemSearchIndex|ctor:(HttpClienthttpClient,IOptions<OpenSearchOptions>options,IExternalDependencyPolicyProvider?policyProvider)"] =
@@ -977,7 +876,7 @@ public sealed class RefactorSemanticPreservationTests
             RepositoryDirectory,
             RefactorSemanticInventory.BaselineCommit);
         var target = RefactorSemanticInventory.ReadWorkingTree(ProjectDirectory);
-        var comparison = RefactorSemanticInventory.Compare(baseline, target);
+        var comparison = RefactorSemanticInventory.Compare(baseline, target, AcceptedTypeRelocations);
         var reports = RefactorValidationReportBuilder.Build(comparison, AcceptedBodyDifferences);
 
         if (Environment.GetEnvironmentVariable("ZUMBO_UPDATE_REFACTOR_REPORTS") == "1")
