@@ -26,7 +26,9 @@
     vm.searchResult = null;
 
     vm.back = function() { $state.go('app.profile'); };
-    vm.canManage = function() { return core.hasPermission(sessionStore.state.currentUser); };
+    vm.canManage = function() {
+      return core.hasPermission(sessionStore.state.currentUser, sessionStore.state.systemRoles);
+    };
     vm.dependencyLabel = core.dependencyLabel;
     vm.dependencyState = core.dependencyState;
     vm.eventLabel = core.eventLabel;

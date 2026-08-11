@@ -25,8 +25,8 @@
           vm.syncProjectCatalog = function(project) {
             vm.projectCatalog = core.snapshot(project);
             vm.catalogRole = core.roleOf(project, vm.session.currentUser && vm.session.currentUser.id);
-            vm.canManageProjectCatalog = core.canManage(vm.catalogRole);
-            vm.canReleaseProjectCatalog = core.canRelease(vm.catalogRole);
+            vm.canManageProjectCatalog = core.canManage(vm.catalogRole, vm.projectRoles);
+            vm.canReleaseProjectCatalog = core.canRelease(vm.catalogRole, vm.projectRoles);
           };
           vm.syncProjectCatalog(vm.project);
 

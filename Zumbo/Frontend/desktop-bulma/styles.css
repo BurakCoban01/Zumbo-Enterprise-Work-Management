@@ -3180,6 +3180,9 @@ kbd {
 .role-title .input { max-width: 320px; }
 .role-title .row-actions { margin-left: auto; }
 .permission-grid, .role-choice-list { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 10px; }
+.permission-catalog-groups { display: grid; gap: 12px; margin-top: 10px; }
+.permission-catalog-groups h5 { color: var(--muted); font-size: .75rem; font-weight: 700; }
+.permission-catalog-groups .permission-grid { margin-top: 6px; }
 .permission-grid label, .role-choice-list label {
   display: inline-flex;
   align-items: center;

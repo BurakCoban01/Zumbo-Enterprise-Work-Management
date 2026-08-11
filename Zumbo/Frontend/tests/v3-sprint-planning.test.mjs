@@ -71,6 +71,9 @@ function model(apiOverrides = {}) {
   };
   const vm = {
     project: { id: 'project-1' }, projectMembership: { role: 'ProjectOwner' },
+    projectRoleHasPermission(roleName, permission) {
+      return roleName === 'ProjectOwner' && permission === 'WorkItemMove';
+    },
     tasks: [task], backlogItems: [task], sprints: [sprint], velocity: [
       { completedPoints: 8 }, { completedPoints: 13 }, { completedPoints: 13 }
     ],
@@ -161,7 +164,7 @@ test('mobile surface provides permission-aware essential sprint lifecycle parity
   for (const method of ['openCreateSprint', 'planBacklogItem', 'unplanSprintItem', 'startSprint', 'completeSprint']) {
     assert.match(mobileTasks, new RegExp(`vm\\.${method} = function`));
   }
-  assert.match(mobileTasks, /membership\.role !== 'Viewer'/);
+  assert.match(mobileTasks, /hasProjectPermission\(membership\.role, 'WorkItemUpdate'\)/);
   assert.match(mobileTasks, /zumboApi\.workflow\(projectId\)/);
   assert.match(mobileHtml, /templates\/create-sprint\.html/);
   assert.match(mobileHtml, /vm\.canEditTasks\(\) && vm\.selectedSprint\(\)\.status === 'Planned'/);

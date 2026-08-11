@@ -46,7 +46,7 @@
           vm.intakeRole = function() {
             return core.roleOf(vm.project, vm.session.currentUser && vm.session.currentUser.id);
           };
-          vm.canManageIntake = function() { return core.canManage(vm.intakeRole()); };
+          vm.canManageIntake = function() { return core.canManage(vm.intakeRole(), vm.projectRoles); };
           vm.intakePublishedInternalForms = function() {
             return vm.intakeForms.filter(function(form) {
               return form.state === 'Published' && form.draft.accessPolicy === 'Internal';

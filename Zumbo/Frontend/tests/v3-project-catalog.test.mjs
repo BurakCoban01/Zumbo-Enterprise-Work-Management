@@ -17,7 +17,10 @@ const mobileApi = await readFile(resolve(root, 'mobile-ionic/api.js'), 'utf8');
 const mobileSource = await readFile(resolve(root, 'mobile-ionic/project-catalog.js'), 'utf8');
 const mobileHtml = await readFile(resolve(root, 'mobile-ionic/index.html'), 'utf8');
 const mobileCss = await readFile(resolve(root, 'mobile-ionic/project-catalog.css'), 'utf8');
-const backend = await readFile(resolve(root, '../Backend/src/Zumbo.Modules.Projects/ProjectCatalogLifecycle.cs'), 'utf8');
+const backend = (await Promise.all([
+  '../Backend/src/Zumbo.Modules.Projects/Application/Compatibility/ProjectService/ProjectService.Catalog.cs',
+  '../Backend/src/Zumbo.Modules.Projects/Domain/ProjectsCore/ProjectCatalogLimits.cs'
+].map(path => readFile(resolve(root, path), 'utf8')))).join('\n');
 
 function project(overrides = {}) {
   return {
@@ -45,11 +48,16 @@ test('template defaults expose the exact backend limit without silent truncation
 });
 
 test('catalog permission and projection preserve lifecycle state', () => {
-  assert.equal(core.canManage('ProjectOwner'), true);
-  assert.equal(core.canManage('ProjectAdmin'), true);
-  assert.equal(core.canManage('Developer'), false);
-  assert.equal(core.canRelease('ProjectAdmin'), false);
-  assert.equal(core.canRelease('ProjectOwner'), true);
+  const roles = [
+    { name: 'ProjectOwner', permissions: ['BoardManage'], isProtected: true },
+    { name: 'ProjectAdmin', permissions: ['BoardManage'], isProtected: false },
+    { name: 'Developer', permissions: ['WorkItemUpdate'], isProtected: false }
+  ];
+  assert.equal(core.canManage('ProjectOwner', roles), true);
+  assert.equal(core.canManage('ProjectAdmin', roles), true);
+  assert.equal(core.canManage('Developer', roles), false);
+  assert.equal(core.canRelease('ProjectAdmin', roles), false);
+  assert.equal(core.canRelease('ProjectOwner', roles), true);
 
   const model = core.snapshot(project({
     templates: [{ id: 't1', archived: false }, { id: 't2', archived: true }],
@@ -98,6 +106,7 @@ test('desktop catalog applies authoritative mutation responses and reloads stale
     project: current,
     projects: [current],
     session: { currentUser: { id: 'owner-1' } },
+    projectRoles: [{ name: 'ProjectOwner', permissions: ['BoardManage'], isProtected: true }],
     entityAudit: [],
     notify(kind, message) { vm.notification = { kind, message }; },
     loadProjectAudit: () => Promise.resolve([])

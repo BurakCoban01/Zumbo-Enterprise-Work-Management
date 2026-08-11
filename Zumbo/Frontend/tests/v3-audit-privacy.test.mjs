@@ -70,7 +70,11 @@ test('audit projection redacts marked values and bounds visible payloads', () =>
 
 test('audit role and integrity states do not overclaim access or empty history', () => {
   assert.equal(core.hasPermission({ roles: ['OrganizationAdmin'] }, [], 'AuditReadAll'), false);
-  assert.equal(core.hasPermission({ roles: ['AuditReader'] }, [], 'AuditReadAll'), true);
+  assert.equal(core.hasPermission(
+    { roles: ['AuditReader'] },
+    [{ name: 'AuditReader', permissions: ['AuditReadAll'] }],
+    'AuditReadAll'
+  ), true);
   assert.equal(core.hasPermission(
     { roles: ['Compliance'] },
     [{ name: 'Compliance', permissions: ['AuditReadAll'] }],

@@ -227,7 +227,7 @@
     root.localStorage.removeItem('zumbo.refreshToken');
     var parsedUser = null;
     try { parsedUser = JSON.parse(root.localStorage.getItem('zumbo.currentUser') || 'null'); } catch (_) { parsedUser = null; }
-    var state = { currentUser: parsedUser, project: null, board: null, team: null };
+    var state = { currentUser: parsedUser, project: null, board: null, team: null, systemRoles: [], projectRoles: [] };
     var service = {
       state: state,
       setUser: function(user) {
@@ -248,6 +248,8 @@
         state.project = null;
         state.board = null;
         state.team = null;
+        state.systemRoles = [];
+        state.projectRoles = [];
         clearTenantStorage(root.localStorage, root.sessionStorage);
       }
     };

@@ -689,6 +689,32 @@ public sealed class MongoMigrationRunnerTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task IdentityAuthorizationIndexes_AreIsolatedAndIdempotent()
+    {
+        var runner = CreateRunner(new MongoMigrationOptions { BatchSize = 10, MaxBatchesPerRun = 20 });
+        var first = Outcome(
+            await runner.RunAsync(CancellationToken.None),
+            MongoMigrationRunner.IdentityAuthorizationIndexMigrationId);
+        var second = Outcome(
+            await runner.RunAsync(CancellationToken.None),
+            MongoMigrationRunner.IdentityAuthorizationIndexMigrationId);
+
+        Assert.Equal(MongoMigrationStates.Completed, first.Status);
+        Assert.Equal(MongoIdentityAuthorizationIndexes.All.Count, first.Examined);
+        Assert.Equal(MongoIdentityAuthorizationIndexes.All.Count, first.Changed);
+        Assert.Equal(MongoMigrationStates.Skipped, second.Status);
+        Assert.Equal(first.Changed, second.Changed);
+
+        var collection = _database.GetCollection<BsonDocument>("identitypermissiondefinitions");
+        using var cursor = await collection.Indexes.ListAsync();
+        var indexes = await cursor.ToListAsync();
+        foreach (var specification in MongoIdentityAuthorizationIndexes.All)
+        {
+            Assert.Contains(indexes, index => index["name"].AsString == specification.Name);
+        }
+    }
+
+    [Fact]
     public async Task DurableMessagingIndexes_AreExactAndCreatedIdempotently()
     {
         var catalog = MongoDurableMessagingIndexes.All;

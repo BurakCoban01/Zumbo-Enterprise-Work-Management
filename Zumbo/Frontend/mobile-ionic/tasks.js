@@ -2,7 +2,7 @@
   'use strict';
 
   angular.module('zumboMobile')
-  .controller('TasksController', function($scope, $state, $ionicPopup, $ionicScrollDelegate, $q, $timeout, zumboApi, sessionStore, realtimeService, apiClient, mobileActionError) {
+  .controller('TasksController', function($scope, $state, $ionicPopup, $ionicScrollDelegate, $q, $timeout, zumboApi, sessionStore, realtimeService, apiClient, mobileActionError, authorizationCatalog) {
     var vm = this;
     vm.mode = sessionStore.state.taskMode || 'my';
     delete sessionStore.state.taskMode;
@@ -154,7 +154,8 @@
       var membership = project && currentUser && (project.members || []).find(function(member) {
         return member.userId === currentUser.id;
       });
-      return !!membership && membership.role !== 'Viewer';
+      return !!membership
+        && authorizationCatalog.hasProjectPermission(membership.role, 'WorkItemUpdate');
     };
     vm.plannedSprints = function() {
       return vm.sprints.filter(function(sprint) { return sprint.status === 'Planned'; });

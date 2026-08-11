@@ -119,7 +119,7 @@
         <div class="mobile-feedback success" role="status" aria-live="polite" ng-if="vm.notice">{{vm.notice}}</div>
         <div class="mobile-feedback error" role="alert" aria-live="assertive" ng-if="vm.error">{{vm.error}}</div>
         <section class="mobile-project-overview" ng-if="vm.project">
-          <header><div><small>{{vm.project.key}} · {{vm.membership.role}}</small><h2>{{vm.project.name}}</h2></div><span class="mobile-health" data-level="{{vm.health().level}}">{{vm.health().label}}</span></header>
+          <header><div><small>{{vm.project.key}} · {{vm.projectRoleLabel(vm.membership.role)}}</small><h2>{{vm.project.name}}</h2></div><span class="mobile-health" data-level="{{vm.health().level}}">{{vm.health().label}}</span></header>
           <div class="mobile-project-metrics"><div><span>Toplam</span><strong>{{vm.summary.total || 0}}</strong></div><div><span>Devam eden</span><strong>{{vm.summary.inProgress || 0}}</strong></div><div><span>Geciken</span><strong>{{vm.summary.overdue || 0}}</strong></div></div>
           <div class="mobile-delivery-list">
             <p><i class="ion-ios-timer-outline"></i><span><small>Aktif sprint</small><strong>{{vm.activeSprint().name || 'Aktif sprint yok'}}</strong></span></p>
@@ -145,16 +145,16 @@
         <div class="mobile-archive-row" ng-repeat="board in vm.archivedBoards track by board.id"><span>{{board.name}}</span><button class="button button-small button-stable" ng-click="vm.restoreBoard(board)">Geri yükle</button></div>
         <div class="item item-divider">Proje üyeleri</div>
         <div class="mobile-member-row" ng-repeat="member in vm.project.members track by member.userId">
-          <span><strong>{{vm.memberLabel(member)}}</strong><small>{{member.role}}</small></span>
-          <div class="mobile-member-actions" ng-if="vm.canManage && member.role !== 'ProjectOwner'">
-            <select ng-model="member.role" aria-label="Mobil proje üyesi rolü"><option>ProjectAdmin</option><option>Developer</option><option>Viewer</option></select>
+          <span><strong>{{vm.memberLabel(member)}}</strong><small>{{vm.projectRoleLabel(member.role)}}</small></span>
+          <div class="mobile-member-actions" ng-if="vm.canManage && !vm.projectRoleProtected(member.role)">
+            <select ng-model="member.role" aria-label="Mobil proje üyesi rolü" ng-options="role.name as role.displayName for role in vm.projectAssignableRoles()"></select>
             <button class="button button-small button-positive button-clear ion-checkmark" ng-click="vm.saveProjectMember(member)" aria-label="Mobil proje üyesi rolünü kaydet"></button>
             <button class="button button-small button-assertive button-clear ion-trash-a" ng-click="vm.removeProjectMember(member)" aria-label="Mobil proje üyesini kaldır"></button>
           </div>
         </div>
         <form class="mobile-manage-form compact" ng-if="vm.canManage" ng-submit="vm.addProjectMember()">
           <label><span>Kullanıcı</span><select ng-model="vm.projectMemberDraft.userId" aria-label="Yeni mobil proje üyesi" ng-options="user.id as (user.username + ' · ' + user.email) for user in vm.users" required><option value="">Kullanıcı seçin</option></select></label>
-          <label><span>Rol</span><select ng-model="vm.projectMemberDraft.role" aria-label="Yeni mobil proje üyesi rolü"><option>ProjectAdmin</option><option>Developer</option><option>Viewer</option></select></label>
+          <label><span>Rol</span><select ng-model="vm.projectMemberDraft.role" aria-label="Yeni mobil proje üyesi rolü" ng-options="role.name as role.displayName for role in vm.projectAssignableRoles()"></select></label>
           <button class="button button-small button-positive" type="submit" ng-disabled="vm.saving">Üye ekle</button>
         </form>
         <div class="item item-divider">Proje etkinliği</div>
@@ -551,7 +551,7 @@
             </form>
 
             <section class="mobile-task-section" ng-if="!vm.canEditTask()">
-              <div class="mobile-task-section-title"><h2>Özellikler</h2><span>{{vm.membership.role}}</span></div>
+              <div class="mobile-task-section-title"><h2>Özellikler</h2><span>{{vm.projectRoleLabel(vm.membership.role)}}</span></div>
               <dl class="mobile-task-properties"><div><dt>Öncelik</dt><dd>{{vm.task.priority}}</dd></div><div><dt>Durum</dt><dd>{{vm.task.status}}</dd></div><div><dt>Son tarih</dt><dd>{{vm.task.dueDate ? (vm.task.dueDate | date:'dd MMM yyyy') : 'Belirtilmemiş'}}</dd></div><div><dt>Sorumlu</dt><dd>{{vm.userName(vm.task.assigneeUserId)}}</dd></div><div ng-repeat="value in vm.task.customFields track by value.fieldKey"><dt>{{vm.fieldDefinition(value).name}}</dt><dd>{{vm.customFieldValue(value)}}</dd></div></dl>
             </section>
 

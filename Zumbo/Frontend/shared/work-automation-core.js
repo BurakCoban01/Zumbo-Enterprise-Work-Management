@@ -32,10 +32,18 @@
     return membership ? membership.role : '';
   }
 
-  function canEdit(role, currentUser) {
+  function canEdit(role, currentUser, projectRoles, systemRoles) {
+    var projectDefinition = (projectRoles || []).find(function(item) {
+      return item.name === role && item.isActive !== false;
+    });
     var globalRoles = currentUser && currentUser.roles || [];
-    return globalRoles.indexOf('SystemAdmin') >= 0
-      || ['ProjectOwner', 'ProjectAdmin'].indexOf(role) >= 0;
+    var hasGlobalAccess = (systemRoles || []).some(function(item) {
+      return item.isActive !== false && globalRoles.indexOf(item.name) >= 0
+        && (item.permissions || []).indexOf('*') >= 0;
+    });
+    return hasGlobalAccess || !!projectDefinition && (projectDefinition.permissions || []).some(function(permission) {
+      return permission === '*' || permission === 'BoardManage';
+    });
   }
 
   function normalizeLabels(value) {

@@ -97,7 +97,11 @@
           sessionStore.state.project = vm.project;
           var role = core.roleOf(vm.project, sessionStore.state.currentUser && sessionStore.state.currentUser.id);
           vm.role = role;
-          vm.canEdit = core.canEdit(role, sessionStore.state.currentUser);
+          vm.canEdit = core.canEdit(
+            role,
+            sessionStore.state.currentUser,
+            sessionStore.state.projectRoles,
+            sessionStore.state.systemRoles);
           var templates = result[3].items || [];
           var recurrences = result[4].items || [];
           var rules = result[5] && result[5].items || [];

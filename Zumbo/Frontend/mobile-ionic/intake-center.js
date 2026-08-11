@@ -77,7 +77,7 @@
           vm.forms = result[3];
           sessionStore.state.project = vm.project;
           vm.role = core.roleOf(vm.project, sessionStore.state.currentUser && sessionStore.state.currentUser.id);
-          vm.canManage = core.canManage(vm.role);
+          vm.canManage = core.canManage(vm.role, sessionStore.state.projectRoles);
           var currentId = vm.selectedForm && vm.selectedForm.id;
           var selected = vm.forms.find(function(form) { return form.id === currentId; })
             || vm.forms.find(function(form) { return form.state !== 'Archived'; })

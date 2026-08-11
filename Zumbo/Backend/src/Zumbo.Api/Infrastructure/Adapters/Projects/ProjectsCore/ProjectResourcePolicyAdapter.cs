@@ -11,6 +11,8 @@ using Zumbo.SharedKernel;
 public sealed class ProjectResourcePolicyAdapter(
     IDocumentRepository<ProjectDocument> projects,
     IDocumentRepository<OrganizationDocument> organizations,
+    IdentityPermissionService identityPermissions,
+    IdentityRoleCatalogService roleCatalog,
     ICurrentUser currentUser) : IProjectResourcePolicy
 {
     public async Task<ProjectResourceAuthorization> AuthorizeAsync(
@@ -27,7 +29,7 @@ public sealed class ProjectResourcePolicyAdapter(
         var project = await projects.SelectAsync(x => x.Id == projectId && !x.Archived, cancellationToken)
             ?? throw new NotFoundException("PROJECT_NOT_FOUND", "Project was not found.");
         await EnsureOrganizationActiveAsync(organizations, project.OrganizationId, cancellationToken);
-        if (PermissionCatalog.IsSystemAdministrator(currentUser.Roles))
+        if (await identityPermissions.HasPermissionAsync(PermissionCatalog.All, cancellationToken))
         {
             return new ProjectResourceAuthorization(project.Id, project.OrganizationId, userId, null, true);
         }
@@ -50,7 +52,7 @@ public sealed class ProjectResourcePolicyAdapter(
             throw new ForbiddenException("User is not a member of this project.");
         }
 
-        if (!PermissionCatalog.HasProjectPermission(membership.Role, permission))
+        if (!await roleCatalog.HasProjectPermissionAsync(membership.Role, permission, cancellationToken))
         {
             throw new ForbiddenException($"Project role '{membership.Role}' cannot perform '{permission}'.");
         }

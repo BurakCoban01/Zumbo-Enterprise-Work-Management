@@ -2,7 +2,7 @@
   'use strict';
 
   angular.module('zumboMobile')
-    .controller('ProjectPlanningController', function($state, $stateParams, $q, $window, zumboApi, sessionStore, apiClient, mobileActionError, mobilePwaService) {
+    .controller('ProjectPlanningController', function($state, $stateParams, $q, $window, zumboApi, sessionStore, apiClient, mobileActionError, mobilePwaService, authorizationCatalog) {
       var vm = this;
       var core = $window.ZumboPlanningCore;
       var projectId = $stateParams.projectId;
@@ -88,7 +88,9 @@
         var membership = vm.project && currentUser && (vm.project.members || []).find(function(member) {
           return member.userId === currentUser.id;
         });
-        return !!membership && membership.role !== 'Viewer' && !vm.pwa.offline;
+        return !!membership
+          && authorizationCatalog.hasProjectPermission(membership.role, 'WorkItemUpdate')
+          && !vm.pwa.offline;
       };
 
       vm.openTask = function(task) {

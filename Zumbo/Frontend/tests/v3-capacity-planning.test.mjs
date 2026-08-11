@@ -101,7 +101,8 @@ test('desktop and mobile expose complete capacity workflows and states', () => {
     assert.match(source, /\/sharing/);
     assert.match(source, /apiClient\.delete\('\/api\/capacity-plans\//);
     assert.match(source, /canEdit/);
-    assert.match(source, /\['ProjectOwner', 'ProjectAdmin'\]/);
+    assert.match(source, /BoardManage/);
+    assert.doesNotMatch(source, /\['ProjectOwner', 'ProjectAdmin'\]/);
     assert.match(source, /teamMember\.status === 'Active'/);
   }
   assert.match(desktopHtml, /vm\.activeSection === 'capacity'/);

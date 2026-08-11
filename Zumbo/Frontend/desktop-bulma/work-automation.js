@@ -51,7 +51,9 @@
               vm.session.currentUser && vm.session.currentUser.id);
             vm.canEditWorkAutomation = core.canEdit(
               vm.workAutomationRole,
-              vm.session.currentUser);
+              vm.session.currentUser,
+              vm.projectRoles,
+              vm.roles);
           };
           vm.syncWorkAutomationContext(vm.project);
 

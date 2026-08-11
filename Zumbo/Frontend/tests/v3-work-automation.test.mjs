@@ -18,8 +18,15 @@ const mobileApi = await readFile(resolve(root, 'mobile-ionic/api.js'), 'utf8');
 const mobileSource = await readFile(resolve(root, 'mobile-ionic/work-automation.js'), 'utf8');
 const mobileHtml = await readFile(resolve(root, 'mobile-ionic/index.html'), 'utf8');
 const mobileCss = await readFile(resolve(root, 'mobile-ionic/work-automation.css'), 'utf8');
-const backend = await readFile(resolve(root, '../Backend/src/Zumbo.Modules.WorkItems/WorkItemRecurrence.cs'), 'utf8');
-const endpoints = await readFile(resolve(root, '../Backend/src/Zumbo.Api/Endpoints/WorkItemEndpoints.cs'), 'utf8');
+const backend = (await Promise.all([
+  '../Backend/src/Zumbo.Modules.WorkItems/Application/Compatibility/Recurrences/WorkItemTemplateRecurrenceService/RecurrenceFacade.cs',
+  '../Backend/src/Zumbo.Modules.WorkItems/Application/Features/Recurrences/RecurrenceSchedulePolicy.cs',
+  '../Backend/src/Zumbo.Modules.WorkItems/Application/Features/Recurrences/PreviewWorkItemRecurrenceSlice.cs'
+].map(path => readFile(resolve(root, path), 'utf8')))).join('\n');
+const endpoints = await readFile(
+  resolve(root, '../Backend/src/Zumbo.Api/Presentation/Endpoints/WorkItems/Recurrences/PreviewRecurrenceEndpoint.cs'),
+  'utf8'
+);
 
 function project(role = 'ProjectOwner') {
   return {
@@ -71,10 +78,16 @@ function recurrence(overrides = {}) {
 }
 
 test('shared automation core preserves template fields, limits, roles and lifecycle states', () => {
-  assert.equal(core.canEdit('ProjectOwner', {}), true);
-  assert.equal(core.canEdit('ProjectAdmin', {}), true);
-  assert.equal(core.canEdit('Developer', {}), false);
-  assert.equal(core.canEdit('Viewer', {}), false);
+  const roles = [
+    { name: 'ProjectOwner', permissions: ['BoardManage'] },
+    { name: 'ProjectAdmin', permissions: ['BoardManage'] },
+    { name: 'Developer', permissions: ['WorkItemUpdate'] },
+    { name: 'Viewer', permissions: ['WorkItemView'] }
+  ];
+  assert.equal(core.canEdit('ProjectOwner', {}, roles, []), true);
+  assert.equal(core.canEdit('ProjectAdmin', {}, roles, []), true);
+  assert.equal(core.canEdit('Developer', {}, roles, []), false);
+  assert.equal(core.canEdit('Viewer', {}, roles, []), false);
   assert.equal(core.roleOf(project('Viewer'), 'user-1'), 'Viewer');
 
   const labels = core.normalizeLabels('Ops, API\nops');
@@ -148,6 +161,8 @@ test('desktop automation uses authoritative pages, previews and versioned lifecy
     project: project(),
     projectMembership: { role: 'ProjectOwner' },
     session: { currentUser: { id: 'user-1', roles: [] } },
+    projectRoles: [{ name: 'ProjectOwner', permissions: ['BoardManage'] }],
+    roles: [],
     boards: [{ id: 'board-1', name: 'Delivery' }],
     activeIssueTypes: () => [{ key: 'Task', name: 'Task', active: true }],
     userName: id => id,
@@ -177,8 +192,8 @@ test('desktop automation uses authoritative pages, previews and versioned lifecy
 test('backend preview reuses authoritative validation and cadence without mutation', () => {
   assert.match(backend, /PreviewWorkItemRecurrenceRequest/);
   assert.match(backend, /PreviewRecurrenceAsync/);
-  assert.match(backend, /ValidateSchedule\(new CreateWorkItemRecurrenceRequest/);
-  assert.match(backend, /next = Next\(next, schedule\.Frequency, schedule\.Interval\)/);
+  assert.match(backend, /schedulePolicy\.Validate\(new CreateWorkItemRecurrenceRequest/);
+  assert.match(backend, /next = RecurrenceSchedulePolicy\.Next\(next, schedule\.Frequency, schedule\.Interval\)/);
   assert.match(backend, /Math\.Clamp\(request\.PreviewCount, 1, 10\)/);
   assert.match(endpoints, /MapPost\("\/recurrences\/preview"/);
   assert.match(endpoints, /PermissionCatalog\.WorkItemCreate/);

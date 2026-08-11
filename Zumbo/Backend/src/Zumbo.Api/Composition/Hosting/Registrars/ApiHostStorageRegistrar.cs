@@ -100,6 +100,7 @@ internal static class ApiHostStorageRegistrar
                 options.MapDocument<Zumbo.Modules.Identity.RefreshSessionDocument>("identity", "refresh_sessions");
                 options.MapDocument<Zumbo.Modules.Identity.ApiKeyDocument>("identity", "api_keys");
                 options.MapDocument<Zumbo.Modules.Identity.IdentityRoleDocument>("identity", "identity_roles");
+                options.MapDocument<Zumbo.Modules.Identity.IdentityPermissionDefinitionDocument>("identity", "permission_definitions");
                 options.MapDocument<Zumbo.Modules.Identity.PrivacyWorkflowDocument>("identity", "privacy_workflows");
                 options.MapDocument<Zumbo.Modules.Organizations.OrganizationDocument>("organizations", "organizations");
                 options.MapDocument<Zumbo.Modules.Teams.TeamDocument>("teams", "teams");

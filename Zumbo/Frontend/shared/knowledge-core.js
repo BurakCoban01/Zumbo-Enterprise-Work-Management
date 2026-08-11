@@ -7,13 +7,18 @@
 })(typeof globalThis !== 'undefined' ? globalThis : this, function() {
   'use strict';
 
-  function scopeOptions(projects, portfolios, userId) {
+  function scopeOptions(projects, portfolios, userId, projectRoles) {
     var result = [];
     (projects || []).forEach(function(project) {
       var membership = (project.members || []).find(function(member) {
         return member.userId === userId;
       });
-      if (!membership || ['ProjectOwner', 'ProjectAdmin'].indexOf(membership.role) < 0) return;
+      var role = membership && (projectRoles || []).find(function(item) {
+        return item.name === membership.role && item.isActive !== false;
+      });
+      if (!role || !(role.permissions || []).some(function(permission) {
+        return permission === '*' || permission === 'BoardManage';
+      })) return;
       result.push({
         key: 'Project:' + project.id,
         type: 'Project',

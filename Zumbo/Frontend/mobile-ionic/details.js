@@ -11,33 +11,41 @@
     vm.summary = {};
     vm.sprints = [];
     vm.users = [];
-    vm.projectMemberDraft = { userId: '', role: 'Developer' };
+    vm.projectRoles = [];
+    vm.projectMemberDraft = { userId: '', role: '' };
     vm.boardDraft = { name: '', type: 'Kanban' };
     vm.load = function() {
       return zumboApi.projects().then(function(projects) {
         vm.project = projects.filter(function(project) { return project.id === $stateParams.projectId; })[0];
         sessionStore.state.project = vm.project;
-        if (!vm.project) return [[], [], [], [], {}, { items: [] }];
+        if (!vm.project) return [[], [], [], [], [], {}, { items: [] }];
         vm.projectDraft = { name: vm.project.name, visibility: vm.project.visibility };
         var membership = vm.project.members.filter(function(member) { return member.userId === sessionStore.state.currentUser.id; })[0];
         vm.membership = membership;
-        vm.canManage = membership && ['ProjectOwner', 'ProjectAdmin'].indexOf(membership.role) >= 0;
-        vm.canArchive = membership && membership.role === 'ProjectOwner';
-        return $q.all([
-          zumboApi.boards(vm.project.id),
-          zumboApi.boards(vm.project.id, true),
-          zumboApi.audit('Project', vm.project.id),
-          vm.canManage ? zumboApi.users() : $q.when([]),
-          zumboApi.summary(vm.project.id),
-          zumboApi.sprints(vm.project.id)
-        ]);
+        return zumboApi.projectRoles().then(function(roles) {
+          vm.projectRoles = roles || [];
+          var membershipRole = membership && projectRole(membership.role);
+          vm.canManage = !!membershipRole && (membershipRole.permissions || []).indexOf('BoardManage') >= 0;
+          vm.canArchive = !!membershipRole && membershipRole.isProtected;
+          return $q.all([
+            vm.projectRoles,
+            zumboApi.boards(vm.project.id),
+            zumboApi.boards(vm.project.id, true),
+            zumboApi.audit('Project', vm.project.id),
+            vm.canManage ? zumboApi.users() : $q.when([]),
+            zumboApi.summary(vm.project.id),
+            zumboApi.sprints(vm.project.id)
+          ]);
+        });
       }).then(function(result) {
-        vm.boards = result[0];
-        vm.archivedBoards = result[1];
-        vm.audit = result[2];
-        vm.users = result[3];
-        vm.summary = result[4] || {};
-        vm.sprints = result[5].items || result[5] || [];
+        vm.projectRoles = result[0] || [];
+        resetProjectMemberDraft();
+        vm.boards = result[1];
+        vm.archivedBoards = result[2];
+        vm.audit = result[3];
+        vm.users = result[4];
+        vm.summary = result[5] || {};
+        vm.sprints = result[6].items || result[6] || [];
       }).catch(function(error) {
         vm.error = mobileActionError(error, 'Proje yüklenemedi.');
       });
@@ -142,25 +150,42 @@
       var user = vm.users.find(function(item) { return item.id === member.userId; });
       return user ? user.username + ' · ' + user.email : member.userId;
     };
+    function projectRole(roleName) {
+      return vm.projectRoles.find(function(role) { return role.name === roleName; }) || null;
+    }
+    function resetProjectMemberDraft() {
+      var defaultRole = vm.projectRoles.find(function(role) { return role.isActive && role.isDefault; });
+      vm.projectMemberDraft = { userId: '', role: defaultRole ? defaultRole.name : '' };
+    }
+    vm.projectAssignableRoles = function() {
+      return vm.projectRoles.filter(function(role) { return role.isActive && !role.isProtected; });
+    };
+    vm.projectRoleProtected = function(roleName) {
+      return !!(projectRole(roleName) || {}).isProtected;
+    };
+    vm.projectRoleLabel = function(roleName) {
+      var role = projectRole(roleName);
+      return role && role.displayName || roleName;
+    };
     vm.addProjectMember = function() {
       if (!vm.canManage || !vm.projectMemberDraft.userId || vm.saving) return;
       vm.saving = true;
       zumboApi.addProjectMember(vm.project.id, vm.projectMemberDraft).then(function() {
-        vm.projectMemberDraft = { userId: '', role: 'Developer' };
+        resetProjectMemberDraft();
         vm.notice = 'Proje üyesi eklendi.';
         return vm.load();
       }).catch(function(error) { vm.error = mobileActionError(error, 'Proje üyesi eklenemedi.'); })
         .finally(function() { vm.saving = false; });
     };
     vm.saveProjectMember = function(member) {
-      if (!vm.canManage || member.role === 'ProjectOwner' || vm.saving) return;
+      if (!vm.canManage || vm.projectRoleProtected(member.role) || vm.saving) return;
       vm.saving = true;
       zumboApi.changeProjectMemberRole(vm.project.id, member.userId, member.role).then(vm.load)
         .catch(function(error) { vm.error = mobileActionError(error, 'Proje üyesi güncellenemedi.'); })
         .finally(function() { vm.saving = false; });
     };
     vm.removeProjectMember = function(member) {
-      if (!vm.canManage || member.role === 'ProjectOwner' || vm.saving) return;
+      if (!vm.canManage || vm.projectRoleProtected(member.role) || vm.saving) return;
       vm.saving = true;
       zumboApi.removeProjectMember(vm.project.id, member.userId).then(vm.load)
         .catch(function(error) { vm.error = mobileActionError(error, 'Proje üyesi kaldırılamadı.'); })
@@ -292,6 +317,8 @@
     vm.users = [];
     vm.teams = [];
     vm.sprints = [];
+    vm.systemRoles = [];
+    vm.projectRoles = [];
     vm.relationCandidates = [];
     vm.relationCandidateTotal = 0;
     var catalogProject = null;
@@ -315,29 +342,31 @@
 
     function role() { return vm.membership && vm.membership.role; }
     function systemAdministrator() {
-      var roles = sessionStore.state.currentUser && sessionStore.state.currentUser.roles || [];
-      return roles.indexOf('SystemAdmin') >= 0;
+      var assigned = sessionStore.state.currentUser && sessionStore.state.currentUser.roles || [];
+      return vm.systemRoles.some(function(definition) {
+        return assigned.indexOf(definition.name) >= 0 && (definition.permissions || []).indexOf('*') >= 0;
+      });
     }
-    function editableRole() { return systemAdministrator() || ['ProjectOwner', 'ProjectAdmin', 'Developer'].indexOf(role()) >= 0; }
-    function managerRole() { return systemAdministrator() || ['ProjectOwner', 'ProjectAdmin'].indexOf(role()) >= 0; }
+    function hasProjectPermission(permission) {
+      var definition = vm.projectRoles.find(function(item) { return item.name === role(); });
+      return !!definition && (definition.permissions || []).indexOf(permission) >= 0;
+    }
+    function editableRole() { return systemAdministrator() || hasProjectPermission('WorkItemUpdate'); }
+    function managerRole() { return systemAdministrator() || hasProjectPermission('WorkItemApprove'); }
     vm.offline = function() { return !!mobilePwaService.state.offline; };
     vm.canEditTask = editableRole;
-    vm.canComment = function() { return !!vm.membership || systemAdministrator(); };
-    vm.canUpload = editableRole;
-    vm.canLogWork = editableRole;
-    vm.canLink = editableRole;
+    vm.canComment = function() { return systemAdministrator() || hasProjectPermission('CommentCreate'); };
+    vm.canUpload = function() { return systemAdministrator() || hasProjectPermission('AttachmentCreate'); };
+    vm.canLogWork = function() { return systemAdministrator() || hasProjectPermission('WorkLogCreate'); };
+    vm.canLink = function() { return systemAdministrator() || hasProjectPermission('WorkItemLink'); };
     vm.canApprove = managerRole;
 
     vm.userName = function(userId) {
       return displayNameResolver.user(userId, vm.users, sessionStore.state.currentUser);
     };
     vm.projectRoleLabel = function(value) {
-      return {
-        ProjectOwner: 'Proje sahibi',
-        ProjectAdmin: 'Proje yöneticisi',
-        Developer: 'Geliştirici',
-        Viewer: 'Görüntüleyici'
-      }[value] || 'Proje üyesi';
+      var definition = vm.projectRoles.find(function(item) { return item.name === value; });
+      return definition && definition.displayName || 'Proje üyesi';
     };
     vm.fieldDefinition = function(value) {
       return (vm.schema.customFields || []).find(function(field) { return field.key === value.fieldKey; })
@@ -521,7 +550,9 @@
               vm.error = mobileActionError(error, 'Takip ve oy bilgisi yüklenemedi.');
               vm.partial = true;
               return vm.collaboration;
-            })
+            }),
+            zumboApi.roles(),
+            zumboApi.projectRoles()
           ]);
         });
       }).then(function(result) {
@@ -537,6 +568,8 @@
         vm.relationCandidates = (result[6].items || []).filter(function(item) { return item.id !== vm.task.id; });
         vm.relationCandidateTotal = Number(result[6].totalCount) || vm.relationCandidates.length;
         vm.collaboration = result[7];
+        vm.systemRoles = result[8] || [];
+        vm.projectRoles = result[9] || [];
         vm.transitions = workflow.transitions.filter(function(transition) {
           return transition.fromStatus === vm.task.status;
         });

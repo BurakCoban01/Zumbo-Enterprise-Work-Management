@@ -59,7 +59,8 @@
           vm.scopes = core.scopeOptions(
             vm.projects,
             vm.portfolios,
-            sessionStore.state.currentUser.id);
+            sessionStore.state.currentUser.id,
+            sessionStore.state.projectRoles);
           if (vm.document) {
             var current = vm.documents.find(function(item) {
               return item.id === vm.document.id;

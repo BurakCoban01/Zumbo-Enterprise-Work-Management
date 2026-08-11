@@ -20,6 +20,27 @@
         : fallback;
     };
   })
+  .factory('authorizationCatalog', function(sessionStore) {
+    function roleHasPermission(definitions, roleName, permission) {
+      var role = (definitions || []).find(function(item) {
+        return item.name === roleName && item.isActive !== false;
+      });
+      return !!role && (role.permissions || []).some(function(value) {
+        return value === '*' || value === permission;
+      });
+    }
+    return {
+      hasSystemPermission: function(permission) {
+        var assigned = sessionStore.state.currentUser && sessionStore.state.currentUser.roles || [];
+        return assigned.some(function(roleName) {
+          return roleHasPermission(sessionStore.state.systemRoles, roleName, permission);
+        });
+      },
+      hasProjectPermission: function(roleName, permission) {
+        return roleHasPermission(sessionStore.state.projectRoles, roleName, permission);
+      }
+    };
+  })
   .factory('zumboApi', function(apiClient, sessionStore) {
     return {
       projects: function(archived) { return apiClient.get('/api/projects?organizationId=' + sessionStore.state.currentUser.organizationId + (archived ? '&archived=true' : '')); },
@@ -92,6 +113,7 @@
       completeProjectMilestone: function(projectId, milestoneId) { return apiClient.post('/api/projects/' + projectId + '/milestones/' + milestoneId + '/complete', {}); },
       users: function() { return apiClient.get('/api/auth/users'); },
       roles: function() { return apiClient.get('/api/auth/roles'); },
+      projectRoles: function() { return apiClient.get('/api/auth/roles?scope=Project'); },
       addProjectMember: function(projectId, draft) { return apiClient.post('/api/projects/' + projectId + '/members', draft); },
       changeProjectMemberRole: function(projectId, userId, role) {
         return apiClient.patch('/api/projects/' + projectId + '/members/' + userId + '/role', { role: role });

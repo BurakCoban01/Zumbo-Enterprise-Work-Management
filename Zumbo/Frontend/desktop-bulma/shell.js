@@ -10,7 +10,8 @@
       return {
         install: function(vm) {
           vm.canCreateTask = function() {
-            return !!vm.board && !!vm.projectMembership && vm.projectMembership.role !== 'Viewer';
+            return !!vm.board && !!vm.projectMembership
+              && vm.projectRoleHasPermission(vm.projectMembership.role, 'WorkItemCreate');
           };
           vm.openCommandPalette = function() {
             vm.commandOpen = true;

@@ -147,14 +147,14 @@
 
           vm.projectOwnerName = function() {
             var owner = (vm.project && vm.project.members || []).find(function(member) {
-              return member.role === 'ProjectOwner';
+              return vm.projectRoleProtected(member.role);
             });
             return owner ? memberName(owner) : 'Proje sahibi';
           };
           vm.projectMemberName = memberName;
           vm.projectContributors = function() {
             return (vm.project && vm.project.members || []).filter(function(member) {
-              return member.role !== 'ProjectOwner';
+              return !vm.projectRoleProtected(member.role);
             }).slice(0, 4);
           };
           vm.activeProjectSprint = function() {

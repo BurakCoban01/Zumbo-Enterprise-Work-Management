@@ -20,6 +20,46 @@
       }) || null;
     }
 
+    function projectRole(roleName) {
+      return (vm.projectRoles || []).find(function(role) { return role.name === roleName; }) || null;
+    }
+
+    function projectRoleHasPermission(roleName, permission) {
+      var role = projectRole(roleName);
+      return !!role && (role.permissions || []).some(function(value) {
+        return value === '*' || value === permission;
+      });
+    }
+
+    vm.projectRoleHasPermission = projectRoleHasPermission;
+    vm.hasSystemPermission = function(permission) {
+      var assigned = vm.session.currentUser && vm.session.currentUser.roles || [];
+      return (vm.roles || []).some(function(role) {
+        return role.isActive !== false && assigned.indexOf(role.name) >= 0
+          && (role.permissions || []).some(function(value) {
+            return value === '*' || value === permission;
+          });
+      });
+    };
+
+    vm.projectAssignableRoles = function() {
+      return (vm.projectRoles || []).filter(function(role) { return role.isActive && !role.isProtected; });
+    };
+
+    vm.projectRoleLabel = function(roleName) {
+      var role = projectRole(roleName);
+      return role && role.displayName || roleName;
+    };
+
+    vm.projectRoleProtected = function(roleName) {
+      return !!(projectRole(roleName) || {}).isProtected;
+    };
+
+    function resetProjectMemberDraft() {
+      var defaultRole = (vm.projectRoles || []).find(function(role) { return role.isActive && role.isDefault; });
+      vm.projectMemberDraft = { userId: '', role: defaultRole ? defaultRole.name : '' };
+    }
+
     function firstAccessibleProject(projects) {
       return (projects || []).find(function(project) { return !!membershipFor(project); }) || null;
     }
@@ -33,8 +73,9 @@
       vm.projectDraft = existingDraft || { name: project.name, visibility: project.visibility };
       vm.projectMembership = membershipFor(project);
       vm.canManageProject = !!vm.projectMembership
-        && ['ProjectOwner', 'ProjectAdmin'].indexOf(vm.projectMembership.role) >= 0;
-      vm.canArchiveProject = !!vm.projectMembership && vm.projectMembership.role === 'ProjectOwner';
+        && projectRoleHasPermission(vm.projectMembership.role, 'BoardManage');
+      vm.canArchiveProject = !!vm.projectMembership
+        && !!(projectRole(vm.projectMembership.role) || {}).isProtected;
       var index = vm.projects.findIndex(function(item) { return item.id === project.id; });
       if (index >= 0) vm.projects[index] = project;
       if (vm.syncProjectCatalog) vm.syncProjectCatalog(project);
@@ -76,8 +117,17 @@
 
     vm.reloadProjects = function() {
       if (!vm.session.currentUser) return;
-      return apiClient.get('/api/projects?organizationId=' + encodeURIComponent(vm.session.currentUser.organizationId))
-        .then(function(projects) { vm.projects = projects; return projects; });
+      return $q.all([
+        apiClient.get('/api/projects?organizationId=' + encodeURIComponent(vm.session.currentUser.organizationId)),
+        apiClient.get('/api/auth/roles?scope=Project'),
+        apiClient.get('/api/auth/roles')
+      ]).then(function(result) {
+        vm.projects = result[0];
+        vm.projectRoles = result[1];
+        vm.roles = result[2];
+        resetProjectMemberDraft();
+        return vm.projects;
+      });
     };
 
     vm.loadUsers = function(search) {
@@ -332,7 +382,7 @@
       return apiClient.post('/api/projects/' + vm.project.id + '/members', vm.projectMemberDraft)
         .then(function(project) {
           setProjectState(project, true);
-          vm.projectMemberDraft = { userId: '', role: 'Developer' };
+          resetProjectMemberDraft();
           vm.notify('success', 'Proje üyesi eklendi.');
           return vm.loadProjectAudit();
         }).catch(function(error) { vm.notify('error', apiActionError(error, 'Proje üyesi eklenemedi.')); })
@@ -340,7 +390,7 @@
     };
 
     vm.changeProjectMemberRole = function(member) {
-      if (!vm.project || !vm.canManageProject || !member || member.role === 'ProjectOwner' || vm.entitySaving) return;
+      if (!vm.project || !vm.canManageProject || !member || vm.projectRoleProtected(member.role) || vm.entitySaving) return;
       vm.entitySaving = true;
       return apiClient.patch('/api/projects/' + vm.project.id + '/members/' + member.userId + '/role', { role: member.role })
         .then(function(project) { setProjectState(project, true); vm.notify('success', 'Proje rolü güncellendi.'); return vm.loadProjectAudit(); })
@@ -349,7 +399,7 @@
     };
 
     vm.removeProjectMember = function(member) {
-      if (!vm.project || !vm.canManageProject || !member || member.role === 'ProjectOwner' || vm.entitySaving) return;
+      if (!vm.project || !vm.canManageProject || !member || vm.projectRoleProtected(member.role) || vm.entitySaving) return;
       vm.entitySaving = true;
       return apiClient.delete('/api/projects/' + vm.project.id + '/members/' + member.userId)
         .then(function(project) { setProjectState(project, true); vm.notify('success', 'Proje üyesi kaldırıldı.'); return vm.loadProjectAudit(); })

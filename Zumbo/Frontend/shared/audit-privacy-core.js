@@ -106,10 +106,8 @@
 
   function hasPermission(user, roles, permission) {
     var names = (user && user.roles) || [];
-    if (names.indexOf('SystemAdmin') >= 0) return true;
-    if (permission === 'AuditReadAll' && names.indexOf('AuditReader') >= 0) return true;
     return (roles || []).some(function(role) {
-      return names.indexOf(role.name) >= 0
+      return role.isActive !== false && names.indexOf(role.name) >= 0
         && ((role.permissions || []).indexOf('*') >= 0 || (role.permissions || []).indexOf(permission) >= 0);
     });
   }

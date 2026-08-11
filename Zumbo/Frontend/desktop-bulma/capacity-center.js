@@ -24,15 +24,14 @@
           }
 
           function isSystemAdministrator() {
-            var roles = vm.session.currentUser && vm.session.currentUser.roles || [];
-            return roles.indexOf('SystemAdmin') >= 0;
+            return vm.hasSystemPermission('*');
           }
 
           function isManageableProject(project) {
             if (isSystemAdministrator()) return true;
             return (project.members || []).some(function(member) {
               return member.userId === currentUserId()
-                && ['ProjectOwner', 'ProjectAdmin'].indexOf(member.role) >= 0;
+                && vm.projectRoleHasPermission(member.role, 'BoardManage');
             });
           }
 

@@ -232,5 +232,5 @@ test('desktop and mobile surfaces expose scope, alternatives, zoom, filters and 
   assert.match(mobileHtml, /vm\.model\.dependencyRisks\.length/);
   assert.match(mobileSource, /loadTaskPages\(page \+ 1/);
   assert.match(mobileSource, /loadSprintPages\(result\.nextCursor/);
-  assert.match(mobileSource, /membership\.role !== 'Viewer'/);
+  assert.match(mobileSource, /hasProjectPermission\(membership\.role, 'WorkItemUpdate'\)/);
 });

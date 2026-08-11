@@ -10,15 +10,10 @@ angular.module('zumboDesktop', ['zumbo.shared.api', 'zumbo.shared.displayNames',
     vm.boardAudit = [];
     vm.organizationAudit = [];
     vm.roles = [];
-    vm.roleDraft = { name: '', permissions: ['WorkItemView'] };
+    vm.roleDraft = { name: '', permissions: [] };
     vm.userRoleDrafts = {};
-    vm.permissionCatalog = [
-      'UserRoleManage', 'AuditReadAll', 'OrganizationManage', 'IntegrationManage',
-      'BoardView', 'BoardManage', 'WorkItemView', 'WorkItemCreate',
-      'WorkItemUpdate', 'WorkItemMove', 'WorkItemAssign', 'WorkItemApprove',
-      'WorkItemDelete', 'CommentCreate', 'AttachmentCreate',
-      'AttachmentDelete', 'WorkLogCreate'
-    ];
+    vm.defaultRoleNames = [];
+    vm.permissionCatalog = [];
     vm.summary = {};
     vm.statusDistribution = [];
     vm.workload = [];
@@ -57,7 +52,8 @@ angular.module('zumboDesktop', ['zumbo.shared.api', 'zumbo.shared.displayNames',
     vm.pendingTaskIds = {};
     vm.taskLoadRequestId = 0;
     vm.activeTaskLoad = null;
-    vm.projectMemberDraft = { userId: '', role: 'Developer' };
+    vm.projectRoles = [];
+    vm.projectMemberDraft = { userId: '', role: '' };
     vm.projectTeamId = '';
     vm.boardColumnDraft = { name: '', category: 'Custom', wipLimit: null };
     vm.workflowDraft = { statuses: [], transitions: [] };
@@ -371,7 +367,7 @@ angular.module('zumboDesktop', ['zumbo.shared.api', 'zumbo.shared.displayNames',
 
     vm.restore = function() {
       if (!vm.session.currentUser) return;
-      return apiClient.get('/api/projects?organizationId=' + encodeURIComponent(vm.session.currentUser.organizationId))
+      return vm.reloadProjects()
         .then(function(projects) {
           vm.projects = projects;
           var rememberedId = window.localStorage.getItem('zumbo.projectId');

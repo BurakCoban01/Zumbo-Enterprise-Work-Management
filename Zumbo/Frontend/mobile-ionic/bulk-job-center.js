@@ -4,7 +4,7 @@
   angular.module('zumboMobile')
     .controller('BulkJobCenterController', function(
       $scope, $state, $stateParams, $q, $timeout, $window,
-      zumboApi, sessionStore, apiClient, mobileActionError, mobilePwaService
+      zumboApi, sessionStore, apiClient, mobileActionError, mobilePwaService, authorizationCatalog
     ) {
       var vm = this;
       var core = $window.ZumboBulkJobCore;
@@ -42,7 +42,9 @@
         var membership = vm.project && user && (vm.project.members || []).find(function(member) {
           return member.userId === user.id;
         });
-        return !!membership && membership.role !== 'Viewer' && !vm.pwa.offline;
+        return !!membership
+          && authorizationCatalog.hasProjectPermission(membership.role, 'WorkItemUpdate')
+          && !vm.pwa.offline;
       };
 
       vm.setMode = function(mode) {

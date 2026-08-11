@@ -71,16 +71,15 @@
     }
 
     function systemAdministrator() {
-      var roles = vm.session.currentUser && vm.session.currentUser.roles || [];
-      return roles.indexOf('SystemAdmin') >= 0;
+      return vm.hasSystemPermission('*');
     }
 
     function editableRole() {
-      return systemAdministrator() || ['ProjectOwner', 'ProjectAdmin', 'Developer'].indexOf(currentRole()) >= 0;
+      return systemAdministrator() || vm.projectRoleHasPermission(currentRole(), 'WorkItemUpdate');
     }
 
     function managerRole() {
-      return systemAdministrator() || ['ProjectOwner', 'ProjectAdmin'].indexOf(currentRole()) >= 0;
+      return systemAdministrator() || vm.projectRoleHasPermission(currentRole(), 'WorkItemApprove');
     }
 
     function mutationsUnavailable() {

@@ -9,7 +9,8 @@
       apiClient,
       zumboApi,
       sessionStore,
-      mobileActionError) {
+      mobileActionError,
+      authorizationCatalog) {
       var vm = this;
       var core = $window.ZumboCapacityPlanningCore;
       vm.plans = [];
@@ -29,15 +30,14 @@
       }
 
       function isSystemAdministrator() {
-        var roles = sessionStore.state.currentUser && sessionStore.state.currentUser.roles || [];
-        return roles.indexOf('SystemAdmin') >= 0;
+        return authorizationCatalog.hasSystemPermission('*');
       }
 
       function isManageableProject(project) {
         if (isSystemAdministrator()) return true;
         return (project.members || []).some(function(member) {
           return member.userId === currentUserId()
-            && ['ProjectOwner', 'ProjectAdmin'].indexOf(member.role) >= 0;
+            && authorizationCatalog.hasProjectPermission(member.role, 'BoardManage');
         });
       }
 

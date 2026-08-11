@@ -16,7 +16,14 @@ function createDemoPassword() {
     function accept(auth) {
       tokenStorage.setCsrf(auth.csrfToken);
       sessionStore.setUser(auth.user);
-      return auth;
+      return $q.all([
+        apiClient.get('/api/auth/roles'),
+        apiClient.get('/api/auth/roles?scope=Project')
+      ]).then(function(result) {
+        sessionStore.state.systemRoles = result[0] || [];
+        sessionStore.state.projectRoles = result[1] || [];
+        return auth;
+      });
     }
     function restore() {
       if (!restorePromise) {

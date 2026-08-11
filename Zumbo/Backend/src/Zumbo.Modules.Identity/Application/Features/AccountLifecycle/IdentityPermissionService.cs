@@ -10,7 +10,7 @@ namespace Zumbo.Modules.Identity;
 
 public sealed class IdentityPermissionService(
     IDocumentRepository<UserDocument> users,
-    IDocumentRepository<IdentityRoleDocument> roles,
+    IdentityRoleCatalogService roleCatalog,
     ICurrentUser currentUser)
 {
     public async Task<bool> HasPermissionAsync(string permission, CancellationToken ct)
@@ -27,17 +27,6 @@ public sealed class IdentityPermissionService(
             return false;
         }
 
-        if (PermissionCatalog.HasSystemPermission(user.Roles, permission))
-        {
-            return true;
-        }
-
-        var customRoles = await roles.ListByFilterAsync(
-            x => !x.IsSystem && x.OrganizationId == user.OrganizationId,
-            pageSize: 200,
-            cancellationToken: ct);
-        return customRoles.Any(role =>
-            user.Roles.Contains(role.Name, StringComparer.OrdinalIgnoreCase)
-            && role.Permissions.Any(value => value == "*" || value.Equals(permission, StringComparison.OrdinalIgnoreCase)));
+        return await roleCatalog.HasPermissionAsync(user.Roles, user.OrganizationId, permission, ct);
     }
 }

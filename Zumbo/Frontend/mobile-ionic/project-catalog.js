@@ -200,8 +200,8 @@
         vm.project = project;
         vm.model = core.snapshot(project);
         vm.role = core.roleOf(project, sessionStore.state.currentUser && sessionStore.state.currentUser.id);
-        vm.canManage = core.canManage(vm.role);
-        vm.canRelease = core.canRelease(vm.role);
+        vm.canManage = core.canManage(vm.role, sessionStore.state.projectRoles);
+        vm.canRelease = core.canRelease(vm.role, sessionStore.state.projectRoles);
       }
       function resetTemplateDraft() {
         vm.templateDraft = { id: null, name: '', isDefault: false, defaultComponentNamesText: '' };

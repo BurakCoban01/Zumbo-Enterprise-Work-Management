@@ -1403,6 +1403,12 @@ public sealed class ApiFlowTests : IClassFixture<WebApplicationFactory<Program>>
             $"role-api-member-{stamp}@zumbo.local",
             "P@ssword123",
             organizationId));
+        var managerUsername = "role-api-manager" + stamp;
+        var manager = await PostAsync<AuthResponse>("/api/auth/register", new RegisterUserRequest(
+            managerUsername,
+            $"role-api-manager-{stamp}@zumbo.local",
+            "P@ssword123",
+            organizationId));
 
         _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", member.AccessToken);
         var forbiddenCreate = await _client.PostAsJsonAsync("/api/auth/roles", new CreateRoleRequest(
@@ -1427,10 +1433,40 @@ public sealed class ApiFlowTests : IClassFixture<WebApplicationFactory<Program>>
         Assert.True(auditIntegrity.Data.Valid);
         var availableRoles = await GetAsync<IReadOnlyList<RoleResponse>>("/api/auth/roles");
         Assert.Contains(availableRoles, x => x.Name == "SystemAdmin" && x.IsSystem);
+        var systemAdminRole = Assert.Single(availableRoles, x => x.Name == "SystemAdmin");
+        var protectedUpdate = await _client.PutAsJsonAsync(
+            $"/api/auth/roles/{systemAdminRole.Id}",
+            new UpdateRoleRequest(
+                systemAdminRole.Name,
+                systemAdminRole.Permissions,
+                systemAdminRole.Version,
+                systemAdminRole.IsActive));
+        Assert.Equal(HttpStatusCode.Conflict, protectedUpdate.StatusCode);
+
+        await PutAsync<UserProfileResponse>(
+            $"/api/auth/users/{manager.User.Id}/roles",
+            new AssignUserRolesRequest(["OrganizationAdmin"]));
+        var refreshedManager = await PostAsync<AuthResponse>(
+            "/api/auth/login",
+            new LoginRequest(managerUsername, "P@ssword123"));
+        _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
+            "Bearer",
+            refreshedManager.AccessToken);
+        var excessiveGrant = await _client.PostAsJsonAsync("/api/auth/roles", new CreateRoleRequest(
+            "Excessive Release Manager",
+            organizationId,
+            ["UserRoleManage", "Release.Publish"]));
+        Assert.Equal(HttpStatusCode.Forbidden, excessiveGrant.StatusCode);
+
+        _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", admin.AccessToken);
         var role = await PostAsync<RoleResponse>("/api/auth/roles", new CreateRoleRequest(
             "Release Manager",
             organizationId,
             ["Release.Approve", "Release.Publish", "AuditReadAll"]));
+        var staleRoleUpdate = await _client.PutAsJsonAsync(
+            $"/api/auth/roles/{role.Id}",
+            new UpdateRoleRequest(role.Name, role.Permissions, role.Version + 1, role.IsActive));
+        Assert.Equal(HttpStatusCode.Conflict, staleRoleUpdate.StatusCode);
         var assigned = await PutAsync<UserProfileResponse>(
             $"/api/auth/users/{member.User.Id}/roles",
             new AssignUserRolesRequest([role.Name]));
@@ -1446,6 +1482,19 @@ public sealed class ApiFlowTests : IClassFixture<WebApplicationFactory<Program>>
         var customPermissionAudit = await GetAsync<IReadOnlyList<AuditLogResponse>>(
             $"/api/audit/entity/Identity/{member.User.Id}");
         Assert.Contains(customPermissionAudit, x => x.Action == "UserRolesChanged");
+
+        _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", admin.AccessToken);
+        role = await PutAsync<RoleResponse>(
+            $"/api/auth/roles/{role.Id}",
+            new UpdateRoleRequest(role.Name, role.Permissions, role.Version, false));
+        Assert.False(role.IsActive);
+
+        _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
+            "Bearer",
+            refreshedMember.AccessToken);
+        var disabledRoleAccess = await _client.GetAsync(
+            $"/api/audit/integrity/{organizationId}");
+        Assert.Equal(HttpStatusCode.Forbidden, disabledRoleAccess.StatusCode);
 
         _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", admin.AccessToken);
         var inUseDelete = await _client.DeleteAsync($"/api/auth/roles/{role.Id}");

@@ -27,7 +27,7 @@ test('mobile work modes keep real API-backed board list backlog and sprint comma
     assert.ok(html.includes(command), `${command} is missing from the mobile surface`);
   }
   assert.match(tasks, /vm\.canEditTasks = function/);
-  assert.match(tasks, /membership\.role !== 'Viewer'/);
+  assert.match(tasks, /hasProjectPermission\(membership\.role, 'WorkItemUpdate'\)/);
   assert.match(tasks, /vm\.loadError = mobileActionError/);
   assert.match(tasks, /\$getByHandle\('taskWorkScroll'\)\.scrollTop\(true\)/);
   assert.match(html, /delegate-handle="taskWorkScroll"/);

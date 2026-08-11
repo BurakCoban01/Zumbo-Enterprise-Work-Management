@@ -7,6 +7,7 @@
       return {
         install: function(vm, apiActionError) {
     vm.sessions = [];
+    vm.permissionCatalogGroups = [];
     vm.securityLoadError = '';
     vm.sessionActionId = null;
     vm.mfaRecoveryDraft = { password: '', code: '' };
@@ -53,9 +54,6 @@
 
     function currentUserHasPermission(permission) {
       var currentRoles = (vm.session.currentUser && vm.session.currentUser.roles) || [];
-      if (currentRoles.some(function(role) { return role === 'SystemAdmin'; })) return true;
-      if (permission === 'UserRoleManage'
-          && currentRoles.some(function(role) { return role === 'OrganizationAdmin'; })) return true;
       return vm.roles.some(function(role) {
         return currentRoles.indexOf(role.name) >= 0
           && (role.permissions || []).some(function(value) { return value === '*' || value === permission; });
@@ -64,10 +62,11 @@
 
     function refreshManagementCapabilities() {
       var currentRoles = (vm.session.currentUser && vm.session.currentUser.roles) || [];
-      vm.isSystemAdmin = currentRoles.indexOf('SystemAdmin') >= 0;
+      vm.isSystemAdmin = vm.roles.some(function(role) {
+        return currentRoles.indexOf(role.name) >= 0 && (role.permissions || []).indexOf('*') >= 0;
+      });
       vm.canManageRoles = currentUserHasPermission('UserRoleManage');
       vm.canManageOrganization = vm.isSystemAdmin
-        || currentRoles.indexOf('OrganizationAdmin') >= 0
         || currentUserHasPermission('OrganizationManage')
         || !!(vm.organization && vm.organization.ownerUserId === vm.session.currentUser.id);
       if (!vm.canManageRoles && vm.settingsTab === 'access') vm.settingsTab = 'account';
@@ -77,35 +76,65 @@
       vm.roles.forEach(function(role) {
         role.editName = role.name;
         role.editPermissions = (role.permissions || []).slice();
+        role.editIsActive = role.isActive;
       });
       vm.userRoleDrafts = {};
+      vm.defaultRoleNames = vm.roles.filter(function(role) { return role.isDefault; })
+        .map(function(role) { return role.name; });
       vm.users.forEach(function(user) { vm.userRoleDrafts[user.id] = (user.roles || []).slice(); });
       refreshManagementCapabilities();
     }
 
+    function groupPermissionCatalog() {
+      var groups = [];
+      (vm.permissionCatalog || []).forEach(function(permission) {
+        var group = groups.find(function(item) { return item.name === permission.category; });
+        if (!group) {
+          group = { name: permission.category, permissions: [] };
+          groups.push(group);
+        }
+        group.permissions.push(permission);
+      });
+      vm.permissionCatalogGroups = groups;
+    }
+
+    vm.permissionGroups = function() { return vm.permissionCatalogGroups; };
+
+    vm.permissionLabel = function(permissionKey) {
+      var definition = (vm.permissionCatalog || []).find(function(item) { return item.key === permissionKey; });
+      return definition && definition.label || permissionKey;
+    };
+
     vm.loadRoleAdministration = function() {
       if (!vm.session.currentUser) return $q.when([]);
       vm.roleAdminLoading = true;
-      return apiClient.get('/api/auth/roles').then(function(roles) {
-        vm.roles = roles;
+      return $q.all([
+        apiClient.get('/api/auth/roles'),
+        apiClient.get('/api/auth/permissions')
+      ]).then(function(result) {
+        vm.roles = result[0];
+        vm.permissionCatalog = result[1];
+        groupPermissionCatalog();
         prepareRoleAdministration();
-        return roles;
+        return vm.roles;
       }).catch(function() {
         vm.roles = [];
+        vm.permissionCatalog = [];
+        groupPermissionCatalog();
         refreshManagementCapabilities();
         return [];
       }).finally(function() { vm.roleAdminLoading = false; });
     };
 
     vm.permissionSelected = function(role, permission) {
-      return ((role && role.permissions) || []).indexOf(permission) >= 0;
+      return ((role && role.permissions) || []).indexOf(permission.key) >= 0;
     };
 
     vm.togglePermission = function(role, permission) {
       var permissions = role.permissions || (role.permissions = []);
-      var index = permissions.indexOf(permission);
+      var index = permissions.indexOf(permission.key);
       if (index >= 0) permissions.splice(index, 1);
-      else permissions.push(permission);
+      else permissions.push(permission.key);
     };
 
     vm.createRole = function() {
@@ -116,7 +145,7 @@
         organizationId: vm.session.currentUser.organizationId,
         permissions: vm.roleDraft.permissions
       }).then(function() {
-        vm.roleDraft = { name: '', permissions: ['WorkItemView'] };
+        vm.roleDraft = { name: '', permissions: [] };
         vm.notify('success', 'Özel rol oluşturuldu.');
         return vm.loadRoleAdministration();
       }).catch(function(error) { vm.notify('error', apiActionError(error, 'Rol oluşturulamadı.')); })
@@ -128,7 +157,9 @@
       vm.entitySaving = true;
       return apiClient.put('/api/auth/roles/' + role.id, {
         name: role.editName,
-        permissions: role.editPermissions
+        permissions: role.editPermissions,
+        version: role.version,
+        isActive: role.editIsActive
       }).then(function() {
         vm.notify('success', 'Rol güncellendi.');
         return $q.all([vm.loadRoleAdministration(), vm.loadUsers()]).then(prepareRoleAdministration);
@@ -152,23 +183,25 @@
 
     vm.toggleUserRole = function(user, roleName) {
       if (!user || user.id === vm.session.currentUser.id) return;
-      var roles = vm.userRoleDrafts[user.id] || (vm.userRoleDrafts[user.id] = ['User']);
+      var roles = vm.userRoleDrafts[user.id] || (vm.userRoleDrafts[user.id] = vm.defaultRoleNames.slice());
       var index = roles.indexOf(roleName);
       if (index >= 0) roles.splice(index, 1);
       else roles.push(roleName);
-      if (roles.indexOf('User') < 0) roles.unshift('User');
+      vm.defaultRoleNames.forEach(function(defaultRole) {
+        if (roles.indexOf(defaultRole) < 0) roles.unshift(defaultRole);
+      });
     };
 
     vm.canAssignRole = function(role) {
       if (!role || vm.isSystemAdmin) return true;
-      return !role.isSystem || ['SystemAdmin', 'OrganizationAdmin', 'AuditReader'].indexOf(role.name) < 0;
+      return !role.isProtected;
     };
 
     vm.saveUserRoles = function(user) {
       if (!vm.canManageRoles || !user || user.id === vm.session.currentUser.id || vm.entitySaving) return;
       vm.entitySaving = true;
       return apiClient.put('/api/auth/users/' + user.id + '/roles', {
-        roles: vm.userRoleDrafts[user.id] || ['User']
+        roles: vm.userRoleDrafts[user.id] || vm.defaultRoleNames.slice()
       }).then(function(updated) {
         var index = vm.users.findIndex(function(item) { return item.id === updated.id; });
         if (index >= 0) vm.users[index] = updated;

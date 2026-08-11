@@ -34,7 +34,7 @@
       return webhookCore.hasPermission(sessionStore.state.currentUser, vm.integrationRoles);
     };
     vm.canManageOperations = function() {
-      return operationsCore.hasPermission(sessionStore.state.currentUser);
+      return operationsCore.hasPermission(sessionStore.state.currentUser, vm.integrationRoles);
     };
     mobilePrivacyFeature.install(vm);
 

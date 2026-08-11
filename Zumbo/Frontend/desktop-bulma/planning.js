@@ -40,7 +40,8 @@
           vm.sprintNextCursor = null;
 
           vm.canPlanSprint = function() {
-            return !!vm.projectMembership && vm.projectMembership.role !== 'Viewer';
+            return !!vm.projectMembership
+              && vm.projectRoleHasPermission(vm.projectMembership.role, 'WorkItemMove');
           };
 
           vm.setWorkMode = function(mode) {

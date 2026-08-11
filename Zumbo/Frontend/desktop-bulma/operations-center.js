@@ -24,7 +24,7 @@
           };
 
           vm.canManageOperations = function() {
-            return core.hasPermission(vm.session.currentUser);
+            return core.hasPermission(vm.session.currentUser, vm.roles);
           };
 
           vm.openSettingsTab = function(tab) {

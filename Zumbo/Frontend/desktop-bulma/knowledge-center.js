@@ -56,7 +56,8 @@
               vm.knowledgeScopes = core.scopeOptions(
                 vm.projects,
                 vm.knowledgePortfolios,
-                vm.session.currentUser && vm.session.currentUser.id);
+                vm.session.currentUser && vm.session.currentUser.id,
+                vm.projectRoles);
               if (vm.knowledgeDocument) {
                 var current = vm.knowledgeDocuments.find(function(item) {
                   return item.id === vm.knowledgeDocument.id;

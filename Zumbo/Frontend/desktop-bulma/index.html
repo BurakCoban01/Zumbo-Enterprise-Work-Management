@@ -301,7 +301,7 @@
             <section class="overview-band" aria-labelledby="team-heading">
               <div class="overview-band-heading"><div><p class="eyebrow">Sorumluluk</p><h3 id="team-heading">Proje ekibi</h3></div><button ng-if="vm.canManageProject" ng-click="vm.showSection('projects')">Yönet</button></div>
               <div class="overview-owner"><i data-lucide="badge-check" lucide-icon></i><span><small>Proje sahibi</small><strong>{{vm.projectOwnerName()}}</strong></span></div>
-              <div class="overview-member" ng-repeat="member in vm.projectContributors() track by member.userId"><span>{{vm.projectMemberName(member)}}</span><small>{{member.role}}</small></div>
+              <div class="overview-member" ng-repeat="member in vm.projectContributors() track by member.userId"><span>{{vm.projectMemberName(member)}}</span><small>{{vm.projectRoleLabel(member.role)}}</small></div>
               <p class="overview-team-links" ng-if="vm.projectTeams().length"><span ng-repeat="team in vm.projectTeams() track by team.id">{{team.name}}</span></p>
               <p class="section-empty" ng-if="!vm.project.members.length">Projeye atanmış üye yok.</p>
             </section>
@@ -992,7 +992,7 @@
             <button class="button is-small is-primary" ng-if="vm.canManageProject" ng-click="vm.saveProject()" ng-disabled="vm.entitySaving || !vm.projectDraft.name"><i data-lucide="save" lucide-icon></i><span>Kaydet</span></button>
             <button class="button is-small is-danger is-light" ng-if="vm.canArchiveProject" ng-click="vm.archiveProject()" ng-disabled="vm.entitySaving"><i data-lucide="archive" lucide-icon></i><span>Arşivle</span></button>
           </div>
-          <div class="permission-notice" ng-if="vm.projectMembership && !vm.canManageProject"><i data-lucide="eye" lucide-icon></i><span>{{vm.projectMembership.role}} rolüyle bu proje salt okunur görüntüleniyor.</span></div>
+          <div class="permission-notice" ng-if="vm.projectMembership && !vm.canManageProject"><i data-lucide="eye" lucide-icon></i><span>{{vm.projectRoleLabel(vm.projectMembership.role)}} rolüyle bu proje salt okunur görüntüleniyor.</span></div>
           <p class="section-empty" ng-if="!vm.projectMembership">Bu organizasyon içi proje görünür; pano ve iş öğelerine erişmek için proje üyeliği gerekir.</p>
           <div class="project-facts">
             <div><strong>{{vm.project.members.length}}</strong><span>Üye</span></div>
@@ -1037,14 +1037,14 @@
           <div class="member-table">
             <div class="member-row member-manage-row" ng-repeat="member in vm.project.members track by member.userId">
               <span>{{vm.userName(member.userId)}}</span>
-              <strong ng-if="!vm.canManageProject || member.role === 'ProjectOwner'">{{member.role}}</strong>
-              <div class="select is-small" ng-if="vm.canManageProject && member.role !== 'ProjectOwner'"><select ng-model="member.role" ng-change="vm.changeProjectMemberRole(member)" ng-disabled="vm.entitySaving" aria-label="Proje üyesi rolü"><option>ProjectAdmin</option><option>Developer</option><option>Viewer</option></select></div>
-              <button class="icon-button is-small danger-icon" ng-if="vm.canManageProject && member.role !== 'ProjectOwner'" ng-click="vm.removeProjectMember(member)" ng-disabled="vm.entitySaving" aria-label="Proje üyesini kaldır" title="Proje üyesini kaldır"><i data-lucide="user-round-x" lucide-icon></i></button>
+              <strong ng-if="!vm.canManageProject || vm.projectRoleProtected(member.role)">{{vm.projectRoleLabel(member.role)}}</strong>
+              <div class="select is-small" ng-if="vm.canManageProject && !vm.projectRoleProtected(member.role)"><select ng-model="member.role" ng-change="vm.changeProjectMemberRole(member)" ng-disabled="vm.entitySaving" aria-label="Proje üyesi rolü" ng-options="role.name as role.displayName for role in vm.projectAssignableRoles()"></select></div>
+              <button class="icon-button is-small danger-icon" ng-if="vm.canManageProject && !vm.projectRoleProtected(member.role)" ng-click="vm.removeProjectMember(member)" ng-disabled="vm.entitySaving" aria-label="Proje üyesini kaldır" title="Proje üyesini kaldır"><i data-lucide="user-round-x" lucide-icon></i></button>
             </div>
           </div>
           <form class="member-add-row" ng-if="vm.canManageProject" ng-submit="vm.addProjectMember()">
             <div class="select is-small is-fullwidth"><select ng-model="vm.projectMemberDraft.userId" ng-options="user.id as (user.username + ' · ' + user.email) for user in vm.users" aria-label="Proje üyesi" required><option value="">Kullanıcı seçin</option></select></div>
-            <div class="select is-small"><select ng-model="vm.projectMemberDraft.role" aria-label="Yeni proje rolü"><option>ProjectAdmin</option><option>Developer</option><option>Viewer</option></select></div>
+            <div class="select is-small"><select ng-model="vm.projectMemberDraft.role" aria-label="Yeni proje rolü" ng-options="role.name as role.displayName for role in vm.projectAssignableRoles()"></select></div>
             <button class="button is-small" type="submit" ng-disabled="vm.entitySaving"><i data-lucide="user-round-plus" lucide-icon></i><span>Üye ekle</span></button>
           </form>
           <div class="detail-subheading" ng-if="vm.canManageProject"><h3>Bağlı ekipler</h3></div>
@@ -1715,17 +1715,18 @@
             <article class="role-definition" ng-repeat="role in vm.roles track by role.id" ng-class="{'system-role': role.isSystem}" data-role-name="{{role.name}}">
               <div class="role-title">
                 <input class="input" ng-if="!role.isSystem" ng-model="role.editName" aria-label="Rol adı">
-                <strong ng-if="role.isSystem">{{role.name}}</strong>
+                <strong ng-if="role.isSystem">{{role.displayName || role.name}}</strong>
                 <span class="status-pill" ng-if="role.isSystem">Sistem</span>
+                <label class="toggle-label" ng-if="!role.isSystem"><input type="checkbox" ng-model="role.editIsActive"><span>{{role.editIsActive ? 'Etkin' : 'Devre dışı'}}</span></label>
                 <div class="row-actions" ng-if="!role.isSystem"><button class="icon-button" ng-click="vm.saveRole(role)" aria-label="Rolü kaydet" title="Rolü kaydet" ng-disabled="vm.entitySaving"><i data-lucide="save" lucide-icon></i></button><button class="icon-button danger-icon" ng-click="vm.deleteRole(role)" aria-label="Rolü kaldır" title="Rolü kaldır" ng-disabled="vm.entitySaving"><i data-lucide="trash-2" lucide-icon></i></button></div>
               </div>
-              <div class="permission-grid" ng-if="!role.isSystem"><label ng-repeat="permission in vm.permissionCatalog track by permission"><input type="checkbox" ng-checked="role.editPermissions.indexOf(permission) >= 0" ng-click="vm.togglePermission({permissions: role.editPermissions}, permission)"><span>{{permission}}</span></label></div>
-              <div class="permission-tags" ng-if="role.isSystem"><span ng-repeat="permission in role.permissions track by permission">{{permission}}</span></div>
+              <div class="permission-catalog-groups" ng-if="!role.isSystem"><section ng-repeat="group in vm.permissionGroups() track by group.name"><h5>{{group.name}}</h5><div class="permission-grid"><label ng-repeat="permission in group.permissions track by permission.key" title="{{permission.description}}"><input type="checkbox" ng-checked="role.editPermissions.indexOf(permission.key) >= 0" ng-click="vm.togglePermission({permissions: role.editPermissions}, permission)"><span>{{permission.label}}</span></label></div></section></div>
+              <div class="permission-tags" ng-if="role.isSystem"><span ng-repeat="permission in role.permissions track by permission">{{permission === '*' ? 'Tüm yetkiler' : vm.permissionLabel(permission)}}</span></div>
             </article>
           </div>
           <form class="role-create-form" ng-submit="vm.createRole()">
             <input class="input" ng-model="vm.roleDraft.name" placeholder="Yeni rol adı" aria-label="Yeni rol adı" required>
-            <div class="permission-grid"><label ng-repeat="permission in vm.permissionCatalog track by permission"><input type="checkbox" ng-checked="vm.permissionSelected(vm.roleDraft, permission)" ng-click="vm.togglePermission(vm.roleDraft, permission)"><span>{{permission}}</span></label></div>
+            <div class="permission-catalog-groups"><section ng-repeat="group in vm.permissionGroups() track by group.name"><h5>{{group.name}}</h5><div class="permission-grid"><label ng-repeat="permission in group.permissions track by permission.key" title="{{permission.description}}"><input type="checkbox" ng-checked="vm.permissionSelected(vm.roleDraft, permission)" ng-click="vm.togglePermission(vm.roleDraft, permission)"><span>{{permission.label}}</span></label></div></section></div>
             <button class="button is-primary" type="submit" ng-disabled="vm.entitySaving || !vm.roleDraft.permissions.length"><i data-lucide="plus" lucide-icon></i><span>Rol oluştur</span></button>
           </form>
         </section>
@@ -1735,7 +1736,7 @@
           <div class="user-role-list">
             <article class="user-role-row" ng-repeat="user in vm.users track by user.id">
               <div class="user-role-identity"><strong>{{user.username}}</strong><small>{{user.email}}</small></div>
-              <div class="role-choice-list"><label ng-repeat="role in vm.roles track by role.id" ng-if="vm.canAssignRole(role)"><input type="checkbox" ng-checked="vm.userHasDraftRole(user, role.name)" ng-click="vm.toggleUserRole(user, role.name)" ng-disabled="role.name === 'User' || user.id === vm.session.currentUser.id"><span>{{role.name}}</span></label></div>
+              <div class="role-choice-list"><label ng-repeat="role in vm.roles track by role.id" ng-if="vm.canAssignRole(role)"><input type="checkbox" ng-checked="vm.userHasDraftRole(user, role.name)" ng-click="vm.toggleUserRole(user, role.name)" ng-disabled="role.isDefault || user.id === vm.session.currentUser.id"><span>{{role.displayName || role.name}}</span></label></div>
               <button class="button" ng-click="vm.saveUserRoles(user)" ng-disabled="vm.entitySaving || user.id === vm.session.currentUser.id"><i data-lucide="save" lucide-icon></i><span>{{user.id === vm.session.currentUser.id ? 'Aktif oturum' : 'Rolleri kaydet'}}</span></button>
             </article>
           </div>

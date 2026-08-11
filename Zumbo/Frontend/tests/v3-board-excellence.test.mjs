@@ -54,6 +54,13 @@ function model({ role = 'Developer', api = {} } = {}) {
     selectedTaskIds: {},
     pendingTaskIds: {},
     priorityFilter: '',
+    projectRoleHasPermission(roleName, permission) {
+      const roles = [
+        { name: 'Developer', permissions: ['WorkItemUpdate'] },
+        { name: 'Viewer', permissions: ['WorkItemView'] }
+      ];
+      return roles.some(item => item.name === roleName && item.permissions.includes(permission));
+    },
     userName: id => id === 'user-1' ? 'Ada' : 'Mert',
     moveTaskToColumn: (id, target) => Promise.resolve({ id, target }),
     dropTaskBefore(id, anchor, placement) { vm.dropCall = { id, anchor, placement }; return Promise.resolve(); },
@@ -254,5 +261,5 @@ test('templates expose semantic table, keyboard/touch movement and permission-aw
   assert.match(mobileAuth, /var restorePromise = null/);
   assert.match(mobileAuth, /restorePromise = apiClient\.get\('\/api\/browser-auth\/session'\)/);
   assert.match(mobileTasks, /BOARD_WIP_LIMIT_EXCEEDED/);
-  assert.match(mobileTasks, /membership\.role !== 'Viewer'/);
+  assert.match(mobileTasks, /hasProjectPermission\(membership\.role, 'WorkItemUpdate'\)/);
 });

@@ -162,8 +162,10 @@ test('automation core builds bounded typed event and schedule rule requests', ()
 
   draft.intervalMinutes = 4;
   assert.equal(core.validRule(draft), false);
-  assert.equal(core.canEdit('Developer', { roles: [] }), false);
-  assert.equal(core.canEdit('Viewer', { roles: ['SystemAdmin'] }), true);
+  const projectRoles = [{ name: 'Developer', permissions: ['WorkItemUpdate'] }];
+  const systemRoles = [{ name: 'SystemAdmin', permissions: ['*'] }];
+  assert.equal(core.canEdit('Developer', { roles: [] }, projectRoles, systemRoles), false);
+  assert.equal(core.canEdit('Viewer', { roles: ['SystemAdmin'] }, projectRoles, systemRoles), true);
 });
 
 test('desktop rule workflow loads details, saves a draft, dry-runs and replays dead letters', async () => {
@@ -222,6 +224,8 @@ test('desktop rule workflow loads details, saves a draft, dry-runs and replays d
     },
     projectMembership: { role: 'ProjectOwner' },
     session: { currentUser: { id: 'user-1', roles: [] } },
+    projectRoles: [{ name: 'ProjectOwner', permissions: ['BoardManage'] }],
+    roles: [],
     boards: [],
     activeIssueTypes: () => [{ key: 'Task', name: 'Task', active: true }],
     notify(kind, message) { vm.feedback = { kind, message }; }

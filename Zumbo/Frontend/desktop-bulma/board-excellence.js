@@ -75,7 +75,8 @@
           vm.bulkResult = null;
 
           vm.canEditWorkItems = function() {
-            return !!vm.board && !!vm.projectMembership && vm.projectMembership.role !== 'Viewer';
+            return !!vm.board && !!vm.projectMembership
+              && vm.projectRoleHasPermission(vm.projectMembership.role, 'WorkItemUpdate');
           };
 
           vm.listColumnVisible = function(column) {

@@ -2032,15 +2032,27 @@ public sealed class DomainRuleTests
         _currentUser.Roles = ["User", "SystemAdmin"];
         var audit = new RecordingIdentityAuditWriter();
         var roleDocuments = new InMemoryDocumentRepository<IdentityRoleDocument>();
+        var permissionDocuments = new InMemoryDocumentRepository<IdentityPermissionDefinitionDocument>();
+        var lockProvider = new InMemoryDistributedLockProvider();
+        var lockOptions = Options.Create(new DistributedLockOptions());
+        var roleCatalog = new IdentityRoleCatalogService(roleDocuments, lockProvider, lockOptions, _clock);
+        var permissionCatalog = new IdentityPermissionCatalogService(
+            permissionDocuments,
+            lockProvider,
+            lockOptions,
+            audit,
+            _clock);
         var administration = new IdentityAdministrationService(
             userDocuments,
             roleDocuments,
             sessionStore,
             new InMemoryDurableTransactionRunner(),
-            new IdentityPermissionService(userDocuments, roleDocuments, _currentUser),
+            new IdentityPermissionService(userDocuments, roleCatalog, _currentUser),
+            roleCatalog,
+            permissionCatalog,
             audit,
-            new InMemoryDistributedLockProvider(),
-            Options.Create(new DistributedLockOptions()),
+            lockProvider,
+            lockOptions,
             _clock,
             _currentUser);
         var role = await administration.CreateRoleAsync(

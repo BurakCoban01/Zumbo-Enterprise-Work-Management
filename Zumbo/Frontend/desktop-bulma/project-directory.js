@@ -53,7 +53,7 @@
           };
           vm.projectDirectoryRole = function(project) {
             var membership = helpers.membershipFor(project);
-            return membership ? membership.role : 'Üye değil';
+            return membership ? vm.projectRoleLabel(membership.role) : 'Üye değil';
           };
           vm.projectDirectoryCanOpen = function(project) {
             return !!helpers.membershipFor(project);
