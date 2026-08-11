@@ -8,6 +8,8 @@ export interface ProjectSummary {
   readonly teamIds?: readonly string[];
   readonly archived?: boolean;
   readonly version?: number;
+  readonly milestones?: readonly ProjectMilestoneSummary[];
+  readonly releases?: readonly ProjectReleaseSummary[];
 }
 
 export interface ProjectMemberSummary {
@@ -15,10 +17,37 @@ export interface ProjectMemberSummary {
   readonly role: string;
 }
 
-export interface BoardSummary {
+export interface ProjectMilestoneSummary {
   readonly id: string;
   readonly name: string;
+  readonly dueAt?: string | null;
+  readonly status: string;
+}
+
+export interface ProjectReleaseSummary {
+  readonly id: string;
+  readonly name: string;
+  readonly scheduledAt?: string | null;
+  readonly status: string;
+}
+
+export interface BoardSummary {
+  readonly id: string;
+  readonly projectId?: string;
+  readonly name: string;
   readonly type?: string;
+  readonly swimlaneMode?: string;
+  readonly columns?: readonly BoardColumnSummary[];
+  readonly version?: number;
+}
+
+export interface BoardColumnSummary {
+  readonly id: string;
+  readonly name: string;
+  readonly category?: string;
+  readonly position: number;
+  readonly wipLimit?: number | null;
+  readonly statusNames?: readonly string[];
 }
 
 export interface OrganizationSummary {
@@ -66,6 +95,10 @@ export interface ProjectViewDefinition {
 }
 
 export type IconName =
+  | 'arrow-down'
+  | 'arrow-left'
+  | 'arrow-right'
+  | 'arrow-up'
   | 'archive'
   | 'arrow-up-right'
   | 'bell'
@@ -74,11 +107,14 @@ export type IconName =
   | 'briefcase'
   | 'chart'
   | 'check-check'
+  | 'columns'
   | 'chevron-down'
   | 'chevron-left'
   | 'chevron-right'
   | 'chevrons-left'
   | 'folder'
+  | 'edit'
+  | 'eye'
   | 'gauge'
   | 'home'
   | 'inbox'
@@ -90,13 +126,15 @@ export type IconName =
   | 'moon'
   | 'plus'
   | 'refresh'
+  | 'rows'
   | 'search'
   | 'save'
   | 'settings'
   | 'star'
   | 'sun'
   | 'target'
-  | 'users';
+  | 'users'
+  | 'x';
 
 export const PROJECT_VIEWS: readonly ProjectViewDefinition[] = [
   { id: 'overview', label: 'Genel bakış', icon: 'chart', group: 'primary', requiresBoard: false },

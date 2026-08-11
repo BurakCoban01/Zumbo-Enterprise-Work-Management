@@ -6,9 +6,12 @@ import { catchError, finalize, forkJoin, map, of, switchMap } from 'rxjs';
 import { DesktopNavigationComponent } from './shell/desktop-navigation.component';
 import { CommandPaletteComponent } from './shell/command-palette.component';
 import { HomePage } from './features/home/home.page';
+import { ProjectBoardPage } from './features/board/project-board.page';
 import { InboxPage } from './features/inbox/inbox.page';
+import { ProjectListPage } from './features/list/project-list.page';
 import { NotificationItem } from './features/notifications/notification.models';
 import { NotificationPopoverComponent } from './features/notifications/notification-popover.component';
+import { ProjectOverviewPage } from './features/overview/project-overview.page';
 import { MyWorkPage } from './features/personal-work/my-work.page';
 import { ProjectDirectoryPage } from './features/projects/project-directory.page';
 import {
@@ -33,7 +36,7 @@ const NAV_KEY = 'zumbo.navCollapsed';
 
 @Component({
   selector: 'zumbo-desktop-workspace',
-  imports: [CommandPaletteComponent, DesktopNavigationComponent, HomePage, InboxPage, MyWorkPage, NotificationPopoverComponent, ProjectDirectoryPage, ProjectSwitcherComponent, ProjectViewTabsComponent, RouterLink, ZumboIconComponent],
+  imports: [CommandPaletteComponent, DesktopNavigationComponent, HomePage, InboxPage, MyWorkPage, NotificationPopoverComponent, ProjectBoardPage, ProjectDirectoryPage, ProjectListPage, ProjectOverviewPage, ProjectSwitcherComponent, ProjectViewTabsComponent, RouterLink, ZumboIconComponent],
   templateUrl: './workspace.page.html',
   styleUrls: ['./workspace.page.scss', './workspace-responsive.scss']
 })
@@ -48,6 +51,7 @@ export class DesktopWorkspacePage {
 
   protected readonly projects = signal<readonly ProjectSummary[]>([]);
   protected readonly boards = signal<readonly BoardSummary[]>([]);
+  protected readonly projectContextLoading = signal(false);
   protected readonly loading = signal(true);
   protected readonly error = signal<string | null>(null);
   protected readonly selectedProjectId = signal<string | null>(null);
@@ -212,15 +216,20 @@ export class DesktopWorkspacePage {
   private loadProjectContext(projectId: string, requestedView: ProjectViewId): void {
     this.projectContextId = projectId;
     this.boards.set([]);
+    this.projectContextLoading.set(true);
     this.api.get<readonly BoardSummary[]>(`/api/boards/by-project/${encodeURIComponent(projectId)}`)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: boards => {
           this.boards.set(boards);
+          this.projectContextLoading.set(false);
           const available = PROJECT_VIEWS.some(view => view.id === requestedView && (!view.requiresBoard || boards.length > 0));
           if (!available) void this.router.navigate(['/workspace', projectId, 'overview'], { replaceUrl: true });
         },
-        error: () => this.error.set('Proje bağlamı yüklenemedi.')
+        error: () => {
+          this.projectContextLoading.set(false);
+          this.error.set('Proje bağlamı yüklenemedi.');
+        }
       });
     void this.realtime.stop().then(() => this.realtime.connect(projectId)).catch(() => {
       this.error.set('Canlı güncellemeler şu anda kullanılamıyor.');

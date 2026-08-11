@@ -1,6 +1,10 @@
 import { Component, ElementRef, Input, OnChanges, inject } from '@angular/core';
 import {
   ArchiveRestore,
+  ArrowDown,
+  ArrowLeft,
+  ArrowRight,
+  ArrowUp,
   ArrowUpRight,
   Bell,
   Bookmark,
@@ -8,11 +12,13 @@ import {
   BriefcaseBusiness,
   ChartNoAxesCombined,
   CheckCheck,
+  Columns3,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
   ChevronsLeft,
   FolderKanban,
+  Eye,
   Gauge,
   House,
   Inbox,
@@ -22,8 +28,10 @@ import {
   Menu,
   Milestone,
   Moon,
+  Pencil,
   Plus,
   RefreshCw,
+  Rows3,
   Search,
   Save,
   Settings,
@@ -31,12 +39,17 @@ import {
   Sun,
   Target,
   UsersRound,
+  X,
   createElement
 } from 'lucide';
 import { IconName } from './desktop-shell.models';
 
 const ICONS = {
   archive: ArchiveRestore,
+  'arrow-down': ArrowDown,
+  'arrow-left': ArrowLeft,
+  'arrow-right': ArrowRight,
+  'arrow-up': ArrowUp,
   'arrow-up-right': ArrowUpRight,
   bell: Bell,
   bookmark: Bookmark,
@@ -44,11 +57,14 @@ const ICONS = {
   briefcase: BriefcaseBusiness,
   chart: ChartNoAxesCombined,
   'check-check': CheckCheck,
+  columns: Columns3,
   'chevron-down': ChevronDown,
   'chevron-left': ChevronLeft,
   'chevron-right': ChevronRight,
   'chevrons-left': ChevronsLeft,
   folder: FolderKanban,
+  edit: Pencil,
+  eye: Eye,
   gauge: Gauge,
   home: House,
   inbox: Inbox,
@@ -60,13 +76,15 @@ const ICONS = {
   moon: Moon,
   plus: Plus,
   refresh: RefreshCw,
+  rows: Rows3,
   search: Search,
   save: Save,
   settings: Settings,
   star: Star,
   sun: Sun,
   target: Target,
-  users: UsersRound
+  users: UsersRound,
+  x: X
 } as const;
 
 @Component({

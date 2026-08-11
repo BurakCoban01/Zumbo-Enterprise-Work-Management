@@ -1,0 +1,66 @@
+<section class="project-overview" aria-labelledby="overview-title">
+  <header class="overview-heading">
+    <div><p class="zumbo-kicker">{{ project().key }} · {{ project().visibility === 'Private' ? 'Özel' : 'Kuruluş içi' }}</p><h2 id="overview-title">Genel bakış</h2></div>
+    @if (activeSprint(); as sprint) { <div class="sprint-goal"><span>Aktif sprint</span><strong>{{ sprint.goal || sprint.name }}</strong></div> }
+  </header>
+
+  @if (error()) {
+    <div class="overview-error" role="alert"><div><strong>Genel bakış açılamadı</strong><p>{{ error() }}</p></div><button type="button" (click)="load()">Yeniden dene</button></div>
+  } @else if (loading() && !data()) {
+    <div class="overview-loading" role="status" aria-label="Genel bakış yükleniyor"><span class="zumbo-skeleton"></span><span class="zumbo-skeleton"></span><span class="zumbo-skeleton"></span></div>
+  } @else if (data(); as overview) {
+    @if (overview.partial) { <p class="partial-notice" role="status">Bazı proje ayrıntılarına şu anda ulaşılamıyor.</p> }
+
+    <section class="health-strip" [attr.data-tone]="healthTone()" aria-label="Proje sağlığı">
+      <div><span class="health-dot" aria-hidden="true"></span><div><small>Proje sağlığı</small><strong>{{ healthLabel() }}</strong></div></div>
+      <p>@if (overview.summary.overdue > 0) { {{ overview.summary.overdue }} gecikmiş iş öğesi takip bekliyor. } @else if (overview.risks.length > 0) { Yaklaşan teslim tarihlerini gözden geçirin. } @else { Planlanan çalışma ilerliyor. }</p>
+    </section>
+
+    <nav class="metric-grid" aria-label="Proje metrikleri">
+      <a [routerLink]="['/workspace', project().id, 'board']"><span>Toplam iş</span><strong>{{ overview.summary.total }}</strong><small>Pano kapsamı</small></a>
+      <a [routerLink]="['/workspace', project().id, 'board']"><span>Devam eden</span><strong>{{ overview.summary.inProgress }}</strong><small>Aktif çalışma</small></a>
+      <a [routerLink]="['/workspace', project().id, 'reports']"><span>Geciken</span><strong>{{ overview.summary.overdue }}</strong><small>Tarih aşımı</small></a>
+      <a [routerLink]="['/workspace', project().id, 'workload']"><span>Proje üyeleri</span><strong>{{ project().members?.length ?? 0 }}</strong><small>Ekip kapasitesi</small></a>
+    </nav>
+
+    <div class="overview-columns">
+      <div class="overview-primary">
+        <section class="overview-band" aria-labelledby="delivery-title">
+          <header><div><p class="zumbo-kicker">Plan</p><h3 id="delivery-title">Teslimat akışı</h3></div><a [routerLink]="['/workspace', project().id, 'catalog']">Planlamayı aç <zumbo-icon name="chevron-right" /></a></header>
+          <div class="delivery-list">
+            <div><span>Sprint</span>@if (activeSprint(); as sprint) { <strong>{{ sprint.name }}</strong><small>{{ formatDate(sprint.endDate) }} tarihine kadar</small> } @else { <strong>Aktif sprint yok</strong><small>Planlama bekliyor</small> }</div>
+            <div><span>Sonraki kilometre taşı</span>@if (nextMilestone(); as milestone) { <strong>{{ milestone.name }}</strong><small>{{ formatDate(milestone.dueAt) }}</small> } @else { <strong>Planlanmadı</strong><small>Yaklaşan kilometre taşı yok</small> }</div>
+            <div><span>Sonraki sürüm</span>@if (nextRelease(); as release) { <strong>{{ release.name }}</strong><small>{{ formatDate(release.scheduledAt) }}</small> } @else { <strong>Planlanmadı</strong><small>Yaklaşan sürüm yok</small> }</div>
+          </div>
+        </section>
+
+        <section class="overview-band" aria-labelledby="risk-title">
+          <header><div><p class="zumbo-kicker">Sonraki 14 gün</p><h3 id="risk-title">Teslim tarihi riskleri</h3></div><a [routerLink]="['/workspace', project().id, 'reports']">Raporlar <zumbo-icon name="chevron-right" /></a></header>
+          <div class="risk-list">
+            @for (risk of overview.risks.slice(0, 5); track risk.id) { <a [routerLink]="riskRoute(risk)"><span><strong>{{ risk.title }}</strong><small>{{ userName(risk.assigneeUserId) }}</small></span><time>{{ formatDate(risk.dueDate) }}</time><zumbo-icon name="chevron-right" /></a> }
+            @empty { <p class="band-empty">Yaklaşan teslim tarihi riski yok.</p> }
+          </div>
+        </section>
+      </div>
+
+      <aside class="overview-secondary">
+        <section class="overview-band team-band" aria-labelledby="team-title">
+          <header><div><p class="zumbo-kicker">Sorumluluk</p><h3 id="team-title">Ekip</h3></div>@if (canManage()) { <a routerLink="/workspace/section/projects">Yönet <zumbo-icon name="chevron-right" /></a> }</header>
+          <div class="owner-line"><span class="member-avatar" aria-hidden="true">{{ memberName(owner()).slice(0, 1).toUpperCase() }}</span><div><strong>{{ memberName(owner()) }}</strong><small>Proje sahibi</small></div></div>
+          <div class="contributor-list">
+            @for (member of contributors(); track member.userId) { <div><span class="member-avatar" aria-hidden="true">{{ memberName(member).slice(0, 1).toUpperCase() }}</span><span><strong>{{ memberName(member) }}</strong><small>{{ roleLabel(member) }}</small></span></div> }
+          </div>
+          @if (projectTeams().length) { <div class="team-tags" aria-label="Proje ekipleri">@for (team of projectTeams(); track team.id) { <span>{{ team.name }}</span> }</div> }
+        </section>
+
+        <section class="overview-band activity-band" aria-labelledby="activity-title">
+          <header><div><p class="zumbo-kicker">Son hareketler</p><h3 id="activity-title">Aktivite</h3></div><a [routerLink]="['/workspace', project().id, 'timeline']">Tümü <zumbo-icon name="chevron-right" /></a></header>
+          <ol>
+            @for (entry of activity(); track entry.id) { <li><span class="activity-mark" aria-hidden="true"></span><div><strong>{{ userName(entry.actorUserId) }}</strong><p>{{ activityLabel(entry) }}</p><time>{{ formatDate(entry.createdAt, true) }}</time></div></li> }
+            @empty { <li class="band-empty">Henüz proje aktivitesi yok.</li> }
+          </ol>
+        </section>
+      </aside>
+    </div>
+  }
+</section>
