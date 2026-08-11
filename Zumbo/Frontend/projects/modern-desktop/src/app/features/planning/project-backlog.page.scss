@@ -1,0 +1,32 @@
+:host { display: block; min-width: 0; }
+.project-backlog { display: grid; min-width: 0; gap: 14px; }
+.backlog-heading { display: flex; align-items: end; justify-content: space-between; gap: 16px; }
+.backlog-heading h2 { margin: 2px 0 0; color: var(--ink); font-size: 22px; letter-spacing: 0; }
+.backlog-context { display: grid; justify-items: end; }
+.backlog-context strong { color: var(--ink); font-size: 20px; }
+.backlog-context span, .backlog-toolbar label > span { color: var(--muted); font-size: 12px; }
+.backlog-toolbar { display: flex; min-width: 0; flex-wrap: wrap; align-items: end; gap: 8px; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
+.backlog-toolbar label { display: grid; gap: 3px; }
+.backlog-toolbar select, .backlog-search { height: 36px; border: 1px solid var(--line-strong); border-radius: 5px; background: var(--panel); color: var(--ink); }
+.backlog-toolbar select { min-width: 130px; padding: 0 28px 0 9px; }
+.backlog-toolbar .sprint-target select { min-width: 220px; }
+.backlog-search { display: grid; min-width: 220px; grid-template-columns: 18px minmax(0, 1fr); align-items: center; gap: 6px; padding: 0 9px; }
+.backlog-search input { min-width: 0; border: 0; outline: 0; background: transparent; color: var(--ink); font-size: 13px; }
+.backlog-search zumbo-icon { color: var(--muted); }
+.icon-tool { display: grid; width: 36px; height: 36px; border: 1px solid var(--line-strong); border-radius: 5px; background: var(--panel); color: var(--muted); place-items: center; cursor: pointer; }
+.sprint-strip { display: grid; grid-template-columns: 1.1fr 1fr 1fr; border-left: 3px solid var(--accent); background: var(--surface-subtle); }
+.sprint-strip[data-status='Active'] { border-left-color: var(--success); }
+.sprint-strip[data-status='Completed'] { border-left-color: var(--muted); }
+.sprint-strip > div { display: grid; gap: 2px; min-width: 0; padding: 10px 12px; border-right: 1px solid var(--line); }
+.sprint-strip > div:last-child { border-right: 0; }
+.sprint-strip span, .sprint-strip small { color: var(--muted); font-size: 12px; }
+.sprint-strip strong { overflow: hidden; color: var(--ink); font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+.backlog-notice, .backlog-error { display: flex; min-height: 42px; align-items: center; justify-content: space-between; gap: 12px; border-left: 3px solid var(--accent); background: var(--surface-subtle); padding: 6px 9px 6px 12px; color: var(--ink); font-size: 13px; }
+.backlog-notice > div { display: flex; align-items: center; gap: 4px; }
+.backlog-notice button { display: grid; min-width: 32px; height: 32px; border: 0; background: transparent; color: var(--muted); place-items: center; }
+.backlog-notice .undo-action { border: 1px solid var(--line-strong); border-radius: 4px; background: var(--panel); padding: 0 9px; color: var(--accent-strong); }
+.backlog-error { border: 1px solid var(--danger); border-left-width: 3px; }
+.backlog-error button, .load-more { min-height: 36px; border: 1px solid var(--line-strong); border-radius: 5px; background: var(--panel); padding: 0 12px; color: var(--ink); cursor: pointer; }
+.backlog-degraded { margin: 0; color: var(--muted); font-size: 12px; }
+.backlog-loading { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+.backlog-loading span { height: 320px; }

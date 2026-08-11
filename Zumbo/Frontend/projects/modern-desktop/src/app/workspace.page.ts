@@ -12,6 +12,8 @@ import { ProjectListPage } from './features/list/project-list.page';
 import { NotificationItem } from './features/notifications/notification.models';
 import { NotificationPopoverComponent } from './features/notifications/notification-popover.component';
 import { ProjectOverviewPage } from './features/overview/project-overview.page';
+import { ProjectBacklogPage } from './features/planning/project-backlog.page';
+import { ProjectSprintPage } from './features/planning/project-sprint.page';
 import { MyWorkPage } from './features/personal-work/my-work.page';
 import { ProjectDirectoryPage } from './features/projects/project-directory.page';
 import {
@@ -36,7 +38,7 @@ const NAV_KEY = 'zumbo.navCollapsed';
 
 @Component({
   selector: 'zumbo-desktop-workspace',
-  imports: [CommandPaletteComponent, DesktopNavigationComponent, HomePage, InboxPage, MyWorkPage, NotificationPopoverComponent, ProjectBoardPage, ProjectDirectoryPage, ProjectListPage, ProjectOverviewPage, ProjectSwitcherComponent, ProjectViewTabsComponent, RouterLink, ZumboIconComponent],
+  imports: [CommandPaletteComponent, DesktopNavigationComponent, HomePage, InboxPage, MyWorkPage, NotificationPopoverComponent, ProjectBacklogPage, ProjectBoardPage, ProjectDirectoryPage, ProjectListPage, ProjectOverviewPage, ProjectSprintPage, ProjectSwitcherComponent, ProjectViewTabsComponent, RouterLink, ZumboIconComponent],
   templateUrl: './workspace.page.html',
   styleUrls: ['./workspace.page.scss', './workspace-responsive.scss']
 })

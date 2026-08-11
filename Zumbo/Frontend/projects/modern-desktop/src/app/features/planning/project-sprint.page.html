@@ -1,0 +1,78 @@
+<section class="project-sprint" aria-labelledby="sprint-title">
+  <header class="sprint-heading">
+    <div><p class="zumbo-kicker">{{ project().key }} · Odaklı teslimat</p><h2 id="sprint-title">Sprint</h2></div>
+    <div class="sprint-heading-actions">
+      <label><span>Sprint</span><select [value]="selectedSprintId()" (change)="selectSprint($event)" aria-label="Sprint seç">@for (sprint of data()?.sprints ?? []; track sprint.id) { <option [value]="sprint.id" [selected]="sprint.id === selectedSprintId()">{{ sprintLabel(sprint) }}</option> }</select></label>
+      @if (canPlan()) { <button class="new-sprint" type="button" (click)="createOpen.set(!createOpen())" [attr.aria-expanded]="createOpen()"><zumbo-icon name="plus" /> Yeni sprint</button> }
+      <button class="icon-tool" type="button" (click)="load()" [disabled]="loading()" aria-label="Sprint planını yenile" title="Sprint planını yenile"><zumbo-icon name="refresh" /></button>
+    </div>
+  </header>
+
+  @if (notice()) { <div class="sprint-notice" role="status"><span>{{ notice() }}</span><button type="button" (click)="notice.set(null)" aria-label="Bildirimi kapat"><zumbo-icon name="x" /></button></div> }
+  @if (error()) { <div class="sprint-error" role="alert"><span>{{ error() }}</span><button type="button" (click)="load()">Yeniden dene</button></div> }
+
+  @if (createOpen() && canPlan()) {
+    <form class="sprint-create" (submit)="$event.preventDefault(); createSprint()">
+      <header><div><h3>Yeni sprint</h3><p>Net bir hedef ve teslim aralığı belirleyin.</p></div><button type="button" (click)="createOpen.set(false)" aria-label="Sprint formunu kapat"><zumbo-icon name="x" /></button></header>
+      <div class="sprint-create-fields">
+        <label><span>Ad</span><input type="text" maxlength="100" required [value]="draft().name" (input)="updateDraft('name', $event)"></label>
+        <label class="goal-field"><span>Hedef</span><input type="text" maxlength="500" [value]="draft().goal" (input)="updateDraft('goal', $event)"></label>
+        <label><span>Başlangıç</span><input type="date" required [value]="draft().startDate" (input)="updateDraft('startDate', $event)"></label>
+        <label><span>Bitiş</span><input type="date" required [value]="draft().endDate" (input)="updateDraft('endDate', $event)"></label>
+        <button type="submit" [disabled]="busy() || !draft().name.trim()"><zumbo-icon name="save" /> Oluştur</button>
+      </div>
+      @if (draftError()) { <p class="field-error" role="alert">{{ draftError() }}</p> }
+    </form>
+  }
+
+  @if (loading() && !data()) {
+    <div class="sprint-loading" role="status" aria-label="Sprint planı yükleniyor"><span class="zumbo-skeleton"></span><span class="zumbo-skeleton"></span><span class="zumbo-skeleton"></span></div>
+  } @else if (!error() && selectedSprint(); as sprint) {
+    <section class="sprint-context" [attr.data-status]="sprint.status">
+      <div class="sprint-intro"><span>{{ statusLabel(sprint.status) }}</span><h3>{{ sprint.name }}</h3><p>{{ sprint.goal || 'Hedef belirtilmedi' }}</p></div>
+      <div class="sprint-dates"><span>Süre</span><strong>{{ sprint.startDate }} – {{ sprint.endDate }}</strong><small>@if (sprint.startedAt) { {{ sprint.startedAt.slice(0, 10) }} tarihinde başladı } @else { Henüz başlamadı }</small></div>
+      @if (canPlan()) {
+        <div class="sprint-lifecycle">
+          @if (sprint.status === 'Planned') { <button type="button" (click)="startSprint()" [disabled]="busy()"><zumbo-icon name="arrow-right" /> Sprint'i başlat</button> }
+          @if (sprint.status === 'Active') {
+            <label><span>Tamamlanmayan işler</span><select [value]="carryoverSprintId()" (change)="carryoverSprintId.set($any($event.target).value)" aria-label="Devreden iş hedefi"><option value="">Backlog'a devret</option>@for (target of carryoverTargets(); track target.id) { <option [value]="target.id">{{ target.name }} sprintine devret</option> }</select></label>
+            <button type="button" (click)="completeSprint()" [disabled]="busy()"><zumbo-icon name="check-check" /> Sprint'i tamamla</button>
+          }
+        </div>
+      }
+    </section>
+
+    <section class="sprint-summary" aria-label="Sprint özeti">
+      <div><span>Planlanan</span><strong>{{ sprintItems().length }} iş</strong><small>{{ planningPoints() }} puan</small></div>
+      <div><span>Taahhüt</span><strong>{{ sprint.committedItems }} iş</strong><small>{{ sprint.committedPoints }} puan</small></div>
+      <div><span>Tamamlanan</span><strong>{{ sprint.completedItems }} iş</strong><small>{{ sprint.completedPoints }} puan</small></div>
+      <div><span>Devreden</span><strong>{{ sprint.carryoverItems }} iş</strong><small>{{ sprint.carryoverPoints }} puan</small></div>
+      <div><span>Kapasite</span><strong>@if (capacityPercent() != null) { %{{ capacityPercent() }} } @else { Veri yok }</strong><small>@if (capacityBaseline() != null) { {{ capacityBaseline()!.toFixed(1) }} puan ortalama } @else { Tamamlanan sprint bekleniyor }</small></div>
+    </section>
+
+    <div class="sprint-layout">
+      <section class="burndown-panel" aria-labelledby="burndown-heading">
+        <header><div><p class="zumbo-kicker">Kapsam bağlantısı</p><h3 id="burndown-heading">Burndown</h3></div><span>{{ burndown().length }} gün</span></header>
+        @if (burndownLoading()) { <div class="burndown-state" role="status">Burndown yükleniyor</div> }
+        @else if (burndownError()) { <div class="burndown-state error" role="alert"><span>{{ burndownError() }}</span><button type="button" (click)="retryBurndown()">Yeniden dene</button></div> }
+        @else if (burndown().length) {
+          <div class="burndown-bars">
+            @for (point of burndown(); track point.date) { <div><time>{{ formatDate(point.date) }}</time><span><b [style.width.%]="burndownWidth(point)"></b></span><strong>{{ point.remainingPoints }} puan · {{ point.remainingItems }} iş</strong></div> }
+          </div>
+        } @else { <div class="burndown-state">Sprint başladığında burndown kapsamı burada oluşur.</div> }
+      </section>
+
+      <section class="sprint-scope-list" aria-labelledby="sprint-items-heading">
+        <header><div><p class="zumbo-kicker">Sprint kapsamı</p><h3 id="sprint-items-heading">Planlanan işler</h3></div><strong>{{ sprintItems().length }}</strong></header>
+        <div class="scope-items">
+          @for (item of sprintItems(); track item.id) {
+            <article><a [routerLink]="['/workspace', project().id, 'sprint', 'task', item.id]"><strong>{{ item.title }}</strong><span>{{ item.status }} · {{ priorityLabel(item.priority) }} · {{ item.estimatePoints ?? 0 }} puan</span></a>@if (canPlan() && sprint.status === 'Planned') { <button type="button" (click)="unplanItem(item)" [disabled]="busy()" [attr.aria-label]="item.title + ' işini backlog alanına taşı'" title="Backlog alanına taşı"><zumbo-icon name="arrow-left" /></button> }</article>
+          } @empty { <div class="scope-empty"><strong>Bu sprintte iş yok</strong><span>Backlog görünümünden planlı sprint kapsamına iş ekleyin.</span></div> }
+        </div>
+      </section>
+    </div>
+    @if (!canPlan()) { <p class="read-only-note"><zumbo-icon name="eye" /> Bu proje rolü sprint yaşam döngüsünü salt okunur görüntülüyor.</p> }
+  } @else if (!error()) {
+    <div class="sprint-empty"><strong>Henüz sprint yok</strong><p>Planlamaya başlamak için ilk sprinti oluşturun.</p></div>
+  }
+</section>

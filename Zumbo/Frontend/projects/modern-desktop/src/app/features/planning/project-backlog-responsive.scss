@@ -1,0 +1,20 @@
+@media (max-width: 760px) {
+  .project-backlog { gap: 12px; }
+  .backlog-heading { align-items: center; }
+  .backlog-heading h2 { font-size: 20px; }
+  .backlog-toolbar { align-items: stretch; }
+  .backlog-toolbar > label, .backlog-search { width: 100%; }
+  .backlog-toolbar select, .backlog-toolbar .sprint-target select, .backlog-search { min-width: 0; height: 44px; }
+  .icon-tool { width: 44px; height: 44px; }
+  .sprint-strip { grid-template-columns: 1fr; }
+  .sprint-strip > div { border-right: 0; border-bottom: 1px solid var(--line); }
+  .sprint-strip > div:last-child { border-bottom: 0; }
+  .planning-workspace { grid-template-columns: 1fr; }
+  .planning-column { max-height: none; }
+  .planning-list { max-height: none; overflow: visible; }
+  .planning-list article { min-height: 62px; }
+  .planning-main { min-height: 60px; }
+  .move-action { width: 44px; height: 44px; margin-right: 8px; }
+  .backlog-notice button { width: 44px; height: 44px; }
+  .backlog-error button, .load-more { min-height: 44px; }
+}

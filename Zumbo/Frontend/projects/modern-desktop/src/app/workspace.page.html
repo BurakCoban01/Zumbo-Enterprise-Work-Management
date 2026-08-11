@@ -50,7 +50,7 @@
       } @else if (!projects().length) {
         <section class="empty-state"><h2>Proje bulunmuyor</h2><p>Bu çalışma alanında erişebileceğiniz bir proje yok.</p></section>
       } @else {
-        @if (section() !== 'home' && section() !== 'mywork' && section() !== 'inbox' && section() !== 'projects' && !(section() === 'project' && (activeView() === 'overview' || activeView() === 'board' || activeView() === 'list'))) {
+        @if (section() !== 'home' && section() !== 'mywork' && section() !== 'inbox' && section() !== 'projects' && !(section() === 'project' && (activeView() === 'overview' || activeView() === 'board' || activeView() === 'list' || activeView() === 'backlog' || activeView() === 'sprint'))) {
           <header class="content-heading">
             <div><p class="zumbo-kicker">{{ section() === 'project' ? selectedProject()?.key : 'Çalışma alanı' }}</p><h2>{{ pageTitle() }}</h2></div>
             @if (selectedProject()) { <span class="project-key">{{ selectedProject()?.key }}</span> }
@@ -70,6 +70,10 @@
           @if (session.currentUser(); as user) { <zumbo-project-board-page [project]="project" [boards]="boards()" [contextReady]="!projectContextLoading()" [userId]="user.id" /> }
         } @else if (section() === 'project' && activeView() === 'list' && selectedProject(); as project) {
           @if (session.currentUser(); as user) { <zumbo-project-list-page [project]="project" [boards]="boards()" [contextReady]="!projectContextLoading()" [userId]="user.id" /> }
+        } @else if (section() === 'project' && activeView() === 'backlog' && selectedProject(); as project) {
+          @if (session.currentUser(); as user) { <zumbo-project-backlog-page [project]="project" [contextReady]="!projectContextLoading()" [userId]="user.id" /> }
+        } @else if (section() === 'project' && activeView() === 'sprint' && selectedProject(); as project) {
+          @if (session.currentUser(); as user) { <zumbo-project-sprint-page [project]="project" [contextReady]="!projectContextLoading()" [userId]="user.id" /> }
         } @else {
           <section class="surface-placeholder" aria-labelledby="surface-title">
             <h3 id="surface-title">{{ pageTitle() }}</h3>
