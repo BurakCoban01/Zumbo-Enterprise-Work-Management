@@ -3,12 +3,15 @@ import { ZumboApiClient } from '@zumbo/modern-shared';
 import { Observable, catchError, forkJoin, map, of } from 'rxjs';
 import {
   BulkWorkItemResponse,
+  CreateProjectWorkItem,
   ProjectWorkItem,
   ProjectWorkItemCollection,
+  ProjectWorkItemDetail,
   ProjectWorkItemRole,
   ProjectWorkItemSearchResult,
   ProjectWorkItemUpdate,
-  ProjectWorkItemUser
+  ProjectWorkItemUser,
+  WorkItemSchema
 } from './project-work-item.models';
 
 @Injectable({ providedIn: 'root' })
@@ -31,6 +34,34 @@ export class ProjectWorkItemService {
 
   update(task: ProjectWorkItem, update: ProjectWorkItemUpdate): Observable<ProjectWorkItem> {
     return this.api.put<ProjectWorkItem>(`/api/work-items/${encodeURIComponent(task.id)}`, update, { ifMatch: task.version });
+  }
+
+  get(workItemId: string): Observable<ProjectWorkItemDetail> {
+    return this.api.get<ProjectWorkItemDetail>(`/api/work-items/${encodeURIComponent(workItemId)}`);
+  }
+
+  schema(projectId: string): Observable<WorkItemSchema> {
+    return this.api.get<WorkItemSchema>(`/api/work-item-schemas/${encodeURIComponent(projectId)}`);
+  }
+
+  create(request: CreateProjectWorkItem): Observable<ProjectWorkItemDetail> {
+    return this.api.post<ProjectWorkItemDetail>('/api/work-items', request);
+  }
+
+  archive(task: ProjectWorkItem): Observable<{ readonly archived: boolean }> {
+    return this.api.delete<{ readonly archived: boolean }>(`/api/work-items/${encodeURIComponent(task.id)}`, { ifMatch: task.version });
+  }
+
+  addComment(workItemId: string, body: string): Observable<ProjectWorkItemDetail> {
+    return this.api.post<ProjectWorkItemDetail>(`/api/work-items/${encodeURIComponent(workItemId)}/comments`, { body, mentions: [] });
+  }
+
+  addChecklist(workItemId: string, text: string): Observable<ProjectWorkItemDetail> {
+    return this.api.post<ProjectWorkItemDetail>(`/api/work-items/${encodeURIComponent(workItemId)}/checklist`, { text });
+  }
+
+  setChecklist(workItemId: string, entryId: string, completed: boolean): Observable<ProjectWorkItemDetail> {
+    return this.api.patch<ProjectWorkItemDetail>(`/api/work-items/${encodeURIComponent(workItemId)}/checklist/${encodeURIComponent(entryId)}`, { completed });
   }
 
   bulkMove(workItemIds: readonly string[], status: string): Observable<BulkWorkItemResponse> {

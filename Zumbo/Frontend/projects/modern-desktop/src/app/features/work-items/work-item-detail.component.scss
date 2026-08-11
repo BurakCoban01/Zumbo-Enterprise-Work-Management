@@ -1,0 +1,26 @@
+.work-detail-backdrop { position: fixed; z-index: calc(var(--z-overlay) - 1); inset: 0; background: rgb(10 20 24 / 44%); }
+.work-detail { position: fixed; z-index: var(--z-overlay); inset: 0 0 0 max(244px, calc(100vw - 1180px)); display: grid; grid-template-rows: auto minmax(0, 1fr); border-left: 1px solid var(--line-strong); background: var(--surface); box-shadow: var(--elevation-overlay); }
+:host-context(.nav-collapsed) .work-detail { left: 76px; }
+.work-detail-header { display: flex; min-height: 72px; align-items: center; justify-content: space-between; gap: 16px; border-bottom: 1px solid var(--line); background: var(--panel); padding: 10px 16px; }
+.work-detail-header h2 { margin: 2px 0 0; color: var(--ink); font-size: 20px; }
+.work-detail-header > div:last-child { display: flex; gap: 8px; }
+.work-detail-header button, .inline-command button { display: grid; width: 38px; height: 38px; border: 1px solid var(--line-strong); border-radius: 4px; background: var(--panel); color: var(--ink); place-items: center; }
+.work-detail-state { display: grid; place-content: center; gap: 8px; color: var(--muted); text-align: center; }
+.work-detail-state.error { color: var(--danger); }.work-detail-state button { min-height: 40px; border: 1px solid currentColor; background: transparent; color: inherit; }
+.work-detail-body { display: grid; min-height: 0; grid-template-columns: minmax(0, 1fr) 330px; overflow: hidden; }
+.work-detail-body > main, .work-detail-properties { min-height: 0; overflow-y: auto; padding: 14px; }
+.work-detail-body section { border-top: 3px solid var(--line-strong); background: var(--surface-subtle); padding: 12px; }
+.work-detail-body > main { display: grid; align-content: start; gap: 12px; }
+.work-detail-properties { display: grid; align-content: start; gap: 12px; border-left: 1px solid var(--line); background: var(--panel); }
+.section-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+.section-heading h3 { margin: 0; color: var(--ink); font-size: 15px; }.section-heading span { color: var(--muted); font-size: 12px; }
+.work-detail textarea, .work-detail input, .work-detail select { width: 100%; border: 1px solid var(--line-strong); border-radius: 4px; background: var(--panel); padding: 8px 10px; color: var(--ink); }
+.work-detail input, .work-detail select { min-height: 40px; }.work-detail textarea { resize: vertical; }
+.description-copy { margin: 0; color: var(--ink); font-size: 13px; line-height: 1.6; white-space: pre-wrap; }
+.work-detail-notice, .work-detail-readonly { display: flex; min-height: 40px; align-items: center; gap: 8px; margin: 0; border-left: 3px solid var(--accent); background: var(--accent-soft); padding: 8px 10px; color: var(--ink); font-size: 12px; }
+.work-detail-readonly { border-left-color: var(--line-strong); background: var(--surface-subtle); color: var(--muted); }
+.checklist, .comments { display: grid; gap: 7px; }.checklist label { display: flex; min-height: 36px; align-items: center; gap: 9px; color: var(--ink); font-size: 13px; }.checklist input { width: 18px; min-height: 18px; }
+.inline-command { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 7px; margin-top: 10px; }
+.comments article { display: grid; grid-template-columns: 32px minmax(0, 1fr); gap: 9px; border-bottom: 1px solid var(--line); padding: 8px 0; }.avatar { display: grid; width: 32px; height: 32px; border-radius: 50%; background: var(--accent-soft); color: var(--accent-strong); place-items: center; }
+.comments header { display: flex; justify-content: space-between; gap: 10px; }.comments strong, .comments p { color: var(--ink); font-size: 13px; }.comments time { color: var(--muted); font-size: 12px; }.comments p { margin: 4px 0 0; white-space: pre-wrap; }
+.comment-compose { display: grid; justify-items: end; gap: 8px; margin-top: 10px; }.comment-compose button, .save-detail { display: inline-flex; min-height: 40px; align-items: center; gap: 7px; border: 1px solid var(--accent); border-radius: 4px; background: var(--accent); padding: 0 12px; color: var(--accent-contrast); }

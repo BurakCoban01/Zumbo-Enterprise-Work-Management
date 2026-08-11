@@ -1,0 +1,19 @@
+@if (canCreate()) {
+  <button class="work-create-trigger" type="button" (click)="show()" [disabled]="loading()" title="Yeni iş öğesi oluştur"><zumbo-icon name="plus" /><span>Yeni iş</span></button>
+}
+@if (open()) {
+  <div class="work-create-backdrop" (click)="close()">
+    <form class="work-create-dialog" (submit)="$event.preventDefault(); submit()" (click)="$event.stopPropagation()" role="dialog" aria-modal="true" aria-labelledby="work-create-title">
+      <header><div><p class="zumbo-kicker">{{ project().key }} · Yeni kayıt</p><h2 id="work-create-title">İş öğesi oluştur</h2></div><button type="button" (click)="close()" aria-label="İş oluşturma formunu kapat"><zumbo-icon name="x" /></button></header>
+      <label class="wide"><span>Başlık</span><input type="text" maxlength="200" required [value]="draft().title" (input)="update('title', $event)"></label>
+      <div class="work-create-grid">
+        <label><span>Tür</span><select [value]="draft().type" (change)="update('type', $event)">@for (type of activeTypes(); track type.key) { <option [value]="type.key">{{ type.name }}</option> }</select></label>
+        <label><span>Öncelik</span><select [value]="draft().priority" (change)="update('priority', $event)"><option value="Critical">Kritik</option><option value="High">Yüksek</option><option value="Medium">Orta</option><option value="Low">Düşük</option></select></label>
+        <label><span>Bitiş tarihi</span><input type="date" [value]="draft().dueDate" (input)="update('dueDate', $event)"></label>
+        <label><span>Üst iş</span><select [value]="draft().parentId" (change)="update('parentId', $event)" [disabled]="draft().type !== 'Subtask'"><option value="">Üst iş yok</option>@for (task of parentCandidates(); track task.id) { <option [value]="task.id">{{ task.title }}</option> }</select></label>
+      </div>
+      @if (error()) { <p class="work-create-error" role="alert">{{ error() }}</p> }
+      <footer><button type="button" (click)="close()" [disabled]="saving()">Vazgeç</button><button class="primary" type="submit" [disabled]="saving() || !draft().title.trim()"><zumbo-icon name="plus" /> {{ saving() ? 'Oluşturuluyor' : 'Oluştur' }}</button></footer>
+    </form>
+  </div>
+}

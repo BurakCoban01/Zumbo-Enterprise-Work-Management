@@ -27,6 +27,7 @@
       </div>
       <div class="topbar-actions">
         <zumbo-command-palette [project]="selectedProject()" [availableViews]="availableViews()" />
+        @if (selectedProject() && session.currentUser(); as user) { <zumbo-work-item-create [project]="selectedProject()!" [boards]="boards()" [userId]="user.id" [contextReady]="!projectContextLoading()" (created)="openCreatedTask($event)" /> }
         @if (selectedProject() && section() === 'project') {
           <button class="icon-button" type="button" (click)="toggleFavorite()" [class.active]="favorite()" [title]="favorite() ? 'Favorilerden kaldır' : 'Favorilere ekle'"><zumbo-icon name="star" /></button>
         }
@@ -83,5 +84,8 @@
       }
     </main>
   </section>
+  @if (selectedProject() && selectedTaskId() && session.currentUser(); as user) {
+    <zumbo-work-item-detail [project]="selectedProject()!" [userId]="user.id" [taskId]="selectedTaskId()!" (closed)="closeTaskDetail()" (archived)="closeTaskDetail()" />
+  }
   @if (mobileNavOpen()) { <button class="nav-backdrop" type="button" (click)="mobileNavOpen.set(false)" aria-label="Navigasyonu kapat"></button> }
 </div>

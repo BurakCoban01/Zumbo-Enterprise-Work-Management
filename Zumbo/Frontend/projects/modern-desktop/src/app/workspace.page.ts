@@ -16,6 +16,9 @@ import { ProjectBacklogPage } from './features/planning/project-backlog.page';
 import { ProjectSprintPage } from './features/planning/project-sprint.page';
 import { MyWorkPage } from './features/personal-work/my-work.page';
 import { ProjectDirectoryPage } from './features/projects/project-directory.page';
+import { ProjectWorkItemDetail } from './features/work-items/project-work-item.models';
+import { WorkItemCreateComponent } from './features/work-items/work-item-create.component';
+import { WorkItemDetailComponent } from './features/work-items/work-item-detail.component';
 import {
   BoardSummary,
   isProjectView,
@@ -38,7 +41,7 @@ const NAV_KEY = 'zumbo.navCollapsed';
 
 @Component({
   selector: 'zumbo-desktop-workspace',
-  imports: [CommandPaletteComponent, DesktopNavigationComponent, HomePage, InboxPage, MyWorkPage, NotificationPopoverComponent, ProjectBacklogPage, ProjectBoardPage, ProjectDirectoryPage, ProjectListPage, ProjectOverviewPage, ProjectSprintPage, ProjectSwitcherComponent, ProjectViewTabsComponent, RouterLink, ZumboIconComponent],
+  imports: [CommandPaletteComponent, DesktopNavigationComponent, HomePage, InboxPage, MyWorkPage, NotificationPopoverComponent, ProjectBacklogPage, ProjectBoardPage, ProjectDirectoryPage, ProjectListPage, ProjectOverviewPage, ProjectSprintPage, ProjectSwitcherComponent, ProjectViewTabsComponent, RouterLink, WorkItemCreateComponent, WorkItemDetailComponent, ZumboIconComponent],
   templateUrl: './workspace.page.html',
   styleUrls: ['./workspace.page.scss', './workspace-responsive.scss']
 })
@@ -57,6 +60,7 @@ export class DesktopWorkspacePage {
   protected readonly loading = signal(true);
   protected readonly error = signal<string | null>(null);
   protected readonly selectedProjectId = signal<string | null>(null);
+  protected readonly selectedTaskId = signal<string | null>(null);
   protected readonly section = signal<WorkspaceSection | 'project'>('project');
   protected readonly activeView = signal<ProjectViewId>('overview');
   protected readonly organizationName = signal('Çalışma alanı');
@@ -149,6 +153,15 @@ export class DesktopWorkspacePage {
     });
   }
 
+  protected openCreatedTask(task: ProjectWorkItemDetail): void {
+    void this.router.navigate(['/workspace', task.projectId, this.activeView(), 'task', task.id]);
+  }
+
+  protected closeTaskDetail(): void {
+    const projectId = this.selectedProjectId();
+    if (projectId) void this.router.navigate(['/workspace', projectId, this.activeView()]);
+  }
+
   private restoreWorkspace(): void {
     this.session.restore().pipe(
       switchMap(auth => {
@@ -185,6 +198,7 @@ export class DesktopWorkspacePage {
       const project = this.projects().find(item => item.id === storedProjectId) ?? this.projects()[0] ?? null;
       this.selectedProjectId.set(project?.id ?? null);
       this.section.set(section);
+      this.selectedTaskId.set(null);
       this.mobileNavOpen.set(false);
       return;
     }
@@ -206,6 +220,7 @@ export class DesktopWorkspacePage {
     this.section.set('project');
     this.activeView.set(view);
     this.selectedProjectId.set(project.id);
+    this.selectedTaskId.set(this.route.snapshot.paramMap.get('taskId'));
     this.rememberProject(project);
     if (this.projectContextId !== project.id) {
       this.loadProjectContext(project.id, view);
