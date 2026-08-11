@@ -1,0 +1,16 @@
+<section class="settings-page" aria-labelledby="settings-shell-heading">
+  <header><div><p class="eyebrow">Kişisel ve kurumsal yönetim</p><h2 id="settings-shell-heading">Ayarlar</h2><p>Hesap, organizasyon ve yönetim yapılandırmalarını görev bağlamına göre yönetin.</p></div></header>
+  @if(error()){<p class="shell-error" role="alert">{{error()}}</p>}
+  <nav class="settings-tabs" aria-label="Ayar kategorileri" role="tablist">
+    <button type="button" role="tab" [attr.aria-selected]="tab()==='account'" [class.active]="tab()==='account'" (click)="select('account')"><zumbo-icon name="settings" />Hesap</button>
+    <button type="button" role="tab" [attr.aria-selected]="tab()==='organization'" [class.active]="tab()==='organization'" (click)="select('organization')"><zumbo-icon name="users" />Organizasyon</button>
+    @if(tabs().includes('access')){<button type="button" role="tab" [attr.aria-selected]="tab()==='access'" [class.active]="tab()==='access'" (click)="select('access')"><zumbo-icon name="check" />Rol ve izinler</button>}
+    @if(tabs().includes('integrations')){<button type="button" role="tab" [attr.aria-selected]="tab()==='integrations'" [class.active]="tab()==='integrations'" (click)="select('integrations')"><zumbo-icon name="link" />Entegrasyonlar</button>}
+    @if(tabs().includes('operations')){<button type="button" role="tab" [attr.aria-selected]="tab()==='operations'" [class.active]="tab()==='operations'" (click)="select('operations')"><zumbo-icon name="gauge" />Operasyonlar</button>}
+  </nav>
+  @if(tab()==='account'){<zumbo-account-settings-page [context]="context()" (currentSessionRevoked)="currentSessionRevoked.emit()"/>}
+  @else if(tab()==='organization'){<zumbo-organization-access-settings-page mode="organization" [context]="context()" [roles]="roles()" [catalog]="catalog()" [canManageOrganization]="canManageOrganization()"/>}
+  @else if(tab()==='access'){<zumbo-organization-access-settings-page mode="access" [context]="context()" [roles]="roles()" [catalog]="catalog()" [canManageOrganization]="canManageOrganization()"/>}
+  @else if(tab()==='integrations'){<zumbo-integration-page/>}
+  @else if(tab()==='operations'){<zumbo-operations-page [organizationId]="context().organizationId"/>}
+</section>

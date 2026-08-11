@@ -24,6 +24,7 @@ export class DesktopNavigationComponent {
   readonly activeSection = input.required<string>();
   readonly currentProject = input<ProjectSummary | null>(null);
   readonly unreadCount = input(0);
+  readonly showAudit = input(false);
   readonly favorites = input<readonly ProjectSummary[]>([]);
   readonly recentProjects = input<readonly ProjectSummary[]>([]);
 

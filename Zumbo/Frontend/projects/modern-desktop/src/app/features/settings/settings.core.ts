@@ -1,0 +1,4 @@
+import { SettingsContext, SettingsRole, SettingsTab } from './settings.models';
+export function settingsPermissions(context:SettingsContext,roles:readonly SettingsRole[]):readonly string[]{return [...new Set(roles.filter(role=>role.isActive&&context.roleNames.includes(role.name)).flatMap(role=>role.permissions))];}
+export function hasSettingsPermission(permissions:readonly string[],key:string):boolean{return permissions.includes('*')||permissions.includes(key);}
+export function settingsTabs(permissions:readonly string[]):readonly SettingsTab[]{const tabs:SettingsTab[]=['account','organization'];if(hasSettingsPermission(permissions,'UserRoleManage'))tabs.push('access');if(hasSettingsPermission(permissions,'IntegrationManage'))tabs.push('integrations');if(hasSettingsPermission(permissions,'OperationsManage'))tabs.push('operations');return tabs;}

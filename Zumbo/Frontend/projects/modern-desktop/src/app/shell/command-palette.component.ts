@@ -34,15 +34,18 @@ const SECTION_COMMANDS: readonly { id: WorkspaceSection; label: string }[] = [
 export class CommandPaletteComponent {
   readonly project = input<ProjectSummary | null>(null);
   readonly availableViews = input<readonly ProjectViewDefinition[]>(PROJECT_VIEWS);
+  readonly showAudit = input(false);
   protected readonly opened = signal(false);
   protected readonly query = signal('');
   protected readonly commands = computed<readonly CommandItem[]>(() => {
-    const sections: readonly CommandItem[] = SECTION_COMMANDS.map(command => ({
+    const sections: readonly CommandItem[] = SECTION_COMMANDS
+      .filter(command => command.id !== 'audit' || this.showAudit())
+      .map(command => ({
       id: `section-${command.id}`,
       label: command.label,
       group: 'Çalışma alanı',
       route: ['/workspace', 'section', command.id]
-    }));
+      }));
     const project = this.project();
     const views: readonly CommandItem[] = project ? this.availableViews().map(view => ({
       id: `view-${view.id}`,

@@ -1,0 +1,2 @@
+import {inject,Injectable} from '@angular/core';import {ZumboApiClient} from '@zumbo/modern-shared';import {forkJoin} from 'rxjs';import {PermissionDefinition,SettingsRole} from './settings.models';
+@Injectable() export class SettingsService{private readonly api=inject(ZumboApiClient);loadCatalog(){return forkJoin({roles:this.api.get<readonly SettingsRole[]>('/api/auth/roles'),permissions:this.api.get<readonly PermissionDefinition[]>('/api/auth/permissions')});}}

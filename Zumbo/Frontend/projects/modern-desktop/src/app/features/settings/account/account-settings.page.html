@@ -1,0 +1,109 @@
+<section class="account-settings" aria-labelledby="settings-heading">
+  <header class="page-heading">
+    <div><p class="eyebrow">Kişisel çalışma alanı</p><h2 id="settings-heading">Hesap ve güvenlik</h2><p>Kimliğinizi, erişim güvenliğinizi ve bildirim tercihlerinizi tek yerden yönetin.</p></div>
+    <button class="icon-button" type="button" (click)="load()" [disabled]="loading() || !!busy()" aria-label="Hesap ayarlarını yenile" title="Yenile"><zumbo-icon name="refresh" /></button>
+  </header>
+
+  @if (notice()) { <p class="feedback success" role="status">{{notice()}}</p> }
+  @if (error()) { <p class="feedback error" role="alert">{{error()}}</p> }
+  @if (loading()) { <div class="loading-state" role="status">Hesap bilgileri yükleniyor</div> }
+  @else {
+    <nav class="settings-jump" aria-label="Hesap ayarı bölümleri">
+      <a href="#security">Güvenlik</a><a href="#sessions">Oturumlar</a><a href="#api-keys">API anahtarları</a><a href="#notifications">Bildirimler</a><a href="#privacy">Gizlilik</a>
+    </nav>
+
+    <div class="settings-layout">
+      <main class="settings-main">
+        <section class="identity-band" aria-labelledby="identity-heading">
+          <div class="identity-avatar" aria-hidden="true">{{context().username.slice(0, 1).toUpperCase()}}</div>
+          <div><h3 id="identity-heading">{{context().username}}</h3><p>{{context().email}}</p></div>
+          <span>Kurumsal hesap</span>
+        </section>
+
+        <section class="settings-band" id="security" aria-labelledby="security-heading">
+          <header><div><h3 id="security-heading">Giriş güvenliği</h3><p>Parolanızı ve iki adımlı doğrulamayı yönetin.</p></div><span class="status-pill" [class.enabled]="mfa().enabled">{{mfa().enabled ? 'MFA etkin' : 'MFA kapalı'}}</span></header>
+          <div class="security-grid">
+            <form class="setting-block" (ngSubmit)="changePassword()">
+              <div><h4>Parola</h4><p>Yeni parola mevcut parolanızdan farklı olmalıdır.</p></div>
+              <label>Mevcut parola<input type="password" name="currentPassword" [(ngModel)]="passwordDraft.currentPassword" autocomplete="current-password" required></label>
+              <label>Yeni parola<input type="password" name="newPassword" [(ngModel)]="passwordDraft.newPassword" autocomplete="new-password" required></label>
+              <button type="submit" [disabled]="!!busy()">Parolayı değiştir</button>
+            </form>
+
+            <div class="setting-block mfa-block">
+              <div><h4>İki adımlı doğrulama</h4><p>{{mfa().enabled ? mfa().remainingRecoveryCodes + ' kullanılabilir kurtarma kodu var.' : 'Doğrulayıcı uygulamasıyla hesabınızı güçlendirin.'}}</p></div>
+              @if (!mfa().enabled && !mfaSetup()) {
+                <label>Parola<input type="password" [(ngModel)]="mfaDraft.password" autocomplete="current-password"></label>
+                <button type="button" (click)="beginMfa()" [disabled]="!!busy() || !mfaDraft.password">Kurulumu başlat</button>
+              } @else if (mfaSetup(); as setup) {
+                <div class="secret-output"><div><strong>Doğrulayıcı sırrı</strong><button class="icon-button" type="button" (click)="copy(setup.secret)" aria-label="MFA sırrını kopyala" title="Kopyala"><zumbo-icon name="copy" /></button></div><code>{{setup.secret}}</code><p>{{setup.provisioningUri}}</p></div>
+                <label>6 haneli kod<input [(ngModel)]="mfaDraft.code" inputmode="numeric" autocomplete="one-time-code"></label>
+                <button type="button" (click)="confirmMfa()" [disabled]="!!busy() || !mfaDraft.code">Etkinleştir</button>
+              } @else {
+                <label>Parola<input type="password" [(ngModel)]="mfaDraft.password" autocomplete="current-password"></label>
+                <label>Doğrulama veya kurtarma kodu<input [(ngModel)]="mfaDraft.code" autocomplete="one-time-code"></label>
+                <button class="danger-button" type="button" (click)="disableMfa()" [disabled]="!!busy()">Devre dışı bırak</button>
+              }
+            </div>
+          </div>
+          @if (mfa().enabled) {
+            <form class="recovery-row" (ngSubmit)="regenerateRecoveryCodes()">
+              <div><strong>Kurtarma kodları</strong><span>Yenileme mevcut kodları hemen geçersiz kılar.</span></div>
+              <label><span>Parola</span><input type="password" name="recoveryPassword" [(ngModel)]="recoveryDraft.password" autocomplete="current-password" required></label>
+              <label><span>Doğrulama kodu</span><input name="recoveryCode" [(ngModel)]="recoveryDraft.code" autocomplete="one-time-code" required></label>
+              <button type="submit" [disabled]="!!busy()">Kodları yenile</button>
+            </form>
+          }
+          @if (recoveryCodes().length) {
+            <div class="recovery-output" role="status"><header><div><strong>Yeni kurtarma kodları</strong><span>Bu liste kapatıldıktan sonra yeniden gösterilmez.</span></div><button class="icon-button" type="button" (click)="dismissRecoveryCodes()" aria-label="Kurtarma kodlarını kapat"><zumbo-icon name="x" /></button></header><div>@for (code of recoveryCodes(); track code) { <code>{{code}}</code> }</div></div>
+          }
+        </section>
+
+        <section class="settings-band" id="sessions" aria-labelledby="sessions-heading">
+          <header><div><h3 id="sessions-heading">Aktif oturumlar</h3><p>Hesabınıza erişen cihazları inceleyin ve tanımadıklarınızı kapatın.</p></div><span>{{activeSessionCount()}} etkin</span></header>
+          <div class="row-list">
+            @for (session of shownSessions(); track session.id) {
+              <article class="data-row" [class.current]="session.isCurrent" [class.inactive]="!sessionActive(session)">
+                <span class="row-icon"><zumbo-icon name="settings" /></span><div><strong>{{session.deviceName || 'Bilinmeyen cihaz'}}</strong><span>{{session.isCurrent ? 'Bu cihaz' : (sessionActive(session) ? 'Etkin oturum' : 'Kapatılmış')}} · Son kullanım {{session.lastSeenAt | date:'dd.MM.yyyy HH:mm'}}</span><small>Geçerlilik {{session.expiresAt | date:'dd.MM.yyyy HH:mm'}}</small></div>
+                @if (sessionActive(session)) { <button type="button" [class.danger-button]="session.isCurrent" (click)="revokeSession(session)" [disabled]="!!busy()">{{session.isCurrent ? 'Bu cihazdan çık' : 'Oturumu kapat'}}</button> } @else { <span class="status-pill">Kapalı</span> }
+              </article>
+            } @empty { <div class="empty-state">Gösterilecek oturum yok.</div> }
+          </div>
+          @if (hiddenSessionCount() || showAllSessions()) { <button class="session-disclosure" type="button" (click)="showAllSessions.set(!showAllSessions())">{{showAllSessions() ? 'Son kullanılanları göster' : hiddenSessionCount() + ' eski oturumu daha göster'}}</button> }
+        </section>
+
+        <section class="settings-band" id="api-keys" aria-labelledby="keys-heading">
+          <header><div><h3 id="keys-heading">API anahtarları</h3><p>Otomasyonlar için süreli erişim oluşturun. Tam anahtar yalnızca bir kez gösterilir.</p></div></header>
+          @if (createdApiKey(); as key) { <div class="secret-output api-secret"><div><strong>Yeni API anahtarı</strong><span><button class="icon-button" type="button" (click)="copy(key.key)" aria-label="API anahtarını kopyala"><zumbo-icon name="copy" /></button><button class="icon-button" type="button" (click)="dismissApiKey()" aria-label="API anahtarını kapat"><zumbo-icon name="x" /></button></span></div><code>{{key.key}}</code><p>Kapatmadan önce güvenli bir parola yöneticisine kaydedin.</p></div> }
+          <form class="api-key-form" (ngSubmit)="createApiKey()">
+            <label>Anahtar adı<input name="keyName" [(ngModel)]="apiKeyDraft.name" placeholder="Örn. Rapor otomasyonu" required></label>
+            <label>Parola<input type="password" name="keyPassword" [(ngModel)]="apiKeyDraft.password" autocomplete="current-password" required></label>
+            <label>MFA kodu<input name="keyMfa" [(ngModel)]="apiKeyDraft.mfaCode" autocomplete="one-time-code" placeholder="Etkinse gerekli"></label>
+            <label>Geçerlilik (gün)<input type="number" name="keyExpiry" [(ngModel)]="apiKeyDraft.expiresInDays" min="1" max="365"></label>
+            <button type="submit" [disabled]="!!busy()">Anahtar oluştur</button>
+          </form>
+          <div class="row-list compact-list">@for (key of apiKeys(); track key.id) { <article class="data-row"><span class="row-icon"><zumbo-icon name="link" /></span><div><strong>{{key.name}}</strong><span>{{key.keyPrefix}} · {{key.expiresAt | date:'dd.MM.yyyy'}} tarihine kadar</span></div>@if (!key.revokedAt) { <button class="icon-button danger-icon" type="button" (click)="revokeApiKey(key)" [disabled]="!!busy()" aria-label="API anahtarını iptal et" title="İptal et"><zumbo-icon name="trash" /></button> } @else { <span class="status-pill">İptal</span> }</article> } @empty { <div class="empty-state">Henüz API anahtarı yok.</div> }</div>
+        </section>
+
+        <section class="settings-band" id="notifications" aria-labelledby="notification-heading">
+          <header><div><h3 id="notification-heading">Bildirim tercihleri</h3><p>İş akışınızı bölmeden hangi kanallardan haberdar olacağınızı belirleyin.</p></div></header>
+          <form class="preference-form" (ngSubmit)="savePreferences()">
+            <label class="toggle-row"><span><strong>Uygulama içi bildirimler</strong><small>Gelen kutusu ve bildirim merkezinde göster</small></span><input type="checkbox" name="inApp" [ngModel]="preferences().inAppEnabled" (ngModelChange)="preferences.update(value => ({...value, inAppEnabled: $event}))"></label>
+            <label class="toggle-row"><span><strong>E-posta bildirimleri</strong><small>Etkin olayları e-posta kanalına da gönder</small></span><input type="checkbox" name="email" [ngModel]="preferences().emailEnabled" (ngModelChange)="preferences.update(value => ({...value, emailEnabled: $event}))"></label>
+            <label class="muted-field">Sessize alınan türler<input name="muted" [(ngModel)]="mutedTypesText" placeholder="Assignment, Mention"><small>Birden fazla türü virgülle ayırın.</small></label>
+            <button type="submit" [disabled]="!!busy()"><zumbo-icon name="save" />Tercihleri kaydet</button>
+          </form>
+        </section>
+
+        <section class="settings-band danger-zone" id="privacy" aria-labelledby="privacy-heading">
+          <header><div><h3 id="privacy-heading">Gizlilik ve hesap yaşam döngüsü</h3><p>Kişisel verilerinizi dışa aktarın veya hesabınızı kalıcı olarak anonimleştirin.</p></div><button type="button" (click)="exportPrivacy()" [disabled]="!!busy()"><zumbo-icon name="arrow-down" />Verilerimi indir</button></header>
+          @if (privacyJob(); as job) {
+            <div class="privacy-workflow"><div><strong>{{job.state}}</strong><span>Anonimleştirme işi · {{job.updatedAt | date:'dd.MM.yyyy HH:mm'}}</span><b>{{privacyProgress()}}%</b></div><progress max="100" [value]="privacyProgress()"></progress>@if (job.lastError) { <p role="alert">{{job.lastError}}</p> }<footer><button type="button" (click)="refreshPrivacy()" [disabled]="!!busy()">Durumu yenile</button>@if (privacyFailed()) { <button type="button" (click)="retryPrivacy()" [disabled]="!!busy()">Yeniden dene</button><button type="button" (click)="reconcilePrivacy()" [disabled]="!!busy()">Uzlaştır</button> }@if (privacyTerminal()) { <button type="button" (click)="dismissPrivacy()">Kapat</button> }</footer></div>
+          } @else {
+            <form class="privacy-form" (ngSubmit)="anonymize()"><div><strong>Hesabı anonimleştir</strong><span>Bu işlem geri alınamaz ve hesap erişimini kalıcı olarak kapatır.</span></div><label>Parola<input type="password" name="privacyPassword" [(ngModel)]="privacyDraft.password" autocomplete="current-password" required></label><label>Onay<input name="privacyConfirmation" [(ngModel)]="privacyDraft.confirmation" placeholder="ANONYMIZE" required></label><button class="danger-button" type="submit" [disabled]="!!busy() || privacyDraft.confirmation !== 'ANONYMIZE'">Hesabı anonimleştir</button></form>
+          }
+        </section>
+      </main>
+    </div>
+  }
+</section>

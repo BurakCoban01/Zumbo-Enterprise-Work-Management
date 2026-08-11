@@ -19,6 +19,7 @@ export class ProjectViewTabsComponent {
     ['operate', 'Operasyon'],
     ['insights', 'İçgörüler']
   ]);
+  protected readonly secondaryGroups = ['plan', 'operate', 'insights'] as const;
 
   protected primary(): readonly ProjectViewDefinition[] {
     return this.views().filter(view => view.group === 'primary');
@@ -26,5 +27,13 @@ export class ProjectViewTabsComponent {
 
   protected secondary(): readonly ProjectViewDefinition[] {
     return this.views().filter(view => view.group !== 'primary');
+  }
+
+  protected viewsInGroup(group: ProjectViewDefinition['group']): readonly ProjectViewDefinition[] {
+    return this.secondary().filter(view => view.group === group);
+  }
+
+  protected isGroupActive(group: ProjectViewDefinition['group']): boolean {
+    return this.viewsInGroup(group).some(view => view.id === this.activeView());
   }
 }

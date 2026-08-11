@@ -10,7 +10,7 @@
     @if (!navCollapsed()) {
       <zumbo-project-switcher [organizationName]="organizationName()" [projects]="projects()" [selectedProjectId]="selectedProjectId()" (projectChange)="selectProject($event)" />
     }
-    <zumbo-desktop-navigation [activeSection]="section()" [currentProject]="selectedProject()" [unreadCount]="unreadCount()" [favorites]="favorites()" [recentProjects]="recentProjects()" />
+    <zumbo-desktop-navigation [activeSection]="section()" [currentProject]="selectedProject()" [unreadCount]="unreadCount()" [showAudit]="canViewAudit()" [favorites]="favorites()" [recentProjects]="recentProjects()" />
     <footer class="side-footer">
       <span class="user-avatar" aria-hidden="true">{{ session.currentUser()?.username?.slice(0, 1)?.toUpperCase() }}</span>
       <span class="nav-label user-name">{{ session.currentUser()?.username }}</span>
@@ -26,7 +26,7 @@
         <h1>{{ section() === 'project' ? selectedProject()?.name : pageTitle() }}</h1>
       </div>
       <div class="topbar-actions">
-        <zumbo-command-palette [project]="selectedProject()" [availableViews]="availableViews()" />
+        <zumbo-command-palette [project]="selectedProject()" [availableViews]="availableViews()" [showAudit]="canViewAudit()" />
         @if (selectedProject() && session.currentUser(); as user) { <zumbo-work-item-create [project]="selectedProject()!" [boards]="boards()" [userId]="user.id" [contextReady]="!projectContextLoading()" (created)="openCreatedTask($event)" /> }
         @if (selectedProject() && section() === 'project') {
           <button class="icon-button" type="button" (click)="toggleFavorite()" [class.active]="favorite()" [title]="favorite() ? 'Favorilerden kaldır' : 'Favorilere ekle'"><zumbo-icon name="star" /></button>
@@ -73,6 +73,14 @@
           <zumbo-capacity-page [projects]="projects()" [userId]="user.id" />
         } @else if (section() === 'knowledge' && session.currentUser(); as user) {
           <zumbo-knowledge-page [projects]="projects()" [userId]="user.id" />
+        } @else if (section() === 'teams' && session.currentUser(); as user) {
+          <zumbo-teams-page [context]="{ id: user.id, organizationId: user.organizationId, roleNames: user.roles }" />
+        } @else if (section() === 'audit' && session.currentUser(); as user) {
+          <zumbo-audit-page [context]="{ organizationId: user.organizationId, roleNames: user.roles }" [projects]="projects()" />
+        } @else if (section() === 'archive' && session.currentUser(); as user) {
+          <zumbo-archive-page [context]="{ organizationId: user.organizationId, projectId: selectedProjectId(), roleNames: user.roles }" (restored)="refreshAfterArchiveRestore()" />
+        } @else if (section() === 'settings' && session.currentUser(); as user) {
+          <zumbo-settings-page [context]="{ id: user.id, username: user.username, email: user.email, organizationId: user.organizationId, roleNames: user.roles }" (currentSessionRevoked)="logout()" />
         } @else if (section() === 'project' && activeView() === 'overview' && selectedProject(); as project) {
           @if (session.currentUser(); as user) { <zumbo-project-overview-page [project]="project" [boards]="boards()" [contextReady]="!projectContextLoading()" [userId]="user.id" /> }
         } @else if (section() === 'project' && activeView() === 'board' && selectedProject(); as project) {

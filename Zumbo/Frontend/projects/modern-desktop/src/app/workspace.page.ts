@@ -5,6 +5,9 @@ import { ZumboApiClient, ZumboRealtimeService, ZumboSessionService } from '@zumb
 import { catchError, finalize, forkJoin, map, of, switchMap } from 'rxjs';
 import { DesktopNavigationComponent } from './shell/desktop-navigation.component';
 import { CommandPaletteComponent } from './shell/command-palette.component';
+import { ArchivePage } from './features/archive/archive.page';
+import { SettingsPage } from './features/settings/settings.page';
+import { AuditPage } from './features/audit/audit.page';
 import { AutomationPage } from './features/automation/automation.page';
 import { CapacityPage } from './features/capacity/capacity.page';
 import { HomePage } from './features/home/home.page';
@@ -26,17 +29,20 @@ import { MyWorkPage } from './features/personal-work/my-work.page';
 import { PortfolioPage } from './features/portfolios/portfolio.page';
 import { ProjectDirectoryPage } from './features/projects/project-directory.page';
 import { ProjectReportingPage } from './features/reporting/project-reporting.page';
+import { TeamsPage } from './features/teams/teams.page';
 import { ProjectWorkItemDetail } from './features/work-items/project-work-item.models';
 import { WorkItemCreateComponent } from './features/work-items/work-item-create.component';
 import { WorkItemDetailComponent } from './features/work-items/work-item-detail.component';
 import {
   BoardSummary,
+  hasWorkspacePermission,
   isProjectView,
   isWorkspaceSection,
   OrganizationSummary,
   PROJECT_VIEWS,
   ProjectSummary,
   ProjectViewId,
+  WorkspaceRole,
   WorkspaceSection
 } from './shell/desktop-shell.models';
 import { ProjectSwitcherComponent } from './shell/project-switcher.component';
@@ -51,7 +57,7 @@ const NAV_KEY = 'zumbo.navCollapsed';
 
 @Component({
   selector: 'zumbo-desktop-workspace',
-  imports: [AutomationPage, CapacityPage, CommandPaletteComponent, DesktopNavigationComponent, GoalPage, HomePage, InboxPage, IntakePage, JobsPage, KnowledgePage, MyWorkPage, NotificationPopoverComponent, PortfolioPage, ProjectBacklogPage, ProjectBoardPage, ProjectCatalogPage, ProjectDirectoryPage, ProjectListPage, ProjectOverviewPage, ProjectPlanningViewPage, ProjectReportingPage, ProjectSprintPage, ProjectSwitcherComponent, ProjectViewTabsComponent, RouterLink, WorkItemCreateComponent, WorkItemDetailComponent, ZumboIconComponent],
+  imports: [SettingsPage, ArchivePage, AuditPage, AutomationPage, CapacityPage, CommandPaletteComponent, DesktopNavigationComponent, GoalPage, HomePage, InboxPage, IntakePage, JobsPage, KnowledgePage, MyWorkPage, NotificationPopoverComponent, PortfolioPage, ProjectBacklogPage, ProjectBoardPage, ProjectCatalogPage, ProjectDirectoryPage, ProjectListPage, ProjectOverviewPage, ProjectPlanningViewPage, ProjectReportingPage, ProjectSprintPage, ProjectSwitcherComponent, ProjectViewTabsComponent, RouterLink, TeamsPage, WorkItemCreateComponent, WorkItemDetailComponent, ZumboIconComponent],
   templateUrl: './workspace.page.html',
   styleUrls: ['./workspace.page.scss', './workspace-responsive.scss']
 })
@@ -65,6 +71,7 @@ export class DesktopWorkspacePage {
   protected readonly session = inject(ZumboSessionService);
 
   protected readonly projects = signal<readonly ProjectSummary[]>([]);
+  protected readonly roles = signal<readonly WorkspaceRole[]>([]);
   protected readonly boards = signal<readonly BoardSummary[]>([]);
   protected readonly projectContextLoading = signal(false);
   protected readonly loading = signal(true);
@@ -88,6 +95,11 @@ export class DesktopWorkspacePage {
     return SECTION_LABELS[this.section() as WorkspaceSection];
   });
   protected readonly favorite = computed(() => this.favorites().some(project => project.id === this.selectedProjectId()));
+  protected readonly canViewAudit = computed(() => hasWorkspacePermission(
+    this.session.currentUser()?.roles ?? [],
+    this.roles(),
+    'AuditReadAll'
+  ));
 
   constructor() {
     this.route.paramMap.pipe(takeUntilDestroyed()).subscribe(() => this.applyRoute());
@@ -182,6 +194,10 @@ export class DesktopWorkspacePage {
     if (projectId) void this.router.navigate(['/workspace', projectId, this.activeView()]);
   }
 
+  protected refreshAfterArchiveRestore(): void {
+    this.restoreWorkspace();
+  }
+
   private restoreWorkspace(): void {
     this.session.restore().pipe(
       switchMap(auth => {
@@ -193,7 +209,8 @@ export class DesktopWorkspacePage {
         return forkJoin({
           projects: this.api.get<readonly ProjectSummary[]>(`/api/projects?organizationId=${organizationId}`),
           organizations: this.api.get<readonly OrganizationSummary[]>('/api/organizations').pipe(catchError(() => of([]))),
-          notifications: this.api.get<readonly NotificationItem[]>('/api/notifications?page=1&pageSize=50').pipe(catchError(() => of([])))
+          notifications: this.api.get<readonly NotificationItem[]>('/api/notifications?page=1&pageSize=50').pipe(catchError(() => of([]))),
+          roles: this.api.get<readonly WorkspaceRole[]>('/api/auth/roles').pipe(catchError(() => of([])))
         }).pipe(map(data => ({ ...data, organizationId: auth.user.organizationId })));
       }),
       finalize(() => this.loading.set(false)),
@@ -202,6 +219,7 @@ export class DesktopWorkspacePage {
       next: data => {
         if (!data) return;
         this.projects.set(data.projects);
+        this.roles.set(data.roles);
         this.organizationName.set(data.organizations.find(item => item.id === data.organizationId)?.name ?? 'Çalışma alanı');
         this.unreadCount.set(data.notifications.filter(item => !item.read).length);
         if (!this.applyLegacyLocation()) this.applyRoute(true);

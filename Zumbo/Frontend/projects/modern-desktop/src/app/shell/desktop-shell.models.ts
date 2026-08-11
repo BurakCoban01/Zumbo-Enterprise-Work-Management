@@ -55,6 +55,12 @@ export interface OrganizationSummary {
   readonly name: string;
 }
 
+export interface WorkspaceRole {
+  readonly name: string;
+  readonly permissions: readonly string[];
+  readonly isActive: boolean;
+}
+
 export type WorkspaceSection =
   | 'home'
   | 'mywork'
@@ -167,4 +173,14 @@ export function isWorkspaceSection(value: string | null): value is WorkspaceSect
 
 export function isProjectView(value: string | null): value is ProjectViewId {
   return !!value && PROJECT_VIEWS.some(candidate => candidate.id === value);
+}
+
+export function hasWorkspacePermission(
+  roleNames: readonly string[],
+  roles: readonly WorkspaceRole[],
+  permission: string
+): boolean {
+  return roles.some(role => role.isActive
+    && roleNames.includes(role.name)
+    && role.permissions.some(value => value === '*' || value === permission));
 }

@@ -7,8 +7,8 @@
 .work-detail-header button, .inline-command button { display: grid; width: 38px; height: 38px; border: 1px solid var(--line-strong); border-radius: 4px; background: var(--panel); color: var(--ink); place-items: center; }
 .work-detail-state { display: grid; place-content: center; gap: 8px; color: var(--muted); text-align: center; }
 .work-detail-state.error { color: var(--danger); }.work-detail-state button { min-height: 40px; border: 1px solid currentColor; background: transparent; color: inherit; }
-.work-detail-body { display: grid; min-height: 0; grid-template-columns: minmax(0, 1fr) 330px; overflow: hidden; }
-.work-detail-body > main, .work-detail-properties { min-height: 0; overflow-y: auto; padding: 14px; }
+.work-detail-body { display: grid; min-height: 0; grid-template-columns: minmax(0, 1fr) 330px; align-items: start; overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; }
+.work-detail-body > main, .work-detail-properties { min-height: 0; overflow: visible; padding: 14px; }
 .work-detail-body section { border-top: 3px solid var(--line-strong); background: var(--surface-subtle); padding: 12px; }
 .work-detail-body > main { display: grid; align-content: start; gap: 12px; }
 .work-detail-properties { display: grid; align-content: start; gap: 12px; border-left: 1px solid var(--line); background: var(--panel); }
