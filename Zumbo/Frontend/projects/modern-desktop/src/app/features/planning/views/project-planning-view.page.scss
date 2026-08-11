@@ -1,0 +1,40 @@
+:host { display: block; min-width: 0; }
+.planning-view { min-width: 0; color: var(--ink); }
+.planning-view strong { color: var(--ink); }
+.planning-head { display: flex; align-items: end; justify-content: space-between; gap: 24px; padding: 18px 24px; border-bottom: 1px solid var(--line); }
+.planning-head h2, .planning-head p, .roadmap-rollup h3, .roadmap-rollup p { margin: 0; }
+.planning-head h2 { font-size: 22px; }
+.planning-head > div:first-child > p:last-child { margin-top: 3px; color: var(--muted); font-size: 13px; }
+.planning-fresh { text-align: right; }
+.planning-fresh strong, .planning-fresh small { display: block; }
+.planning-fresh small { margin-top: 2px; color: var(--muted); font-size: 12px; }
+.planning-toolbar { display: flex; align-items: end; gap: 10px; padding: 12px 24px; border-bottom: 1px solid var(--line); background: var(--surface-subtle); }
+.planning-toolbar label { display: grid; gap: 4px; min-width: 128px; color: var(--muted); font-size: 11px; font-weight: 700; }
+.planning-toolbar input, .planning-toolbar select, .planning-table-wrap input, .calendar-agenda input, .unscheduled-list input { min-height: 36px; border: 1px solid var(--line-strong); border-radius: 5px; background: var(--surface); color: var(--ink); padding: 0 10px; font: inherit; }
+.planning-search { position: relative; flex: 1; max-width: 360px; }
+.planning-search zumbo-icon { position: absolute; left: 10px; bottom: 9px; }
+.planning-search input { width: 100%; padding-left: 34px; }
+.icon-command, .planning-shift button, .segmented button, .planning-rollup button, .unscheduled-toggle, .planning-state button { min-height: 36px; border: 1px solid var(--line-strong); border-radius: 5px; background: var(--surface); color: var(--ink); padding: 0 11px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer; }
+.icon-command { width: 36px; padding: 0; }
+.planning-navigation { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 16px; padding: 12px 24px; border-bottom: 1px solid var(--line); }
+.planning-navigation > strong { text-align: center; font-size: 13px; }
+.planning-shift, .segmented { display: flex; }
+.planning-shift button + button, .segmented button + button { margin-left: -1px; }
+.planning-shift button:first-child, .segmented button:first-child { border-radius: 5px 0 0 5px; }
+.planning-shift button:last-child, .segmented button:last-child { border-radius: 0 5px 5px 0; }
+.segmented button.active { position: relative; border-color: var(--accent); background: var(--accent-soft); color: var(--accent-strong); }
+.planning-notice { margin: 12px 24px 0; border-left: 3px solid var(--success); background: var(--success-soft); padding: 9px 12px; font-size: 13px; }
+.planning-notice.error { border-color: var(--danger); background: var(--danger-soft); }
+.planning-loading { display: grid; gap: 10px; padding: 28px 24px; }
+.planning-loading span { height: 68px; border-radius: 5px; background: var(--surface-subtle); animation: pulse 1.2s ease-in-out infinite; }
+.planning-state { margin: 24px; padding: 40px 20px; border: 1px dashed var(--line-strong); text-align: center; }
+.planning-state p { margin: 4px 0 14px; color: var(--muted); }
+.planning-state.danger { border-color: var(--danger); }
+.planning-summary { display: flex; gap: 1px; border-bottom: 1px solid var(--line); background: var(--line); }
+.planning-summary span { flex: 1; padding: 12px 24px; background: var(--surface); color: var(--muted); font-size: 12px; }
+.planning-summary strong { margin-right: 5px; color: var(--ink); font-size: 16px; }
+.planning-empty { padding: 30px 24px; color: var(--muted); text-align: center; }
+.unscheduled-toggle { margin: 12px 24px; }
+.unscheduled-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 8px; padding: 0 24px 18px; }
+.unscheduled-list span { display: flex; align-items: center; justify-content: space-between; gap: 8px; border: 1px solid var(--line); padding: 8px; font-size: 12px; }
+@keyframes pulse { 50% { opacity: .45; } }

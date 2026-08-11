@@ -1,0 +1,48 @@
+.planning-rollup { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 12px 24px; border-bottom: 1px solid var(--line); }
+.planning-rollup > div strong, .planning-rollup > div span { display: block; }
+.planning-rollup > div strong { font-size: 20px; }
+.planning-rollup > div span, .planning-rollup p { margin: 0; color: var(--muted); font-size: 12px; }
+.planning-rollup p { display: flex; align-items: center; gap: 6px; }
+.planning-rollup p.danger { color: var(--danger); }
+.planning-rollup.compact { justify-content: flex-end; }
+.planning-table-wrap { overflow: auto; max-height: calc(100vh - 350px); }
+.planning-table-wrap table { width: 100%; min-width: 860px; border-collapse: collapse; }
+.planning-table-wrap th { position: sticky; top: 0; z-index: 1; background: var(--surface-subtle); color: var(--muted); text-align: left; font-size: 11px; }
+.planning-table-wrap th, .planning-table-wrap td { padding: 10px 12px; border-bottom: 1px solid var(--line); }
+.planning-table-wrap td { font-size: 12px; }
+.planning-table-wrap td:first-child a { color: var(--ink); font-weight: 700; text-decoration: none; }
+.planning-table-wrap td small { display: block; color: var(--muted); }
+.gantt-scroll { overflow: auto; max-height: calc(100vh - 360px); min-height: 240px; }
+.gantt-axis, .gantt-row { display: grid; grid-template-columns: minmax(220px, 28%) minmax(720px, 1fr); min-width: 940px; }
+.gantt-axis { position: sticky; top: 0; z-index: 2; background: var(--surface-subtle); border-bottom: 1px solid var(--line); }
+.gantt-axis > span { padding: 10px 12px; color: var(--muted); font-size: 11px; font-weight: 700; }
+.gantt-axis > div, .gantt-track { display: grid; grid-template-columns: repeat(12, minmax(60px, 1fr)); }
+.gantt-axis time { padding: 10px 5px; border-left: 1px solid var(--line); color: var(--muted); text-align: center; font-size: 10px; }
+.gantt-row { min-height: 58px; border-bottom: 1px solid var(--line); }
+.gantt-row > a, .gantt-row > div:first-child { min-width: 0; padding: 11px 12px; color: var(--ink); text-decoration: none; }
+.gantt-row strong, .gantt-row small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gantt-row strong { font-size: 12px; }
+.gantt-row small { margin-top: 3px; color: var(--muted); font-size: 10px; }
+.gantt-track { align-items: center; background: repeating-linear-gradient(90deg, transparent 0 calc(8.333% - 1px), var(--line) calc(8.333% - 1px) 8.333%); }
+.gantt-bar { display: flex; align-items: center; min-width: 8px; height: 24px; border-radius: 3px; background: var(--accent); color: white; overflow: hidden; }
+.gantt-bar.risk { background: var(--danger); }
+.gantt-bar.milestone { justify-self: center; width: 24px; transform: rotate(45deg); }
+.gantt-bar.milestone b { transform: rotate(-45deg); font-size: 0; }
+.gantt-bar b { padding: 0 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; }
+.gantt-bar.roadmap { gap: 0; background: var(--line-strong); }
+.gantt-bar.roadmap i { height: 100%; background: var(--accent); }
+.gantt-bar.roadmap i[data-tone="todo"] { background: #64748b; }
+.gantt-bar.roadmap i[data-tone="inprogress"] { background: #2563eb; }
+.gantt-bar.roadmap i[data-tone="done"] { background: #15803d; }
+.roadmap-rollup { display: flex; justify-content: space-between; gap: 20px; padding: 18px 24px; border-bottom: 1px solid var(--line); }
+.roadmap-rollup > div:last-child { display: grid; min-width: 160px; text-align: right; }
+.roadmap-rollup > div:last-child strong { font-size: 24px; }
+.roadmap-rollup progress { width: 160px; accent-color: var(--success); }
+.roadmap-rollup small { color: var(--muted); font-size: 11px; }
+.roadmap-legend { display: flex; flex-wrap: wrap; gap: 8px 14px; margin-top: 10px; }
+.roadmap-legend span { color: var(--muted); font-size: 11px; }
+.roadmap-legend i { display: inline-block; width: 8px; height: 8px; margin-right: 4px; border-radius: 2px; background: var(--accent); }
+.roadmap-legend i[data-tone="todo"] { background: #64748b; }
+.roadmap-legend i[data-tone="inprogress"] { background: #2563eb; }
+.roadmap-legend i[data-tone="done"] { background: #15803d; }
+.roadmap-legend i[data-tone="custom"] { background: #a16207; }

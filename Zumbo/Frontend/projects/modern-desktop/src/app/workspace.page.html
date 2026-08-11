@@ -51,7 +51,7 @@
       } @else if (!projects().length) {
         <section class="empty-state"><h2>Proje bulunmuyor</h2><p>Bu çalışma alanında erişebileceğiniz bir proje yok.</p></section>
       } @else {
-        @if (section() !== 'home' && section() !== 'mywork' && section() !== 'inbox' && section() !== 'projects' && !(section() === 'project' && (activeView() === 'overview' || activeView() === 'board' || activeView() === 'list' || activeView() === 'backlog' || activeView() === 'sprint'))) {
+        @if (section() !== 'home' && section() !== 'mywork' && section() !== 'inbox' && section() !== 'projects' && !(section() === 'project' && (activeView() === 'overview' || activeView() === 'board' || activeView() === 'list' || activeView() === 'backlog' || activeView() === 'sprint' || activeView() === 'calendar' || activeView() === 'timeline' || activeView() === 'roadmap'))) {
           <header class="content-heading">
             <div><p class="zumbo-kicker">{{ section() === 'project' ? selectedProject()?.key : 'Çalışma alanı' }}</p><h2>{{ pageTitle() }}</h2></div>
             @if (selectedProject()) { <span class="project-key">{{ selectedProject()?.key }}</span> }
@@ -75,6 +75,12 @@
           @if (session.currentUser(); as user) { <zumbo-project-backlog-page [project]="project" [contextReady]="!projectContextLoading()" [userId]="user.id" /> }
         } @else if (section() === 'project' && activeView() === 'sprint' && selectedProject(); as project) {
           @if (session.currentUser(); as user) { <zumbo-project-sprint-page [project]="project" [contextReady]="!projectContextLoading()" [userId]="user.id" /> }
+        } @else if (section() === 'project' && (activeView() === 'calendar' || activeView() === 'timeline' || activeView() === 'roadmap') && selectedProject(); as project) {
+          @if (session.currentUser(); as user) { <zumbo-project-planning-view-page [project]="project" [contextReady]="!projectContextLoading()" [userId]="user.id" [view]="activeView()" /> }
+        } @else if (section() === 'project' && (activeView() === 'workload' || activeView() === 'reports' || activeView() === 'dashboards') && selectedProject(); as project) {
+          <zumbo-project-reporting-page [project]="project" [projects]="projects()" [contextReady]="!projectContextLoading()" [view]="activeView()" />
+        } @else if (section() === 'project' && activeView() === 'catalog' && selectedProject(); as project) {
+          @if (session.currentUser(); as user) { <zumbo-project-catalog-page [project]="project" [contextReady]="!projectContextLoading()" [userId]="user.id" (projectChange)="updateProject($event)" /> }
         } @else {
           <section class="surface-placeholder" aria-labelledby="surface-title">
             <h3 id="surface-title">{{ pageTitle() }}</h3>

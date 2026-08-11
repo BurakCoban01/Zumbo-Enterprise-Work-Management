@@ -109,6 +109,7 @@ export type IconName =
   | 'check'
   | 'check-check'
   | 'columns'
+  | 'copy'
   | 'chevron-down'
   | 'chevron-left'
   | 'chevron-right'

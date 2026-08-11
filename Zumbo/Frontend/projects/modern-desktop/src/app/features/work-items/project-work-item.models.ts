@@ -10,9 +10,12 @@ export interface ProjectWorkItem {
   readonly priority: string;
   readonly status: string;
   readonly assigneeUserId?: string | null;
+  readonly teamId?: string | null;
   readonly dueDate?: string | null;
+  readonly completedAt?: string | null;
   readonly estimatePoints?: number | null;
   readonly labels: readonly string[];
+  readonly relations?: readonly WorkItemRelation[];
   readonly rank: number;
   readonly version: number;
 }
@@ -128,8 +131,15 @@ export interface ProjectWorkflowTransition {
   readonly requiresApproval?: boolean;
 }
 
+export interface ProjectWorkflowStatus {
+  readonly name: string;
+  readonly category?: string | null;
+  readonly position?: number;
+}
+
 export interface ProjectWorkflow {
   readonly transitions: readonly ProjectWorkflowTransition[];
+  readonly statuses?: readonly ProjectWorkflowStatus[];
 }
 
 export interface ProjectWorkItemCollection {

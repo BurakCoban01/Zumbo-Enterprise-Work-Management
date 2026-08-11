@@ -6,6 +6,7 @@ import { catchError, finalize, forkJoin, map, of, switchMap } from 'rxjs';
 import { DesktopNavigationComponent } from './shell/desktop-navigation.component';
 import { CommandPaletteComponent } from './shell/command-palette.component';
 import { HomePage } from './features/home/home.page';
+import { ProjectCatalogPage } from './features/catalog/project-catalog.page';
 import { ProjectBoardPage } from './features/board/project-board.page';
 import { InboxPage } from './features/inbox/inbox.page';
 import { ProjectListPage } from './features/list/project-list.page';
@@ -14,8 +15,10 @@ import { NotificationPopoverComponent } from './features/notifications/notificat
 import { ProjectOverviewPage } from './features/overview/project-overview.page';
 import { ProjectBacklogPage } from './features/planning/project-backlog.page';
 import { ProjectSprintPage } from './features/planning/project-sprint.page';
+import { ProjectPlanningViewPage } from './features/planning/views/project-planning-view.page';
 import { MyWorkPage } from './features/personal-work/my-work.page';
 import { ProjectDirectoryPage } from './features/projects/project-directory.page';
+import { ProjectReportingPage } from './features/reporting/project-reporting.page';
 import { ProjectWorkItemDetail } from './features/work-items/project-work-item.models';
 import { WorkItemCreateComponent } from './features/work-items/work-item-create.component';
 import { WorkItemDetailComponent } from './features/work-items/work-item-detail.component';
@@ -41,7 +44,7 @@ const NAV_KEY = 'zumbo.navCollapsed';
 
 @Component({
   selector: 'zumbo-desktop-workspace',
-  imports: [CommandPaletteComponent, DesktopNavigationComponent, HomePage, InboxPage, MyWorkPage, NotificationPopoverComponent, ProjectBacklogPage, ProjectBoardPage, ProjectDirectoryPage, ProjectListPage, ProjectOverviewPage, ProjectSprintPage, ProjectSwitcherComponent, ProjectViewTabsComponent, RouterLink, WorkItemCreateComponent, WorkItemDetailComponent, ZumboIconComponent],
+  imports: [CommandPaletteComponent, DesktopNavigationComponent, HomePage, InboxPage, MyWorkPage, NotificationPopoverComponent, ProjectBacklogPage, ProjectBoardPage, ProjectCatalogPage, ProjectDirectoryPage, ProjectListPage, ProjectOverviewPage, ProjectPlanningViewPage, ProjectReportingPage, ProjectSprintPage, ProjectSwitcherComponent, ProjectViewTabsComponent, RouterLink, WorkItemCreateComponent, WorkItemDetailComponent, ZumboIconComponent],
   templateUrl: './workspace.page.html',
   styleUrls: ['./workspace.page.scss', './workspace-responsive.scss']
 })

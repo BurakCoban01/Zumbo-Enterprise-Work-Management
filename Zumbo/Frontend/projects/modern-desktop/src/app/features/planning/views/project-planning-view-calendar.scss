@@ -1,0 +1,21 @@
+.calendar-weekdays, .calendar-grid { display: grid; grid-template-columns: repeat(7, minmax(120px, 1fr)); min-width: 840px; }
+.calendar-weekdays { border-bottom: 1px solid var(--line); background: var(--surface-subtle); }
+.calendar-weekdays span { padding: 8px 10px; color: var(--muted); font-size: 11px; font-weight: 700; text-transform: uppercase; }
+.calendar-grid { grid-auto-rows: minmax(118px, auto); }
+.planning-view:has(.calendar-grid) { overflow-x: auto; }
+.calendar-day { min-width: 0; padding: 8px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); background: var(--surface); }
+.calendar-day.outside { background: var(--surface-subtle); opacity: .66; }
+.calendar-day.today { box-shadow: inset 0 3px var(--accent); }
+.calendar-day > time { display: block; margin-bottom: 6px; color: var(--muted); font-size: 11px; font-weight: 700; }
+.calendar-event { display: block; margin-bottom: 4px; border-left: 3px solid var(--accent); border-radius: 3px; background: var(--accent-soft); padding: 5px 6px; color: var(--ink); text-decoration: none; cursor: pointer; }
+.calendar-event[data-tone="risk"] { border-color: var(--danger); background: var(--danger-soft); }
+.calendar-event[data-tone="done"] { border-color: var(--success); background: var(--success-soft); }
+.calendar-event[data-tone="sprint"] { border-color: var(--warning); }
+.calendar-event[data-tone="milestone"], .calendar-event[data-tone="release"] { border-color: #0f766e; background: color-mix(in srgb, #0f766e 12%, var(--surface)); }
+.calendar-event strong, .calendar-event small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; }
+.calendar-event small { margin-top: 2px; color: var(--muted); }
+.calendar-agenda { display: grid; }
+.calendar-agenda article { display: grid; grid-template-columns: 130px 8px minmax(0, 1fr) auto; align-items: center; gap: 12px; min-height: 58px; padding: 8px 24px; border-bottom: 1px solid var(--line); }
+.calendar-agenda time, .calendar-agenda small { color: var(--muted); font-size: 12px; }
+.calendar-agenda strong, .calendar-agenda small { display: block; }
+.event-tone { width: 8px; height: 28px; border-radius: 2px; background: var(--accent); }

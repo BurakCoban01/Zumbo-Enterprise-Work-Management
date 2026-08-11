@@ -1,0 +1,31 @@
+@media (max-width: 760px) {
+  .planning-head { align-items: start; padding: 14px 16px; }
+  .planning-head h2 { font-size: 19px; }
+  .planning-head > div:first-child > p:last-child { display: none; }
+  .planning-fresh { max-width: 130px; }
+  .planning-toolbar { display: grid; grid-template-columns: 1fr 1fr auto; padding: 10px 16px; }
+  .planning-search { grid-column: 1 / -1; max-width: none; }
+  .planning-toolbar label { min-width: 0; }
+  .planning-toolbar input, .planning-toolbar select { min-height: 44px; }
+  .planning-toolbar .icon-command { min-width: 44px; min-height: 44px; }
+  .planning-navigation { grid-template-columns: 1fr auto; gap: 10px; padding: 10px 16px; }
+  .planning-navigation > strong { grid-column: 1 / -1; grid-row: 1; text-align: left; font-size: 12px; }
+  .planning-shift, .segmented { grid-row: 2; }
+  .planning-shift button, .segmented button { box-sizing: border-box; min-width: 44px; min-height: 44px; }
+  .planning-shift button:nth-child(2) { min-width: 68px; white-space: nowrap; }
+  .segmented button { min-width: 58px; padding: 0 8px; white-space: nowrap; }
+  .planning-summary span { padding: 10px 12px; }
+  .calendar-agenda article { grid-template-columns: 1fr auto; gap: 6px; padding: 10px 16px; }
+  .calendar-agenda .event-tone { display: none; }
+  .calendar-agenda article > div { grid-column: 1; }
+  .calendar-agenda input, .calendar-agenda a { grid-column: 2; grid-row: 1 / span 2; min-height: 44px; }
+  .planning-rollup { align-items: start; flex-wrap: wrap; padding: 12px 16px; }
+  .planning-rollup button { min-height: 44px; }
+  .planning-rollup.compact { justify-content: space-between; }
+  .roadmap-rollup { display: block; padding: 14px 16px; }
+  .roadmap-rollup > div:last-child { margin-top: 14px; text-align: left; }
+  .gantt-scroll, .planning-table-wrap { max-height: none; }
+  .unscheduled-toggle { min-height: 44px; margin: 12px 16px; }
+  .unscheduled-list { grid-template-columns: 1fr; padding: 0 16px 16px; }
+  .unscheduled-list input { min-height: 44px; }
+}

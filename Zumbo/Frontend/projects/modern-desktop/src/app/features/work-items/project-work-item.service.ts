@@ -1,6 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 import { ZumboApiClient } from '@zumbo/modern-shared';
-import { Observable, catchError, forkJoin, map, of } from 'rxjs';
+import { Observable, catchError, forkJoin, map, of, switchMap } from 'rxjs';
 import {
   BulkWorkItemResponse,
   CreateProjectWorkItem,
@@ -30,6 +30,21 @@ export class ProjectWorkItemService {
       users: result.users,
       roles: result.roles
     })));
+  }
+
+  loadAll(projectId: string): Observable<ProjectWorkItemCollection> {
+    return this.load(projectId).pipe(switchMap(first => {
+      const pageSize = 100;
+      const pageCount = Math.ceil(first.totalCount / pageSize);
+      if (pageCount <= 1) return of(first);
+      return forkJoin(Array.from({ length: pageCount - 1 }, (_, index) =>
+        this.api.post<ProjectWorkItemSearchResult>('/api/work-items/search', { projectId, page: index + 2, pageSize })
+      )).pipe(map(pages => ({
+        ...first,
+        tasks: [...first.tasks, ...pages.flatMap(page => page.items)].sort(compareProjectWorkItemRank),
+        degraded: first.degraded || pages.some(page => page.degraded === true)
+      })));
+    }));
   }
 
   update(task: ProjectWorkItem, update: ProjectWorkItemUpdate): Observable<ProjectWorkItem> {
