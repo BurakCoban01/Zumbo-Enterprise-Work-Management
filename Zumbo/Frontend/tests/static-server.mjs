@@ -1,4 +1,5 @@
 import { createServer } from 'node:http';
+import { randomBytes } from 'node:crypto';
 import { readFile, stat } from 'node:fs/promises';
 import { extname, resolve, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -28,11 +29,25 @@ export async function startStaticServer(directory, { host = '127.0.0.1', port = 
         response.writeHead(403).end('Forbidden');
         return;
       }
-      if ((await stat(path)).isDirectory()) path = resolve(path, 'index.html');
-      const body = await readFile(path);
+      try {
+        if ((await stat(path)).isDirectory()) path = resolve(path, 'index.html');
+      } catch (error) {
+        const modernSurface = decodedPath.match(/^\/(modern-(?:desktop|mobile))(?:\/.*)?$/)?.[1];
+        if (!modernSurface || error?.code !== 'ENOENT') throw error;
+        path = resolve(root, modernSurface, 'index.html');
+      }
+      let body = await readFile(path);
+      const nonce = randomBytes(18).toString('base64url');
+      const headers = Object.fromEntries(Object.entries(securityHeaders).map(([name, value]) => [
+        name,
+        String(value).replaceAll('__ZUMBO_CSP_NONCE__', nonce)
+      ]));
+      if (path.endsWith('.html') && body.includes(Buffer.from('__ZUMBO_CSP_NONCE__'))) {
+        body = Buffer.from(body.toString('utf8').replaceAll('__ZUMBO_CSP_NONCE__', nonce));
+      }
       response.writeHead(200, {
-        ...securityHeaders,
-        'Cache-Control': path.endsWith('service-worker.js') ? 'no-cache' : 'no-store',
+        ...headers,
+        'Cache-Control': /(?:service-worker|ngsw-worker)\.js$/.test(path) ? 'no-cache' : 'no-store',
         'Content-Length': body.byteLength,
         'Content-Type': contentTypes[extname(path).toLowerCase()] || 'application/octet-stream',
         'X-Content-Type-Options': 'nosniff'

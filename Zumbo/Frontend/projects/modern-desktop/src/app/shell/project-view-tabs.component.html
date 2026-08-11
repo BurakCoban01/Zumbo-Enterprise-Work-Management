@@ -1,0 +1,24 @@
+<nav class="project-tabs" aria-label="Proje görünümü">
+  @for (view of primary(); track view.id) {
+    <a [routerLink]="['/workspace', projectId(), view.id]" [class.active]="activeView() === view.id" [attr.aria-current]="activeView() === view.id ? 'page' : null">
+      <zumbo-icon [name]="view.icon" [size]="16" /><span>{{ view.label }}</span>
+    </a>
+  }
+  @if (secondary().length) {
+    <details>
+      <summary>Diğer <zumbo-icon name="chevron-down" [size]="15" /></summary>
+      <div class="view-menu">
+        @for (group of ['plan', 'operate', 'insights']; track group) {
+          @if (groupLabels.get($any(group)); as label) {
+            <span>{{ label }}</span>
+            @for (view of secondary(); track view.id) {
+              @if (view.group === group) {
+                <a [routerLink]="['/workspace', projectId(), view.id]" [class.active]="activeView() === view.id">{{ view.label }}</a>
+              }
+            }
+          }
+        }
+      </div>
+    </details>
+  }
+</nav>

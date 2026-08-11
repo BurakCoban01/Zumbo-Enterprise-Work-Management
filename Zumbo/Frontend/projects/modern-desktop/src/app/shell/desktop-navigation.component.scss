@@ -1,0 +1,14 @@
+:host { display: grid; gap: 12px; }
+nav { display: grid; gap: 14px; }
+.nav-group { display: grid; gap: 2px; }
+h2 { margin: 0 8px 4px; color: var(--muted); font-size: 12px; font-weight: 750; text-transform: uppercase; }
+.nav-item { display: grid; min-height: 38px; grid-template-columns: 20px minmax(0, 1fr) auto; align-items: center; gap: 9px; border-radius: 5px; padding: 0 9px; color: var(--muted); font-size: 13px; font-weight: 650; }
+.nav-item:hover, .nav-item.active { background: var(--accent-soft); color: var(--accent-strong); }
+.nav-count { min-width: 20px; border-radius: 10px; background: var(--danger); color: #fff; padding: 1px 5px; font-size: 11px; text-align: center; }
+.project-shortcuts { display: grid; gap: 2px; border-top: 1px solid var(--line); padding-top: 12px; }
+.project-shortcuts a { overflow: hidden; padding: 5px 8px; color: var(--muted); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.project-shortcuts a:hover { color: var(--ink); }
+:host-context(.nav-collapsed) h2, :host-context(.nav-collapsed) .nav-label, :host-context(.nav-collapsed) .project-shortcuts { display: none; }
+:host-context(.nav-collapsed) nav { gap: 5px; }
+:host-context(.nav-collapsed) .nav-item { grid-template-columns: 1fr; justify-items: center; padding: 0; }
+:host-context(.nav-collapsed) .nav-count { position: absolute; margin: -22px -22px 0 0; }

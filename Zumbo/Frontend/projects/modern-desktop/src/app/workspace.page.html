@@ -1,0 +1,82 @@
+<div class="modern-page workspace-shell" [class.theme-dark]="theme() === 'dark'" [class.nav-collapsed]="navCollapsed()" [class.mobile-nav-open]="mobileNavOpen()">
+  <a class="skip-link" href="#main-content">Ana içeriğe geç</a>
+  <aside class="side-nav" aria-label="Çalışma alanı navigasyonu">
+    <header class="nav-brand">
+      <a class="modern-brand" routerLink="/workspace"><img src="shared/zumbo-mark.svg" alt=""><span class="nav-label">Zumbo</span></a>
+      <button class="icon-button nav-collapse" type="button" (click)="toggleNav()" [title]="navCollapsed() ? 'Navigasyonu genişlet' : 'Navigasyonu daralt'">
+        <zumbo-icon name="chevrons-left" />
+      </button>
+    </header>
+    @if (!navCollapsed()) {
+      <zumbo-project-switcher [organizationName]="organizationName()" [projects]="projects()" [selectedProjectId]="selectedProjectId()" (projectChange)="selectProject($event)" />
+    }
+    <zumbo-desktop-navigation [activeSection]="section()" [currentProject]="selectedProject()" [unreadCount]="unreadCount()" [favorites]="favorites()" [recentProjects]="recentProjects()" />
+    <footer class="side-footer">
+      <span class="user-avatar" aria-hidden="true">{{ session.currentUser()?.username?.slice(0, 1)?.toUpperCase() }}</span>
+      <span class="nav-label user-name">{{ session.currentUser()?.username }}</span>
+      <button class="icon-button" type="button" (click)="logout()" title="Çıkış yap"><zumbo-icon name="logout" /></button>
+    </footer>
+  </aside>
+
+  <section class="workspace">
+    <header class="topbar">
+      <button class="icon-button mobile-menu" type="button" (click)="mobileNavOpen.set(!mobileNavOpen())" title="Navigasyonu aç"><zumbo-icon name="menu" /></button>
+      <div class="title-context">
+        <p>{{ organizationName() }} @if (selectedProject()) { <span aria-hidden="true">/</span> {{ selectedProject()?.key }} }</p>
+        <h1>{{ section() === 'project' ? selectedProject()?.name : pageTitle() }}</h1>
+      </div>
+      <div class="topbar-actions">
+        <zumbo-command-palette [project]="selectedProject()" [availableViews]="availableViews()" />
+        @if (selectedProject() && section() === 'project') {
+          <button class="icon-button" type="button" (click)="toggleFavorite()" [class.active]="favorite()" [title]="favorite() ? 'Favorilerden kaldır' : 'Favorilere ekle'"><zumbo-icon name="star" /></button>
+        }
+        <button class="icon-button" type="button" (click)="toggleTheme()" [title]="theme() === 'dark' ? 'Açık temaya geç' : 'Koyu temaya geç'">
+          <zumbo-icon [name]="theme() === 'dark' ? 'sun' : 'moon'" />
+        </button>
+        <a class="icon-button notification-button" [routerLink]="['/workspace', 'section', 'inbox']" title="Bildirimleri aç">
+          <zumbo-icon name="bell" />
+          @if (unreadCount()) { <span>{{ unreadCount() }}</span> }
+        </a>
+      </div>
+    </header>
+
+    @if (selectedProject() && section() === 'project') {
+      <zumbo-project-view-tabs [projectId]="selectedProject()!.id" [activeView]="activeView()" [views]="availableViews()" />
+    }
+
+    <main id="main-content" class="workspace-main" tabindex="-1">
+      @if (error()) { <p class="zumbo-message danger" role="alert"><span>{{ error() }}</span></p> }
+      @if (loading()) {
+        <div class="loading-state" role="status" aria-label="Çalışma alanı yükleniyor">
+          <span class="zumbo-skeleton"></span><span class="zumbo-skeleton"></span><span class="zumbo-skeleton"></span>
+        </div>
+      } @else if (!projects().length) {
+        <section class="empty-state"><h2>Proje bulunmuyor</h2><p>Bu çalışma alanında erişebileceğiniz bir proje yok.</p></section>
+      } @else {
+        @if (section() !== 'home') {
+          <header class="content-heading">
+            <div><p class="zumbo-kicker">{{ section() === 'project' ? selectedProject()?.key : 'Çalışma alanı' }}</p><h2>{{ pageTitle() }}</h2></div>
+            @if (selectedProject()) { <span class="project-key">{{ selectedProject()?.key }}</span> }
+          </header>
+        }
+        @if (section() === 'home' && session.currentUser(); as user) {
+          <zumbo-home-page [projects]="projects()" [userId]="user.id" [username]="user.username" (unreadChange)="unreadCount.set($event)" />
+        } @else if (section() === 'projects') {
+          <nav class="project-list" aria-label="Projeler">
+            @for (project of projects(); track project.id) {
+              <a [routerLink]="['/workspace', project.id, 'overview']" [attr.aria-current]="project.id === selectedProjectId() ? 'page' : null">
+                <span class="project-key">{{ project.key }}</span><strong>{{ project.name }}</strong><span aria-hidden="true">›</span>
+              </a>
+            }
+          </nav>
+        } @else {
+          <section class="surface-placeholder" aria-labelledby="surface-title">
+            <h3 id="surface-title">{{ pageTitle() }}</h3>
+            <p>{{ selectedProject()?.name || organizationName() }}</p>
+          </section>
+        }
+      }
+    </main>
+  </section>
+  @if (mobileNavOpen()) { <button class="nav-backdrop" type="button" (click)="mobileNavOpen.set(false)" aria-label="Navigasyonu kapat"></button> }
+</div>

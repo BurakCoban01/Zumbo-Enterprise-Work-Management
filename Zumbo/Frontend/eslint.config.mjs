@@ -25,7 +25,7 @@ const browserGlobals = {
 
 export default [
   {
-    ignores: ['node_modules/**', 'vendor/**', 'dist/**', 'frontend-run*.log', 'http*.log']
+    ignores: ['node_modules/**', 'vendor/**', 'dist/**', 'dist-modern/**', '.angular/**', 'frontend-run*.log', 'http*.log']
   },
   {
     files: ['desktop-bulma/**/*.js', 'mobile-ionic/**/*.js', 'shared/**/*.js'],

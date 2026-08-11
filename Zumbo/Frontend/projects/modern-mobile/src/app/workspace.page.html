@@ -1,0 +1,28 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-title>{{ selectedProject()?.name || 'Projeler' }}</ion-title>
+    <ion-buttons slot="end"><ion-button type="button" (click)="logout()">Çıkış</ion-button></ion-buttons>
+  </ion-toolbar>
+</ion-header>
+<ion-content [fullscreen]="true">
+  <main class="mobile-workspace" id="main-content">
+    <header class="mobile-heading">
+      <div class="modern-mobile-brand"><img src="shared/zumbo-mark.svg" alt=""><span>Zumbo</span></div>
+      <p>{{ session.currentUser()?.username }}</p>
+    </header>
+    @if (error()) { <p class="mobile-state is-error" role="alert">{{ error() }}</p> }
+    @if (loading()) {
+      <p class="mobile-state" role="status">Yükleniyor</p>
+    } @else if (!projects().length) {
+      <p class="mobile-state">Bu çalışma alanında proje bulunmuyor.</p>
+    } @else {
+      <ion-list lines="full" aria-label="Projeler">
+        @for (project of projects(); track project.id) {
+          <ion-item button detail="true" (click)="open(project)" [attr.aria-current]="project.id === selectedProjectId() ? 'page' : null">
+            <ion-label><small>{{ project.key }}</small><h2>{{ project.name }}</h2></ion-label>
+          </ion-item>
+        }
+      </ion-list>
+    }
+  </main>
+</ion-content>

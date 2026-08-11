@@ -1,0 +1,5 @@
+:host { display: grid; gap: 10px; }
+.context-selector { display: grid; min-width: 0; gap: 4px; }
+.context-selector span { color: var(--muted); font-size: 12px; font-weight: 700; text-transform: uppercase; }
+.context-selector strong { overflow: hidden; color: var(--ink); font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+select { width: 100%; min-height: 36px; border: 1px solid var(--line); border-radius: 5px; background: var(--panel); color: var(--ink); padding: 0 28px 0 8px; text-overflow: ellipsis; }

@@ -1,0 +1,40 @@
+<section class="home-surface">
+  <header class="home-heading">
+    <div><p class="zumbo-kicker">Bugünün odağı</p><h2>Merhaba, {{ username() }}</h2><p>Projelerinizdeki açık işler ve eylem bekleyen bildirimler.</p></div>
+  </header>
+
+  @if (loading()) {
+    <div class="home-loading" role="status" aria-label="Kişisel çalışma görünümü yükleniyor">
+      <span class="zumbo-skeleton"></span><span class="zumbo-skeleton"></span><span class="zumbo-skeleton"></span><span class="zumbo-skeleton"></span>
+    </div>
+  } @else {
+    @if (error()) { <div class="zumbo-message danger" role="alert"><span>{{ error() }}</span><button type="button" (click)="load()">Yeniden dene</button></div> }
+    @if (data().partial && !error()) { <p class="zumbo-message warning"><span>Bazı projeler yenilenemedi; erişilebilen işler gösteriliyor.</span></p> }
+
+    <nav class="home-metrics" aria-label="Kişisel çalışma özeti">
+      <a [routerLink]="['/workspace', 'section', 'mywork']" (click)="rememberMode('assigned')"><span>Açık</span><strong>{{ assigned().length }}</strong></a>
+      <a [routerLink]="['/workspace', 'section', 'mywork']" (click)="rememberMode('due')"><span>Tarihli</span><strong>{{ due().length }}</strong></a>
+      <a [routerLink]="['/workspace', 'section', 'mywork']" (click)="rememberMode('blocked')"><span>Engelli</span><strong>{{ blocked().length }}</strong></a>
+      <a [routerLink]="['/workspace', 'section', 'inbox']"><span>Okunmamış</span><strong>{{ unread().length }}</strong></a>
+    </nav>
+
+    <div class="home-columns">
+      <section>
+        <header><h3>Yaklaşan işler</h3><a [routerLink]="['/workspace', 'section', 'mywork']" (click)="rememberMode('due')">Tümünü gör</a></header>
+        <div class="home-list">
+          @for (task of due().slice(0, 5); track task.id) {
+            <a class="task-row" [routerLink]="taskRoute(task)"><span><strong>{{ task.title }}</strong><small>{{ task.projectName }} · {{ task.status }}</small></span><time>{{ formatDate(task.dueDate) }}</time></a>
+          } @empty { <p class="empty-row">Yaklaşan iş yok.</p> }
+        </div>
+      </section>
+      <section>
+        <header><h3>Son bildirimler</h3><a [routerLink]="['/workspace', 'section', 'inbox']">Gelen kutusu</a></header>
+        <div class="home-list">
+          @for (notification of unread().slice(0, 5); track notification.id) {
+            <button class="notification-row" type="button" (click)="read(notification)"><span class="unread-mark"></span><span><strong>{{ notificationLabel(notification) }}</strong><small>{{ notification.message }}</small></span><time>{{ formatDate(notification.createdAt) }}</time></button>
+          } @empty { <p class="empty-row">Yeni bildirim yok.</p> }
+        </div>
+      </section>
+    </div>
+  }
+</section>

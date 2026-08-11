@@ -1,0 +1,16 @@
+<ion-header><ion-toolbar><ion-title>Giriş</ion-title></ion-toolbar></ion-header>
+<ion-content [fullscreen]="true">
+  <main class="mobile-login" id="main-content">
+    <div class="modern-mobile-brand"><img src="shared/zumbo-mark.svg" alt=""><span>Zumbo</span></div>
+    <header><h1>Çalışma alanına giriş</h1><p>Görevlerinize ve ekip projelerinize devam edin.</p></header>
+    <form [formGroup]="form" (ngSubmit)="submit()">
+      <ion-item><ion-input label="Kullanıcı" labelPlacement="stacked" formControlName="usernameOrEmail" autocomplete="username" required /></ion-item>
+      <ion-item><ion-input label="Parola" labelPlacement="stacked" type="password" formControlName="password" autocomplete="current-password" required /></ion-item>
+      @if (mfaRequired()) {
+        <ion-item><ion-input label="Doğrulama kodu" labelPlacement="stacked" formControlName="mfaCode" inputmode="numeric" autocomplete="one-time-code" maxlength="16" required /></ion-item>
+      }
+      @if (error()) { <p class="mobile-error" role="alert">{{ error() }}</p> }
+      <ion-button type="submit" expand="block" [disabled]="busy() || form.invalid">{{ busy() ? 'Giriş yapılıyor' : 'Giriş yap' }}</ion-button>
+    </form>
+  </main>
+</ion-content>

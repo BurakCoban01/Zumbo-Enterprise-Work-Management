@@ -9,6 +9,8 @@
 **/node_modules/
 **/dist/
 **/coverage/
+Frontend/dist-modern/
+Frontend/.angular/
 **/.playwright/
 **/.playwright-mcp/
 artifacts/ui/playwright/

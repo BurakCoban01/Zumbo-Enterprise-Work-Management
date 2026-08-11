@@ -1,0 +1,9 @@
+.mobile-workspace { min-height: 100%; padding-bottom: env(safe-area-inset-bottom); }
+.mobile-heading { display: flex; min-height: 82px; align-items: center; justify-content: space-between; gap: 14px; border-bottom: 1px solid var(--line); padding: 14px 18px; background: var(--panel); }
+.mobile-heading p { overflow: hidden; margin: 0; color: var(--muted); text-overflow: ellipsis; white-space: nowrap; }
+ion-list { padding: 0; background: var(--panel); }
+ion-item { --background: var(--panel); --border-color: var(--line); --min-height: 66px; }
+ion-label small { color: var(--muted); font-size: 12px; font-weight: 750; }
+ion-label h2 { margin-top: 3px; color: var(--ink); font-size: 15px; }
+.mobile-state { margin: 0; padding: 24px 18px; color: var(--muted); }
+.mobile-state.is-error { color: var(--danger); }

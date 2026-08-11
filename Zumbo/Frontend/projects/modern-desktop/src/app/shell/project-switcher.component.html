@@ -1,0 +1,13 @@
+<div class="context-selector">
+  <span>Organizasyon</span>
+  <strong [title]="organizationName()">{{ organizationName() }}</strong>
+</div>
+<label class="context-selector">
+  <span>Proje</span>
+  <select [value]="selectedProjectId() || ''" (change)="select($event)">
+    <option value="" disabled>Proje seçin</option>
+    @for (project of projects(); track project.id) {
+      <option [value]="project.id" [selected]="project.id === selectedProjectId()">{{ project.key }} · {{ project.name }}</option>
+    }
+  </select>
+</label>
