@@ -1,0 +1,29 @@
+import {Component,computed,inject,signal} from '@angular/core';
+import {FormsModule} from '@angular/forms';
+import {IonBackButton,IonContent,IonHeader,IonRefresher,IonRefresherContent,IonSegment,IonSegmentButton,IonTitle,IonToolbar} from '@ionic/angular/standalone';
+import {finalize} from 'rxjs';
+import {normalizeApiError,ZumboSessionService} from '@zumbo/modern-shared';
+import {MobileConnectivityService} from '../../shell/mobile-connectivity.service';
+import {MobileWorkspaceStore} from '../../shell/mobile-workspace.store';
+import {CapacityAllocation,CapacityContext,CapacityDraft,CapacityPlan,CapacityScenario,CapacityUser} from './mobile-capacity.models';
+import {MobileCapacityService} from './mobile-capacity.service';
+@Component({selector:'zumbo-mobile-capacity',imports:[FormsModule,IonBackButton,IonContent,IonHeader,IonRefresher,IonRefresherContent,IonSegment,IonSegmentButton,IonTitle,IonToolbar],providers:[MobileCapacityService],templateUrl:'./mobile-capacity.page.html',styleUrls:['../strategy/mobile-strategy.page.scss','../strategy/mobile-strategy-detail.scss','./mobile-capacity.page.scss','./mobile-capacity-edit.scss']})
+export class MobileCapacityPage {
+ private readonly api=inject(MobileCapacityService);private readonly session=inject(ZumboSessionService);protected readonly store=inject(MobileWorkspaceStore);protected readonly connectivity=inject(MobileConnectivityService);protected readonly items=signal<readonly CapacityPlan[]>([]);protected readonly users=signal<readonly CapacityUser[]>([]);protected readonly context=signal<CapacityContext|null>(null);protected readonly loading=signal(true);protected readonly busy=signal(false);protected readonly error=signal<string|null>(null);protected readonly scenario=signal<CapacityScenario|null>(null);protected readonly selectedId=computed(()=>this.context()?.plan.id||'');protected readonly tab=signal<'people'|'projects'|'edit'|'scenario'>('people');protected draft:CapacityDraft=this.emptyDraft();protected scenarioRows:CapacityAllocation[]=[];
+ constructor(){this.load();}
+ protected load(done?:()=>void){this.loading.set(true);this.error.set(null);this.api.list().pipe(finalize(()=>{this.loading.set(false);done?.();})).subscribe({next:value=>{this.items.set(value.page.items.filter(item=>!item.archived));this.users.set(value.users);const id=this.selectedId()||this.items()[0]?.id;if(id)this.select(id);},error:()=>this.error.set('Kapasite planları yüklenemedi.')});}
+ protected select(id:string){this.api.detail(id).subscribe({next:value=>{this.context.set(value);this.tab.set('people');this.draft=this.fromPlan(value.plan);this.scenarioRows=value.plan.allocations.map(item=>({...item}));this.scenario.set(null);},error:()=>this.error.set('Kapasite ayrıntısı yüklenemedi.')});}
+ protected refresh(event:Event){this.load(()=>void(event.target as unknown as{complete():Promise<void>}).complete());}
+ protected userName(id:string){const user=this.users().find(item=>item.id===id);return user?.username||user?.email||'Kullanıcı';}
+ protected projectName(id:string){const project=this.store.projects().find(item=>item.id===id);return project?`${project.key} · ${project.name}`:'Erişilemeyen proje';}
+ protected state(value:string){return ({Available:'Uygun',Balanced:'Dengeli',NearCapacity:'Sınıra yakın',OverCapacity:'Kapasite üstü'} as Record<string,string>)[value]||value;}
+ protected create(){this.context.set(null);this.draft=this.emptyDraft();this.tab.set('edit');}
+ protected edit(){const plan=this.context()?.plan;if(!plan?.canEdit)return;this.draft=this.fromPlan(plan);this.tab.set('edit');}
+ protected cancel(){const plan=this.context()?.plan;if(plan)this.tab.set('people');else this.load();}
+ protected save(){const user=this.session.currentUser(),plan=this.context()?.plan;if(!user||!this.draft.name.trim()||!this.draft.periodStart||!this.draft.periodEnd||(!plan&&!this.draft.projectId)||this.busy()||this.connectivity.offline()||(plan&&!plan.canEdit))return;this.busy.set(true);this.api.save(this.draft,user.id,plan).pipe(finalize(()=>this.busy.set(false))).subscribe({next:value=>{this.context.set(null);this.load();this.select(value.id);},error:value=>this.error.set(normalizeApiError(value).message||'Kapasite planı kaydedilemedi.')});}
+ protected archive(){const plan=this.context()?.plan;if(!plan?.canEdit||this.busy()||this.connectivity.offline()||!confirm('Bu kapasite planını arşivlemek istiyor musunuz?'))return;this.busy.set(true);this.api.archive(plan).pipe(finalize(()=>this.busy.set(false))).subscribe({next:()=>{this.context.set(null);this.load();},error:value=>this.error.set(normalizeApiError(value).message||'Kapasite planı arşivlenemedi.')});}
+ protected preview(){const plan=this.context()?.plan;if(!plan?.canEdit||this.busy()||this.connectivity.offline())return;this.busy.set(true);this.api.scenario(plan,this.scenarioRows).pipe(finalize(()=>this.busy.set(false))).subscribe({next:value=>this.scenario.set(value),error:value=>this.error.set(normalizeApiError(value).message||'Senaryo hesaplanamadı.')});}
+ protected delta(key:keyof CapacityScenario['candidate']['summary']){const value=this.scenario();return value?Number(value.candidate.summary[key])-Number(value.baseline.summary[key]):0;}
+ private fromPlan(plan:CapacityPlan):CapacityDraft{return{id:plan.id,name:plan.name,description:plan.description||'',periodStart:plan.periodStart,periodEnd:plan.periodEnd,projectId:plan.projectIds[0]||'',weeklyCapacityHours:plan.members[0]?.weeklyCapacityHours||40,version:plan.version};}
+ private emptyDraft():CapacityDraft{const start=new Date(),end=new Date();end.setDate(end.getDate()+13);const date=(value:Date)=>value.toISOString().slice(0,10);return{name:'',description:'',periodStart:date(start),periodEnd:date(end),projectId:this.store?.projects?.()[0]?.id||'',weeklyCapacityHours:40};}
+}

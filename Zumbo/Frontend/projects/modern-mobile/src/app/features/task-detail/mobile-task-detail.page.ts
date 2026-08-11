@@ -3,7 +3,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
 import { IonBackButton, IonButtons, IonContent, IonHeader, IonTitle, IonToolbar } from '@ionic/angular/standalone';
-import { ZumboSessionService } from '@zumbo/modern-shared';
+import { ZumboRealtimeService, ZumboSessionService } from '@zumbo/modern-shared';
 import { Observable, finalize, firstValueFrom } from 'rxjs';
 import { MobileConnectivityService } from '../../shell/mobile-connectivity.service';
 import { MobileTaskAttachment, MobileTaskDetail } from '../../shell/mobile-workspace.models';
@@ -21,7 +21,9 @@ export class MobileTaskDetailPage implements OnInit {
   private readonly route = inject(ActivatedRoute);
   private readonly service = inject(MobileTaskDetailService);
   private readonly session = inject(ZumboSessionService);
+  private readonly realtime = inject(ZumboRealtimeService);
   private readonly destroyRef = inject(DestroyRef);
+  private realtimeReloading = false;
   protected readonly connectivity = inject(MobileConnectivityService);
   protected readonly store = inject(MobileWorkspaceStore);
   protected readonly context = signal<MobileTaskDetailContext | null>(null);
@@ -57,6 +59,13 @@ export class MobileTaskDetailPage implements OnInit {
   });
   protected readonly loggedHours = computed(() => (this.task()?.workLogs ?? []).reduce((total, item) => total + item.hours, 0));
 
+  constructor() {
+    this.realtime.changes$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(change => {
+      if (change.workItemId === this.task()?.id) this.reloadRealtime();
+    });
+    this.realtime.resync$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => this.reloadRealtime());
+  }
+
   async ngOnInit(): Promise<void> {
     const taskId = this.route.snapshot.paramMap.get('taskId');
     if (!taskId) {
@@ -66,7 +75,9 @@ export class MobileTaskDetailPage implements OnInit {
     }
     try {
       await this.store.load();
-      this.accept(await firstValueFrom(this.service.load(taskId)));
+      const context = await firstValueFrom(this.service.load(taskId));
+      this.accept(context);
+      void this.realtime.connect(context.detail.projectId).then(() => this.realtime.synchronize([context.detail])).catch(() => undefined);
     } catch {
       this.error.set('İş ayrıntısı yüklenemedi. Erişiminizi kontrol edip yeniden deneyin.');
     } finally {
@@ -218,6 +229,7 @@ export class MobileTaskDetailPage implements OnInit {
   }
 
   private acceptDetail(detail: MobileTaskDetail): void {
+    this.realtime.remember(detail);
     this.context.update(context => context ? { ...context, detail } : context);
     this.draft.set({ title: detail.title, description: detail.description ?? '', priority: detail.priority, dueDate: detail.dueDate?.slice(0, 10) ?? '' });
     this.nextStatus = this.context()?.workflow?.transitions.find(item => item.fromStatus === detail.status && !item.requiresApproval)?.toStatus ?? '';
@@ -243,6 +255,16 @@ export class MobileTaskDetailPage implements OnInit {
     this.service.loadStream(task.id, stream).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: page => this.context.update(context => context ? { ...context, [stream]: page } : context),
       error: () => this.error.set('İlgili çalışma akışı yenilenemedi.')
+    });
+  }
+
+  private reloadRealtime(): void {
+    const task = this.task();
+    if (!task || this.saving() || this.realtimeReloading) return;
+    this.realtimeReloading = true;
+    this.service.load(task.id).pipe(finalize(() => this.realtimeReloading = false), takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: context => { this.accept(context); this.realtime.synchronize([context.detail]); },
+      error: () => this.error.set('Güncel iş ayrıntısı alınamadı.')
     });
   }
 }

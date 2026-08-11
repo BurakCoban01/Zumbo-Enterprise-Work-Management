@@ -24,7 +24,7 @@ export class MobileTabsPage {
   protected readonly currentUrl = signal(this.router.url);
   protected readonly unread = computed(() => this.store.notifications().filter(item => !item.read).length);
   protected readonly moreContext = computed(() =>
-    ['/workspace/projects', '/workspace/search', '/workspace/account'].some(path => this.currentUrl().includes(path))
+    ['/workspace/projects', '/workspace/search', '/workspace/account', '/workspace/portfolios', '/workspace/goals', '/workspace/capacity', '/workspace/knowledge', '/workspace/teams', '/teams/'].some(path => this.currentUrl().includes(path))
   );
 
   constructor() {

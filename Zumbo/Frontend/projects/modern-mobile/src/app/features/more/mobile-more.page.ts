@@ -2,7 +2,7 @@ import { Component, inject } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { IonContent, IonHeader, IonIcon, IonTitle, IonToolbar } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
-import { chevronForwardOutline, folderOpenOutline, logOutOutline, personCircleOutline, searchOutline } from 'ionicons/icons';
+import { bookOutline, chevronForwardOutline, flagOutline, folderOpenOutline, layersOutline, logOutOutline, peopleOutline, personCircleOutline, searchOutline } from 'ionicons/icons';
 import { ZumboRealtimeService, ZumboSessionService } from '@zumbo/modern-shared';
 import { MobileWorkspaceStore } from '../../shell/mobile-workspace.store';
 
@@ -19,7 +19,7 @@ export class MobileMorePage {
   private readonly router = inject(Router);
 
   constructor() {
-    addIcons({ folderOpenOutline, logOutOutline, chevronForwardOutline, personCircleOutline, searchOutline });
+    addIcons({ bookOutline, folderOpenOutline, logOutOutline, chevronForwardOutline, flagOutline, layersOutline, peopleOutline, personCircleOutline, searchOutline });
   }
 
   protected logout(): void {

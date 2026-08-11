@@ -1,0 +1,12 @@
+export interface PortfolioPage { readonly items: readonly Portfolio[]; readonly totalCount: number; }
+export interface Portfolio { readonly id:string; readonly ownerUserId:string; readonly name:string; readonly description?:string|null; readonly viewerUserIds:readonly string[]; readonly initiatives:readonly Initiative[]; readonly dependencies:readonly PortfolioDependency[]; readonly canEdit:boolean; readonly archived:boolean; readonly updatedAt:string; readonly version:number; }
+export interface Initiative { readonly id:string; readonly name:string; readonly summary?:string|null; readonly ownerUserId:string; readonly status:string; readonly health:string; readonly confidence?:number|null; readonly targetAt?:string|null; readonly projectIds:readonly string[]; readonly statusUpdates:readonly InitiativeUpdate[]; readonly canUpdateStatus:boolean; }
+export interface InitiativeUpdate { readonly id:string; readonly status:string; readonly health:string; readonly confidence?:number|null; readonly note:string; readonly createdAt:string; }
+export interface PortfolioDependency { readonly id:string; readonly sourceProjectId:string; readonly targetProjectId:string; readonly description:string; readonly status:string; readonly requiredBy?:string|null; }
+export interface PortfolioRoadmap { readonly sourceStatus:string; readonly unavailableProjectIds:readonly string[]; readonly initiatives:readonly RoadmapInitiative[]; readonly dependencies:readonly PortfolioDependency[]; }
+export interface RoadmapInitiative { readonly id:string; readonly name:string; readonly status:string; readonly health:string; readonly confidence?:number|null; readonly targetAt?:string|null; readonly totalWorkItems:number; readonly completedWorkItems:number; readonly overdueWorkItems:number; readonly progress:number; }
+export interface PortfolioContext { readonly portfolio:Portfolio; readonly roadmap:PortfolioRoadmap; }
+export interface PortfolioUser { readonly id:string; readonly username?:string|null; readonly email?:string|null; }
+export interface PortfolioDraft { id?:string; name:string; description:string; viewerUserIds:string[]; version?:number; }
+export interface InitiativeDraft { id?:string; name:string; summary:string; ownerUserId:string; status:string; health:string; confidence:number|null; targetAt:string; projectIds:string[]; }
+export interface DependencyDraft { id?:string; sourceProjectId:string; targetProjectId:string; description:string; status:string; requiredBy:string; }

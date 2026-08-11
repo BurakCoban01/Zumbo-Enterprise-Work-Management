@@ -1,0 +1,40 @@
+import {Component,computed,inject,signal} from '@angular/core';
+import {FormsModule} from '@angular/forms';
+import {IonBackButton,IonContent,IonHeader,IonRefresher,IonRefresherContent,IonTitle,IonToolbar} from '@ionic/angular/standalone';
+import {finalize,forkJoin} from 'rxjs';
+import {normalizeApiError,ZumboSessionService} from '@zumbo/modern-shared';
+import {MobileConnectivityService} from '../../shell/mobile-connectivity.service';
+import {MobileWorkspaceStore} from '../../shell/mobile-workspace.store';
+import {DependencyDraft,Initiative,InitiativeDraft,Portfolio,PortfolioContext,PortfolioDependency,PortfolioDraft,PortfolioUser} from './mobile-portfolio.models';
+import {MobilePortfolioService} from './mobile-portfolio.service';
+@Component({selector:'zumbo-mobile-portfolios',imports:[FormsModule,IonBackButton,IonContent,IonHeader,IonRefresher,IonRefresherContent,IonTitle,IonToolbar],providers:[MobilePortfolioService],templateUrl:'./mobile-portfolio.page.html',styleUrls:['./mobile-strategy.page.scss','./mobile-strategy-detail.scss','./mobile-strategy-edit.scss']})
+export class MobilePortfolioPage{
+ private readonly api=inject(MobilePortfolioService);private readonly session=inject(ZumboSessionService);protected readonly store=inject(MobileWorkspaceStore);protected readonly connectivity=inject(MobileConnectivityService);protected readonly items=signal<readonly Portfolio[]>([]);protected readonly users=signal<readonly PortfolioUser[]>([]);protected readonly context=signal<PortfolioContext|null>(null);protected readonly loading=signal(true);protected readonly busy=signal(false);protected readonly error=signal<string|null>(null);protected readonly selectedId=computed(()=>this.context()?.portfolio.id||'');protected readonly editor=signal<'none'|'portfolio'|'initiative'|'dependency'>('none');protected portfolioDraft:PortfolioDraft={name:'',description:'',viewerUserIds:[]};protected initiativeDraft:InitiativeDraft=this.newInitiativeDraft();protected dependencyDraft:DependencyDraft=this.newDependencyDraft();protected statusDraft={status:'Active',health:'OnTrack',confidence:80,note:''};protected selectedInitiative='';
+ constructor(){this.load();}
+ protected load(done?:()=>void,preferredId?:string){this.loading.set(true);this.error.set(null);forkJoin({page:this.api.list(),users:this.api.users()}).pipe(finalize(()=>{this.loading.set(false);done?.();})).subscribe({next:value=>{this.items.set(value.page.items.filter(item=>!item.archived));this.users.set(value.users);const id=preferredId||this.selectedId()||this.items()[0]?.id;if(id)this.select(id);},error:()=>this.error.set('Portföyler yüklenemedi.')});}
+ protected select(id:string){this.api.detail(id).subscribe({next:value=>{this.context.set(value);this.editor.set('none');this.portfolioDraft=this.toPortfolioDraft(value.portfolio);},error:()=>this.error.set('Portföy ayrıntısı yüklenemedi.')});}
+ protected refresh(event:Event){this.load(()=>void(event.target as unknown as{complete():Promise<void>}).complete());}
+ protected canUpdate(){return this.context()?.portfolio.initiatives.find(item=>item.id===this.selectedInitiative)?.canUpdateStatus===true;}
+ protected statusInitiativeChanged(){const item=this.portfolioInitiative(this.selectedInitiative);if(!item)return;this.statusDraft={status:item.status,health:item.health,confidence:item.confidence??80,note:''};}
+ protected updateStatus(){const context=this.context();if(!context||!this.canUpdate()||!this.statusDraft.note.trim()||this.busy()||this.connectivity.offline())return;this.busy.set(true);this.api.updateStatus(context.portfolio,this.selectedInitiative,{...this.statusDraft,note:this.statusDraft.note.trim()}).pipe(finalize(()=>this.busy.set(false))).subscribe({next:portfolio=>{this.context.set({...context,portfolio});this.statusDraft.note='';},error:value=>this.error.set(normalizeApiError(value).message||'Durum güncellenemedi.')});}
+ protected date(value?:string|null){return value?new Intl.DateTimeFormat('tr-TR',{day:'2-digit',month:'short',year:'numeric'}).format(new Date(value)):'Tarih yok';}
+ protected statusLabel(value:string){return ({Draft:'Taslak',Active:'Aktif',OnTrack:'Yolunda',AtRisk:'Riskli',OffTrack:'Kritik',Completed:'Tamamlandı',Archived:'Arşivlendi'} as Record<string,string>)[value]||value;}
+ protected healthLabel(value:string){return ({Green:'İyi',Yellow:'Dikkat',Red:'Kritik',OnTrack:'Yolunda',AtRisk:'Riskli',OffTrack:'Kritik'} as Record<string,string>)[value]||value;}
+ protected userName(id:string){const user=this.users().find(item=>item.id===id);return user?.username||user?.email||'Kullanıcı';}
+ protected projectName(id:string){const project=this.store.projects().find(item=>item.id===id);return project?`${project.key} · ${project.name}`:'Erişilemeyen proje';}
+ protected portfolioInitiative(id:string){return this.context()?.portfolio.initiatives.find(item=>item.id===id);}
+ protected createPortfolio(){this.context.set(null);this.portfolioDraft={name:'',description:'',viewerUserIds:[]};this.editor.set('portfolio');}
+ protected editPortfolio(){const portfolio=this.context()?.portfolio;if(!portfolio?.canEdit)return;this.portfolioDraft=this.toPortfolioDraft(portfolio);this.editor.set('portfolio');}
+ protected savePortfolio(){if(!this.portfolioDraft.name.trim()||this.busy()||this.connectivity.offline())return;this.mutate(this.api.savePortfolio(this.portfolioDraft),value=>{this.context.set(null);this.load(undefined,value.id);});}
+ protected archive(){const portfolio=this.context()?.portfolio;if(!portfolio?.canEdit||!confirm('Bu portföyü arşivlemek istiyor musunuz?'))return;this.mutate(this.api.archive(portfolio),()=>{this.context.set(null);this.load();});}
+ protected newInitiative(item?:Initiative){const portfolio=this.context()?.portfolio;if(!portfolio?.canEdit)return;this.initiativeDraft=this.newInitiativeDraft(item);this.editor.set('initiative');}
+ protected saveInitiative(){const portfolio=this.context()?.portfolio,draft=this.initiativeDraft;if(!portfolio?.canEdit||!draft.name.trim()||!draft.ownerUserId||!draft.projectIds.length)return;this.mutate(this.api.saveInitiative(portfolio,draft),value=>this.select(value.id));}
+ protected newDependency(item?:PortfolioDependency){const portfolio=this.context()?.portfolio;if(!portfolio?.canEdit)return;this.dependencyDraft=this.newDependencyDraft(item);this.editor.set('dependency');}
+ protected saveDependency(){const portfolio=this.context()?.portfolio,draft=this.dependencyDraft;if(!portfolio?.canEdit||!draft.sourceProjectId||!draft.targetProjectId||draft.sourceProjectId===draft.targetProjectId||!draft.description.trim())return;this.mutate(this.api.saveDependency(portfolio,draft),value=>this.select(value.id));}
+ protected toggleProject(id:string,on:boolean){this.initiativeDraft.projectIds=on?[...new Set([...this.initiativeDraft.projectIds,id])]:this.initiativeDraft.projectIds.filter(value=>value!==id);}
+ protected cancelEditor(){if(this.context())this.editor.set('none');else this.load();}
+ private mutate<T>(request:import('rxjs').Observable<T>,done:(value:T)=>void){if(this.busy()||this.connectivity.offline())return;this.busy.set(true);this.error.set(null);request.pipe(finalize(()=>this.busy.set(false))).subscribe({next:done,error:value=>this.error.set(normalizeApiError(value).message||'İşlem tamamlanamadı.')});}
+ private toPortfolioDraft(item:Portfolio):PortfolioDraft{return{id:item.id,name:item.name,description:item.description||'',viewerUserIds:[...item.viewerUserIds],version:item.version};}
+ private newInitiativeDraft(item?:Initiative):InitiativeDraft{return{id:item?.id,name:item?.name||'',summary:item?.summary||'',ownerUserId:item?.ownerUserId||this.session.currentUser()?.id||'',status:item?.status||'Planned',health:item?.health||'NoUpdate',confidence:item?.confidence??null,targetAt:item?.targetAt?.slice(0,10)||'',projectIds:[...(item?.projectIds||[])]};}
+ private newDependencyDraft(item?:PortfolioDependency):DependencyDraft{return{id:item?.id,sourceProjectId:item?.sourceProjectId||'',targetProjectId:item?.targetProjectId||'',description:item?.description||'',status:item?.status||'Active',requiredBy:item?.requiredBy?.slice(0,10)||''};}
+}

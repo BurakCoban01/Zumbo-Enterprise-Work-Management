@@ -1,0 +1,46 @@
+<ion-header><ion-toolbar><ion-back-button slot="start" defaultHref="/workspace/more" text="Geri"/><ion-title>Portföyler</ion-title></ion-toolbar></ion-header>
+<ion-content [fullscreen]="true"><ion-refresher slot="fixed" (ionRefresh)="refresh($event)"><ion-refresher-content pullingText="Yenile"/></ion-refresher>
+<main class="strategy-page" [class.editing]="editor()!=='none'">
+  <header><p>Stratejik görünüm</p><h1>Portföyler</h1><span>İnisiyatifleri, teslimat sağlığını ve bağımlılıkları izleyin.</span></header>
+  @if(connectivity.offline()){<p class="strategy-state warning">Çevrimdışıyken portföy salt okunur.</p>}
+  @if(error()){<p class="strategy-state error" role="alert">{{error()}}</p>}
+  @if(loading()){<p class="strategy-state">Portföyler yükleniyor...</p>}
+  <button class="create-action" type="button" (click)="createPortfolio()" [disabled]="connectivity.offline()">Yeni portföy</button>
+  <nav class="entity-strip" aria-label="Portföy seçimi">@for(item of items();track item.id){<button type="button" [class.active]="selectedId()===item.id" (click)="select(item.id)"><strong>{{item.name}}</strong><small>{{item.initiatives.length}} inisiyatif</small></button>}</nav>
+
+  @if(editor()==='portfolio'){
+    <section class="strategy-band editor"><h2>{{portfolioDraft.id?'Portföyü düzenle':'Yeni portföy'}}</h2>
+      <label><span>Ad</span><input maxlength="160" [(ngModel)]="portfolioDraft.name"></label>
+      <label><span>Açıklama</span><textarea rows="4" [(ngModel)]="portfolioDraft.description"></textarea></label>
+      <div class="editor-actions"><button type="button" (click)="cancelEditor()">Vazgeç</button><button class="primary" type="button" (click)="savePortfolio()" [disabled]="!portfolioDraft.name.trim()||busy()||connectivity.offline()">Kaydet</button></div>
+      @if(portfolioDraft.id){<button class="inline-action danger-action" type="button" (click)="archive()">Portföyü arşivle</button>}
+    </section>
+  }
+  @if(editor()==='initiative'){
+    <section class="strategy-band editor"><h2>{{initiativeDraft.id?'İnisiyatifi düzenle':'Yeni inisiyatif'}}</h2>
+      <label><span>Ad</span><input maxlength="160" [(ngModel)]="initiativeDraft.name"></label><label><span>Özet</span><textarea rows="3" [(ngModel)]="initiativeDraft.summary"></textarea></label>
+      <label><span>Sahip</span><select [(ngModel)]="initiativeDraft.ownerUserId">@for(user of users();track user.id){<option [value]="user.id">{{userName(user.id)}}</option>}</select></label>
+      <div class="field-pair"><label><span>Durum</span><select [(ngModel)]="initiativeDraft.status"><option value="Planned">Planlandı</option><option value="Active">Aktif</option><option value="Paused">Duraklatıldı</option><option value="Completed">Tamamlandı</option><option value="Cancelled">İptal</option></select></label><label><span>Sağlık</span><select [(ngModel)]="initiativeDraft.health"><option value="NoUpdate">Güncelleme yok</option><option value="OnTrack">Yolunda</option><option value="AtRisk">Riskli</option><option value="OffTrack">Kritik</option></select></label></div>
+      <div class="field-pair"><label><span>Güven (%)</span><input type="number" min="0" max="100" [(ngModel)]="initiativeDraft.confidence"></label><label><span>Hedef tarihi</span><input type="date" [(ngModel)]="initiativeDraft.targetAt"></label></div>
+      <fieldset><legend>Projeler</legend><div class="choice-list">@for(project of store.projects();track project.id){<label><input type="checkbox" [checked]="initiativeDraft.projectIds.includes(project.id)" (change)="toggleProject(project.id,$any($event.target).checked)"><span>{{project.key}} · {{project.name}}</span></label>}</div></fieldset>
+      <div class="editor-actions"><button type="button" (click)="cancelEditor()">Vazgeç</button><button class="primary" type="button" (click)="saveInitiative()" [disabled]="!initiativeDraft.name.trim()||!initiativeDraft.ownerUserId||!initiativeDraft.projectIds.length||busy()||connectivity.offline()">Kaydet</button></div>
+    </section>
+  }
+  @if(editor()==='dependency'){
+    <section class="strategy-band editor"><h2>{{dependencyDraft.id?'Bağımlılığı düzenle':'Yeni bağımlılık'}}</h2>
+      <label><span>Kaynak proje</span><select [(ngModel)]="dependencyDraft.sourceProjectId">@for(project of store.projects();track project.id){<option [value]="project.id">{{project.key}} · {{project.name}}</option>}</select></label>
+      <label><span>Hedef proje</span><select [(ngModel)]="dependencyDraft.targetProjectId">@for(project of store.projects();track project.id){<option [value]="project.id">{{project.key}} · {{project.name}}</option>}</select></label>
+      <label><span>Açıklama</span><textarea rows="3" [(ngModel)]="dependencyDraft.description"></textarea></label>
+      <div class="field-pair"><label><span>Durum</span><select [(ngModel)]="dependencyDraft.status"><option value="Active">Aktif</option><option value="Resolved">Çözüldü</option><option value="Accepted">Kabul edildi</option></select></label><label><span>Gerekli tarih</span><input type="date" [(ngModel)]="dependencyDraft.requiredBy"></label></div>
+      <div class="editor-actions"><button type="button" (click)="cancelEditor()">Vazgeç</button><button class="primary" type="button" (click)="saveDependency()" [disabled]="!dependencyDraft.description.trim()||!dependencyDraft.sourceProjectId||!dependencyDraft.targetProjectId||dependencyDraft.sourceProjectId===dependencyDraft.targetProjectId||busy()||connectivity.offline()">Kaydet</button></div>
+    </section>
+  }
+
+  @if(context();as value){<div class="browse-content">
+    <section class="strategy-summary"><article><strong>{{value.roadmap.initiatives.length}}</strong><span>İnisiyatif</span></article><article><strong>{{value.roadmap.dependencies.length}}</strong><span>Bağımlılık</span></article><article><strong>{{value.roadmap.unavailableProjectIds.length}}</strong><span>Eksik kaynak</span></article></section>
+    @if(value.portfolio.canEdit){<div class="record-actions"><button type="button" (click)="editPortfolio()">Portföyü düzenle</button><button type="button" (click)="newInitiative()">İnisiyatif ekle</button><button type="button" (click)="newDependency()">Bağımlılık ekle</button></div>}
+    <section class="strategy-band"><h2>Yol haritası</h2>@for(item of value.roadmap.initiatives;track item.id){<article class="progress-row"><header><div><strong>{{item.name}}</strong><small>{{statusLabel(item.status)}} · {{healthLabel(item.health)}} · {{date(item.targetAt)}}</small></div><b>{{item.progress}}%</b></header><div class="progress"><span [style.width.%]="item.progress"></span></div><p>{{item.completedWorkItems}}/{{item.totalWorkItems}} tamamlandı · {{item.overdueWorkItems}} geciken</p>@if(value.portfolio.canEdit){<button class="text-action" type="button" (click)="newInitiative(portfolioInitiative(item.id))">Düzenle</button>}</article>}@empty{<p class="empty">İnisiyatif yok.</p>}</section>
+    @if(value.portfolio.canEdit&&value.portfolio.dependencies.length){<section class="strategy-band"><h2>Bağımlılıklar</h2>@for(item of value.portfolio.dependencies;track item.id){<article class="management-row"><div><strong>{{projectName(item.sourceProjectId)}} → {{projectName(item.targetProjectId)}}</strong><small>{{item.description}}</small></div><button type="button" (click)="newDependency(item)">Düzenle</button></article>}</section>}
+    <section class="strategy-band"><h2>Durum güncellemesi</h2><label><span>İnisiyatif</span><select [(ngModel)]="selectedInitiative" (ngModelChange)="statusInitiativeChanged()"><option value="">Seçin</option>@for(item of value.portfolio.initiatives;track item.id){<option [value]="item.id" [disabled]="!item.canUpdateStatus">{{item.name}}</option>}</select></label><div class="field-pair"><label><span>Durum</span><select [(ngModel)]="statusDraft.status"><option value="Planned">Planlandı</option><option value="Active">Aktif</option><option value="Paused">Duraklatıldı</option><option value="Completed">Tamamlandı</option><option value="Cancelled">İptal</option></select></label><label><span>Sağlık</span><select [(ngModel)]="statusDraft.health"><option value="NoUpdate">Güncelleme yok</option><option value="OnTrack">Yolunda</option><option value="AtRisk">Riskli</option><option value="OffTrack">Kritik</option></select></label></div><label><span>Güven (%)</span><input type="number" min="0" max="100" [(ngModel)]="statusDraft.confidence"></label><label><span>Not</span><textarea rows="3" maxlength="1000" [(ngModel)]="statusDraft.note"></textarea></label><button class="primary" type="button" (click)="updateStatus()" [disabled]="!canUpdate()||!statusDraft.note.trim()||busy()||connectivity.offline()">Durumu kaydet</button></section>
+  </div>}
+</main></ion-content>

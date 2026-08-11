@@ -1,0 +1,12 @@
+export interface GoalPage { readonly items:readonly Goal[]; readonly totalCount:number; }
+export interface Goal { readonly id:string; readonly ownerUserId:string; readonly name:string; readonly description?:string|null; readonly periodStart:string; readonly periodEnd:string; readonly status:string; readonly health:string; readonly confidence?:number|null; readonly progress:number; readonly viewerUserIds:readonly string[]; readonly initiativeLinks:readonly GoalLink[]; readonly projectIds:readonly string[]; readonly keyResults:readonly KeyResult[]; readonly statusUpdates:readonly GoalUpdate[]; readonly canEdit:boolean; readonly canUpdateStatus:boolean; readonly archived:boolean; readonly version:number; }
+export interface KeyResult { readonly id:string; readonly name:string; readonly description?:string|null; readonly ownerUserId:string; readonly baselineValue:number; readonly targetValue:number; readonly currentValue:number; readonly unit:string; readonly direction:string; readonly progress:number; readonly confidence?:number|null; readonly canUpdate:boolean; readonly progressUpdates:readonly KeyResultUpdate[]; }
+export interface KeyResultUpdate { readonly id:string; readonly currentValue:number; readonly confidence?:number|null; readonly note:string; readonly createdAt:string; }
+export interface GoalUpdate { readonly id:string; readonly status:string; readonly health:string; readonly confidence?:number|null; readonly note:string; readonly createdAt:string; }
+export interface GoalRollup { readonly sourceStatus:string; readonly progress:number; readonly confidence?:number|null; readonly unavailableSources:readonly string[]; readonly initiatives:readonly unknown[]; readonly projects:readonly unknown[]; }
+export interface GoalContext { readonly goal:Goal; readonly rollup:GoalRollup; }
+export interface GoalLink { readonly portfolioId:string; readonly initiativeId:string; }
+export interface GoalUser { readonly id:string; readonly username?:string|null; readonly email?:string|null; }
+export interface GoalPortfolio { readonly id:string; readonly name:string; readonly initiatives:readonly {readonly id:string;readonly name:string}[]; }
+export interface GoalDraft { id?:string; name:string; description:string; periodStart:string; periodEnd:string; viewerUserIds:string[]; initiativeKeys:string[]; projectIds:string[]; version?:number; }
+export interface KeyResultDraft { id?:string; name:string; description:string; ownerUserId:string; baselineValue:number; targetValue:number; initialValue:number; unit:string; direction:string; }

@@ -1,0 +1,40 @@
+<ion-header><ion-toolbar><ion-back-button slot="start" defaultHref="/workspace/more" text="Geri"/><ion-title>Hedefler</ion-title></ion-toolbar></ion-header>
+<ion-content [fullscreen]="true"><ion-refresher slot="fixed" (ionRefresh)="refresh($event)"><ion-refresher-content pullingText="Yenile"/></ion-refresher>
+<main class="strategy-page" [class.editing]="editor()!=='none'">
+  <header><p>Sonuç odağı</p><h1>Hedefler</h1><span>Ölçülebilir sonuçları ve güven sinyallerini takip edin.</span></header>
+  @if(connectivity.offline()){<p class="strategy-state warning">Çevrimdışıyken hedefler salt okunur.</p>}
+  @if(error()){<p class="strategy-state error" role="alert">{{error()}}</p>}
+  @if(loading()){<p class="strategy-state">Hedefler yükleniyor...</p>}
+  <button class="create-action" type="button" (click)="createGoal()" [disabled]="connectivity.offline()">Yeni hedef</button>
+  <nav class="entity-strip" aria-label="Hedef seçimi">@for(item of items();track item.id){<button type="button" [class.active]="selectedId()===item.id" (click)="select(item.id)"><strong>{{item.name}}</strong><small>{{item.progress}}% · {{healthLabel(item.health)}}</small></button>}</nav>
+
+  @if(editor()==='goal'){
+    <section class="strategy-band editor"><h2>{{goalDraft.id?'Hedefi düzenle':'Yeni hedef'}}</h2>
+      <label><span>Ad</span><input maxlength="160" [(ngModel)]="goalDraft.name"></label><label><span>Açıklama</span><textarea rows="3" [(ngModel)]="goalDraft.description"></textarea></label>
+      <div class="field-pair"><label><span>Başlangıç</span><input type="date" [(ngModel)]="goalDraft.periodStart"></label><label><span>Bitiş</span><input type="date" [(ngModel)]="goalDraft.periodEnd"></label></div>
+      <fieldset><legend>Projeler</legend><div class="choice-list">@for(project of store.projects();track project.id){<label><input type="checkbox" [checked]="goalDraft.projectIds.includes(project.id)" (change)="toggleGoalProject(project.id,$any($event.target).checked)"><span>{{project.key}} · {{project.name}}</span></label>}</div></fieldset>
+      @if(initiativeOptions().length){<fieldset><legend>İnisiyatif bağlantıları</legend><div class="choice-list">@for(option of initiativeOptions();track option.key){<label><input type="checkbox" [checked]="goalDraft.initiativeKeys.includes(option.key)" (change)="toggleInitiative(option.key,$any($event.target).checked)"><span>{{option.label}}</span></label>}</div></fieldset>}
+      <div class="editor-actions"><button type="button" (click)="cancelEditor()">Vazgeç</button><button class="primary" type="button" (click)="saveGoal()" [disabled]="!goalDraft.name.trim()||!goalDraft.periodStart||!goalDraft.periodEnd||goalDraft.periodEnd<goalDraft.periodStart||busy()||connectivity.offline()">Kaydet</button></div>
+      @if(goalDraft.id){<button class="inline-action danger-action" type="button" (click)="archive()">Hedefi arşivle</button>}
+    </section>
+  }
+  @if(editor()==='result'){
+    <section class="strategy-band editor"><h2>{{resultDraft.id?'Anahtar sonucu düzenle':'Yeni anahtar sonuç'}}</h2>
+      <label><span>Ad</span><input maxlength="160" [(ngModel)]="resultDraft.name"></label><label><span>Açıklama</span><textarea rows="3" [(ngModel)]="resultDraft.description"></textarea></label>
+      <label><span>Sahip</span><select [(ngModel)]="resultDraft.ownerUserId">@for(user of users();track user.id){<option [value]="user.id">{{userName(user.id)}}</option>}</select></label>
+      <div class="field-pair"><label><span>Başlangıç</span><input type="number" [(ngModel)]="resultDraft.baselineValue"></label><label><span>Hedef</span><input type="number" [(ngModel)]="resultDraft.targetValue"></label></div>
+      <div class="field-pair"><label><span>Güncel değer</span><input type="number" [(ngModel)]="resultDraft.initialValue"></label><label><span>Birim</span><input maxlength="30" [(ngModel)]="resultDraft.unit"></label></div>
+      <label><span>Yön</span><select [(ngModel)]="resultDraft.direction"><option value="Increase">Artış</option><option value="Decrease">Azalış</option></select></label>
+      <div class="editor-actions"><button type="button" (click)="cancelEditor()">Vazgeç</button><button class="primary" type="button" (click)="saveResult()" [disabled]="!resultDraft.name.trim()||!resultDraft.ownerUserId||!resultDraft.unit.trim()||resultDraft.baselineValue===resultDraft.targetValue||busy()||connectivity.offline()">Kaydet</button></div>
+    </section>
+  }
+
+  @if(context();as value){<div class="browse-content">
+    <section class="goal-focus"><div class="goal-ring"><strong>{{value.goal.progress}}%</strong></div><div><h2>{{value.goal.name}}</h2><p>{{value.goal.description||'Açıklama yok.'}}</p><small>{{statusLabel(value.goal.status)}} · Güven {{value.goal.confidence??0}}%</small></div></section>
+    <section class="strategy-summary"><article><strong>{{value.rollup.progress}}%</strong><span>Toplam ilerleme</span></article><article><strong>{{sourceLabel(value.rollup.sourceStatus)}}</strong><span>Kaynak durumu</span></article><article><strong>{{value.rollup.unavailableSources.length}}</strong><span>Eksik kaynak</span></article></section>
+    @if(value.goal.canEdit){<div class="record-actions"><button type="button" (click)="editGoal()">Hedefi düzenle</button><button type="button" (click)="editResult()">Anahtar sonuç ekle</button></div>}
+    <section class="strategy-band"><h2>Anahtar sonuçlar</h2>@for(item of value.goal.keyResults;track item.id){<article class="result-row"><header><div><strong>{{item.name}}</strong><small>{{item.currentValue}} / {{item.targetValue}} {{item.unit}}</small></div><b>{{item.progress}}%</b></header><div class="progress"><span [style.width.%]="item.progress"></span></div><div class="record-actions">@if(item.canUpdate){<button type="button" (click)="choose(item)">İlerleme gir</button>}@if(value.goal.canEdit){<button type="button" (click)="editResult(item)">Düzenle</button>}</div></article>}@empty{<p class="empty">Anahtar sonuç yok.</p>}</section>
+    @if(result();as item){<section class="strategy-band editor"><h2>{{item.name}}</h2><label><span>Güncel değer</span><input type="number" [(ngModel)]="progressDraft.currentValue"></label><label><span>Güven</span><input type="number" min="0" max="100" [(ngModel)]="progressDraft.confidence"></label><label><span>İlerleme notu</span><textarea rows="3" maxlength="1000" [(ngModel)]="progressDraft.note"></textarea></label><button class="primary" type="button" (click)="saveProgress()" [disabled]="!progressDraft.note.trim()||busy()||connectivity.offline()">İlerlemeyi kaydet</button></section>}
+    @if(value.goal.canUpdateStatus){<section class="strategy-band"><h2>Hedef durumu</h2><div class="field-pair"><label><span>Durum</span><select [(ngModel)]="statusDraft.status"><option value="Draft">Taslak</option><option value="Active">Aktif</option><option value="Paused">Duraklatıldı</option><option value="Completed">Tamamlandı</option><option value="Cancelled">İptal</option></select></label><label><span>Sağlık</span><select [(ngModel)]="statusDraft.health"><option value="NoUpdate">Güncelleme yok</option><option value="OnTrack">Yolunda</option><option value="AtRisk">Riskli</option><option value="OffTrack">Kritik</option></select></label></div><label><span>Güven (%)</span><input type="number" min="0" max="100" [(ngModel)]="statusDraft.confidence"></label><label><span>Not</span><textarea rows="3" maxlength="1000" [(ngModel)]="statusDraft.note"></textarea></label><button class="primary" type="button" (click)="saveStatus()" [disabled]="!statusDraft.note.trim()||busy()||connectivity.offline()">Durumu kaydet</button></section>}
+  </div>}
+</main></ion-content>

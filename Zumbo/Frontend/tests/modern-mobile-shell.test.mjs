@@ -38,6 +38,7 @@ test('mobile search and project work preserve scoped paging and whole-card task 
   const service = await read('projects/modern-mobile/src/app/features/work/mobile-work.service.ts');
   const search = await read('projects/modern-mobile/src/app/features/work/mobile-search.page.ts');
   const searchTemplate = await read('projects/modern-mobile/src/app/features/work/mobile-search.page.html');
+  const projectPage = await read('projects/modern-mobile/src/app/features/work/mobile-project-work.page.ts');
   const projectTemplate = await read('projects/modern-mobile/src/app/features/work/mobile-project-work.page.html');
   const detailService = await read('projects/modern-mobile/src/app/features/task-detail/mobile-task-detail.service.ts');
   const detailTemplate = await read('projects/modern-mobile/src/app/features/task-detail/mobile-task-detail.page.html');
@@ -52,6 +53,8 @@ test('mobile search and project work preserve scoped paging and whole-card task 
   assert.match(search, /result\.items\.length\s*===\s*50/);
   assert.match(searchTemplate, /<a class="work-card"[^>]*\[routerLink\]="\['\/tasks',item\.id\]"/);
   assert.match(projectTemplate, /<a class="work-card"[^>]*\[routerLink\]="\['\/tasks',item\.id\]"/);
+  assert.match(projectPage, /realtime\.connect\(this\.projectId\)/);
+  assert.match(projectPage, /realtime\.synchronize\(response\.result\.items\)/);
   assert.match(detailService, /\/api\/work-items\/\$\{encodeURIComponent\(taskId\)\}/);
   assert.match(detailTemplate, /aria-label="Geri"/);
   assert.match(tabs, /'\/workspace\/search'/);
@@ -74,6 +77,8 @@ test('mobile task detail keeps permission, offline and bounded collaboration con
     assert.match(page, new RegExp(`hasPermission\\('${permission}'\\)`));
   }
   assert.match(page, /connectivity\.offline\(\)/);
+  assert.match(page, /realtime\.connect\(context\.detail\.projectId\)/);
+  assert.match(page, /realtime\.resync\$/);
   assert.equal((template.match(/role="tab"/g) ?? []).length, 3);
   assert.match(template, /İlk \{\{context\(\)\?\.activity\?\.items\?\.length\|\|0\}\}/);
   for (const endpoint of ['/collaboration', '/checklist', '/status', '/watch', '/vote']) {
@@ -136,10 +141,181 @@ test('mobile project hub preserves overview, adaptive board and planning access'
   assert.match(page, /hasPermission\('WorkItemMove'\)/);
   assert.match(page, /tasks:snapshot\.tasks\.map/);
   assert.match(page, /this\.data\.set\(snapshot\)/);
+  assert.match(page, /realtime\.connect\(this\.projectId\)/);
+  assert.match(page, /realtime\.resync\$/);
+  assert.match(page, /realtime\.synchronize\(value\.tasks\)/);
   assert.equal((template.match(/<ion-segment-button/g) ?? []).length, 3);
   assert.match(template, /@for\(status of statuses\(\)/);
   assert.match(styles, /overflow-x:auto/);
   assert.match(styles, /grid-template-columns:minmax\(0,1fr\) auto/);
+});
+
+test('mobile portfolios and goals preserve strategic read and permission-driven update contracts', async () => {
+  const routes = await read('projects/modern-mobile/src/app/app.routes.ts');
+  const more = await read('projects/modern-mobile/src/app/features/more/mobile-more.page.html');
+  const tabs = await read('projects/modern-mobile/src/app/shell/mobile-tabs.page.ts');
+  const portfolioPage = await read('projects/modern-mobile/src/app/features/strategy/mobile-portfolio.page.ts');
+  const portfolioService = await read('projects/modern-mobile/src/app/features/strategy/mobile-portfolio.service.ts');
+  const portfolioTemplate = await read('projects/modern-mobile/src/app/features/strategy/mobile-portfolio.page.html');
+  const goalPage = await read('projects/modern-mobile/src/app/features/strategy/mobile-goal.page.ts');
+  const goalService = await read('projects/modern-mobile/src/app/features/strategy/mobile-goal.service.ts');
+  const goalTemplate = await read('projects/modern-mobile/src/app/features/strategy/mobile-goal.page.html');
+
+  for (const path of ['portfolios', 'goals']) {
+    assert.match(routes, new RegExp(`path: '${path}'`));
+    assert.match(more, new RegExp(`/workspace/${path}`));
+    assert.match(tabs, new RegExp(`'/workspace/${path}'`));
+  }
+  for (const endpoint of ['/api/portfolios?page=1&pageSize=100', '/roadmap', '/status-updates']) {
+    assert.ok(portfolioService.includes(endpoint), `missing portfolio endpoint ${endpoint}`);
+  }
+  for (const endpoint of ['/api/goals?page=1&pageSize=100', '/rollup', '/progress-updates']) {
+    assert.ok(goalService.includes(endpoint), `missing goal endpoint ${endpoint}`);
+  }
+  for (const service of [portfolioService, goalService]) {
+    assert.match(service, /ifMatch:/);
+    assert.match(service, /idempotencyKey:this\.api\.newIdempotencyKey\(\)/);
+  }
+  assert.match(portfolioPage, /canUpdateStatus===true/);
+  assert.match(portfolioPage, /connectivity\.offline\(\)/);
+  assert.match(goalPage, /result\?\.canUpdate/);
+  assert.match(goalPage, /connectivity\.offline\(\)/);
+  assert.match(portfolioTemplate, /value="Active">Aktif/);
+  assert.match(portfolioTemplate, /value="NoUpdate">Güncelleme yok/);
+  assert.match(portfolioTemplate, /\(ngModelChange\)="statusInitiativeChanged\(\)"/);
+  for (const contract of ['/api/auth/users', 'savePortfolio', 'saveInitiative', 'saveDependency', 'api.delete']) assert.ok(portfolioService.includes(contract), `missing portfolio definition contract ${contract}`);
+  for (const label of ['Yeni portföy', 'Portföyü düzenle', 'İnisiyatif ekle', 'Bağımlılık ekle']) assert.ok(portfolioTemplate.includes(label), `missing portfolio action ${label}`);
+  for (const contract of ['/api/auth/users', 'saveGoal', 'saveKeyResult', 'api.delete']) assert.ok(goalService.includes(contract), `missing goal definition contract ${contract}`);
+  for (const label of ['Yeni hedef', 'Hedefi düzenle', 'Anahtar sonuç ekle', 'Hedef durumu']) assert.ok(goalTemplate.includes(label), `missing goal action ${label}`);
+  assert.match(goalPage, /OnTrack:'Yolunda'/);
+  assert.match(goalTemplate, /sourceLabel\(value\.rollup\.sourceStatus\)/);
+  assert.doesNotMatch(`${portfolioPage}\n${goalPage}`, /Administrator|SystemAdmin|ProjectOwner/);
+});
+
+test('mobile capacity and knowledge preserve operational read and collaboration contracts', async () => {
+  const routes = await read('projects/modern-mobile/src/app/app.routes.ts');
+  const more = await read('projects/modern-mobile/src/app/features/more/mobile-more.page.html');
+  const tabs = await read('projects/modern-mobile/src/app/shell/mobile-tabs.page.ts');
+  const capacityService = await read('projects/modern-mobile/src/app/features/capacity/mobile-capacity.service.ts');
+  const capacityTemplate = await read('projects/modern-mobile/src/app/features/capacity/mobile-capacity.page.html');
+  const knowledgePage = await read('projects/modern-mobile/src/app/features/knowledge/mobile-knowledge.page.ts');
+  const knowledgeService = await read('projects/modern-mobile/src/app/features/knowledge/mobile-knowledge.service.ts');
+  const knowledgeTemplate = await read('projects/modern-mobile/src/app/features/knowledge/mobile-knowledge.page.html');
+
+  for (const path of ['capacity', 'knowledge']) {
+    assert.match(routes, new RegExp(`path: '${path}'`));
+    assert.match(more, new RegExp(`/workspace/${path}`));
+    assert.match(tabs, new RegExp(`'/workspace/${path}'`));
+  }
+  for (const endpoint of ['/api/capacity-plans?page=1&pageSize=100', '/api/auth/users', '/snapshot']) {
+    assert.ok(capacityService.includes(endpoint), `missing mobile capacity endpoint ${endpoint}`);
+  }
+  for (const endpoint of ['/api/knowledge-documents?page=1&pageSize=100', 'scope-link-options', '/comments', '/resolve']) {
+    assert.ok(knowledgeService.includes(endpoint), `missing mobile knowledge endpoint ${endpoint}`);
+  }
+  assert.match(capacityTemplate, /Kişi yükü/);
+  assert.match(capacityTemplate, /Proje dağılımı/);
+  for (const contract of ['/scenarios', 'ifMatch:plan.version', "post<CapacityPlan>('/api/capacity-plans'", 'idempotencyKey:this.api.newIdempotencyKey()']) assert.ok(capacityService.includes(contract));
+  assert.match(capacityTemplate, /Tahsis senaryosu/);
+  assert.match(capacityTemplate, /Planı arşivle/);
+  assert.match(knowledgePage, /document\.canComment/);
+  assert.match(knowledgePage, /connectivity\.offline\(\)/);
+  assert.match(knowledgeService, /ifMatch:document\.version/);
+  assert.match(knowledgeService, /idempotencyKey:this\.api\.newIdempotencyKey\(\)/);
+  assert.match(knowledgeService, /api\.put<KnowledgeDocument>/);
+  assert.match(knowledgeService, /api\.delete/);
+  assert.match(knowledgePage, /BoardManage/);
+  assert.match(knowledgeTemplate, /Yeni doküman/);
+  assert.match(knowledgeTemplate, /Yeni sürüm/);
+  assert.equal((knowledgeTemplate.match(/<ion-segment-button/g) ?? []).length, 4);
+  assert.doesNotMatch(`${capacityService}\n${knowledgePage}\n${knowledgeTemplate}`, /Administrator|SystemAdmin|ProjectOwner/);
+});
+
+test('mobile public intake and teams preserve anonymous submission and membership authority', async () => {
+  const routes = await read('projects/modern-mobile/src/app/app.routes.ts');
+  const more = await read('projects/modern-mobile/src/app/features/more/mobile-more.page.html');
+  const tabs = await read('projects/modern-mobile/src/app/shell/mobile-tabs.page.ts');
+  const intakeCore = await read('projects/modern-mobile/src/app/features/intake/mobile-public-intake.core.ts');
+  const intakeService = await read('projects/modern-mobile/src/app/features/intake/mobile-public-intake.service.ts');
+  const intakePage = await read('projects/modern-mobile/src/app/features/intake/mobile-public-intake.page.ts');
+  const intakeTemplate = await read('projects/modern-mobile/src/app/features/intake/mobile-public-intake.page.html');
+  const teamCore = await read('projects/modern-mobile/src/app/features/teams/mobile-team.core.ts');
+  const teamService = await read('projects/modern-mobile/src/app/features/teams/mobile-team.service.ts');
+  const teamPage = await read('projects/modern-mobile/src/app/features/teams/mobile-team.page.ts');
+
+  assert.match(routes, /path: 'intake\/:publicId'/);
+  assert.match(routes, /path: 'teams\/:teamId'/);
+  assert.match(routes, /path: 'teams'/);
+  assert.match(more, /\/workspace\/teams/);
+  assert.match(tabs, /'\/workspace\/teams'/);
+  for (const endpoint of ['/api/intake/public/forms/', '/submissions']) assert.ok(intakeService.includes(endpoint));
+  assert.match(intakeService, /idempotencyKey:this\.api\.newIdempotencyKey\(\)/);
+  assert.match(intakeCore, /files\.length>5/);
+  assert.match(intakeCore, /25\*1024\*1024/);
+  assert.match(intakePage, /connectivity\.offline\(\)/);
+  assert.match(intakePage, /INTAKE_FORM_NOT_FOUND:'Paylaşılan form bulunamadı\.'/);
+  for (const type of ['LongText', 'Email', 'Number', 'Date', 'Choice', 'Checkbox', 'Attachment']) assert.ok(intakeTemplate.includes(`@case('${type}')`));
+  assert.match(intakeTemplate, /class="honeypot"/);
+  for (const endpoint of ['/api/teams?organizationId=', '/api/auth/roles', '/api/audit/entity/Team/', '/members/']) assert.ok(teamService.includes(endpoint));
+  assert.match(teamService, /ifMatch:team\.version/);
+  assert.match(teamService, /idempotencyKey:this\.api\.newIdempotencyKey\(\)/);
+  assert.match(teamCore, /teamMembership\(team,userId\)\?\.role/);
+  assert.match(teamPage, /systemPermission\(ctx\.roles,user\.roles,'TeamManage'\)/);
+  assert.match(teamPage, /connectivity\.offline\(\)/);
+  assert.doesNotMatch(`${intakePage}\n${teamPage}`, /Administrator|SystemAdmin|ProjectOwner/);
+});
+
+test('mobile project catalog preserves delivery lifecycle and runtime project authority', async () => {
+  const routes = await read('projects/modern-mobile/src/app/app.routes.ts');
+  const hub = await read('projects/modern-mobile/src/app/features/project-hub/mobile-project-hub.page.html');
+  const page = await read('projects/modern-mobile/src/app/features/catalog/mobile-project-catalog.page.ts');
+  const service = await read('projects/modern-mobile/src/app/features/catalog/mobile-project-catalog.service.ts');
+  const template = await read('projects/modern-mobile/src/app/features/catalog/mobile-project-catalog.page.html');
+  const styles = await read('projects/modern-mobile/src/app/features/catalog/mobile-project-catalog.page.scss');
+
+  assert.match(routes, /path: 'projects\/:projectId\/catalog'/);
+  assert.match(hub, /\['\/workspace\/projects',projectId,'catalog'\]/);
+  for (const endpoint of ['/api/projects/', '/api/auth/roles?scope=Project', '/api/auth/users', '/api/audit/entity/Project/', '/templates', '/components', '/versions', '/releases', '/milestones']) {
+    assert.ok(service.includes(endpoint), `missing mobile catalog endpoint ${endpoint}`);
+  }
+  assert.match(page, /canManageProjectCatalog/);
+  assert.match(page, /canReleaseProjectCatalog/);
+  assert.match(page, /connectivity\.offline\(\)/);
+  assert.match(page, /projectCatalogErrorMessage/);
+  for (const tab of ['releases', 'milestones', 'components', 'templates', 'activity']) {
+    assert.ok(template.includes(`value="${tab}"`) || template.includes(`'${tab}'`), `missing catalog tab ${tab}`);
+  }
+  for (const action of ['approveRelease', 'publishRelease', 'completeMilestone', 'archiveTemplate', 'archiveComponent', 'archiveVersion']) {
+    assert.ok(page.includes(action), `missing catalog lifecycle action ${action}`);
+  }
+  assert.match(styles, /min-height:\s*44px/);
+  assert.doesNotMatch(`${page}\n${template}`, /Administrator|SystemAdmin|ProjectOwner/);
+});
+
+test('mobile project intake preserves form authoring, internal submission and triage authority', async () => {
+  const routes = await read('projects/modern-mobile/src/app/app.routes.ts');
+  const hub = await read('projects/modern-mobile/src/app/features/project-hub/mobile-project-hub.page.html');
+  const core = await read('projects/modern-mobile/src/app/features/intake/mobile-project-intake.core.ts');
+  const service = await read('projects/modern-mobile/src/app/features/intake/mobile-project-intake.service.ts');
+  const page = await read('projects/modern-mobile/src/app/features/intake/mobile-project-intake.page.ts');
+  const template = await read('projects/modern-mobile/src/app/features/intake/mobile-project-intake.page.html');
+  const styles = await read('projects/modern-mobile/src/app/features/intake/mobile-project-intake.page.scss');
+
+  assert.match(routes, /path: 'projects\/:projectId\/intake'/);
+  assert.match(hub, /\['\/workspace\/projects',projectId,'intake'\]/);
+  for (const endpoint of ['/api/projects/', '/api/boards/by-project/', '/api/work-item-schemas/', '/api/intake/forms?projectId=', '/api/auth/roles?scope=Project', '/published', '/submissions?page=1&pageSize=100', '/triage']) {
+    assert.ok(service.includes(endpoint), `missing mobile project-intake endpoint ${endpoint}`);
+  }
+  for (const permission of ['WorkflowManage', 'WorkItemCreate', 'WorkItemUpdate']) assert.ok(page.includes(permission), `missing intake permission ${permission}`);
+  assert.match(page, /connectivity\.offline\(\)/);
+  assert.match(service, /idempotencyKey:\s*this\.api\.newIdempotencyKey\(\)/);
+  assert.match(core, /25\s*\*\s*1024\s*\*\s*1024/);
+  for (const tab of ['forms', 'submit', 'triage']) assert.ok(template.includes(`value="${tab}"`) || template.includes(`'${tab}'`), `missing intake tab ${tab}`);
+  for (const type of ['LongText', 'Email', 'Number', 'Date', 'Choice', 'Checkbox', 'Attachment']) assert.ok(template.includes(`'${type}'`), `missing intake field type ${type}`);
+  for (const action of ['saveForm', 'publishForm', 'archiveForm', 'submitRequest', 'triage']) assert.ok(page.includes(action), `missing intake action ${action}`);
+  assert.match(template, /class="honeypot"/);
+  assert.match(styles, /min-height:\s*(?:44|46)px/);
+  assert.doesNotMatch(`${page}\n${template}`, /Administrator|SystemAdmin|ProjectOwner/);
 });
 
 function transpileCommonJs(source) {

@@ -1,0 +1,8 @@
+import {MobileTeam,MobileTeamRole} from './mobile-team.models';
+export function systemPermission(roles:readonly MobileTeamRole[],roleNames:readonly string[],permission:string){return roles.some(role=>role.isActive&&roleNames.includes(role.name)&&role.permissions.some(value=>value==='*'||value===permission));}
+export function teamMembership(team:MobileTeam,userId:string){return team.members.find(member=>member.userId===userId&&member.status==='Active')??null;}
+export function canManageMobileTeam(team:MobileTeam,userId:string){return['Owner','Admin'].includes(teamMembership(team,userId)?.role||'');}
+export function isMobileTeamOwner(team:MobileTeam,userId:string){return teamMembership(team,userId)?.role==='Owner';}
+export function mobileTeamRoleLabel(value:string){return({Owner:'Sahip',Admin:'Yönetici',Member:'Üye'} as Record<string,string>)[value]||value;}
+export function mobileTeamStatusLabel(value:string){return({Active:'Aktif',Invited:'Davet edildi',Declined:'Reddedildi',Revoked:'İptal edildi',Expired:'Süresi doldu'} as Record<string,string>)[value]||value;}
+export function mobileTeamAuditLabel(value:string){return({TeamArchived:'Ekip arşivlendi',TeamCreated:'Ekip oluşturuldu',TeamInviteAccepted:'Davet kabul edildi',TeamInviteDeclined:'Davet reddedildi',TeamInviteExpired:'Davet süresi doldu',TeamInviteRevoked:'Davet iptal edildi',TeamMemberInvited:'Üye davet edildi',TeamMemberRemoved:'Üye kaldırıldı',TeamMemberRoleChanged:'Üye rolü değiştirildi',TeamOwnershipTransferred:'Ekip sahipliği devredildi',TeamRestored:'Ekip geri yüklendi',TeamUpdated:'Ekip güncellendi'} as Record<string,string>)[value]||'Ekip etkinliği';}

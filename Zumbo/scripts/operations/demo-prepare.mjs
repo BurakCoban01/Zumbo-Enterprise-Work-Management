@@ -17,7 +17,8 @@ const labels = {
   keyResult: '[DEMO-V1] Zamaninda Tamamlama Orani',
   capacity: '[DEMO-V1] Ekip Kapasite Plani',
   dashboard: '[DEMO-V1] Teslimat Nabzi',
-  knowledge: '[DEMO-V1] Yerel Demo Runbooku'
+  knowledge: '[DEMO-V1] Yerel Demo Runbooku',
+  intake: '[DEMO-V1] Dis Talep Formu'
 };
 const scriptDirectory = dirname(fileURLToPath(import.meta.url));
 const environmentPath = resolve(
@@ -149,6 +150,8 @@ async function inspectBaseline() {
   if (!users.some(user => user.id === selected.viewerId)) {
     throw new Error('The selected project Viewer is not present in the organization user directory.');
   }
+  const boards = items(await api(`/api/boards/by-project/${encodeURIComponent(selected.project.id)}`));
+  if (!boards.length) throw new Error('The selected demo project must include a board for intake routing.');
 
   checks.push(
     'synthetic-users-present',
@@ -162,6 +165,7 @@ async function inspectBaseline() {
     teams,
     projects,
     project: selected.project,
+    board: boards[0],
     viewerId: selected.viewerId,
     workItems: selectedWorkItems
   };
@@ -385,16 +389,65 @@ async function prepareStrategicRecords(baseline) {
     changes.push('knowledge-document-created');
   }
 
+  const intakeForms = items(await api(`/api/intake/forms?projectId=${encodeURIComponent(baseline.project.id)}`));
+  let intake = uniqueNamed(intakeForms.filter(item => item.state !== 'Archived'), labels.intake, 'intake form');
+  if (!intake) {
+    intake = await api('/api/intake/forms', {
+      method: 'POST',
+      body: {
+        projectId: baseline.project.id,
+        name: labels.intake,
+        description: 'Musteri ve is ortaklarinin operasyon taleplerini guvenli bicimde iletmesi icin yerel demo formu.',
+        definition: {
+          accessPolicy: 'Public',
+          boardId: baseline.board.id,
+          workItemType: 'Task',
+          defaultPriority: 'Medium',
+          confirmationMessage: 'Talebiniz alindi. Ekip inceleme sonrasinda sizinle iletisime gececek.',
+          fields: [
+            { key: 'summary', label: 'Talep basligi', type: 'Text', required: true, options: [] },
+            { key: 'details', label: 'Talep ayrintisi', type: 'LongText', required: true, options: [] },
+            { key: 'contact_email', label: 'Iletisim e-postasi', type: 'Email', required: true, options: [] },
+            { key: 'urgency', label: 'Oncelik', type: 'Choice', required: true, options: ['Normal', 'Yuksek', 'Kritik'] },
+            { key: 'needed_by', label: 'Ihtiyac tarihi', type: 'Date', required: false, options: [] }
+          ],
+          mapping: {
+            titleFieldKey: 'summary',
+            descriptionFieldKey: 'details',
+            priorityFieldKey: null,
+            dueDateFieldKey: 'needed_by',
+            customFields: []
+          }
+        }
+      }
+    });
+    changes.push('public-intake-created');
+  }
+  if (intake.state !== 'Published') {
+    intake = await api(`/api/intake/forms/${intake.id}/publish`, { method: 'POST', body: {} });
+    changes.push('public-intake-published');
+  }
+
   checks.push(
     'portfolio-and-initiative-prepared',
     'goal-and-key-result-prepared',
     'capacity-plan-prepared',
     'dashboard-prepared',
-    'knowledge-document-prepared'
+    'knowledge-document-prepared',
+    'public-intake-prepared'
   );
 }
 
 async function resetSeedOwnedRecords() {
+  const projects = items(await api(`/api/projects?organizationId=${encodeURIComponent(actor.organizationId)}&pageSize=100`));
+  for (const project of projects) {
+    const matches = named(items(await api(`/api/intake/forms?projectId=${encodeURIComponent(project.id)}`)).filter(item => item.state !== 'Archived'), labels.intake);
+    if (matches.length > 1) throw new Error('Scoped reset found duplicate active seed-owned intake forms.');
+    for (const form of matches) {
+      await api(`/api/intake/forms/${form.id}/archive`, { method: 'POST', body: {} });
+      changes.push('public-intake-archived');
+    }
+  }
   const resources = [
     {
       type: 'knowledge document',
@@ -451,20 +504,23 @@ async function verifyState(baseline) {
     goalPage,
     capacityPage,
     dashboardPage,
-    knowledgePage
+    knowledgePage,
+    intakeForms
   ] = await Promise.all([
     api('/api/portfolios?page=1&pageSize=100'),
     api('/api/goals?page=1&pageSize=100'),
     api('/api/capacity-plans?page=1&pageSize=100'),
     api('/api/dashboards?page=1&pageSize=100'),
-    api(`/api/knowledge-documents?query=${encodeURIComponent(labels.knowledge)}&page=1&pageSize=100`)
+    api(`/api/knowledge-documents?query=${encodeURIComponent(labels.knowledge)}&page=1&pageSize=100`),
+    api(`/api/intake/forms?projectId=${encodeURIComponent(baseline.project.id)}`)
   ]);
   const activeCounts = {
     portfolios: named(items(portfolioPage), labels.portfolio).length,
     goals: named(items(goalPage), labels.goal).length,
     capacityPlans: named(items(capacityPage), labels.capacity).length,
     dashboards: named(items(dashboardPage), labels.dashboard).length,
-    knowledgeDocuments: named(items(knowledgePage), labels.knowledge, 'title').length
+    knowledgeDocuments: named(items(knowledgePage), labels.knowledge, 'title').length,
+    publicIntakeForms: named(items(intakeForms).filter(item => item.state !== 'Archived'), labels.intake).length
   };
   const expected = mode === 'reset' ? 0 : 1;
   for (const [name, count] of Object.entries(activeCounts)) {
@@ -484,6 +540,7 @@ async function verifyState(baseline) {
       'knowledge document',
       'title'
     );
+    const intake = uniqueNamed(items(intakeForms).filter(item => item.state !== 'Archived'), labels.intake, 'intake form');
     if (named(portfolio.initiatives || [], labels.initiative).length !== 1
       || named(goal.keyResults || [], labels.keyResult).length !== 1
       || !goal.initiativeLinks?.length
@@ -492,15 +549,19 @@ async function verifyState(baseline) {
       || capacity.allocations?.length < 2
       || dashboard.widgets?.length < 2
       || !dashboard.viewerUserIds?.includes(baseline.viewerId)
-      || knowledge.currentContentVersion !== 1) {
-      throw new Error('One or more seed-owned strategic records are incomplete.');
+      || knowledge.currentContentVersion !== 1
+      || intake.state !== 'Published'
+      || intake.draft?.accessPolicy !== 'Public'
+      || !intake.publicId) {
+      throw new Error('One or more seed-owned demo records are incomplete.');
     }
     await api(`/api/portfolios/${portfolio.id}/roadmap`);
     await api(`/api/goals/${goal.id}/rollup`);
     await api(`/api/capacity-plans/${capacity.id}/snapshot`);
     await api(`/api/dashboards/${dashboard.id}/render`);
     await api(`/api/knowledge-documents/${knowledge.id}`);
-    checks.push('strategic-read-models-ready');
+    await api(`/api/intake/public/forms/${encodeURIComponent(intake.publicId)}`);
+    checks.push('demo-read-models-ready');
   }
 
   checks.push('active-seed-records-unique');
@@ -591,7 +652,7 @@ function buildEvidence(passed, baseline, verification, blocker = null) {
     changes,
     checks,
     blocker,
-    resetScope: 'seed-owned strategic records in the authenticated synthetic organization',
+    resetScope: 'seed-owned strategic and intake records in the authenticated synthetic organization',
     directDatabaseWrites: false,
     secretsRecorded: false,
     noDeployment: true,

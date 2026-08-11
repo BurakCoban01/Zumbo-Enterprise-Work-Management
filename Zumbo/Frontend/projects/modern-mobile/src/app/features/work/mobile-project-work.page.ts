@@ -1,7 +1,9 @@
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { IonContent, IonHeader, IonRefresher, IonRefresherContent, IonTitle, IonToolbar } from '@ionic/angular/standalone';
 import { firstValueFrom } from 'rxjs';
+import { ZumboRealtimeService } from '@zumbo/modern-shared';
 import { MobileWorkItemRecord, MobileWorkflowStatus } from '../../shell/mobile-workspace.models';
 import { MobileWorkspaceStore } from '../../shell/mobile-workspace.store';
 import { mergeUniqueWorkItems } from './mobile-work.core';
@@ -16,6 +18,9 @@ import { MobileWorkService } from './mobile-work.service';
 export class MobileProjectWorkPage implements OnInit {
   private readonly route = inject(ActivatedRoute);
   private readonly service = inject(MobileWorkService);
+  private readonly realtime = inject(ZumboRealtimeService);
+  private readonly destroyRef = inject(DestroyRef);
+  private loadInFlight = false;
   protected readonly store = inject(MobileWorkspaceStore);
   protected readonly projectId = this.route.snapshot.paramMap.get('projectId') ?? '';
   protected readonly project = computed(() => this.store.projects().find(item => item.id === this.projectId));
@@ -28,25 +33,36 @@ export class MobileProjectWorkPage implements OnInit {
   protected readonly loading = signal(false);
   protected readonly error = signal<string | null>(null);
 
+  constructor() {
+    this.realtime.changes$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(change => {
+      if (change.projectId === this.projectId) void this.load(false);
+    });
+    this.realtime.resync$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => void this.load(false));
+  }
+
   async ngOnInit(): Promise<void> {
+    void this.realtime.connect(this.projectId).catch(() => undefined);
     await this.load();
   }
 
-  protected async load(): Promise<void> {
-    if (!this.projectId || this.loading()) return;
-    this.loading.set(true);
+  protected async load(showLoading = true): Promise<void> {
+    if (!this.projectId || this.loadInFlight) return;
+    this.loadInFlight = true;
+    if (showLoading) this.loading.set(true);
     this.error.set(null);
     try {
       await this.store.load();
       const response = await firstValueFrom(this.service.loadProject(this.projectId, this.selectedStatus()));
       this.statuses.set([...response.workflow.statuses].sort((a, b) => (a.position ?? 0) - (b.position ?? 0)));
       this.items.set(response.result.items);
+      this.realtime.synchronize(response.result.items);
       this.page.set(1);
       this.hasMore.set(response.result.items.length === 50);
       this.degraded.set(response.result.degraded === true);
     } catch {
       this.error.set('Proje işleri yüklenemedi. Yeniden deneyin.');
     } finally {
+      this.loadInFlight = false;
       this.loading.set(false);
     }
   }
