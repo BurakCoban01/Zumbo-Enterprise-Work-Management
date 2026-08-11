@@ -2,13 +2,16 @@ import { Component, OnInit, computed, input, output, signal } from '@angular/cor
 import { RouterLink } from '@angular/router';
 import { finalize } from 'rxjs';
 import { ProjectSummary } from '../../shell/desktop-shell.models';
-import { HomeData, HomeNotification, PersonalWorkItem } from './home.models';
+import { NotificationItem, notificationLabel } from '../notifications/notification.models';
+import { NotificationService } from '../notifications/notification.service';
+import { PersonalWorkService, compareDueDates, isBlocked, isOpen } from '../personal-work/personal-work.service';
+import { HomeData, PersonalWorkItem } from './home.models';
 import { HomeService } from './home.service';
 
 @Component({
   selector: 'zumbo-home-page',
   imports: [RouterLink],
-  providers: [HomeService],
+  providers: [HomeService, NotificationService, PersonalWorkService],
   templateUrl: './home.page.html',
   styleUrl: './home.page.scss'
 })
@@ -21,7 +24,7 @@ export class HomePage implements OnInit {
   protected readonly data = signal<HomeData>({ tasks: [], notifications: [], partial: false });
   protected readonly loading = signal(true);
   protected readonly error = signal<string | null>(null);
-  protected readonly assigned = computed(() => this.data().tasks.filter(task => !task.completedAt));
+  protected readonly assigned = computed(() => this.data().tasks.filter(isOpen));
   protected readonly due = computed(() => this.assigned().filter(task => task.dueDate).sort(compareDueDates));
   protected readonly blocked = computed(() => this.assigned().filter(isBlocked));
   protected readonly unread = computed(() => this.data().notifications.filter(notification => !notification.read));
@@ -48,7 +51,7 @@ export class HomePage implements OnInit {
     localStorage.setItem('zumbo.personal.mode', mode);
   }
 
-  protected read(notification: HomeNotification): void {
+  protected read(notification: NotificationItem): void {
     if (notification.read) return;
     this.home.markNotificationRead(notification.id).subscribe({
       next: () => {
@@ -63,28 +66,11 @@ export class HomePage implements OnInit {
     return ['/workspace', task.projectId, 'board', 'task', task.id];
   }
 
-  protected notificationLabel(notification: HomeNotification): string {
-    return NOTIFICATION_LABELS[notification.type] ?? 'Bildirim';
+  protected notificationLabel(notification: NotificationItem): string {
+    return notificationLabel(notification);
   }
 
   protected formatDate(value: string | null | undefined): string {
     return value ? new Intl.DateTimeFormat('tr-TR', { day: '2-digit', month: 'short' }).format(new Date(value)) : '';
   }
-}
-
-const NOTIFICATION_LABELS: Readonly<Record<string, string>> = {
-  Mention: 'Bahsetme',
-  Assignment: 'Atama',
-  ApprovalRequest: 'Onay isteği',
-  Approval: 'Onay sonucu',
-  DueDateReminder: 'Tarih hatırlatması',
-  TeamInvitation: 'Ekip daveti'
-};
-
-function isBlocked(task: PersonalWorkItem): boolean {
-  return (task.relations ?? []).some(relation => ['blockedby', 'isblockedby', 'dependson'].includes(String(relation.relationType ?? '').toLowerCase()));
-}
-
-function compareDueDates(left: PersonalWorkItem, right: PersonalWorkItem): number {
-  return new Date(left.dueDate ?? 0).getTime() - new Date(right.dueDate ?? 0).getTime();
 }

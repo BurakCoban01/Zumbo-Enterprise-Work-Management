@@ -1,0 +1,24 @@
+<button class="icon-button notification-button" type="button" (click)="toggle()" aria-haspopup="dialog" aria-label="Bildirimleri aç" [attr.aria-expanded]="open()" title="Bildirimleri aç">
+  <zumbo-icon name="bell" />
+  @if (unreadCount()) { <span class="notification-count">{{ unreadCount() }}</span> }
+</button>
+@if (open()) {
+  <section class="notification-popover" role="dialog" aria-label="Bildirimler">
+    <header><strong>Bildirimler</strong><span>{{ unreadCount() }} okunmamış</span></header>
+    <div class="notification-preview" aria-live="polite">
+      @if (loading()) {
+        <p class="popover-state">Bildirimler yükleniyor...</p>
+      } @else if (error()) {
+        <p class="popover-state error">Bildirimler yüklenemedi.</p>
+      } @else {
+        @for (notification of notifications().slice(0, 6); track notification.id) {
+          <button type="button" [class.unread]="!notification.read" (click)="read(notification)">
+            <span class="preview-dot" aria-hidden="true"></span>
+            <span><strong>{{ label(notification) }}</strong><small>{{ notification.message }}</small></span>
+          </button>
+        } @empty { <p class="popover-state">Yeni bildirim yok.</p> }
+      }
+    </div>
+    <a class="notification-inbox-link" [routerLink]="['/workspace', 'section', 'inbox']" (click)="close()"><zumbo-icon name="inbox" /><span>Gelen kutusunu aç</span></a>
+  </section>
+}

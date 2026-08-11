@@ -1,0 +1,22 @@
+:host { position: relative; display: inline-grid; }
+.icon-button { position: relative; display: inline-grid; width: 38px; min-width: 38px; height: 38px; place-items: center; border: 1px solid transparent; border-radius: 5px; background: transparent; color: var(--muted); cursor: pointer; }
+.icon-button:hover, .icon-button[aria-expanded='true'] { border-color: var(--line); background: var(--surface-subtle); color: var(--accent-strong); }
+.notification-count { position: absolute; top: -4px; right: -4px; min-width: 18px; height: 18px; border: 2px solid var(--panel); border-radius: 9px; background: var(--danger); color: #fff; font-size: 10px; line-height: 14px; text-align: center; }
+.notification-popover { position: absolute; z-index: var(--z-overlay); top: calc(100% + 10px); right: 0; width: min(360px, calc(100vw - 28px)); border: 1px solid var(--line-strong); border-radius: 7px; background: var(--panel); box-shadow: var(--elevation-overlay); color: var(--ink); }
+.notification-popover header { display: flex; align-items: center; justify-content: space-between; gap: 12px; border-bottom: 1px solid var(--line); padding: 13px 15px; }
+.notification-popover header strong { color: var(--ink); font-size: 13px; }
+.notification-popover header span { color: var(--muted); font-size: 11px; }
+.notification-preview { max-height: 360px; overflow-y: auto; }
+.notification-preview button { display: grid; width: 100%; min-height: 58px; grid-template-columns: 8px minmax(0, 1fr); align-items: center; gap: 10px; border: 0; border-bottom: 1px solid var(--line); background: transparent; padding: 10px 15px; color: var(--ink); text-align: left; cursor: pointer; }
+.notification-preview button:hover { background: var(--surface-subtle); }
+.notification-preview button.unread { background: color-mix(in srgb, var(--accent-soft) 42%, var(--panel)); }
+.preview-dot { width: 7px; height: 7px; border-radius: 50%; background: transparent; }
+.unread .preview-dot { background: var(--accent); }
+.notification-preview button span:last-child { min-width: 0; }
+.notification-preview strong, .notification-preview small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.notification-preview strong { color: var(--ink); font-size: 12px; }
+.notification-preview small { margin-top: 3px; color: var(--muted); font-size: 11px; }
+.popover-state { margin: 0; padding: 28px 15px; color: var(--muted); font-size: 12px; text-align: center; }
+.popover-state.error { color: var(--danger); }
+.notification-inbox-link { display: flex; min-height: 44px; align-items: center; justify-content: center; gap: 8px; color: var(--accent-strong); font-size: 12px; font-weight: 700; }
+.notification-inbox-link:hover { background: var(--surface-subtle); }

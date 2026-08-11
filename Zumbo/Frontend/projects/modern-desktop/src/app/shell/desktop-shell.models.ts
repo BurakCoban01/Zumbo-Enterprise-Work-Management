@@ -1,22 +1,29 @@
 export interface ProjectSummary {
   readonly id: string;
+  readonly organizationId?: string;
   readonly key: string;
   readonly name: string;
+  readonly visibility?: string;
+  readonly members?: readonly ProjectMemberSummary[];
+  readonly teamIds?: readonly string[];
+  readonly archived?: boolean;
+  readonly version?: number;
+}
+
+export interface ProjectMemberSummary {
+  readonly userId: string;
+  readonly role: string;
 }
 
 export interface BoardSummary {
   readonly id: string;
   readonly name: string;
+  readonly type?: string;
 }
 
 export interface OrganizationSummary {
   readonly id: string;
   readonly name: string;
-}
-
-export interface NotificationSummary {
-  readonly id: string;
-  readonly read: boolean;
 }
 
 export type WorkspaceSection =
@@ -60,11 +67,16 @@ export interface ProjectViewDefinition {
 
 export type IconName =
   | 'archive'
+  | 'arrow-up-right'
   | 'bell'
   | 'book'
+  | 'bookmark'
   | 'briefcase'
   | 'chart'
+  | 'check-check'
   | 'chevron-down'
+  | 'chevron-left'
+  | 'chevron-right'
   | 'chevrons-left'
   | 'folder'
   | 'gauge'
@@ -76,7 +88,10 @@ export type IconName =
   | 'menu'
   | 'milestone'
   | 'moon'
+  | 'plus'
+  | 'refresh'
   | 'search'
+  | 'save'
   | 'settings'
   | 'star'
   | 'sun'

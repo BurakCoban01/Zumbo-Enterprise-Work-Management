@@ -6,11 +6,15 @@ import { catchError, finalize, forkJoin, map, of, switchMap } from 'rxjs';
 import { DesktopNavigationComponent } from './shell/desktop-navigation.component';
 import { CommandPaletteComponent } from './shell/command-palette.component';
 import { HomePage } from './features/home/home.page';
+import { InboxPage } from './features/inbox/inbox.page';
+import { NotificationItem } from './features/notifications/notification.models';
+import { NotificationPopoverComponent } from './features/notifications/notification-popover.component';
+import { MyWorkPage } from './features/personal-work/my-work.page';
+import { ProjectDirectoryPage } from './features/projects/project-directory.page';
 import {
   BoardSummary,
   isProjectView,
   isWorkspaceSection,
-  NotificationSummary,
   OrganizationSummary,
   PROJECT_VIEWS,
   ProjectSummary,
@@ -29,7 +33,7 @@ const NAV_KEY = 'zumbo.navCollapsed';
 
 @Component({
   selector: 'zumbo-desktop-workspace',
-  imports: [CommandPaletteComponent, DesktopNavigationComponent, HomePage, ProjectSwitcherComponent, ProjectViewTabsComponent, RouterLink, ZumboIconComponent],
+  imports: [CommandPaletteComponent, DesktopNavigationComponent, HomePage, InboxPage, MyWorkPage, NotificationPopoverComponent, ProjectDirectoryPage, ProjectSwitcherComponent, ProjectViewTabsComponent, RouterLink, ZumboIconComponent],
   templateUrl: './workspace.page.html',
   styleUrls: ['./workspace.page.scss', './workspace-responsive.scss']
 })
@@ -82,11 +86,43 @@ export class DesktopWorkspacePage {
   protected toggleFavorite(): void {
     const project = this.selectedProject();
     if (!project) return;
-    const favorites = this.favorite()
+    this.toggleProjectFavorite(project);
+  }
+
+  protected toggleProjectFavorite(project: ProjectSummary): void {
+    const favorites = this.favorites().some(item => item.id === project.id)
       ? this.favorites().filter(item => item.id !== project.id)
       : [project, ...this.favorites().filter(item => item.id !== project.id)].slice(0, 12);
     this.favorites.set(favorites);
     localStorage.setItem(FAVORITES_KEY, JSON.stringify(favorites));
+  }
+
+  protected openProject(projectId: string): void {
+    const project = this.projects().find(item => item.id === projectId);
+    if (!project) return;
+    this.rememberProject(project);
+    void this.router.navigate(['/workspace', project.id, 'overview']);
+  }
+
+  protected updateProject(updated: ProjectSummary): void {
+    this.projects.update(projects => projects.map(project => project.id === updated.id ? updated : project));
+    this.favorites.update(projects => replaceProject(projects, updated));
+    this.recentProjects.update(projects => replaceProject(projects, updated));
+    localStorage.setItem(FAVORITES_KEY, JSON.stringify(this.favorites()));
+    localStorage.setItem(RECENT_KEY, JSON.stringify(this.recentProjects()));
+  }
+
+  protected removeProject(projectId: string): void {
+    this.projects.update(projects => projects.filter(project => project.id !== projectId));
+    this.favorites.update(projects => projects.filter(project => project.id !== projectId));
+    this.recentProjects.update(projects => projects.filter(project => project.id !== projectId));
+    localStorage.setItem(FAVORITES_KEY, JSON.stringify(this.favorites()));
+    localStorage.setItem(RECENT_KEY, JSON.stringify(this.recentProjects()));
+    if (this.selectedProjectId() === projectId) {
+      const fallbackId = this.projects()[0]?.id ?? null;
+      this.selectedProjectId.set(fallbackId);
+      fallbackId ? localStorage.setItem(PROJECT_KEY, fallbackId) : localStorage.removeItem(PROJECT_KEY);
+    }
   }
 
   protected toggleTheme(): void {
@@ -118,7 +154,7 @@ export class DesktopWorkspacePage {
         return forkJoin({
           projects: this.api.get<readonly ProjectSummary[]>(`/api/projects?organizationId=${organizationId}`),
           organizations: this.api.get<readonly OrganizationSummary[]>('/api/organizations').pipe(catchError(() => of([]))),
-          notifications: this.api.get<readonly NotificationSummary[]>('/api/notifications?page=1&pageSize=50').pipe(catchError(() => of([])))
+          notifications: this.api.get<readonly NotificationItem[]>('/api/notifications?page=1&pageSize=50').pipe(catchError(() => of([])))
         }).pipe(map(data => ({ ...data, organizationId: auth.user.organizationId })));
       }),
       finalize(() => this.loading.set(false)),
@@ -239,4 +275,8 @@ function readProjects(key: string): readonly ProjectSummary[] {
   } catch {
     return [];
   }
+}
+
+function replaceProject(projects: readonly ProjectSummary[], updated: ProjectSummary): readonly ProjectSummary[] {
+  return projects.map(project => project.id === updated.id ? updated : project);
 }

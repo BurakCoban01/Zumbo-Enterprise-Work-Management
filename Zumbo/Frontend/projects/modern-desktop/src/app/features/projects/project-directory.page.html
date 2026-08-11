@@ -1,0 +1,65 @@
+<section class="project-directory">
+  <header class="directory-heading">
+    <div><p class="zumbo-kicker">Çalışma alanları</p><h2>Projeler</h2><p>Proje bulun, favorileyin ve kaldığınız bağlama dönün.</p></div>
+  </header>
+
+  @if (error()) { <div class="zumbo-message danger" role="alert"><span>{{ error() }}</span></div> }
+  @if (notice()) { <div class="zumbo-message success" role="status"><span>{{ notice() }}</span></div> }
+
+  <div class="directory-toolbar">
+    <div class="project-tabs" role="tablist" aria-label="Proje kapsamı">
+      <button role="tab" [attr.aria-selected]="mode() === 'mine'" [tabIndex]="mode() === 'mine' ? 0 : -1" (click)="setMode('mine')" (keydown)="handleTabKey($event, 0)">Projelerim</button>
+      <button role="tab" [attr.aria-selected]="mode() === 'favorites'" [tabIndex]="mode() === 'favorites' ? 0 : -1" (click)="setMode('favorites')" (keydown)="handleTabKey($event, 1)">Favoriler</button>
+      <button role="tab" [attr.aria-selected]="mode() === 'recent'" [tabIndex]="mode() === 'recent' ? 0 : -1" (click)="setMode('recent')" (keydown)="handleTabKey($event, 2)">Son kullanılan</button>
+      <button role="tab" [attr.aria-selected]="mode() === 'all'" [tabIndex]="mode() === 'all' ? 0 : -1" (click)="setMode('all')" (keydown)="handleTabKey($event, 3)">Tümü</button>
+    </div>
+    <label class="directory-search"><zumbo-icon name="search" /><input type="search" [formControl]="searchControl" placeholder="Proje adı veya anahtarı" aria-label="Projelerde ara"></label>
+    <label class="directory-sort"><span>Sırala</span><select [value]="sort()" (change)="setSort($event)" aria-label="Projeleri sırala"><option value="name">Ada göre</option><option value="key">Anahtara göre</option><option value="recent">Son kullanıma göre</option></select></label>
+  </div>
+
+  <div class="directory-layout">
+    <section class="directory-rail">
+      <nav class="project-results" aria-label="Proje listesi">
+        @for (project of pageItems(); track project.id) {
+          <article [class.active]="project.id === inspectedId()">
+            <button class="project-main" type="button" (click)="inspect(project)"><span><strong>{{ project.key }} · {{ project.name }}</strong><small>{{ roleLabel(project) }} · {{ visibilityLabel(project.visibility) }} · {{ project.members?.length ?? 0 }} üye</small></span><zumbo-icon name="chevron-right" /></button>
+            <button class="icon-action" type="button" (click)="toggleFavorite(project)" [class.active]="isFavorite(project)" [attr.aria-label]="isFavorite(project) ? 'Projeyi favorilerden çıkar' : 'Projeyi favorilere ekle'" title="Favoriyi değiştir"><zumbo-icon name="star" /></button>
+            @if (membership(project)) { <button class="icon-action" type="button" (click)="projectOpen.emit(project.id)" aria-label="Proje çalışma alanını aç" title="Projeyi aç"><zumbo-icon name="arrow-up-right" /></button> }
+          </article>
+        } @empty { <p class="section-empty">Bu kapsam ve aramayla eşleşen proje yok.</p> }
+      </nav>
+      @if (pageCount() > 1) {
+        <nav class="directory-pagination" aria-label="Proje sayfaları"><button class="icon-action" type="button" (click)="changePage(-1)" [disabled]="page() === 1" aria-label="Önceki proje sayfası"><zumbo-icon name="chevron-left" /></button><span>{{ page() }} / {{ pageCount() }}</span><button class="icon-action" type="button" (click)="changePage(1)" [disabled]="page() === pageCount()" aria-label="Sonraki proje sayfası"><zumbo-icon name="chevron-right" /></button></nav>
+      }
+    </section>
+
+    @if (inspectedProject(); as project) {
+      <section class="project-detail" aria-labelledby="project-detail-title">
+        <header><div><p>{{ project.key }}</p><h3 id="project-detail-title">{{ project.name }}</h3></div>@if (inspectedMembership()) { <button class="open-project" type="button" (click)="projectOpen.emit(project.id)"><span>Çalışma alanını aç</span><zumbo-icon name="arrow-up-right" /></button> }</header>
+        <div class="project-form">
+          <label><span>Proje adı</span><input [formControl]="nameControl" maxlength="120" [readOnly]="!canManage()"></label>
+          <label><span>Görünürlük</span><select [value]="visibility()" (change)="setVisibility($event)" [disabled]="!canManage()"><option value="Internal">Kuruluş içi</option><option value="Private">Özel</option></select></label>
+        </div>
+        @if (canManage()) { <button class="save-action" type="button" (click)="save()" [disabled]="saving() || !nameControl.value.trim()"><zumbo-icon name="save" /><span>{{ saving() ? 'Kaydediliyor...' : 'Kaydet' }}</span></button> }
+        @if (inspectedMembership()) {
+          @if (!canManage()) { <p class="permission-note">{{ roleLabel(project) }} rolüyle bu proje salt okunur görüntüleniyor.</p> }
+        } @else { <p class="permission-note">Bu projede pano ve iş öğelerine erişmek için proje üyeliği gerekir.</p> }
+
+        <div class="project-facts"><div><strong>{{ project.members?.length ?? 0 }}</strong><span>Üye</span></div><div><strong>{{ project.teamIds?.length ?? 0 }}</strong><span>Ekip</span></div><div><strong>{{ boards().length }}</strong><span>Pano</span></div></div>
+        <div class="detail-heading"><h4>Panolar</h4></div>
+        <nav class="board-list" aria-label="Proje panoları">
+          @if (loadingBoards()) { <p class="section-empty">Panolar yükleniyor...</p> }
+          @for (board of boards(); track board.id) { <a [routerLink]="['/workspace', project.id, 'board']"><span><strong>{{ board.name }}</strong><small>{{ board.type ?? 'Pano' }}</small></span><zumbo-icon name="chevron-right" /></a> }
+          @if (!loadingBoards() && inspectedMembership() && !boards().length) { <p class="section-empty">Bu projede pano yok.</p> }
+        </nav>
+
+        @if (canArchive()) {
+          <div class="archive-zone">
+            @if (!archiveConfirm()) { <button type="button" (click)="archiveConfirm.set(true)"><zumbo-icon name="archive" /><span>Projeyi arşivle</span></button> }
+            @else { <p>Bu proje arşivlenecek.</p><button type="button" (click)="archiveConfirm.set(false)">Vazgeç</button><button class="danger" type="button" (click)="archive()" [disabled]="saving()">Arşivlemeyi onayla</button> }
+          </div>
+        }
+      </section>
+    }
+  </div>
+</section>

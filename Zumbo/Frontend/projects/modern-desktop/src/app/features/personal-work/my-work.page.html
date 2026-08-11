@@ -1,0 +1,38 @@
+<section class="my-work-surface">
+  <header class="my-work-heading">
+    <div><p class="zumbo-kicker">Kişisel çalışma alanı</p><h2>İşlerim</h2>@if (freshAt()) { <p>Son yenileme {{ freshAt()!.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }) }}</p> }</div>
+    <button class="icon-button" type="button" (click)="load()" title="İşlerimi yenile" aria-label="İşlerimi yenile"><zumbo-icon name="refresh" /></button>
+  </header>
+
+  <div class="my-work-tabs" role="tablist" aria-label="İşlerim görünümü">
+    @for (tab of [{id:'assigned',label:'Atanan'}, {id:'due',label:'Tarihli'}, {id:'blocked',label:'Engelli'}, {id:'recent',label:'Son etkinlik'}]; track tab.id; let index = $index) {
+      <button role="tab" type="button" [attr.aria-selected]="mode() === tab.id" [tabindex]="mode() === tab.id ? 0 : -1" [class.active]="mode() === tab.id" (click)="setMode($any(tab.id))" (keydown)="handleTabKey($event, index)">{{ tab.label }}</button>
+    }
+  </div>
+
+  <div class="my-work-toolbar">
+    <div class="saved-views">
+      @for (view of savedViews(); track view.id) { <button type="button" (click)="setMode(view.mode)"><zumbo-icon name="bookmark" [size]="14" />{{ view.name }}</button> }
+      <form (submit)="$event.preventDefault(); saveView()"><input class="input is-small" type="text" maxlength="40" placeholder="Görünümü kaydet" aria-label="Kişisel görünüm adı" [formControl]="viewName"><button class="icon-button" type="submit" title="Kişisel görünümü kaydet" aria-label="Kişisel görünümü kaydet"><zumbo-icon name="plus" /></button></form>
+    </div>
+    <label class="sort-control"><span>Sırala</span><select [value]="sort()" (change)="setSort($event)" aria-label="İşlerimi sırala"><option value="urgency">Aciliyet</option><option value="project">Proje</option><option value="recent">Son etkinlik</option></select></label>
+  </div>
+
+  @if (error()) { <div class="zumbo-message danger" role="alert"><span>{{ error() }}</span><button type="button" (click)="load()">Yeniden dene</button></div> }
+  @if (partial() && !error()) { <p class="zumbo-message warning"><span>Bazı projeler yenilenemedi; erişilebilen işler gösteriliyor.</span></p> }
+  @if (loading()) {
+    <div class="work-loading" role="status" aria-label="İşler yükleniyor">@for (_ of [1,2,3,4,5]; track _) { <span class="zumbo-skeleton"></span> }</div>
+  } @else {
+    <div class="work-list">
+      @for (task of visibleTasks(); track task.id) {
+        <a class="work-row" [routerLink]="taskRoute(task)">
+          <span [class]="'priority-mark ' + task.priority.toLowerCase()"></span>
+          <span class="work-main"><strong>{{ task.title }}</strong><small>{{ task.projectName }} · {{ task.status }} · {{ task.priority }}</small><span class="signals">@if (blocked(task)) { <em class="blocked">Engellenmiş</em> } @if (overdue(task)) { <em class="overdue">Gecikmiş</em> }</span></span>
+          @if (task.dueDate) { <time>{{ formatDate(task.dueDate) }}</time> }
+          <zumbo-icon name="chevron-right" [size]="16" />
+        </a>
+      } @empty { <p class="empty-row">Bu görünümde iş yok.</p> }
+    </div>
+    @if (hasMore()) { <button class="button load-more" type="button" (click)="load(page() + 1, true)" [disabled]="loadingMore()">{{ loadingMore() ? 'Yükleniyor' : 'Daha fazla yükle' }}</button> }
+  }
+</section>

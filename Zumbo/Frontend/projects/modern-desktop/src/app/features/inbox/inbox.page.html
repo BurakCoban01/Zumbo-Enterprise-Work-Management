@@ -1,0 +1,53 @@
+<section class="inbox-surface">
+  <header class="inbox-heading">
+    <div><p class="zumbo-kicker">Eylem sırası</p><h2>Gelen kutusu</h2><p>Size yöneltilen eylemleri ayırın; genel farkındalık bildirimlerde kalır.</p></div>
+    <div class="inbox-actions">
+      @if (unreadCount()) {
+        <button class="zumbo-button subtle" type="button" (click)="readAll()"><zumbo-icon name="check-check" /><span>Tümünü okundu yap</span></button>
+      }
+      <button class="icon-action" type="button" (click)="loadNotifications()" title="Gelen kutusunu yenile"><zumbo-icon name="refresh" /></button>
+    </div>
+  </header>
+
+  <div class="inbox-tabs" role="tablist" aria-label="Gelen kutusu filtresi">
+    <button role="tab" [attr.aria-selected]="mode() === 'unread'" [tabIndex]="mode() === 'unread' ? 0 : -1" (click)="setMode('unread')" (keydown)="handleTabKey($event, 0)">Okunmamış</button>
+    <button role="tab" [attr.aria-selected]="mode() === 'actions'" [tabIndex]="mode() === 'actions' ? 0 : -1" (click)="setMode('actions')" (keydown)="handleTabKey($event, 1)">Eylem gereken</button>
+    <button role="tab" [attr.aria-selected]="mode() === 'all'" [tabIndex]="mode() === 'all' ? 0 : -1" (click)="setMode('all')" (keydown)="handleTabKey($event, 2)">Tümü</button>
+  </div>
+
+  <div class="inbox-layout">
+    <section class="inbox-list" aria-live="polite">
+      @if (loading()) {
+        <div class="inbox-loading" role="status"><span class="zumbo-skeleton"></span><span class="zumbo-skeleton"></span><span class="zumbo-skeleton"></span></div>
+      } @else if (error()) {
+        <div class="zumbo-message danger" role="alert"><span>{{ error() }}</span><button type="button" (click)="loadNotifications()">Yeniden dene</button></div>
+      } @else {
+        @for (notification of visibleNotifications(); track notification.id) {
+          <article class="inbox-row" [class.unread]="!notification.read" [class.actionable]="notification.category === 'Action'">
+            <span class="inbox-indicator" aria-hidden="true"></span>
+            <button class="inbox-row-main" type="button" (click)="read(notification)">
+              <span><strong>{{ label(notification) }}</strong><small>{{ notification.message }}</small></span><time>{{ formatDate(notification.createdAt) }}</time>
+            </button>
+            @if (sourceRoute(notification); as route) {
+              <a class="icon-action inbox-source" [routerLink]="route" title="Kaynağı aç"><zumbo-icon name="arrow-up-right" /></a>
+            }
+          </article>
+        } @empty { <p class="section-empty">Bu filtrede bildirim yok.</p> }
+        @if (hasMore()) { <button class="zumbo-button load-more" type="button" [disabled]="loadingMore()" (click)="loadNotifications(page() + 1, true)">{{ loadingMore() ? 'Yükleniyor...' : 'Daha fazla yükle' }}</button> }
+      }
+    </section>
+
+    <aside class="approval-queue">
+      <header><h3>Bekleyen onaylar</h3><span>{{ pendingApprovals().length }}</span></header>
+      @if (workLoading()) {
+        <p class="section-empty">Onaylar yükleniyor...</p>
+      } @else if (workError()) {
+        <p class="section-empty error">Onaylar yüklenemedi.</p>
+      } @else {
+        @for (task of pendingApprovals(); track task.id) {
+          <a class="approval-row" [routerLink]="taskRoute(task)"><span><strong>{{ task.title }}</strong><small>{{ task.projectName }}</small></span><zumbo-icon name="chevron-right" /></a>
+        } @empty { <p class="section-empty">Bekleyen onay yok.</p> }
+      }
+    </aside>
+  </div>
+</section>
