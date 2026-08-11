@@ -125,6 +125,7 @@ export type IconName =
   | 'link'
   | 'logout'
   | 'menu'
+  | 'message-square'
   | 'milestone'
   | 'moon'
   | 'paperclip'

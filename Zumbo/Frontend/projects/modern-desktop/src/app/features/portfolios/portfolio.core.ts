@@ -1,0 +1,17 @@
+import { DependencyDraft, Initiative, InitiativeDraft, InitiativeTreeRow, Portfolio, PortfolioDraft } from './portfolio.models';
+
+export const PORTFOLIO_STATUSES = ['Planned', 'Active', 'Paused', 'Completed', 'Cancelled'] as const;
+export const PORTFOLIO_HEALTH = ['NoUpdate', 'OnTrack', 'AtRisk', 'OffTrack'] as const;
+export const DEPENDENCY_STATUSES = ['Active', 'Resolved', 'Accepted'] as const;
+
+export function newPortfolioDraft(item?: Portfolio): PortfolioDraft { return { id: item?.id, name: item?.name ?? '', description: item?.description ?? '', viewerUserIds: [...(item?.viewerUserIds ?? [])], version: item?.version }; }
+export function newInitiativeDraft(ownerUserId: string, item?: Initiative, parentId = ''): InitiativeDraft { return { id: item?.id, name: item?.name ?? '', summary: item?.summary ?? '', parentInitiativeId: item?.parentInitiativeId ?? parentId, ownerUserId: item?.ownerUserId ?? ownerUserId, status: item?.status ?? 'Planned', health: item?.health ?? 'NoUpdate', confidence: item?.confidence ?? null, targetAt: dateInput(item?.targetAt), projectIds: [...(item?.projectIds ?? [])] }; }
+export function newDependencyDraft(item?: import('./portfolio.models').PortfolioDependency): DependencyDraft { return { id: item?.id, sourceProjectId: item?.sourceProjectId ?? '', targetProjectId: item?.targetProjectId ?? '', description: item?.description ?? '', status: item?.status ?? 'Active', requiredBy: dateInput(item?.requiredBy) }; }
+export function portfolioError(draft: PortfolioDraft): string | null { return draft.name.trim() ? null : 'Portföy adı gereklidir.'; }
+export function initiativeError(draft: InitiativeDraft): string | null { if (!draft.name.trim()) return 'İnisiyatif adı gereklidir.'; if (!draft.ownerUserId) return 'İnisiyatif sahibi seçin.'; if (!draft.projectIds.length) return 'En az bir proje bağlayın.'; if (draft.confidence != null && (draft.confidence < 0 || draft.confidence > 100)) return 'Güven 0 ile 100 arasında olmalıdır.'; return null; }
+export function dependencyError(draft: DependencyDraft): string | null { if (!draft.sourceProjectId || !draft.targetProjectId) return 'Bağımlılık için iki proje seçin.'; if (draft.sourceProjectId === draft.targetProjectId) return 'Bir proje kendisine bağlanamaz.'; return draft.description.trim() ? null : 'Bağımlılık açıklaması gereklidir.'; }
+export function initiativeTree(items: readonly Initiative[]): readonly InitiativeTreeRow[] { const byParent = new Map<string, Initiative[]>(); items.forEach(item => { const key = item.parentInitiativeId ?? ''; byParent.set(key, [...(byParent.get(key) ?? []), item]); }); const rows: InitiativeTreeRow[] = []; const visit = (id: string, depth: number) => (byParent.get(id) ?? []).sort((a, b) => a.name.localeCompare(b.name, 'tr-TR')).forEach(item => { rows.push({ item, depth: Math.min(depth, 4) }); visit(item.id, depth + 1); }); visit('', 0); return rows; }
+export function statusLabel(value: string): string { return ({ Planned: 'Planlandı', Active: 'Aktif', Paused: 'Duraklatıldı', Completed: 'Tamamlandı', Cancelled: 'İptal' } as Record<string, string>)[value] ?? value; }
+export function healthLabel(value: string): string { return ({ NoUpdate: 'Güncelleme yok', OnTrack: 'Yolunda', AtRisk: 'Riskli', OffTrack: 'Raydan çıktı' } as Record<string, string>)[value] ?? value; }
+export function dateInput(value?: string | null): string { return value ? value.slice(0, 10) : ''; }
+export function isoDate(value: string): string | null { return value ? new Date(`${value}T00:00:00Z`).toISOString() : null; }

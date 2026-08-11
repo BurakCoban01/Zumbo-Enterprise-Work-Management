@@ -65,6 +65,14 @@
           <zumbo-inbox-page [projects]="projects()" [userId]="user.id" (unreadChange)="unreadCount.set($event)" />
         } @else if (section() === 'projects' && session.currentUser(); as user) {
           <zumbo-project-directory-page [projects]="projects()" [userId]="user.id" [selectedProjectId]="selectedProjectId()" [favorites]="favorites()" [recentProjects]="recentProjects()" (favoriteToggle)="toggleProjectFavorite($event)" (projectOpen)="openProject($event)" (projectUpdated)="updateProject($event)" (projectArchived)="removeProject($event)" />
+        } @else if (section() === 'portfolios' && session.currentUser(); as user) {
+          <zumbo-portfolio-page [projects]="projects()" [userId]="user.id" />
+        } @else if (section() === 'goals' && session.currentUser(); as user) {
+          <zumbo-goal-page [projects]="projects()" [userId]="user.id" />
+        } @else if (section() === 'capacity' && session.currentUser(); as user) {
+          <zumbo-capacity-page [projects]="projects()" [userId]="user.id" />
+        } @else if (section() === 'knowledge' && session.currentUser(); as user) {
+          <zumbo-knowledge-page [projects]="projects()" [userId]="user.id" />
         } @else if (section() === 'project' && activeView() === 'overview' && selectedProject(); as project) {
           @if (session.currentUser(); as user) { <zumbo-project-overview-page [project]="project" [boards]="boards()" [contextReady]="!projectContextLoading()" [userId]="user.id" /> }
         } @else if (section() === 'project' && activeView() === 'board' && selectedProject(); as project) {

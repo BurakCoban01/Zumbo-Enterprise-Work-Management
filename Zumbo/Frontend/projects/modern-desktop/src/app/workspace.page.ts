@@ -6,12 +6,15 @@ import { catchError, finalize, forkJoin, map, of, switchMap } from 'rxjs';
 import { DesktopNavigationComponent } from './shell/desktop-navigation.component';
 import { CommandPaletteComponent } from './shell/command-palette.component';
 import { AutomationPage } from './features/automation/automation.page';
+import { CapacityPage } from './features/capacity/capacity.page';
 import { HomePage } from './features/home/home.page';
+import { GoalPage } from './features/goals/goal.page';
 import { ProjectCatalogPage } from './features/catalog/project-catalog.page';
 import { ProjectBoardPage } from './features/board/project-board.page';
 import { InboxPage } from './features/inbox/inbox.page';
 import { IntakePage } from './features/intake/intake.page';
 import { JobsPage } from './features/jobs/jobs.page';
+import { KnowledgePage } from './features/knowledge/knowledge.page';
 import { ProjectListPage } from './features/list/project-list.page';
 import { NotificationItem } from './features/notifications/notification.models';
 import { NotificationPopoverComponent } from './features/notifications/notification-popover.component';
@@ -20,6 +23,7 @@ import { ProjectBacklogPage } from './features/planning/project-backlog.page';
 import { ProjectSprintPage } from './features/planning/project-sprint.page';
 import { ProjectPlanningViewPage } from './features/planning/views/project-planning-view.page';
 import { MyWorkPage } from './features/personal-work/my-work.page';
+import { PortfolioPage } from './features/portfolios/portfolio.page';
 import { ProjectDirectoryPage } from './features/projects/project-directory.page';
 import { ProjectReportingPage } from './features/reporting/project-reporting.page';
 import { ProjectWorkItemDetail } from './features/work-items/project-work-item.models';
@@ -47,7 +51,7 @@ const NAV_KEY = 'zumbo.navCollapsed';
 
 @Component({
   selector: 'zumbo-desktop-workspace',
-  imports: [AutomationPage, CommandPaletteComponent, DesktopNavigationComponent, HomePage, InboxPage, IntakePage, JobsPage, MyWorkPage, NotificationPopoverComponent, ProjectBacklogPage, ProjectBoardPage, ProjectCatalogPage, ProjectDirectoryPage, ProjectListPage, ProjectOverviewPage, ProjectPlanningViewPage, ProjectReportingPage, ProjectSprintPage, ProjectSwitcherComponent, ProjectViewTabsComponent, RouterLink, WorkItemCreateComponent, WorkItemDetailComponent, ZumboIconComponent],
+  imports: [AutomationPage, CapacityPage, CommandPaletteComponent, DesktopNavigationComponent, GoalPage, HomePage, InboxPage, IntakePage, JobsPage, KnowledgePage, MyWorkPage, NotificationPopoverComponent, PortfolioPage, ProjectBacklogPage, ProjectBoardPage, ProjectCatalogPage, ProjectDirectoryPage, ProjectListPage, ProjectOverviewPage, ProjectPlanningViewPage, ProjectReportingPage, ProjectSprintPage, ProjectSwitcherComponent, ProjectViewTabsComponent, RouterLink, WorkItemCreateComponent, WorkItemDetailComponent, ZumboIconComponent],
   templateUrl: './workspace.page.html',
   styleUrls: ['./workspace.page.scss', './workspace-responsive.scss']
 })
