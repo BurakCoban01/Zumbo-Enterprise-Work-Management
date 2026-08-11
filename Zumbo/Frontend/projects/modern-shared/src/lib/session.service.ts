@@ -42,6 +42,14 @@ export class ZumboSessionService {
     return this.authPost('/api/browser-auth/login', request).pipe(tap(auth => this.accept(auth)));
   }
 
+  forgotPassword(email: string): Observable<void> {
+    return this.authPost<unknown>('/api/auth/forgot-password', { email }).pipe(map(() => undefined));
+  }
+
+  resetPassword(token: string, newPassword: string): Observable<void> {
+    return this.authPost<unknown>('/api/auth/reset-password', { token, newPassword }).pipe(map(() => undefined));
+  }
+
   restore(): Observable<AuthResponse | null> {
     return this.authGet('/api/browser-auth/session').pipe(
       tap(auth => this.accept(auth)),

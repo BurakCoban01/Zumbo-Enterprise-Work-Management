@@ -1,0 +1,19 @@
+.editor{margin-top:24px;border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:12px 0}
+.editor summary{min-height:44px;color:var(--accent);font-weight:750;cursor:pointer}
+.editor form,.stack-form{display:grid;gap:12px;padding:8px 0 4px}
+.editor label span,.stack-form label span,.worklog-form label span{display:block;margin-bottom:5px;color:var(--muted);font-size:12px;font-weight:700}
+input,textarea,select{width:100%;min-height:44px;border:1px solid var(--line);border-radius:5px;padding:9px 10px;background:var(--panel);color:var(--ink);font:inherit}
+textarea{resize:vertical}
+.field-pair{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.primary,.inline-form button,.upload button,.worklog-form button{min-height:44px;border:0;border-radius:5px;padding:9px 14px;background:var(--accent);color:white;font:inherit;font-weight:800}
+.inline-form{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px}
+.checklist{border-top:1px solid var(--line)}
+.checklist label{display:flex;min-height:48px;align-items:center;gap:10px;border-bottom:1px solid var(--line)}
+.checklist input{width:22px;min-height:22px}
+.labels{margin:0}
+.labels>span{display:inline-flex;align-items:center;gap:5px}
+.labels button{width:28px;height:28px;border:0;background:transparent;color:var(--muted);font-size:18px}
+.upload{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;margin-top:10px}
+.worklog-form{display:grid;grid-template-columns:90px minmax(0,1fr) auto;gap:8px;align-items:end;margin-top:10px}
+@media(max-width:480px){.field-pair{grid-template-columns:1fr}.worklog-form{grid-template-columns:90px minmax(0,1fr)}.worklog-form button{grid-column:1/-1}.upload{grid-template-columns:1fr}.upload button{width:100%}}
+@media(max-width:359px){.inline-form{grid-template-columns:1fr}}

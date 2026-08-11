@@ -11,6 +11,7 @@
       }
       @if (error()) { <p class="mobile-error" role="alert">{{ error() }}</p> }
       <ion-button type="submit" expand="block" [disabled]="busy() || form.invalid">{{ busy() ? 'Giriş yapılıyor' : 'Giriş yap' }}</ion-button>
+      <a class="forgot-link" routerLink="/forgot-password">Parolamı unuttum</a>
     </form>
   </main>
 </ion-content>

@@ -6,3 +6,4 @@ form { display: grid; gap: 12px; }
 ion-item { --background: var(--panel); --border-color: var(--line); --min-height: 58px; }
 ion-button { min-height: 48px; margin-top: 8px; }
 .mobile-error { margin: 0; color: var(--danger); }
+.forgot-link { min-height: 44px; display: grid; place-items: center; color: var(--accent); font-weight: 700; text-decoration: none; }

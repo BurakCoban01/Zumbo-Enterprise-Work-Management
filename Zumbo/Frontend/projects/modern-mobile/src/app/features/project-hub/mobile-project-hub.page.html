@@ -1,0 +1,31 @@
+<ion-header><ion-toolbar><ion-back-button slot="start" defaultHref="/workspace/projects" text="Geri"/><ion-title>{{project()?.name||'Proje'}}</ion-title></ion-toolbar><ion-toolbar class="hub-tabs"><ion-segment [value]="tab()" (ionChange)="selectTab($event)" aria-label="Proje görünümü"><ion-segment-button value="overview">Özet</ion-segment-button><ion-segment-button value="board">Pano</ion-segment-button><ion-segment-button value="plan">Plan</ion-segment-button></ion-segment></ion-toolbar></ion-header>
+<ion-content [fullscreen]="true">
+  <ion-refresher slot="fixed" (ionRefresh)="refresh($event)"><ion-refresher-content pullingText="Projeyi yenile"/></ion-refresher>
+  <main class="hub-page" id="main-content">
+    <header class="hub-heading"><p>{{project()?.key||'Proje'}}</p><h1>{{project()?.name||'Proje merkezi'}}</h1><span>{{data()?.summary?.total||0}} iş · {{data()?.summary?.done||0}} tamamlandı</span></header>
+    @if(!online()){<p class="hub-state offline" role="status">Çevrimdışıyken pano salt okunur.</p>}
+    @if(error()){<p class="hub-state error" role="alert">{{error()}}</p>}
+    @if(loading()){<p class="hub-state" role="status">Proje bağlamı yükleniyor...</p>}
+
+    @if(!loading()&&tab()==='overview'){
+      <section class="metric-grid" aria-label="Proje özeti"><article><strong>{{data()?.summary?.total||0}}</strong><span>Toplam iş</span></article><article><strong>{{data()?.summary?.inProgress||0}}</strong><span>Devam eden</span></article><article><strong>{{data()?.summary?.done||0}}</strong><span>Tamamlanan</span></article><article [class.attention]="!!data()?.summary?.overdue"><strong>{{data()?.summary?.overdue||0}}</strong><span>Geciken</span></article></section>
+      <section class="hub-band"><header><div><h2>Aktif sprint</h2><p>Ekibin güncel teslimat odağı</p></div><ion-icon name="calendar-outline"/></header>@if(activeSprint()){<article class="sprint-focus"><strong>{{activeSprint()!.name}}</strong><span>{{activeSprint()!.goal||'Sprint hedefi tanımlanmamış.'}}</span><small>{{date(activeSprint()!.endDate)}} tarihine kadar</small></article>}@else{<p class="empty">Aktif sprint bulunmuyor.</p>}</section>
+      <section class="hub-band"><header><div><h2>Yaklaşan riskler</h2><p>Önümüzdeki 14 günde dikkat isteyen ilk işler</p></div><ion-icon name="warning-outline"/></header><div class="compact-list">@for(item of topRisks();track item.id){<a [routerLink]="['/tasks',item.id]"><span><strong>{{item.title}}</strong><small>{{item.status}}</small></span><time>{{date(item.dueDate)}}</time></a>}@empty{<p class="empty">Yaklaşan tarih riski yok.</p>}</div></section>
+      <a class="primary-link" [routerLink]="['/workspace/projects',projectId,'work']">Tüm proje işlerini aç</a>
+    }
+
+    @if(!loading()&&tab()==='board'){
+      <nav class="status-strip" aria-label="Pano sütunu">@for(status of statuses();track status.name){<button type="button" [class.active]="selectedStatus()===status.name" (click)="setStatus(status.name)"><span>{{status.name}}</span><b>{{statusCount(status.name)}}</b></button>}</nav>
+      <section class="board-column" [attr.aria-label]="selectedStatus()||'Pano'"><header><div><h2>{{selectedStatus()||'Pano'}}</h2><p>{{boardItems().length}} iş</p></div></header>
+        @for(item of boardItems();track item.id){<article class="board-card"><a [routerLink]="['/tasks',item.id]"><strong>{{item.title}}</strong><span>{{item.type}} · {{item.priority}}</span><small>{{date(item.dueDate)}}</small></a>@if(canMove()){<div class="move-actions"><button type="button" (click)="move(item.id,-1)" [disabled]="!!busy()||!canMoveDirection(item.status,-1)" aria-label="Önceki duruma taşı"><ion-icon name="arrow-back-outline"/></button><button type="button" (click)="move(item.id,1)" [disabled]="!!busy()||!canMoveDirection(item.status,1)" aria-label="Sonraki duruma taşı"><ion-icon name="arrow-forward-outline"/></button></div>}</article>}@empty{<p class="empty board-empty">Bu sütunda iş yok.</p>}
+      </section>
+      @if(!canMove()){<p class="permission-note">Bu panoda işler salt okunur.</p>}
+    }
+
+    @if(!loading()&&tab()==='plan'){
+      <section class="plan-summary"><article><strong>{{data()?.backlog?.length||0}}</strong><span>Backlog işi</span></article><article><strong>{{data()?.sprints?.length||0}}</strong><span>Sprint</span></article><article><strong>{{activeSprint()?.committedItems||0}}</strong><span>Aktif kapsam</span></article></section>
+      <section class="hub-band"><header><div><h2>Sprintler</h2><p>Planlanan ve aktif teslimat dönemleri</p></div></header><div class="sprint-list">@for(item of data()?.sprints||[];track item.id){<article><span class="sprint-state">{{sprintStatus(item.status)}}</span><strong>{{item.name}}</strong><p>{{item.goal||'Hedef tanımlanmamış.'}}</p><small>{{date(item.startDate)}} – {{date(item.endDate)}}</small></article>}@empty{<p class="empty">Henüz sprint yok.</p>}</div></section>
+      <section class="hub-band"><header><div><h2>Backlog öncelikleri</h2><p>Planlamaya hazır ilk işler</p></div><a [routerLink]="['/workspace/projects',projectId,'work']">Tümü</a></header><div class="compact-list">@for(item of (data()?.backlog||[]).slice(0,8);track item.id){<a [routerLink]="['/tasks',item.id]"><span><strong>{{item.title}}</strong><small>{{item.type}} · {{item.priority}}</small></span><b>{{item.estimatePoints||0}} p</b></a>}@empty{<p class="empty">Backlog boş.</p>}</div></section>
+    }
+  </main>
+</ion-content>

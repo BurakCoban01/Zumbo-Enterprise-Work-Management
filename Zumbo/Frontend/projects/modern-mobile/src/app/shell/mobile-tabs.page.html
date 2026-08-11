@@ -1,0 +1,12 @@
+@if (connectivity.offline()) {
+  <div class="connectivity-banner" role="status">Çevrimdışısınız. Kayıtlı görünüm salt okunur.</div>
+}
+<ion-tabs>
+  <ion-tab-bar slot="bottom" aria-label="Birincil gezinme">
+    <ion-tab-button tab="home" href="/modern-mobile/workspace/home"><ion-icon name="home-outline" /><ion-label>Ana sayfa</ion-label></ion-tab-button>
+    <ion-tab-button tab="work" href="/modern-mobile/workspace/work"><ion-icon name="briefcase-outline" /><ion-label>İşlerim</ion-label></ion-tab-button>
+    <ion-tab-button tab="create" href="/modern-mobile/workspace/create" class="create-tab"><ion-icon name="add-circle-outline" /><ion-label>Oluştur</ion-label></ion-tab-button>
+    <ion-tab-button tab="inbox" href="/modern-mobile/workspace/inbox"><ion-icon name="notifications-outline" />@if (unread()) { <ion-badge>{{ unread() > 99 ? '99+' : unread() }}</ion-badge> }<ion-label>Gelen kutusu</ion-label></ion-tab-button>
+    <ion-tab-button tab="more" href="/modern-mobile/workspace/more" [class.context-selected]="moreContext()" [attr.aria-selected]="moreContext() ? 'true' : null"><ion-icon name="grid-outline" /><ion-label>Daha fazla</ion-label></ion-tab-button>
+  </ion-tab-bar>
+</ion-tabs>

@@ -1,0 +1,27 @@
+.task-detail{width:min(720px,100%);margin:0 auto;padding:20px 16px 36px;color:var(--ink)}
+header p{margin:0 0 5px;color:var(--accent);font-size:12px;font-weight:800;text-transform:uppercase}
+h1{margin:0;font-size:24px;line-height:1.25;overflow-wrap:anywhere}
+header>div,.labels,.collaboration{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+header>div span,.labels>span{border:1px solid var(--line);border-radius:999px;padding:5px 9px;background:var(--panel);font-size:12px;font-weight:700}
+.detail-tabs{display:grid;grid-template-columns:repeat(3,1fr);margin:20px 0 4px;border-bottom:1px solid var(--line)}
+.detail-tabs button{min-height:46px;border:0;border-bottom:3px solid transparent;background:transparent;color:var(--muted);font:inherit;font-weight:750}
+.detail-tabs button.active{border-color:var(--accent);color:var(--accent)}
+.facts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));margin:18px 0;border-top:1px solid var(--line);border-left:1px solid var(--line)}
+.facts div{min-height:72px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);padding:12px}
+.facts span,.facts strong{display:block}
+.facts span{color:var(--muted);font-size:11px}
+.facts strong{margin-top:5px;font-size:14px;overflow-wrap:anywhere}
+section{margin-top:24px}
+h2{margin:0;font-size:15px}
+.section-title{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.section-title>span{color:var(--muted);font-size:12px}
+.description{margin:8px 0 0;color:var(--muted);line-height:1.6;white-space:pre-wrap;overflow-wrap:anywhere}
+.collaboration button{min-height:44px;border:1px solid var(--line);border-radius:5px;padding:8px 13px;background:var(--panel);color:var(--muted);font:inherit;font-weight:750}
+.collaboration button.active{border-color:var(--accent);background:var(--accent-soft);color:var(--accent)}
+.empty{margin:10px 0;color:var(--muted);font-size:13px}
+.state{margin:16px 0;color:var(--muted);line-height:1.5}
+.state.error{color:var(--danger)}
+.state.notice{border-left:3px solid var(--success);padding:9px 11px;background:var(--success-soft);color:var(--ink)}
+.state.partial{border-left:3px solid var(--warning);padding:9px 11px;background:var(--warning-soft);color:var(--ink)}
+button:disabled{opacity:.55}
+@media(max-width:359px){.facts{grid-template-columns:1fr}}

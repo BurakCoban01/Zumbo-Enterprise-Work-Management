@@ -1,13 +1,13 @@
 import { Component, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { Router } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { IonButton, IonContent, IonHeader, IonInput, IonItem, IonTitle, IonToolbar } from '@ionic/angular/standalone';
 import { finalize } from 'rxjs';
 import { normalizeApiError, ZumboSessionService } from '@zumbo/modern-shared';
 
 @Component({
   selector: 'zumbo-mobile-login',
-  imports: [ReactiveFormsModule, IonButton, IonContent, IonHeader, IonInput, IonItem, IonTitle, IonToolbar],
+  imports: [ReactiveFormsModule, RouterLink, IonButton, IonContent, IonHeader, IonInput, IonItem, IonTitle, IonToolbar],
   templateUrl: './login.page.html',
   styleUrl: './login.page.scss'
 })

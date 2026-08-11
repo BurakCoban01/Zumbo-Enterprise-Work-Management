@@ -1,0 +1,31 @@
+<ion-header><ion-toolbar><ion-title>Daha fazla</ion-title></ion-toolbar></ion-header>
+<ion-content [fullscreen]="true">
+  <main>
+    <header>
+      <span class="avatar">{{session.currentUser()?.username?.slice(0,1)?.toUpperCase()}}</span>
+      <div><h1>{{session.currentUser()?.username}}</h1><p>{{session.currentUser()?.email}}</p></div>
+    </header>
+    <section>
+      <h2>Çalışma alanı</h2>
+      <a routerLink="/workspace/projects">
+        <ion-icon name="folder-open-outline"/>
+        <span><strong>Projeler</strong><small>{{store.projects().length}} erişilebilir proje</small></span>
+        <ion-icon name="chevron-forward-outline"/>
+      </a>
+      <a routerLink="/workspace/search">
+        <ion-icon name="search-outline"/>
+        <span><strong>Arama</strong><small>Proje kapsamındaki işlere ulaşın</small></span>
+        <ion-icon name="chevron-forward-outline"/>
+      </a>
+    </section>
+    <section>
+      <h2>Hesap</h2>
+      <a routerLink="/workspace/account">
+        <ion-icon name="person-circle-outline"/>
+        <span><strong>Hesap ve güvenlik</strong><small>Parola, bildirimler, cihazlar ve veri tercihleri</small></span>
+        <ion-icon name="chevron-forward-outline"/>
+      </a>
+    </section>
+    <section><h2>Oturum</h2><button type="button" (click)="logout()"><ion-icon name="log-out-outline"/><span>Çıkış yap</span></button></section>
+  </main>
+</ion-content>

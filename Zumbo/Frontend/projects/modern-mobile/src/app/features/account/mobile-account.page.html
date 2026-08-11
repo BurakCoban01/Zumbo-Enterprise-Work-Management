@@ -1,0 +1,72 @@
+<ion-header>
+  <ion-toolbar><ion-back-button slot="start" defaultHref="/workspace/more" text="Geri"/><ion-title>Hesap ve güvenlik</ion-title></ion-toolbar>
+  <ion-toolbar class="account-tabs"><ion-segment [value]="tab()" (ionChange)="selectTab($event)" aria-label="Hesap ayarı bölümü">
+    <ion-segment-button value="account">Hesap</ion-segment-button><ion-segment-button value="security">Güvenlik</ion-segment-button><ion-segment-button value="data">Veri</ion-segment-button>
+  </ion-segment></ion-toolbar>
+</ion-header>
+<ion-content [fullscreen]="true">
+  <main id="main-content" class="account-page">
+    <header class="identity"><span class="avatar">{{user()?.username?.slice(0,1)?.toUpperCase()}}</span><div><h1>{{user()?.username}}</h1><p>{{user()?.email}}</p></div></header>
+    @if (!online()) { <p class="state-banner offline" role="status">Çevrimdışıyken hesap ayarları salt okunur.</p> }
+    @if (error()) { <p class="state-banner error" role="alert">{{error()}}</p> }
+    @if (success()) { <p class="state-banner success" role="status">{{success()}}</p> }
+    @if (loading()) { <div class="loading" role="status"><ion-spinner/><span>Hesap bilgileri yükleniyor</span></div> }
+
+    @if (!loading() && tab() === 'account') {
+      <section class="settings-band" aria-labelledby="notification-title">
+        <header><ion-icon name="notifications-outline"/><div><h2 id="notification-title">Bildirim tercihleri</h2><p>Günlük işinizde hangi kanallardan haberdar olacağınızı seçin.</p></div></header>
+        <label class="toggle-row"><span><strong>Uygulama içi bildirim</strong><small>Inbox ve bildirim merkezinde göster</small></span><ion-toggle [ngModel]="preferences().inAppEnabled" (ngModelChange)="preferences.set({...preferences(), inAppEnabled:$event})" aria-label="Uygulama içi bildirim"/></label>
+        <label class="toggle-row"><span><strong>E-posta bildirimi</strong><small>Önemli olayları e-postayla ilet</small></span><ion-toggle [ngModel]="preferences().emailEnabled" (ngModelChange)="preferences.set({...preferences(), emailEnabled:$event})" aria-label="E-posta bildirimi"/></label>
+        <label class="field"><span>Sessize alınan bildirim türleri</span><input [(ngModel)]="mutedTypesText" autocomplete="off" placeholder="Virgülle ayırın"></label>
+        <ion-button expand="block" (click)="savePreferences()" [disabled]="!!busy() || !online()">{{busy()==='preferences' ? 'Kaydediliyor' : 'Tercihleri kaydet'}}</ion-button>
+      </section>
+      <section class="settings-band" aria-labelledby="password-title">
+        <header><ion-icon name="lock-closed-outline"/><div><h2 id="password-title">Parola değiştir</h2><p>Başka yerde kullanmadığınız en az 12 karakterli bir parola seçin.</p></div></header>
+        <label class="field"><span>Mevcut parola</span><input type="password" [(ngModel)]="passwordDraft.currentPassword" autocomplete="current-password"></label>
+        <label class="field"><span>Yeni parola</span><input type="password" [(ngModel)]="passwordDraft.newPassword" autocomplete="new-password" minlength="12"></label>
+        <ion-button expand="block" fill="outline" (click)="changePassword()" [disabled]="!!busy() || !online() || !passwordDraft.currentPassword || passwordDraft.newPassword.length < 12">{{busy()==='password' ? 'Güncelleniyor' : 'Parolayı güncelle'}}</ion-button>
+      </section>
+    }
+
+    @if (!loading() && tab() === 'security') {
+      <section class="settings-band" aria-labelledby="mfa-title">
+        <header><ion-icon name="shield-checkmark-outline"/><div><h2 id="mfa-title">İki adımlı doğrulama</h2><p>{{mfa().enabled ? 'Etkin · ' + mfa().remainingRecoveryCodes + ' kurtarma kodu kaldı' : 'Parolanıza ek bir doğrulama katmanı ekleyin.'}}</p></div><span class="status" [class.active]="mfa().enabled">{{mfa().enabled ? 'Etkin' : 'Kapalı'}}</span></header>
+        @if (!mfa().enabled && !mfaSetup()) {
+          <label class="field"><span>Mevcut parola</span><input type="password" [(ngModel)]="mfaDraft.password" autocomplete="current-password"></label>
+          <ion-button expand="block" (click)="beginMfa()" [disabled]="!!busy() || !online() || !mfaDraft.password">Kurulumu başlat</ion-button>
+        }
+        @if (mfaSetup()) {
+          <div class="secret-panel"><strong>Doğrulayıcı kurulum anahtarı</strong><code>{{mfaSetup()!.secret}}</code><button type="button" class="icon-action" (click)="copy(mfaSetup()!.secret)"><ion-icon name="copy-outline"/>Kopyala</button><small>Bu değer yalnızca kurulum sırasında gösterilir.</small></div>
+          <label class="field"><span>Doğrulayıcı kodu</span><input [(ngModel)]="mfaDraft.code" inputmode="numeric" autocomplete="one-time-code" maxlength="16"></label>
+          <ion-button expand="block" (click)="confirmMfa()" [disabled]="!!busy() || !online() || !mfaDraft.code">Etkinleştir</ion-button>
+        }
+        @if (mfa().enabled) {
+          <details><summary>Kurtarma kodlarını yenile</summary><div class="detail-form"><label class="field"><span>Parola</span><input type="password" [(ngModel)]="recoveryDraft.password" autocomplete="current-password"></label><label class="field"><span>Doğrulama kodu</span><input [(ngModel)]="recoveryDraft.code" autocomplete="one-time-code"></label><ion-button expand="block" fill="outline" (click)="regenerateCodes()" [disabled]="!!busy() || !online() || !recoveryDraft.password || !recoveryDraft.code">Kodları yenile</ion-button></div></details>
+          <details><summary>İki adımlı doğrulamayı kapat</summary><div class="detail-form"><p class="warning-copy">Hesabınız yalnızca parolanızla korunur.</p><label class="field"><span>Parola</span><input type="password" [(ngModel)]="mfaDraft.password" autocomplete="current-password"></label><label class="field"><span>Doğrulama kodu</span><input [(ngModel)]="mfaDraft.code" autocomplete="one-time-code"></label><ion-button color="danger" expand="block" fill="outline" (click)="disableMfa()" [disabled]="!!busy() || !online() || !mfaDraft.password || !mfaDraft.code">Doğrulamayı kapat</ion-button></div></details>
+        }
+        @if (recoveryCodes().length) { <div class="secret-panel"><strong>Yeni kurtarma kodları</strong><div class="code-grid">@for (code of recoveryCodes(); track code) { <code>{{code}}</code> }</div><button type="button" class="icon-action" (click)="copy(recoveryCodes())"><ion-icon name="copy-outline"/>Tümünü kopyala</button><button type="button" class="text-action" (click)="dismissSecrets()">Kapat</button><small>Bu liste kapatıldıktan sonra yeniden gösterilmez.</small></div> }
+      </section>
+
+      <section class="settings-band" aria-labelledby="sessions-title">
+        <header><ion-icon name="phone-portrait-outline"/><div><h2 id="sessions-title">Cihaz oturumları</h2><p>Tanımadığınız veya artık kullanmadığınız cihazların erişimini kapatın.</p></div></header>
+        <div class="list-rows" [class.expanded]="showAllSessions()">
+          @for (item of shownSessions(); track item.id) { <article class="device-row"><div><strong>{{item.deviceName || 'Bilinmeyen cihaz'}}</strong><span>{{item.isCurrent ? 'Bu cihaz' : (sessionActive(item) ? 'Etkin oturum' : 'Kapalı')}}</span><small>Son kullanım {{item.lastSeenAt | date:'dd.MM.yyyy HH:mm'}}</small></div>@if (sessionActive(item)) { <button type="button" class="icon-only" (click)="revokeSession(item)" [disabled]="!!busy() || !online()" [attr.aria-label]="item.isCurrent ? 'Bu cihaz oturumunu kapat' : 'Cihaz oturumunu kapat'"><ion-icon name="trash-outline"/></button> }</article> }
+          @if (!shownSessions().length) { <p class="empty">Gösterilecek cihaz oturumu yok.</p> }
+        </div>
+        @if (hiddenSessionCount() > 0 || showAllSessions()) { <button type="button" class="show-all" (click)="showAllSessions.set(!showAllSessions())">{{showAllSessions() ? 'Oturum özetini göster' : 'Tüm ' + sessions().length + ' oturumu göster'}}</button> }
+      </section>
+
+      <section class="settings-band" aria-labelledby="keys-title">
+        <header><ion-icon name="key-outline"/><div><h2 id="keys-title">API anahtarları</h2><p>Yalnızca kurumsal entegrasyonlarda kullanın.</p></div></header>
+        @for (item of apiKeys(); track item.id) { <article class="key-row"><div><strong>{{item.name}}</strong><code>{{item.keyPrefix}}…</code><small>{{item.revokedAt ? 'Kapalı' : ('Geçerlilik ' + (item.expiresAt | date:'dd.MM.yyyy'))}}</small></div>@if (!item.revokedAt) { <button type="button" class="icon-only" (click)="revokeApiKey(item)" [disabled]="!!busy() || !online()" aria-label="API anahtarını kapat"><ion-icon name="trash-outline"/></button> }</article> }
+        @if (createdApiKey()) { <div class="secret-panel"><strong>Yeni API anahtarı</strong><code class="breakable">{{createdApiKey()!.key}}</code><button type="button" class="icon-action" (click)="copy(createdApiKey()!.key)"><ion-icon name="copy-outline"/>Kopyala</button><small>Tam anahtar yalnızca şimdi gösterilir.</small></div> }
+        <details><summary>Yeni API anahtarı oluştur</summary><div class="detail-form"><label class="field"><span>Anahtar adı</span><input [(ngModel)]="apiKeyDraft.name" autocomplete="off"></label><label class="field"><span>Parola</span><input type="password" [(ngModel)]="apiKeyDraft.password" autocomplete="current-password"></label><label class="field"><span>MFA kodu (etkinse)</span><input [(ngModel)]="apiKeyDraft.mfaCode" autocomplete="one-time-code"></label><label class="field"><span>Geçerlilik (gün)</span><input type="number" min="1" max="365" [(ngModel)]="apiKeyDraft.expiresInDays"></label><ion-button expand="block" (click)="createApiKey()" [disabled]="!!busy() || !online() || !apiKeyDraft.name || !apiKeyDraft.password">Anahtar oluştur</ion-button></div></details>
+      </section>
+    }
+
+    @if (!loading() && tab() === 'data') {
+      <section class="settings-band" aria-labelledby="export-title"><header><ion-icon name="cloud-download-outline"/><div><h2 id="export-title">Verilerimi dışa aktar</h2><p>Hesabınıza ait verileri taşınabilir NDJSON arşivi olarak indirin.</p></div></header><ion-button expand="block" fill="outline" (click)="exportData()" [disabled]="!!busy() || !online()">{{busy()==='export' ? 'Hazırlanıyor' : 'Verilerimi indir'}}</ion-button></section>
+      <section class="settings-band danger-zone" aria-labelledby="anonymize-title"><header><ion-icon name="trash-outline"/><div><h2 id="anonymize-title">Hesabı anonimleştir</h2><p>Hesap erişiminiz kalıcı olarak kapanır ve kişisel referanslar anonimleştirilir.</p></div></header>@if (privacyJob()) { <div class="job-state" role="status"><strong>İşlem durumu: {{privacyJob()!.state}}</strong><span>{{privacyJob()!.progressPercent || 0}}% tamamlandı</span></div> } @else { <p class="warning-copy">Bu işlem geri alınamaz. Devam etmek için parolanızı ve tam olarak <strong>ANONYMIZE</strong> yazın.</p><label class="field"><span>Parola</span><input type="password" [(ngModel)]="privacyDraft.password" autocomplete="current-password"></label><label class="field"><span>Onay ifadesi</span><input [(ngModel)]="privacyDraft.confirmation" autocomplete="off" placeholder="ANONYMIZE"></label><ion-button color="danger" expand="block" fill="outline" (click)="anonymize()" [disabled]="!!busy() || !online() || !privacyDraft.password || privacyDraft.confirmation !== 'ANONYMIZE'">Hesabı anonimleştir</ion-button> }</section>
+    }
+  </main>
+</ion-content>
