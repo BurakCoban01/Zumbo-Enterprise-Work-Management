@@ -72,7 +72,7 @@
 .planning-control.search { flex: 1 1 190px; }
 .planning-control span {
   color: var(--muted);
-  font-size: .7rem;
+  font-size: var(--font-size-caption);
   font-weight: 700;
 }
 
@@ -189,7 +189,7 @@
 .planning-calendar-weekdays span {
   padding: 8px 10px;
   color: var(--muted);
-  font-size: .7rem;
+  font-size: var(--font-size-caption);
   font-weight: 800;
   text-transform: uppercase;
 }
@@ -208,7 +208,7 @@
   display: block;
   margin-bottom: 5px;
   color: var(--muted);
-  font-size: .72rem;
+  font-size: var(--font-size-caption);
   font-weight: 800;
 }
 
@@ -234,8 +234,8 @@
   overflow-wrap: anywhere;
 }
 
-.planning-calendar-event strong { font-size: .72rem; }
-.planning-calendar-event small { color: var(--muted); font-size: .65rem; }
+.planning-calendar-event strong { font-size: var(--font-size-caption); }
+.planning-calendar-event small { color: var(--muted); font-size: var(--font-size-caption); }
 .planning-calendar-event[data-tone="risk"] { border-left-color: var(--danger); }
 .planning-calendar-event[data-tone="sprint"] { border-left-color: var(--color-info); }
 .planning-calendar-event[data-tone="milestone"] { border-left-color: var(--warning); }
@@ -287,7 +287,7 @@
   flex-wrap: wrap;
   margin: 8px 0 12px;
   color: var(--muted);
-  font-size: .7rem;
+  font-size: var(--font-size-caption);
 }
 
 .planning-legend span { display: inline-flex; align-items: center; gap: 5px; }
@@ -312,7 +312,7 @@
   background: var(--panel);
 }
 
-.planning-axis-label { color: var(--muted); font-size: .7rem; font-weight: 800; }
+.planning-axis-label { color: var(--muted); font-size: var(--font-size-caption); font-weight: 800; }
 .planning-axis-grid,
 .planning-gantt-track {
   display: grid;
@@ -324,7 +324,7 @@
   border-right: 1px solid var(--line);
   background: var(--surface-subtle);
   color: var(--muted);
-  font-size: .65rem;
+  font-size: var(--font-size-caption);
   text-align: center;
 }
 
@@ -359,7 +359,7 @@
   border-radius: 4px;
   background: var(--accent-soft);
   color: var(--accent-strong);
-  font-size: .68rem;
+  font-size: var(--font-size-caption);
   font-weight: 800;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -396,7 +396,7 @@
 .status-done { background: var(--success); }
 .status-custom { background: var(--warning); }
 .roadmap-status-legend { display: flex; flex-wrap: wrap; gap: 6px 12px; margin-top: 8px; }
-.roadmap-status-legend span { display: inline-flex; align-items: center; gap: 5px; color: var(--muted); font-size: .72rem; }
+.roadmap-status-legend span { display: inline-flex; align-items: center; gap: 5px; color: var(--muted); font-size: var(--font-size-caption); }
 .roadmap-status-legend i { width: 9px; height: 9px; border: 1px solid var(--line-strong); border-radius: 2px; }
 
 .planning-risk-note {

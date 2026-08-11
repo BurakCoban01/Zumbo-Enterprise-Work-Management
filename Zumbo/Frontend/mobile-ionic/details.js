@@ -4,6 +4,7 @@
   angular.module('zumboMobile')
   .controller('ProjectDetailController', function($scope, $state, $stateParams, $q, zumboApi, sessionStore, apiClient, mobileActionError) {
     var vm = this;
+    vm.auditActionLabel = window.ZumboAuditPrivacyCore.auditActionLabel;
     apiClient.transitionContext('project:' + $stateParams.projectId);
     vm.project = sessionStore.state.project;
     vm.boards = [];

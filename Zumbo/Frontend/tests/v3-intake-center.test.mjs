@@ -16,12 +16,15 @@ const mobileApp = await readFile(resolve(root, 'mobile-ionic/app.js'), 'utf8');
 const mobileFeature = await readFile(resolve(root, 'mobile-ionic/intake-center.js'), 'utf8');
 const mobileHtml = await readFile(resolve(root, 'mobile-ionic/index.html'), 'utf8');
 const mobileCss = await readFile(resolve(root, 'mobile-ionic/intake-center.css'), 'utf8');
-const backendContracts = await readFile(
-  resolve(root, '../Backend/src/Zumbo.Modules.WorkItems/IntakeContracts.cs'),
+const backendContracts = (await Promise.all([
+  'CreateIntakeFormRequest.cs',
+  'IntakeFieldMappingRequest.cs'
+].map(file => readFile(
+  resolve(root, '../Backend/src/Zumbo.Modules.WorkItems/Application/Features/Intake', file),
   'utf8'
-);
+)))).join('\n');
 const backendEndpoints = await readFile(
-  resolve(root, '../Backend/src/Zumbo.Api/Endpoints/IntakeEndpoints.cs'),
+  resolve(root, '../Backend/src/Zumbo.Api/Presentation/Endpoints/Platform/PlatformCore/IntakeEndpoints.cs'),
   'utf8'
 );
 

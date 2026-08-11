@@ -12,6 +12,7 @@
       mobileActionError) {
       var vm = this;
       var core = window.ZumboWorkAutomationCore;
+      vm.auditActionLabel = window.ZumboAuditPrivacyCore.auditActionLabel;
       var tabs = ['rules', 'runs', 'schedules', 'templates', 'activity'];
       var loadSequence = 0;
       var ruleSequence = 0;

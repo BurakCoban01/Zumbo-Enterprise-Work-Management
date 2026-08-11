@@ -15,7 +15,7 @@ const mobileDetails = await readFile(resolve(root, 'mobile-ionic/details.js'), '
 const mobileApi = await readFile(resolve(root, 'mobile-ionic/api.js'), 'utf8');
 const mobileHtml = await readFile(resolve(root, 'mobile-ionic/index.html'), 'utf8');
 const endpoints = await readFile(
-  resolve(root, '../Backend/src/Zumbo.Api/Endpoints/DevelopmentIntegrationEndpoints.cs'),
+  resolve(root, '../Backend/src/Zumbo.Api/Presentation/Endpoints/WorkItems/PlatformCore/DevelopmentIntegrationEndpoints.cs'),
   'utf8'
 );
 
@@ -155,5 +155,5 @@ test('backend keeps anonymous ingress separate from authorized management and li
     /MapGroup\([\s\S]*development-links[\s\S]*MapGet\("\/mappings"/
   );
   assert.match(endpoints, /WithZumboPermission\(PermissionCatalog\.WorkItemLink\)/);
-  assert.match(endpoints, /MapPost\("\/\{connectionId\}\/webhook", ReceiveWebhookAsync\)[\s\S]*AllowAnonymous\(\)/);
+  assert.match(endpoints, /MapPost\("\/\{connectionId\}\/webhook", ReceiveWebhookWithHandlerAsync\)[\s\S]*AllowAnonymous\(\)/);
 });

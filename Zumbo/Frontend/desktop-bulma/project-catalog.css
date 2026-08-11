@@ -44,7 +44,7 @@
 }
 
 .catalog-summary div:last-child { border-right: 0; }
-.catalog-summary dt { color: var(--muted); font-size: 10px; line-height: 1.3; }
+.catalog-summary dt { color: var(--muted); font-size: var(--font-size-caption); line-height: 1.3; }
 .catalog-summary dd { margin: 4px 0 0; color: var(--ink); font-size: 20px; font-weight: 750; }
 
 .catalog-tabs {
@@ -129,7 +129,7 @@
 .catalog-band-heading h3,
 .catalog-editor-heading h3 { margin: 0; color: var(--ink); font-size: 15px; }
 .catalog-band-heading p { margin: 3px 0 0; }
-.catalog-band-heading > span { color: var(--muted); font-size: 11px; white-space: nowrap; }
+.catalog-band-heading > span { color: var(--muted); font-size: var(--font-size-caption); white-space: nowrap; }
 
 .catalog-inline-form,
 .catalog-release-form {
@@ -150,7 +150,7 @@
   gap: 6px;
   min-width: 0;
   color: var(--muted);
-  font-size: 11px;
+  font-size: var(--font-size-caption);
   font-weight: 700;
 }
 
@@ -201,7 +201,7 @@
   border: 1px solid var(--danger);
   border-radius: 4px;
   color: var(--danger);
-  font-size: 11px;
+  font-size: var(--font-size-caption);
   white-space: nowrap;
 }
 
@@ -230,7 +230,7 @@
 .catalog-checkbox input { width: 17px; height: 17px; accent-color: var(--accent); }
 
 .catalog-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 3px; }
-.catalog-tags i { padding: 2px 5px; border: 1px solid var(--border); border-radius: 3px; color: var(--muted); font-size: 10px; font-style: normal; }
+.catalog-tags i { padding: 2px 5px; border: 1px solid var(--border); border-radius: 3px; color: var(--muted); font-size: var(--font-size-caption); font-style: normal; }
 
 .catalog-empty {
   margin: 0;
@@ -247,7 +247,7 @@
 .catalog-audit-list div { display: grid; gap: 2px; }
 .catalog-audit-list strong { color: var(--ink); font-size: 12px; }
 .catalog-audit-list small,
-.catalog-audit-list time { color: var(--muted); font-size: 10px; }
+.catalog-audit-list time { color: var(--muted); font-size: var(--font-size-caption); }
 
 .project-catalog-surface[data-busy="true"] .catalog-list,
 .project-catalog-surface[data-busy="true"] .catalog-editor { opacity: 0.72; }

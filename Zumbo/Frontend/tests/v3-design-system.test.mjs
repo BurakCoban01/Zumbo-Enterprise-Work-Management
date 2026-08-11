@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
+import { readFile, readdir } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import test from 'node:test';
 
@@ -13,10 +13,12 @@ test('V3 semantic token contract covers theme density typography state and motio
     '--color-text-subtle', '--color-text-inverse', '--color-surface-subtle', '--color-panel-raised',
     '--color-border-strong', '--color-brand-signal', '--color-info', '--color-success-soft',
     '--color-warning-soft', '--color-danger-soft', '--font-display', '--font-numeric', '--font-size-title',
+    '--font-size-caption',
     '--font-weight-strong', '--radius-compact', '--elevation-overlay', '--motion-instant',
     '--motion-deliberate', '--motion-easing', '--control-height', '--row-height', '--density-padding'
   ]) assert.match(css, new RegExp(`${token}:`));
   assert.match(css, /\.density-compact\s*\{/);
+  assert.match(css, /--font-size-caption:\s*12px;/);
   assert.doesNotMatch(css, /font-size:\s*[^;]*(?:vw|vh)/);
 });
 
@@ -54,6 +56,20 @@ test('dark theme rebinds legacy aliases to its semantic palette', async () => {
   ]) {
     assert.match(dark, new RegExp(`--${alias}:\\s*var\\(--color-${semantic}\\)`));
   }
+});
+
+test('desktop surfaces keep meaningful text at the caption floor and use adaptive state contrast', async () => {
+  const desktopRoot = resolve(root, 'desktop-bulma');
+  const cssFiles = (await readdir(desktopRoot)).filter(file => file.endsWith('.css'));
+  const css = (await Promise.all(cssFiles.map(file => readFile(resolve(desktopRoot, file), 'utf8')))).join('\n');
+  const styles = await read('desktop-bulma/styles.css');
+  const html = await read('desktop-bulma/index.html');
+
+  assert.doesNotMatch(css, /font-size:\s*(?:8|9|10|11)px|font-size:\s*0?\.(?:5|6|7[0-4])\d*rem/);
+  assert.match(styles, /\.button\.is-primary\s*\{[^}]*color:\s*var\(--color-text-inverse\)/s);
+  assert.match(styles, /\[data-due-state="overdue"\][^}]*color:\s*var\(--danger\)/s);
+  assert.doesNotMatch(html, /\{\{entry\.action\}\}/);
+  assert.match(html, /vm\.auditActionLabel\(entry\.action\)/);
 });
 
 test('component gallery uses shipped primitives and renders required product states', async () => {

@@ -310,7 +310,7 @@
               <div class="overview-band-heading"><div><p class="eyebrow">Etkinlik</p><h3 id="activity-heading">Son değişiklikler</h3></div><button ng-click="vm.setProjectView('timeline')">Tümünü aç</button></div>
               <p class="overview-loading" ng-if="vm.timelineLoading">Etkinlik yenileniyor...</p>
               <div class="status-banner error compact" ng-if="!vm.timelineLoading && vm.timelineError"><span>{{vm.timelineError}}</span><button ng-click="vm.loadTimeline()">Yeniden dene</button></div>
-              <ol class="overview-activity" ng-if="!vm.timelineLoading && !vm.timelineError"><li ng-repeat="entry in vm.recentProjectActivity() track by entry.id"><span></span><div><strong>{{entry.action}}</strong><small>{{vm.activityActorName(entry)}}</small></div><time>{{entry.createdAt | date:'dd MMM HH:mm'}}</time></li></ol>
+              <ol class="overview-activity" ng-if="!vm.timelineLoading && !vm.timelineError"><li ng-repeat="entry in vm.recentProjectActivity() track by entry.id"><span></span><div><strong>{{vm.auditActionLabel(entry.action)}}</strong><small>{{vm.activityActorName(entry)}}</small></div><time>{{entry.createdAt | date:'dd MMM HH:mm'}}</time></li></ol>
               <p class="section-empty" ng-if="!vm.timelineLoading && !vm.timelineError && !vm.recentProjectActivity().length">Henüz proje etkinliği yok.</p>
             </section>
           </aside>
@@ -502,7 +502,7 @@
 
       <section class="catalog-band catalog-activity" ng-if="vm.projectCatalogTab === 'activity'" aria-labelledby="catalog-activity-heading">
         <div class="catalog-band-heading"><div><h3 id="catalog-activity-heading">Teslimat etkinliği</h3><p>Şablon, bileşen, sürüm, yayın ve kilometre taşı değişiklikleri.</p></div><button class="icon-button" type="button" ng-click="vm.loadProjectAudit()" aria-label="Teslimat etkinliğini yenile" title="Yenile"><i data-lucide="refresh-cw" lucide-icon></i></button></div>
-        <ol class="catalog-audit-list"><li ng-repeat="entry in vm.projectCatalogAudit() track by entry.id"><span class="catalog-audit-mark"></span><div><strong>{{entry.action}}</strong><small>{{entry.actorUserId ? vm.userName(entry.actorUserId) : 'Sistem işlemi'}}</small></div><time>{{entry.createdAt | date:'dd MMM yyyy HH:mm'}}</time></li></ol>
+        <ol class="catalog-audit-list"><li ng-repeat="entry in vm.projectCatalogAudit() track by entry.id"><span class="catalog-audit-mark"></span><div><strong>{{vm.auditActionLabel(entry.action)}}</strong><small>{{entry.actorUserId ? vm.userName(entry.actorUserId) : 'Sistem işlemi'}}</small></div><time>{{entry.createdAt | date:'dd MMM yyyy HH:mm'}}</time></li></ol>
         <p class="catalog-empty" ng-if="!vm.projectCatalogAudit().length">Henüz teslimat kataloğu etkinliği yok.</p>
       </section>
     </section>
@@ -626,7 +626,7 @@
       <section class="automation-audit" ng-if="!vm.workAutomationLoading && vm.workAutomationTab === 'activity'" aria-labelledby="automation-audit-heading">
         <div class="automation-section-heading"><div><h3 id="automation-audit-heading">Otomasyon etkinliği</h3><p ng-if="vm.workAutomation.auditTarget">{{vm.workAutomation.auditTarget.label}} için immutable audit kaydı.</p><p ng-if="!vm.workAutomation.auditTarget">Bir şablon düzenleyin veya yineleme seçin.</p></div><i data-lucide="scroll-text" lucide-icon></i></div>
         <p class="automation-feedback error compact" role="alert" ng-if="vm.workAutomationAuditError">{{vm.workAutomationAuditError}}</p>
-        <ol><li ng-repeat="entry in vm.workAutomation.audit track by entry.id"><span></span><div><strong>{{entry.action}}</strong><small>{{entry.actorUserId ? vm.userName(entry.actorUserId) : 'Sistem işlemi'}}</small></div><time>{{entry.createdAt | date:'dd MMM yyyy HH:mm'}}</time></li></ol><p class="automation-empty" ng-if="!vm.workAutomationAuditError && !vm.workAutomation.audit.length">Seçili kayıt için etkinlik bulunamadı.</p>
+        <ol><li ng-repeat="entry in vm.workAutomation.audit track by entry.id"><span></span><div><strong>{{vm.auditActionLabel(entry.action)}}</strong><small>{{entry.actorUserId ? vm.userName(entry.actorUserId) : 'Sistem işlemi'}}</small></div><time>{{entry.createdAt | date:'dd MMM yyyy HH:mm'}}</time></li></ol><p class="automation-empty" ng-if="!vm.workAutomationAuditError && !vm.workAutomation.audit.length">Seçili kayıt için etkinlik bulunamadı.</p>
       </section>
     </section>
 
@@ -1032,7 +1032,7 @@
             </form>
           </div>
           <div class="detail-subheading" ng-if="vm.board && vm.projectMembership"><h3>Pano etkinliği</h3></div>
-          <div class="timeline" ng-if="vm.board && vm.projectMembership"><p ng-repeat="entry in vm.boardAudit | limitTo:10"><strong>{{entry.action}}</strong><span>{{entry.createdAt | date:'dd.MM.yyyy HH:mm'}}</span></p><p ng-if="!vm.boardAudit.length"><span>Henüz pano etkinliği yok.</span></p></div>
+          <div class="timeline" ng-if="vm.board && vm.projectMembership"><p ng-repeat="entry in vm.boardAudit | limitTo:10"><strong>{{vm.auditActionLabel(entry.action)}}</strong><span>{{entry.createdAt | date:'dd.MM.yyyy HH:mm'}}</span></p><p ng-if="!vm.boardAudit.length"><span>Henüz pano etkinliği yok.</span></p></div>
           <div class="detail-subheading"><h3>Üyeler</h3></div>
           <div class="member-table">
             <div class="member-row member-manage-row" ng-repeat="member in vm.project.members track by member.userId">
@@ -1076,7 +1076,7 @@
             </div>
           </div>
           <div class="detail-subheading" ng-if="vm.projectMembership"><h3>Etkinlik</h3></div>
-          <div class="timeline" ng-if="vm.projectMembership"><p ng-repeat="entry in vm.entityAudit | limitTo:10"><strong>{{entry.action}}</strong><span>{{entry.createdAt | date:'dd.MM.yyyy HH:mm'}}</span></p></div>
+          <div class="timeline" ng-if="vm.projectMembership"><p ng-repeat="entry in vm.entityAudit | limitTo:10"><strong>{{vm.auditActionLabel(entry.action)}}</strong><span>{{entry.createdAt | date:'dd.MM.yyyy HH:mm'}}</span></p></div>
         </div>
       </div>
     </section>
@@ -1452,7 +1452,7 @@
             <button class="button" ng-click="vm.inviteTeamMember()" ng-disabled="!vm.teamInviteEmail || vm.entitySaving"><i data-lucide="send" lucide-icon></i><span>Davet et</span></button>
           </div>
           <div class="detail-subheading"><h3>Etkinlik</h3></div>
-          <div class="timeline"><p ng-repeat="entry in vm.entityAudit | limitTo:10"><strong>{{entry.action}}</strong><span>{{entry.createdAt | date:'dd.MM.yyyy HH:mm'}}</span></p></div>
+          <div class="timeline"><p ng-repeat="entry in vm.entityAudit | limitTo:10"><strong>{{vm.auditActionLabel(entry.action)}}</strong><span>{{entry.createdAt | date:'dd.MM.yyyy HH:mm'}}</span></p></div>
         </div>
       </div>
     </section>
@@ -1705,7 +1705,7 @@
           <form class="settings-form" ng-submit="vm.addDepartment()"><input class="input" ng-model="vm.departmentDraft.name" placeholder="Yeni departman" aria-label="Yeni departman adı" required><div class="select"><select ng-model="vm.departmentDraft.parentDepartmentId" ng-options="department.id as department.name for department in vm.organization.departments" aria-label="Yeni departman üst birimi"><option value="">Üst departman yok</option></select></div><button class="button" type="submit" ng-disabled="vm.entitySaving"><i data-lucide="plus" lucide-icon></i><span>Departman ekle</span></button></form>
           <form class="settings-form department-member-form" ng-submit="vm.assignDepartmentMember()"><div class="select"><select ng-model="vm.departmentMemberDraft.departmentId" ng-options="department.id as department.name for department in vm.organization.departments" aria-label="Departman" required><option value="">Departman</option></select></div><div class="select"><select ng-model="vm.departmentMemberDraft.userId" ng-options="user.id as (user.username + ' · ' + user.email) for user in vm.users" aria-label="Departman üyesi" required><option value="">Kullanıcı</option></select></div><input class="input" ng-model="vm.departmentMemberDraft.position" placeholder="Pozisyon" aria-label="Departman pozisyonu" required><button class="button" type="submit" ng-disabled="vm.entitySaving"><i data-lucide="user-round-plus" lucide-icon></i><span>Üye ata</span></button></form>
         </section>
-        <section class="settings-band" ng-if="vm.organization"><div class="settings-heading"><div><h3>Organizasyon etkinliği</h3><p>Profil, departman ve üyelik değişiklikleri</p></div></div><div class="timeline"><p ng-repeat="entry in vm.organizationAudit | limitTo:10"><strong>{{entry.action}}</strong><span>{{entry.createdAt | date:'dd.MM.yyyy HH:mm'}}</span></p><p ng-if="!vm.organizationAudit.length"><span>Henüz organizasyon etkinliği yok.</span></p></div></section>
+        <section class="settings-band" ng-if="vm.organization"><div class="settings-heading"><div><h3>Organizasyon etkinliği</h3><p>Profil, departman ve üyelik değişiklikleri</p></div></div><div class="timeline"><p ng-repeat="entry in vm.organizationAudit | limitTo:10"><strong>{{vm.auditActionLabel(entry.action)}}</strong><span>{{entry.createdAt | date:'dd.MM.yyyy HH:mm'}}</span></p><p ng-if="!vm.organizationAudit.length"><span>Henüz organizasyon etkinliği yok.</span></p></div></section>
       </div>
 
       <div class="settings-content" ng-if="vm.settingsTab === 'access' && vm.canManageRoles && !vm.settingsLoading">

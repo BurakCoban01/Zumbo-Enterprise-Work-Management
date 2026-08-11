@@ -56,6 +56,7 @@ function viewModel({ board = true, role = 'Viewer' } = {}) {
     summary: { total: 8, inProgress: 3, overdue: 0 },
     dueDateRisks: [],
     timelineEntries: [],
+    projectRoleProtected: candidateRole => candidateRole === 'ProjectOwner',
     clearSelection() {},
     rebuildAdvancedViews() {},
     loadTimeline() { return Promise.resolve([]); },

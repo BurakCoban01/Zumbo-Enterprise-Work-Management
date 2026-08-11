@@ -16,11 +16,11 @@
 }
 
 .mobile-intake-head small,
-.mobile-public-intake-head small { color: var(--muted); font-size: 10px; font-weight: 700; }
+.mobile-public-intake-head small { color: var(--muted); font-size: var(--font-size-caption); font-weight: 700; }
 .mobile-intake-head h2,
 .mobile-public-intake-head h2 { margin: 3px 0 2px; overflow-wrap: anywhere; color: var(--ink); font-size: 20px; line-height: 1.2; }
 .mobile-intake-head p,
-.mobile-public-intake-head p { margin: 0; color: var(--muted); font-size: 11px; line-height: 1.4; }
+.mobile-public-intake-head p { margin: 0; color: var(--muted); font-size: var(--font-size-caption); line-height: 1.4; }
 .mobile-intake-head > button { display: grid; flex: 0 0 44px; width: 44px; min-height: 44px; place-items: center; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); color: var(--accent); font-size: 20px; }
 
 .mobile-intake-tabs {
@@ -37,7 +37,7 @@
   border-bottom: 2px solid transparent;
   background: transparent;
   color: var(--muted);
-  font-size: 11px;
+  font-size: var(--font-size-caption);
 }
 
 .mobile-intake-tabs button.active {
@@ -80,7 +80,7 @@
 }
 
 .mobile-intake-section > header h3 { margin: 0; color: var(--ink); font-size: 14px; }
-.mobile-intake-section > header small { color: var(--muted); font-size: 10px; }
+.mobile-intake-section > header small { color: var(--muted); font-size: var(--font-size-caption); }
 
 .mobile-intake-row {
   display: flex;
@@ -101,7 +101,7 @@
 .mobile-intake-row[data-state="Archived"] { opacity: 0.66; }
 .mobile-intake-row > span:first-child { display: grid; flex: 1 1 auto; gap: 3px; min-width: 0; }
 .mobile-intake-row strong { overflow-wrap: anywhere; font-size: 13px; }
-.mobile-intake-row small { overflow-wrap: anywhere; color: var(--muted); font-size: 10px; line-height: 1.35; }
+.mobile-intake-row small { overflow-wrap: anywhere; color: var(--muted); font-size: var(--font-size-caption); line-height: 1.35; }
 
 .mobile-intake-state {
   flex: 0 0 auto;
@@ -109,7 +109,7 @@
   border: 1px solid var(--line);
   border-radius: 4px;
   color: var(--muted);
-  font-size: 9px;
+  font-size: var(--font-size-caption);
 }
 
 .mobile-intake-state[data-state="Published"],
@@ -133,7 +133,7 @@
   gap: 5px;
   min-width: 0;
   color: var(--muted);
-  font-size: 10px;
+  font-size: var(--font-size-caption);
   font-weight: 700;
 }
 
@@ -151,7 +151,7 @@
 }
 
 .mobile-intake-form textarea { min-height: 88px; resize: vertical; }
-.mobile-intake-form input[type="file"] { border-style: dashed; font-size: 11px; }
+.mobile-intake-form input[type="file"] { border-style: dashed; font-size: var(--font-size-caption); }
 .mobile-intake-check { display: flex !important; min-height: 44px; flex-direction: row; align-items: center; }
 .mobile-intake-check input { width: 18px; height: 18px; accent-color: var(--accent); }
 
@@ -190,7 +190,7 @@
   justify-content: space-between;
 }
 
-.mobile-intake-field > header strong { color: var(--ink); font-size: 11px; }
+.mobile-intake-field > header strong { color: var(--ink); font-size: var(--font-size-caption); }
 .mobile-intake-field > header button,
 .mobile-intake-map > header button { display: grid; width: 44px; min-height: 44px; place-items: center; border: 0; background: transparent; color: var(--danger); font-size: 18px; }
 
@@ -215,7 +215,7 @@
   border-bottom: 2px solid transparent;
   background: transparent;
   color: var(--muted);
-  font-size: 11px;
+  font-size: var(--font-size-caption);
 }
 
 .mobile-intake-picker button.active { border-bottom-color: var(--accent); color: var(--accent); font-weight: 700; }
@@ -259,9 +259,9 @@
 
 .mobile-intake-submission > header strong { overflow-wrap: anywhere; color: var(--ink); font-size: 12px; }
 .mobile-intake-values { display: grid; gap: 4px; }
-.mobile-intake-values span { overflow-wrap: anywhere; color: var(--muted); font-size: 10px; }
+.mobile-intake-values span { overflow-wrap: anywhere; color: var(--muted); font-size: var(--font-size-caption); }
 .mobile-intake-files { display: flex; flex-wrap: wrap; gap: 4px; }
-.mobile-intake-files span { padding: 3px 5px; border: 1px solid var(--line); border-radius: 3px; color: var(--muted); font-size: 9px; }
+.mobile-intake-files span { padding: 3px 5px; border: 1px solid var(--line); border-radius: 3px; color: var(--muted); font-size: var(--font-size-caption); }
 .mobile-intake-triage { display: grid; gap: 8px; }
 .mobile-intake-triage textarea { min-height: 72px; border: 1px solid var(--line); border-radius: 5px; padding: 8px; background: var(--panel); color: var(--ink); resize: vertical; }
 
@@ -269,7 +269,7 @@
   margin: 0;
   padding: 22px 16px;
   color: var(--muted);
-  font-size: 11px;
+  font-size: var(--font-size-caption);
   text-align: center;
 }
 

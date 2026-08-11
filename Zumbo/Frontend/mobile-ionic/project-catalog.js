@@ -5,6 +5,7 @@
     .controller('ProjectCatalogController', function($scope, $stateParams, $q, zumboApi, sessionStore, apiClient) {
       var vm = this;
       var core = window.ZumboProjectCatalogCore;
+      vm.auditActionLabel = window.ZumboAuditPrivacyCore.auditActionLabel;
       var allowedTabs = ['releases', 'milestones', 'components', 'templates', 'activity'];
 
       apiClient.transitionContext('project-catalog:' + $stateParams.projectId);

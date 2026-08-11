@@ -158,7 +158,7 @@
           <button class="button button-small button-positive" type="submit" ng-disabled="vm.saving">Üye ekle</button>
         </form>
         <div class="item item-divider">Proje etkinliği</div>
-        <div class="mobile-timeline"><p ng-repeat="entry in vm.audit | limitTo:8"><strong>{{entry.action}}</strong><span>{{entry.createdAt | date:'dd.MM HH:mm'}}</span></p><p ng-if="!vm.audit.length">Henüz etkinlik yok.</p></div>
+        <div class="mobile-timeline"><p ng-repeat="entry in vm.audit | limitTo:8"><strong>{{vm.auditActionLabel(entry.action)}}</strong><span>{{entry.createdAt | date:'dd.MM HH:mm'}}</span></p><p ng-if="!vm.audit.length">Henüz etkinlik yok.</p></div>
       </ion-content>
     </ion-view>
   </script>
@@ -264,7 +264,7 @@
 
         <section class="mobile-catalog-section" ng-if="!vm.loading && vm.project && vm.tab==='activity'" aria-labelledby="mobile-catalog-activity-heading">
           <header><div><h3 id="mobile-catalog-activity-heading">Teslimat etkinliği</h3><small>{{vm.audit.length}} kayıt</small></div></header>
-          <div class="mobile-catalog-audit"><p ng-repeat="entry in vm.audit track by entry.id"><span><strong>{{entry.action}}</strong><small>{{entry.createdAt | date:'dd MMM yyyy HH:mm'}}</small></span></p><p class="mobile-catalog-empty" ng-if="!vm.audit.length">Henüz katalog etkinliği yok.</p></div>
+          <div class="mobile-catalog-audit"><p ng-repeat="entry in vm.audit track by entry.id"><span><strong>{{vm.auditActionLabel(entry.action)}}</strong><small>{{entry.createdAt | date:'dd MMM yyyy HH:mm'}}</small></span></p><p class="mobile-catalog-empty" ng-if="!vm.audit.length">Henüz katalog etkinliği yok.</p></div>
         </section>
       </ion-content>
     </ion-view>
@@ -326,7 +326,7 @@
           <section class="mobile-automation-section" aria-labelledby="mobile-template-list"><header><div><h3 id="mobile-template-list">İş şablonları</h3><small>{{vm.model.activeTemplates.length}} etkin</small></div></header><article class="mobile-automation-row template" ng-repeat="template in vm.model.templates track by template.id" data-state="{{template.archived ? 'archived' : 'active'}}"><span><strong>{{template.name}}</strong><small>{{template.title}} · {{template.type}}</small></span><span class="mobile-automation-state">{{template.archived ? 'Arşiv' : 'Etkin'}}</span><div class="mobile-automation-row-actions" ng-if="vm.canEdit && !template.archived"><button class="button button-small button-clear ion-loop" type="button" ng-click="vm.useTemplate(template)" aria-label="Şablonla yineleme oluştur"></button><button class="button button-small button-clear ion-edit" type="button" ng-click="vm.editTemplate(template)" aria-label="Şablonu düzenle"></button><button class="button button-small button-assertive button-clear ion-archive" type="button" ng-if="!vm.confirmationIs('template',template.id)" ng-click="vm.requestConfirmation('template',template.id)" aria-label="Şablonu arşivle"></button><span class="mobile-automation-confirm" ng-if="vm.confirmationIs('template',template.id)"><button type="button" ng-click="vm.archiveTemplate(template)">Arşivle</button><button type="button" ng-click="vm.cancelConfirmation()">Vazgeç</button></span></div></article><p class="mobile-automation-empty" ng-if="!vm.model.templates.length">Henüz iş şablonu yok.</p></section>
         </div>
 
-        <section class="mobile-automation-section audit" ng-if="!vm.loading && vm.project && vm.tab==='activity'" aria-labelledby="mobile-automation-audit"><header><div><h3 id="mobile-automation-audit">Otomasyon etkinliği</h3><small>{{vm.model.auditTarget.label || 'Kayıt seçin'}}</small></div></header><p class="mobile-feedback error" role="alert" ng-if="vm.auditError">{{vm.auditError}}</p><div class="mobile-automation-audit"><p ng-repeat="entry in vm.model.audit track by entry.id"><strong>{{entry.action}}</strong><time>{{entry.createdAt | date:'dd MMM HH:mm'}}</time></p></div><p class="mobile-automation-empty" ng-if="!vm.auditError && !vm.model.audit.length">Seçili kayıt için etkinlik yok.</p></section>
+        <section class="mobile-automation-section audit" ng-if="!vm.loading && vm.project && vm.tab==='activity'" aria-labelledby="mobile-automation-audit"><header><div><h3 id="mobile-automation-audit">Otomasyon etkinliği</h3><small>{{vm.model.auditTarget.label || 'Kayıt seçin'}}</small></div></header><p class="mobile-feedback error" role="alert" ng-if="vm.auditError">{{vm.auditError}}</p><div class="mobile-automation-audit"><p ng-repeat="entry in vm.model.audit track by entry.id"><strong>{{vm.auditActionLabel(entry.action)}}</strong><time>{{entry.createdAt | date:'dd MMM HH:mm'}}</time></p></div><p class="mobile-automation-empty" ng-if="!vm.auditError && !vm.model.audit.length">Seçili kayıt için etkinlik yok.</p></section>
       </ion-content>
     </ion-view>
   </script>

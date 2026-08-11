@@ -136,7 +136,7 @@
 
 .goal-summary span {
   color: var(--text-muted);
-  font-size: .72rem;
+  font-size: var(--font-size-caption);
 }
 
 .goal-summary strong {

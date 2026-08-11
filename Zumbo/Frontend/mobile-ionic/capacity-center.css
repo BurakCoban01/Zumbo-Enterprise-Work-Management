@@ -200,7 +200,7 @@
 
 .mobile-capacity-metrics span {
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: var(--font-size-caption);
 }
 
 .mobile-capacity-tabs {
@@ -358,6 +358,6 @@
   }
 
   .mobile-capacity-tabs button {
-    font-size: 11px;
+    font-size: var(--font-size-caption);
   }
 }

@@ -52,7 +52,7 @@
 .dashboard-register small,
 .dashboard-register p {
   color: var(--muted);
-  font-size: 0.74rem;
+  font-size: var(--font-size-caption);
 }
 
 .dashboard-main {
@@ -75,7 +75,7 @@
   display: block;
   margin-bottom: 4px;
   color: var(--muted);
-  font-size: 0.72rem;
+  font-size: var(--font-size-caption);
 }
 
 .dashboard-fields .wide {
@@ -87,7 +87,7 @@
   display: block;
   margin-top: 4px;
   color: var(--muted);
-  font-size: 0.7rem;
+  font-size: var(--font-size-caption);
 }
 
 .dashboard-projects select,
@@ -200,7 +200,7 @@
 .dashboard-widget header p,
 .dashboard-widget header span {
   color: var(--muted);
-  font-size: 0.72rem;
+  font-size: var(--font-size-caption);
 }
 
 .dashboard-widget .reporting-table {
@@ -215,7 +215,7 @@
 .dashboard-widget caption {
   padding: 10px 0;
   color: var(--muted);
-  font-size: 0.72rem;
+  font-size: var(--font-size-caption);
   text-align: left;
 }
 

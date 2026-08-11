@@ -149,7 +149,7 @@
 
 .mobile-portfolio-metrics span {
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: var(--font-size-caption);
 }
 
 .mobile-portfolio-tabs {
@@ -224,7 +224,7 @@
 .mobile-portfolio-roadmap header b,
 .mobile-status-stream header b {
   flex: 0 0 auto;
-  font-size: 11px;
+  font-size: var(--font-size-caption);
 }
 
 .mobile-portfolio-roadmap b[data-health="OnTrack"],
@@ -258,7 +258,7 @@
 
 .mobile-portfolio-roadmap footer {
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: var(--font-size-caption);
 }
 
 .mobile-roadmap-project,
@@ -302,6 +302,6 @@
   }
 
   .mobile-portfolio-tabs button {
-    font-size: 11px;
+    font-size: var(--font-size-caption);
   }
 }

@@ -210,7 +210,7 @@
 
 .capacity-summary span {
   color: var(--text-muted);
-  font-size: .7rem;
+  font-size: var(--font-size-caption);
 }
 
 .capacity-summary strong {
@@ -221,7 +221,7 @@
 .capacity-summary small {
   margin-top: 2px;
   color: var(--text-muted);
-  font-size: .68rem;
+  font-size: var(--font-size-caption);
 }
 
 .capacity-tabs {
@@ -281,7 +281,7 @@
 .capacity-table th {
   background: var(--surface-muted);
   color: var(--text-muted);
-  font-size: .72rem;
+  font-size: var(--font-size-caption);
   white-space: nowrap;
 }
 
@@ -324,7 +324,7 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: .74rem;
+  font-size: var(--font-size-caption);
   font-weight: 700;
 }
 
@@ -401,7 +401,7 @@
 .capacity-person-foot {
   justify-content: space-between;
   margin-top: 10px;
-  font-size: .74rem;
+  font-size: var(--font-size-caption);
 }
 
 .capacity-scenario-summary {

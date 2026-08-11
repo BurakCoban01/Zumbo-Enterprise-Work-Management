@@ -91,7 +91,7 @@ test('desktop and mobile use durable job APIs without replacing synchronous bulk
   assert.match(desktopSource, /idempotencyKey: core\.idempotencyKey/);
   assert.match(desktopSource, /\$window\.confirm\('Çalışan işi iptal etmek istiyor musunuz\?'\)/);
   assert.match(mobileSource, /core\.idempotencyKey/);
-  assert.match(desktopHtml, /vm\.bulkMove\('In Progress'\)/);
+  assert.match(desktopHtml, /vm\.bulkMove\(vm\.bulkTargetStatus\)/);
   assert.match(desktopHtml, /vm\.bulkAssignToMe\(\)/);
   assert.match(desktopHtml, /vm\.bulkArchive\(\)/);
 });

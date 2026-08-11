@@ -1,4 +1,4 @@
-.mobile-report-surface{padding:14px 14px 30px;background:var(--zumbo-page);min-height:100%}.mobile-report-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.mobile-report-head h2{font-size:1.25rem;margin:0}.mobile-report-head p{font-size:.78rem;color:var(--zumbo-text-muted);margin:4px 0}.mobile-report-range{min-height:44px;border:1px solid var(--zumbo-border);background:var(--zumbo-surface);padding:0 10px}.mobile-report-fresh{margin:12px 0;padding:9px 11px;border-left:3px solid var(--zumbo-accent);background:var(--zumbo-surface-subtle);font-size:.76rem}.mobile-report-fresh[data-stale=true]{border-color:var(--zumbo-warning)}.mobile-report-metrics{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));border:1px solid var(--zumbo-border);margin:12px 0}.mobile-report-metrics div{padding:11px;border-right:1px solid var(--zumbo-border);border-bottom:1px solid var(--zumbo-border)}.mobile-report-metrics div:nth-child(2n){border-right:0}.mobile-report-metrics div:nth-last-child(-n+2){border-bottom:0}.mobile-report-metrics span,.mobile-report-metrics small{display:block;color:var(--zumbo-text-muted);font-size:.7rem}.mobile-report-metrics strong{font-size:1.2rem}.mobile-capacity-note{padding:11px;border:1px solid var(--zumbo-border);background:var(--zumbo-surface);font-size:.78rem}.mobile-workload-row,.mobile-report-row{display:block;width:100%;padding:12px 0;border:0;border-bottom:1px solid var(--zumbo-border);background:transparent;color:inherit;text-align:left}.mobile-workload-row>span,.mobile-report-row>span{display:flex;justify-content:space-between;gap:10px}.mobile-workload-row small,.mobile-report-row small{display:block;color:var(--zumbo-text-muted);margin-top:4px}.mobile-workload-bar{display:block;height:6px;background:var(--zumbo-surface-strong);margin-top:8px}.mobile-workload-bar i{display:block;height:100%;background:var(--zumbo-accent)}.mobile-report-section{margin-top:18px}.mobile-report-section h3{font-size:.95rem;margin:0 0 6px}.mobile-report-empty{text-align:center;color:var(--zumbo-text-muted);padding:20px 0}.mobile-report-status{display:grid;grid-template-columns:minmax(90px,1fr) 2fr 36px;gap:8px;align-items:center;margin:9px 0;font-size:.76rem}.mobile-report-status i{display:block;height:7px;background:var(--zumbo-accent)}
+.mobile-report-surface{padding:14px 14px 30px;background:var(--zumbo-page);min-height:100%}.mobile-report-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.mobile-report-head h2{font-size:1.25rem;margin:0}.mobile-report-head p{font-size:.78rem;color:var(--zumbo-text-muted);margin:4px 0}.mobile-report-range{min-height:44px;border:1px solid var(--zumbo-border);background:var(--zumbo-surface);padding:0 10px}.mobile-report-fresh{margin:12px 0;padding:9px 11px;border-left:3px solid var(--zumbo-accent);background:var(--zumbo-surface-subtle);font-size:.76rem}.mobile-report-fresh[data-stale=true]{border-color:var(--zumbo-warning)}.mobile-report-metrics{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));border:1px solid var(--zumbo-border);margin:12px 0}.mobile-report-metrics div{padding:11px;border-right:1px solid var(--zumbo-border);border-bottom:1px solid var(--zumbo-border)}.mobile-report-metrics div:nth-child(2n){border-right:0}.mobile-report-metrics div:nth-last-child(-n+2){border-bottom:0}.mobile-report-metrics span,.mobile-report-metrics small{display:block;color:var(--zumbo-text-muted);font-size: var(--font-size-caption)}.mobile-report-metrics strong{font-size:1.2rem}.mobile-capacity-note{padding:11px;border:1px solid var(--zumbo-border);background:var(--zumbo-surface);font-size:.78rem}.mobile-workload-row,.mobile-report-row{display:block;width:100%;padding:12px 0;border:0;border-bottom:1px solid var(--zumbo-border);background:transparent;color:inherit;text-align:left}.mobile-workload-row>span,.mobile-report-row>span{display:flex;justify-content:space-between;gap:10px}.mobile-workload-row small,.mobile-report-row small{display:block;color:var(--zumbo-text-muted);margin-top:4px}.mobile-workload-bar{display:block;height:6px;background:var(--zumbo-surface-strong);margin-top:8px}.mobile-workload-bar i{display:block;height:100%;background:var(--zumbo-accent)}.mobile-report-section{margin-top:18px}.mobile-report-section h3{font-size:.95rem;margin:0 0 6px}.mobile-report-empty{text-align:center;color:var(--zumbo-text-muted);padding:20px 0}.mobile-report-status{display:grid;grid-template-columns:minmax(90px,1fr) 2fr 36px;gap:8px;align-items:center;margin:9px 0;font-size:.76rem}.mobile-report-status i{display:block;height:7px;background:var(--zumbo-accent)}
 .mobile-report-status .report-bar-track{display:block;height:7px;background:var(--zumbo-surface-strong)}
 
 .mobile-report-surface .segmented {
@@ -58,7 +58,7 @@
 .mobile-dashboard-register p {
   margin-top: 3px;
   color: var(--muted);
-  font-size: 0.72rem;
+  font-size: var(--font-size-caption);
 }
 
 .mobile-dashboard-editor {
@@ -77,7 +77,7 @@
   display: block;
   margin-bottom: 4px;
   color: var(--muted);
-  font-size: 0.72rem;
+  font-size: var(--font-size-caption);
   font-weight: 600;
 }
 
@@ -102,7 +102,7 @@
   display: block;
   margin-top: 4px;
   color: var(--muted);
-  font-size: 0.7rem;
+  font-size: var(--font-size-caption);
 }
 
 .mobile-dashboard-editor .mobile-dashboard-multiple {
@@ -246,7 +246,7 @@
 .mobile-dashboard-widget header small,
 .mobile-dashboard-widget header span {
   color: var(--muted);
-  font-size: 0.7rem;
+  font-size: var(--font-size-caption);
 }
 
 .mobile-dashboard-table-wrap {
@@ -264,7 +264,7 @@
 .mobile-dashboard-table-wrap caption {
   padding: 9px 0;
   color: var(--muted);
-  font-size: 0.7rem;
+  font-size: var(--font-size-caption);
   text-align: left;
 }
 
@@ -278,7 +278,7 @@
 
 .mobile-dashboard-table-wrap th {
   color: var(--muted);
-  font-size: 0.68rem;
+  font-size: var(--font-size-caption);
   text-transform: uppercase;
 }
 
@@ -293,7 +293,7 @@
   .mobile-report-surface .segmented button {
     padding-right: 4px;
     padding-left: 4px;
-    font-size: 0.72rem;
+    font-size: var(--font-size-caption);
   }
 
   .mobile-dashboard-numbers,
