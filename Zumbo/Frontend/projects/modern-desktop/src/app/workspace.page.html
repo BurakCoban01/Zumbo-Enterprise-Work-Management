@@ -81,6 +81,12 @@
           <zumbo-project-reporting-page [project]="project" [projects]="projects()" [contextReady]="!projectContextLoading()" [view]="activeView()" />
         } @else if (section() === 'project' && activeView() === 'catalog' && selectedProject(); as project) {
           @if (session.currentUser(); as user) { <zumbo-project-catalog-page [project]="project" [contextReady]="!projectContextLoading()" [userId]="user.id" (projectChange)="updateProject($event)" /> }
+        } @else if (section() === 'project' && activeView() === 'intake' && selectedProject(); as project) {
+          @if (session.currentUser(); as user) { <zumbo-intake-page [project]="project" [boards]="boards()" [contextReady]="!projectContextLoading()" [userId]="user.id" (openWorkItem)="openIntakeWorkItem($event)" /> }
+        } @else if (section() === 'project' && activeView() === 'automation' && selectedProject(); as project) {
+          @if (session.currentUser(); as user) { <zumbo-automation-page [project]="project" [boards]="boards()" [contextReady]="!projectContextLoading()" [userId]="user.id" (openWorkItem)="openAutomationWorkItem($event)" /> }
+        } @else if (section() === 'project' && activeView() === 'jobs' && selectedProject(); as project) {
+          @if (session.currentUser(); as user) { <zumbo-jobs-page [project]="project" [contextReady]="!projectContextLoading()" [userId]="user.id" /> }
         } @else {
           <section class="surface-placeholder" aria-labelledby="surface-title">
             <h3 id="surface-title">{{ pageTitle() }}</h3>

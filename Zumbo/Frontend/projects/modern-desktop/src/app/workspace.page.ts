@@ -5,10 +5,13 @@ import { ZumboApiClient, ZumboRealtimeService, ZumboSessionService } from '@zumb
 import { catchError, finalize, forkJoin, map, of, switchMap } from 'rxjs';
 import { DesktopNavigationComponent } from './shell/desktop-navigation.component';
 import { CommandPaletteComponent } from './shell/command-palette.component';
+import { AutomationPage } from './features/automation/automation.page';
 import { HomePage } from './features/home/home.page';
 import { ProjectCatalogPage } from './features/catalog/project-catalog.page';
 import { ProjectBoardPage } from './features/board/project-board.page';
 import { InboxPage } from './features/inbox/inbox.page';
+import { IntakePage } from './features/intake/intake.page';
+import { JobsPage } from './features/jobs/jobs.page';
 import { ProjectListPage } from './features/list/project-list.page';
 import { NotificationItem } from './features/notifications/notification.models';
 import { NotificationPopoverComponent } from './features/notifications/notification-popover.component';
@@ -44,7 +47,7 @@ const NAV_KEY = 'zumbo.navCollapsed';
 
 @Component({
   selector: 'zumbo-desktop-workspace',
-  imports: [CommandPaletteComponent, DesktopNavigationComponent, HomePage, InboxPage, MyWorkPage, NotificationPopoverComponent, ProjectBacklogPage, ProjectBoardPage, ProjectCatalogPage, ProjectDirectoryPage, ProjectListPage, ProjectOverviewPage, ProjectPlanningViewPage, ProjectReportingPage, ProjectSprintPage, ProjectSwitcherComponent, ProjectViewTabsComponent, RouterLink, WorkItemCreateComponent, WorkItemDetailComponent, ZumboIconComponent],
+  imports: [AutomationPage, CommandPaletteComponent, DesktopNavigationComponent, HomePage, InboxPage, IntakePage, JobsPage, MyWorkPage, NotificationPopoverComponent, ProjectBacklogPage, ProjectBoardPage, ProjectCatalogPage, ProjectDirectoryPage, ProjectListPage, ProjectOverviewPage, ProjectPlanningViewPage, ProjectReportingPage, ProjectSprintPage, ProjectSwitcherComponent, ProjectViewTabsComponent, RouterLink, WorkItemCreateComponent, WorkItemDetailComponent, ZumboIconComponent],
   templateUrl: './workspace.page.html',
   styleUrls: ['./workspace.page.scss', './workspace-responsive.scss']
 })
@@ -158,6 +161,16 @@ export class DesktopWorkspacePage {
 
   protected openCreatedTask(task: ProjectWorkItemDetail): void {
     void this.router.navigate(['/workspace', task.projectId, this.activeView(), 'task', task.id]);
+  }
+
+  protected openIntakeWorkItem(workItemId: string): void {
+    const projectId = this.selectedProjectId();
+    if (projectId) void this.router.navigate(['/workspace', projectId, 'intake', 'task', workItemId]);
+  }
+
+  protected openAutomationWorkItem(workItemId: string): void {
+    const projectId = this.selectedProjectId();
+    if (projectId) void this.router.navigate(['/workspace', projectId, 'automation', 'task', workItemId]);
   }
 
   protected closeTaskDetail(): void {
