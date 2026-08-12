@@ -318,6 +318,117 @@ test('mobile project intake preserves form authoring, internal submission and tr
   assert.doesNotMatch(`${page}\n${template}`, /Administrator|SystemAdmin|ProjectOwner/);
 });
 
+test('mobile Jobs preserves durable operations, recovery and artifact authority', async () => {
+  const routes = await read('projects/modern-mobile/src/app/app.routes.ts');
+  const hub = await read('projects/modern-mobile/src/app/features/project-hub/mobile-project-hub.page.html');
+  const core = await read('projects/modern-mobile/src/app/features/jobs/mobile-jobs.core.ts');
+  const service = await read('projects/modern-mobile/src/app/features/jobs/mobile-jobs.service.ts');
+  const page = await read('projects/modern-mobile/src/app/features/jobs/mobile-jobs.page.ts');
+  const template = await read('projects/modern-mobile/src/app/features/jobs/mobile-jobs.page.html');
+  const styles = await read('projects/modern-mobile/src/app/features/jobs/mobile-jobs.page.scss');
+  assert.match(routes, /path: 'projects\/:projectId\/jobs'/);
+  assert.match(hub, /\['\/workspace\/projects',projectId,'jobs'\]/);
+  assert.match(service, /bulk\/jobs\?projectId=.*page=1&pageSize=50/);
+  for (const endpoint of ["'/api/work-items/bulk/jobs/import'", "'/api/work-items/bulk/jobs/export'", '/cancel', '/retry', "'errors'", "'result'"]) assert.ok(service.includes(endpoint), `missing Jobs contract ${endpoint}`);
+  assert.match(service, /idempotencyKey:\s*this\.api\.newIdempotencyKey\(\)/);
+  assert.match(service, /ifMatch:\s*job\.version/);
+  for (const permission of ['WorkItemCreate', 'WorkItemView', 'WorkItemUpdate']) assert.ok(page.includes(permission), `missing Jobs permission ${permission}`);
+  assert.match(core, /maxInputItems:\s*5000/);
+  assert.match(core, /5\s*\*\s*1024\s*\*\s*1024/);
+  assert.match(page, /setTimeout\(\(\) => this\.refreshJobs\(\),\s*2750\)/);
+  assert.match(page, /connectivity\.offline\(\)/);
+  assert.match(`${styles}\n${template}`, /min-height:\s*(?:44|46|48)px/);
+  assert.doesNotMatch(`${page}\n${template}`, /Administrator|SystemAdmin|ProjectOwner/);
+});
+
+test('mobile Reporting preserves freshness-aware reports and adaptive dashboard reading', async () => {
+  const routes = await read('projects/modern-mobile/src/app/app.routes.ts');
+  const hub = await read('projects/modern-mobile/src/app/features/project-hub/mobile-project-hub.page.html');
+  const core = await read('projects/modern-mobile/src/app/features/reporting/mobile-reporting.core.ts');
+  const service = await read('projects/modern-mobile/src/app/features/reporting/mobile-reporting.service.ts');
+  const page = await read('projects/modern-mobile/src/app/features/reporting/mobile-reporting.page.ts');
+  const template = await read('projects/modern-mobile/src/app/features/reporting/mobile-reporting.page.html');
+  const styles = await read('projects/modern-mobile/src/app/features/reporting/mobile-reporting.page.scss');
+  assert.match(routes, /path: 'projects\/:projectId\/insights'/);
+  assert.match(hub, /\['\/workspace\/projects',projectId,'insights'\]/);
+  for (const report of ['project-summary', 'status-distribution', 'user-workload', 'due-date-risks', 'flow-time', 'completion-rate', 'team-performance']) assert.ok(service.includes(report), `missing report source ${report}`);
+  assert.match(service, /rawResponse:\s*true/);
+  assert.match(core, /X-Zumbo-Report-Generated-At/);
+  assert.match(core, /X-Zumbo-Report-Stale/);
+  for (const dashboard of ['/api/dashboards?page=1&pageSize=100', '/render', '/export']) assert.ok(service.includes(dashboard), `missing dashboard contract ${dashboard}`);
+  for (const tab of ['workload', 'reports', 'dashboards']) assert.ok(template.includes(`'${tab}'`), `missing reporting tab ${tab}`);
+  assert.match(page, /WorkItemView/);
+  assert.match(page, /connectivity\.offline\(\)/);
+  assert.match(page, /queryParams:\s*\{\s*mode:/);
+  assert.match(`${styles}\n${template}`, /min-height:\s*(?:44|46|48)px/);
+  assert.doesNotMatch(`${page}\n${template}`, /Administrator|SystemAdmin|ProjectOwner/);
+});
+
+test('mobile Automation preserves rule, run, template and recurrence lifecycle contracts', async () => {
+  const routes = await read('projects/modern-mobile/src/app/app.routes.ts');
+  const hub = await read('projects/modern-mobile/src/app/features/project-hub/mobile-project-hub.page.html');
+  const service = await read('projects/modern-mobile/src/app/features/automation/mobile-automation.service.ts');
+  const page = await read('projects/modern-mobile/src/app/features/automation/mobile-automation.page.ts');
+  const template = await read('projects/modern-mobile/src/app/features/automation/mobile-automation.page.html');
+  const styles = await read('projects/modern-mobile/src/app/features/automation/mobile-automation.page.scss');
+  assert.match(routes, /path: 'projects\/:projectId\/automation'/);
+  assert.match(hub, /\['\/workspace\/projects',projectId,'automation'\]/);
+  for (const endpoint of ['/api/automations?projectId=', '/api/automations/runs?projectId=', '/api/work-items/templates?projectId=', '/api/work-items/recurrences?projectId=', '/dry-run', '/publish', '/replay', '/preview', '/occurrences']) assert.ok(service.includes(endpoint), `missing Automation contract ${endpoint}`);
+  for (const permission of ['WorkflowManage', 'WorkItemCreate', 'WorkItemUpdate']) assert.ok(page.includes(permission), `missing Automation permission ${permission}`);
+  for (const tab of ['rules', 'runs', 'templates', 'recurrences']) assert.ok(template.includes(`'${tab}'`), `missing Automation tab ${tab}`);
+  for (const action of ['saveRule', 'publishRule', 'setRuleState', 'archiveRule', 'replayRun', 'saveTemplate', 'archiveTemplate', 'previewRecurrence', 'createRecurrence', 'setRecurrenceState', 'archiveRecurrence']) assert.ok(page.includes(action), `missing Automation action ${action}`);
+  assert.match(service, /ifMatch:/);
+  assert.match(page, /connectivity\.offline\(\)/);
+  assert.match(page, /queryParams:\s*\{\s*tab/);
+  assert.match(styles, /min-height:\s*(?:44|46|48)px/);
+  assert.doesNotMatch(`${page}\n${template}`, /Administrator|SystemAdmin|ProjectOwner/);
+});
+
+test('mobile Integrations preserves system authority, delivery recovery and one-time secret handling', async () => {
+  const routes = await read('projects/modern-mobile/src/app/app.routes.ts');
+  const morePage = await read('projects/modern-mobile/src/app/features/more/mobile-more.page.ts');
+  const moreTemplate = await read('projects/modern-mobile/src/app/features/more/mobile-more.page.html');
+  const service = await read('projects/modern-mobile/src/app/features/integrations/mobile-integrations.service.ts');
+  const page = await read('projects/modern-mobile/src/app/features/integrations/mobile-integrations.page.ts');
+  const template = await read('projects/modern-mobile/src/app/features/integrations/mobile-integrations.page.html');
+  assert.match(routes, /path: 'integrations'/);
+  assert.match(routes, /path: 'profile\/integrations'/);
+  assert.match(moreTemplate, /\/workspace\/integrations/);
+  assert.match(morePage, /\/api\/auth\/roles\?scope=System/);
+  assert.match(morePage, /IntegrationManage/);
+  for (const endpoint of ['/api/integrations/webhooks', '/deliveries', '/test-delivery', 'rotate-secret', "active ? 'enable' : 'disable'", '/replay', '/api/integrations/development', '/health', '/repositories', '/mappings', '/rotate-credential', '/disconnect']) assert.ok(service.includes(endpoint), `missing Integrations contract ${endpoint}`);
+  assert.match(service, /ifMatch:/);
+  assert.match(service, /expectedVersion/);
+  assert.match(page, /IntegrationManage/);
+  assert.match(page, /connectivity\.offline\(\)/);
+  assert.match(page, /secret\.set\(null\)/);
+  assert.match(page, /queryParams:\s*\{\s*tab/);
+  for (const tab of ['webhooks', 'development']) assert.ok(template.includes(`'${tab}'`), `missing Integrations tab ${tab}`);
+  assert.doesNotMatch(`${morePage}\n${page}\n${template}`, /Administrator|SystemAdmin|ProjectOwner/);
+});
+
+test('mobile Operations preserves partial health reads and confirmed intervention authority', async () => {
+  const routes = await read('projects/modern-mobile/src/app/app.routes.ts');
+  const morePage = await read('projects/modern-mobile/src/app/features/more/mobile-more.page.ts');
+  const moreTemplate = await read('projects/modern-mobile/src/app/features/more/mobile-more.page.html');
+  const service = await read('projects/modern-mobile/src/app/features/operations/mobile-operations.service.ts');
+  const page = await read('projects/modern-mobile/src/app/features/operations/mobile-operations.page.ts');
+  const template = await read('projects/modern-mobile/src/app/features/operations/mobile-operations.page.html');
+  const styles = await read('projects/modern-mobile/src/app/features/operations/mobile-operations.page.scss');
+  assert.match(routes, /path: 'operations'/);
+  assert.match(routes, /path: 'profile\/operations'/);
+  assert.match(moreTemplate, /\/workspace\/operations/);
+  assert.match(morePage, /OperationsManage/);
+  for (const endpoint of ['/api/operations/external-dependencies', '/api/work-items/durable-messaging/metrics', '/api/work-items/durable-messaging/dead-letters?pageSize=20', '/api/notifications/delivery/status?organizationId=', '/api/notifications/delivery/dead-letters?organizationId=', '/api/operations/storage/security?organizationId=', '/api/work-items/search/reconcile', '/replay', '/maintenance']) assert.ok(service.includes(endpoint), `missing Operations contract ${endpoint}`);
+  assert.match(service, /catchError/);
+  assert.match(page, /OperationsManage/);
+  assert.match(page, /connectivity\.offline\(\)/);
+  assert.match(page, /window\.confirm|confirm\(/);
+  assert.match(styles, /min-height:\s*(?:44|46|48)px/);
+  for (const label of ['Bağımlılık sağlığı', 'Sistem olayları', 'Bildirim teslimatı', 'Dosya güvenliği', 'Arama görünümü']) assert.ok(template.includes(label), `missing Operations surface ${label}`);
+  assert.doesNotMatch(`${morePage}\n${page}\n${template}`, /Administrator|SystemAdmin|ProjectOwner/);
+});
+
 function transpileCommonJs(source) {
   const output = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
   const module = { exports: {} };

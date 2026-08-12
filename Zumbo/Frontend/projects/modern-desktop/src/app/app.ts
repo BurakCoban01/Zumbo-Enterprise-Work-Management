@@ -1,5 +1,6 @@
-import { Component } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
+import { PwaUpdateService } from '@zumbo/modern-shared';
 
 @Component({
   selector: 'zumbo-root',
@@ -8,4 +9,5 @@ import { RouterOutlet } from '@angular/router';
   styleUrl: './app.scss'
 })
 export class App {
+  protected readonly pwaUpdate = inject(PwaUpdateService);
 }

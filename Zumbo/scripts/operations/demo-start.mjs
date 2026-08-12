@@ -17,7 +17,7 @@ const projectName = argumentValue('--project-name') || 'zumbo-local';
 const evidencePath = resolve(repositoryRoot, argumentValue('--evidence') || defaultEvidencePath);
 const composePath = resolve(repositoryRoot, 'Backend/docker-compose.yml');
 const frontendDirectory = resolve(repositoryRoot, 'Frontend');
-const frontendDist = resolve(frontendDirectory, 'dist');
+const frontendDist = resolve(frontendDirectory, 'dist-modern');
 const composeWaitTimeoutSeconds = 900;
 const composeCommandTimeoutMilliseconds = 930_000;
 const readinessRequestTimeoutMilliseconds = 60_000;
@@ -35,16 +35,18 @@ try {
   await check('compose-config', () => command('docker', composeArguments('config', '--quiet'), 30_000));
 
   if (process.argv.includes('--build')) {
-    await check('frontend-build', () => command(pnpmExecutable(), ['--dir', 'Frontend', 'run', 'build'], 180_000));
+    await check('frontend-build', () => command(pnpmExecutable(), ['--dir', 'Frontend', 'run', 'build:modern'], 180_000));
     await check('container-build', () => command('docker', composeArguments('build', 'api', 'gateway'), 600_000));
   }
 
   await check('runtime-config', () => {
-    const runtimeConfigPath = resolve(frontendDist, 'runtime-config.js');
-    if (!existsSync(runtimeConfigPath)) throw new Error('Frontend dist/runtime-config.js is missing. Run with --build.');
-    const content = readFileSync(runtimeConfigPath, 'utf8');
-    if (!content.includes(JSON.stringify(environment.ZUMBO_API_URL))) {
-      throw new Error('Frontend runtime config does not target the configured gateway URL. Run with --build.');
+    for (const surface of ['modern-desktop', 'modern-mobile']) {
+      const runtimeConfigPath = resolve(frontendDist, surface, 'runtime-config.js');
+      if (!existsSync(runtimeConfigPath)) throw new Error(`Frontend ${surface} runtime-config.js is missing. Run with --build.`);
+      const content = readFileSync(runtimeConfigPath, 'utf8');
+      if (!content.includes(JSON.stringify(environment.ZUMBO_API_URL))) {
+        throw new Error(`Frontend ${surface} runtime config does not target the configured gateway URL. Run with --build.`);
+      }
     }
     return { apiBaseUrl: environment.ZUMBO_API_URL };
   });
@@ -142,7 +144,7 @@ function verifyServiceInventory() {
 }
 
 async function ensureFrontend() {
-  const desktopUrl = new URL('/desktop-bulma/index.html', environment.ZUMBO_FRONTEND_URL).toString();
+  const desktopUrl = new URL('/modern-desktop/', environment.ZUMBO_FRONTEND_URL).toString();
   const existing = await request(desktopUrl, { acceptedStatuses: [200], timeoutMs: 3_000 }).catch(() => undefined);
   if (existing?.status === 200 && /zumbo/i.test(existing.body)) return { reused: true };
 
@@ -152,7 +154,7 @@ async function ensureFrontend() {
     throw new Error('Frontend dist is missing. Run demo-start.mjs with --build.');
   }
 
-  const child = spawn(process.execPath, ['tests/static-server.mjs', 'dist'], {
+  const child = spawn(process.execPath, ['tests/static-server.mjs', 'dist-modern', '--canonical'], {
     cwd: frontendDirectory,
     detached: true,
     env: {
@@ -189,13 +191,15 @@ async function verifyHttpReadiness() {
   const urls = {
     live: new URL('/health/live', environment.ZUMBO_GATEWAY_URL).toString(),
     ready: new URL('/health/ready', environment.ZUMBO_GATEWAY_URL).toString(),
-    desktop: new URL('/desktop-bulma/index.html', environment.ZUMBO_FRONTEND_URL).toString(),
-    mobile: new URL('/mobile-ionic/index.html', environment.ZUMBO_FRONTEND_URL).toString()
+    desktop: new URL('/modern-desktop/', environment.ZUMBO_FRONTEND_URL).toString(),
+    mobile: new URL('/modern-mobile/', environment.ZUMBO_FRONTEND_URL).toString(),
+    legacyDesktopBookmark: new URL('/desktop-bulma/index.html', environment.ZUMBO_FRONTEND_URL).toString(),
+    legacyMobileBookmark: new URL('/mobile-ionic/index.html', environment.ZUMBO_FRONTEND_URL).toString()
   };
   const statuses = {};
   for (const [name, url] of Object.entries(urls)) {
     statuses[name] = (await request(url, {
-      acceptedStatuses: [200],
+      acceptedStatuses: name.startsWith('legacy') ? [307] : [200],
       timeoutMs: readinessRequestTimeoutMilliseconds
     })).status;
   }

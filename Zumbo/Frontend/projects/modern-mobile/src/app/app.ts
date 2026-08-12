@@ -1,5 +1,6 @@
-import { Component } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { IonApp, IonRouterOutlet } from '@ionic/angular/standalone';
+import { PwaUpdateService } from '@zumbo/modern-shared';
 
 @Component({
   selector: 'zumbo-root',
@@ -8,4 +9,5 @@ import { IonApp, IonRouterOutlet } from '@ionic/angular/standalone';
   styleUrl: './app.scss'
 })
 export class App {
+  protected readonly pwaUpdate = inject(PwaUpdateService);
 }

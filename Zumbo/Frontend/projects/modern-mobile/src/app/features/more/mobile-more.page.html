@@ -34,6 +34,7 @@
         <ion-icon name="chevron-forward-outline"/>
       </a>
     </section>
+    @if (canIntegrations() || canOperations()) { <section><h2>Yönetim</h2>@if (canIntegrations()) { <a routerLink="/workspace/integrations"><ion-icon name="link-outline"/><span><strong>Entegrasyonlar</strong><small>Webhook ve geliştirme bağlantıları</small></span><ion-icon name="chevron-forward-outline"/></a> }@if (canOperations()) { <a routerLink="/workspace/operations"><ion-icon name="server-outline"/><span><strong>Operasyonlar</strong><small>Sistem sağlığı ve müdahale kuyrukları</small></span><ion-icon name="chevron-forward-outline"/></a> }</section> }
     <section><h2>Oturum</h2><button type="button" (click)="logout()"><ion-icon name="log-out-outline"/><span>Çıkış yap</span></button></section>
   </main>
 </ion-content>

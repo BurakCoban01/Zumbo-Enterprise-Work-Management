@@ -41,15 +41,9 @@ importers:
       '@microsoft/signalr':
         specifier: 8.0.7
         version: 8.0.7
-      angular:
-        specifier: 1.8.3
-        version: 1.8.3
       bulma:
         specifier: 1.0.2
         version: 1.0.2
-      ionic-sdk:
-        specifier: 1.3.2
-        version: 1.3.2
       ionicons:
         specifier: 8.0.13
         version: 8.0.13
@@ -1355,10 +1349,6 @@ packages:
     resolution: {integrity: sha512-0ZzY9mjqV7gop/AH8pIBiAS8giXP7WcSiUfoFYIzYAK9QC5c37E4SIVtJVBMwlURc0/uNt2o4RcNRvdHa4CJ5w==}
     engines: {node: '>= 14.0.0'}
 
-  angular@1.8.3:
-    resolution: {integrity: sha512-5qjkWIQQVsHj4Sb5TcEs4WZWpFeVFHXwxEBHUhrny41D8UrBAd6T/6nPPAsLngJCReIOqi95W3mxdveveutpZw==}
-    deprecated: For the actively supported Angular, see https://www.npmjs.com/package/@angular/core. AngularJS support has officially ended. For extended AngularJS support options, see https://goo.gle/angularjs-path-forward.
-
   ansi-escapes@7.3.0:
     resolution: {integrity: sha512-BvU8nYgGQBxcmMuEeUEmNTvrMVjJNSH7RgW24vXexN4Ven6qCvy4TntnvlnwnMLTVlcRQQdbRY8NKnaIoeWDNg==}
     engines: {node: '>=18'}
@@ -1897,9 +1887,6 @@ packages:
   ini@6.0.0:
     resolution: {integrity: sha512-IBTdIkzZNOpqm7q3dRqJvMaldXjDHWkEDfrwGEQTs5eaQMWV+djAhR+wahyNNMAa+qpbDUhBMVt4ZKNwpPm7xQ==}
     engines: {node: ^20.17.0 || >=22.9.0}
-
-  ionic-sdk@1.3.2:
-    resolution: {integrity: sha512-rW488ECDV8xOEGIpvOaMoVWkCym8M5Qig40NnOXErmNq0JKqXASKf7gcenk2NAIeQBTkxQhqJsOLi6CPwQ4Qrg==}
 
   ionicons@8.0.13:
     resolution: {integrity: sha512-2QQVyG2P4wszne79jemMjWYLp0DBbDhr4/yFroPCxvPP1wtMxgdIV3l5n+XZ5E9mgoXU79w7yTWpm2XzJsISxQ==}
@@ -3969,8 +3956,6 @@ snapshots:
       '@algolia/requester-fetch': 5.52.0
       '@algolia/requester-node-http': 5.52.0
 
-  angular@1.8.3: {}
-
   ansi-escapes@7.3.0:
     dependencies:
       environment: 1.1.0
@@ -4552,8 +4537,6 @@ snapshots:
   inherits@2.0.4: {}
 
   ini@6.0.0: {}
-
-  ionic-sdk@1.3.2: {}
 
   ionicons@8.0.13:
     dependencies:

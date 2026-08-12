@@ -27,6 +27,7 @@ export async function hardenModernFrontend() {
     'Content-Security-Policy': baseHeaders['Content-Security-Policy']
       .replace("base-uri 'none'", "base-uri 'self'")
       .replace("style-src 'self'", "style-src 'self' 'nonce-__ZUMBO_CSP_NONCE__'")
+      .concat("; trusted-types angular angular#bundler zumbo#service-worker default; require-trusted-types-for 'script'")
   };
   await writeFile(resolve(distRoot, 'security-headers.json'), `${JSON.stringify(securityHeaders, null, 2)}\n`, 'utf8');
   await verifyStrictCspCompatibility(distRoot, securityHeaders['Content-Security-Policy']);
@@ -91,6 +92,27 @@ async function verifySurface(directory, surface) {
   const worker = JSON.parse(await readFile(resolve(directory, 'ngsw.json'), 'utf8'));
   if (worker.configVersion !== 1 || !worker.index.startsWith(surface.scope)) {
     throw new Error(`${surface.name} Angular service worker does not own the expected scope.`);
+  }
+  const cachedAssets = worker.assetGroups.flatMap(group => group.urls ?? []);
+  if (cachedAssets.length === 0 || !cachedAssets.some(path => /\.js$/.test(path))) {
+    throw new Error(`${surface.name} Angular service worker has an empty application shell.`);
+  }
+  const hashedAssets = Object.keys(worker.hashTable ?? {});
+  if (hashedAssets.some(path => path.endsWith('/runtime-config.js')) || hashedAssets.some(path => path.endsWith('/index.html'))) {
+    throw new Error(`${surface.name} dynamic shell inputs must not be versioned as application assets.`);
+  }
+  const shellPatterns = worker.assetGroups.flatMap(group => group.patterns ?? []).join('\n');
+  const scopedIndexPattern = surface.scope.replaceAll('/', '\\/') + 'index\\.html';
+  if (!shellPatterns.includes(scopedIndexPattern)) {
+    throw new Error(`${surface.name} nonce-bearing index is not covered by the unversioned shell cache.`);
+  }
+  const runtimeGroup = worker.dataGroups.find(group => group.name === `${surface.name}-runtime-config`);
+  if (!runtimeGroup || runtimeGroup.strategy !== 'freshness' || runtimeGroup.maxSize !== 1 || runtimeGroup.timeoutMs !== 2000) {
+    throw new Error(`${surface.name} runtime config does not use the bounded network-first cache contract.`);
+  }
+  const dataPatterns = worker.dataGroups.flatMap(group => group.patterns ?? []).join('\n');
+  if (/\\\/api(?:\\\/|$)|\\\/hubs(?:\\\/|$)|browser-auth/i.test(dataPatterns)) {
+    throw new Error(`${surface.name} service worker must not cache API, hub or browser-auth data.`);
   }
   for (const reference of index.matchAll(/<(?:script|link)\b[^>]*(?:src|href)=["']([^"']+)["'][^>]*>/gi)) {
     const value = reference[1];

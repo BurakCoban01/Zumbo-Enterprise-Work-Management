@@ -1,1 +1,11 @@
-<ion-app><ion-router-outlet /></ion-app>
+<ion-app>
+  <ion-router-outlet />
+  @if (pwaUpdate.ready()) {
+    <aside class="app-update" role="status" aria-live="polite">
+      <span><strong>Yeni sürüm hazır</strong><small>Güncel sürüme geçebilirsiniz.</small></span>
+      <button type="button" (click)="pwaUpdate.activate()" [disabled]="pwaUpdate.activating()">
+        {{ pwaUpdate.activating() ? 'Açılıyor...' : 'Güncelle' }}
+      </button>
+    </aside>
+  }
+</ion-app>

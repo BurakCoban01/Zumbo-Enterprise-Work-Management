@@ -7,12 +7,12 @@
       "installMode": "prefetch",
       "resources": {
         "files": [
-          "/modern-desktop/index.html",
-          "/modern-desktop/manifest.webmanifest",
-          "/modern-desktop/runtime-config.js",
-          "/modern-desktop/*.css",
-          "/modern-desktop/*.js"
-        ]
+          "/manifest.webmanifest",
+          "/*.css",
+          "/*.js",
+          "!/runtime-config.js"
+        ],
+        "urls": ["/modern-desktop/index.html"]
       }
     },
     {
@@ -20,7 +20,19 @@
       "installMode": "lazy",
       "updateMode": "prefetch",
       "resources": {
-        "files": ["/modern-desktop/shared/**"]
+        "files": ["/shared/**"]
+      }
+    }
+  ],
+  "dataGroups": [
+    {
+      "name": "desktop-runtime-config",
+      "urls": ["/modern-desktop/runtime-config.js"],
+      "cacheConfig": {
+        "strategy": "freshness",
+        "maxSize": 1,
+        "maxAge": "1d",
+        "timeout": "2s"
       }
     }
   ]

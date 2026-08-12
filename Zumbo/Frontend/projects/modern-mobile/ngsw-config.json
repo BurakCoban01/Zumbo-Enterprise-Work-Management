@@ -7,12 +7,12 @@
       "installMode": "prefetch",
       "resources": {
         "files": [
-          "/modern-mobile/index.html",
-          "/modern-mobile/manifest.webmanifest",
-          "/modern-mobile/runtime-config.js",
-          "/modern-mobile/*.css",
-          "/modern-mobile/*.js"
-        ]
+          "/manifest.webmanifest",
+          "/*.css",
+          "/*.js",
+          "!/runtime-config.js"
+        ],
+        "urls": ["/modern-mobile/index.html"]
       }
     },
     {
@@ -20,7 +20,19 @@
       "installMode": "lazy",
       "updateMode": "prefetch",
       "resources": {
-        "files": ["/modern-mobile/shared/**"]
+        "files": ["/shared/**"]
+      }
+    }
+  ],
+  "dataGroups": [
+    {
+      "name": "mobile-runtime-config",
+      "urls": ["/modern-mobile/runtime-config.js"],
+      "cacheConfig": {
+        "strategy": "freshness",
+        "maxSize": 1,
+        "maxAge": "1d",
+        "timeout": "2s"
       }
     }
   ]

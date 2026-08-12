@@ -1,0 +1,69 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-buttons slot="start"><ion-back-button defaultHref="/workspace/more"></ion-back-button></ion-buttons>
+    <ion-title>Operasyonlar</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content [fullscreen]="true">
+  <ion-refresher slot="fixed" (ionRefresh)="refresh($event)"><ion-refresher-content></ion-refresher-content></ion-refresher>
+  <main [attr.aria-busy]="loading() || busy() !== null">
+    <header class="intro">
+      <p>Yetkili operasyon görünümü</p>
+      <h1>Sağlık ve müdahale</h1>
+      <span>Önce müdahale gerektiren sinyalleri görün; ayrıntıları yalnızca gerektiğinde açın.</span>
+      <button type="button" (click)="reload()" [disabled]="loading() || busy() !== null">Yenile</button>
+    </header>
+
+    @if (connectivity.offline()) { <p class="feedback warning" role="status">Çevrimdışısınız. Müdahale işlemleri bağlantı kurulana kadar kilitli.</p> }
+    @if (error()) { <p class="feedback error" role="alert"><span>{{ error() }}</span><button type="button" (click)="dismissError()">Kapat</button></p> }
+    @if (notice()) { <p class="feedback success" role="status"><span>{{ notice() }}</span><button type="button" (click)="dismissNotice()">Kapat</button></p> }
+
+    @if (loading() && !data()) {
+      <section class="loading" aria-label="Operasyon durumu yükleniyor"><ion-spinner name="crescent"></ion-spinner><span>Sağlık sinyalleri yükleniyor</span></section>
+    } @else if (!canManage()) {
+      <section class="state"><h2>Erişim gerekli</h2><p>Bu alanı görüntülemek ve müdahale etmek için operasyon yönetimi yetkisi gerekir.</p></section>
+    } @else if (data(); as value) {
+      <section class="triage" aria-labelledby="triage-heading">
+        <header><div><p>Öncelik</p><h2 id="triage-heading">@if (attentionCount(value)) { {{ attentionCount(value) }} müdahale sinyali } @else { Sağlık sinyalleri normal }</h2></div><span [class.attention]="attentionCount(value) > 0">{{ attentionCount(value) ? 'Gözden geçirin' : 'İzleme sürüyor' }}</span></header>
+        <div class="health-grid">
+          <article [class.attention]="(value.messaging?.deadLetter ?? 0) > 0"><small>Sistem olayları</small><strong>{{ value.messaging?.deadLetter ?? 0 }}</strong><span>Müdahale kuyruğu</span></article>
+          <article [class.attention]="(value.notifications?.deadLetter ?? 0) > 0"><small>Bildirimler</small><strong>{{ value.notifications?.deadLetter ?? 0 }}</strong><span>Yeniden denenecek</span></article>
+          <article [class.attention]="(value.storage?.quarantined ?? 0) > 0"><small>Dosya güvenliği</small><strong>{{ value.storage?.quarantined ?? 0 }}</strong><span>Karantinada</span></article>
+        </div>
+      </section>
+
+      <details class="section" [open]="value.messageDeadLetters.length > 0">
+        <summary><span><strong>Sistem olayları</strong><small>Dayanıklı mesaj kuyruğu ve bekleyen müdahaleler.</small></span><b>{{ value.messaging?.deadLetter ?? 0 }}</b></summary>
+        @if (readFailed('messaging') || readFailed('messageDeadLetters')) { <p class="unavailable">Bu sinyal şu anda alınamadı.</p> } @else {
+          <dl class="metrics"><div><dt>Sırada</dt><dd>{{ value.messaging?.pending ?? 0 }}</dd></div><div><dt>İşleniyor</dt><dd>{{ value.messaging?.processing ?? 0 }}</dd></div><div><dt>Müdahale</dt><dd>{{ value.messaging?.deadLetter ?? 0 }}</dd></div></dl>
+          <div class="action-list">@for (item of value.messageDeadLetters; track item.id) { <article><div><strong>{{ messageLabel(item.eventType) }}</strong><span>{{ item.attempts }} deneme sonrası bekliyor</span></div><button type="button" (click)="replayMessage(item.id)" [disabled]="mutationLocked()">Yeniden dene</button></article> } @empty { <p class="empty">Müdahale bekleyen sistem olayı yok.</p> }</div>
+        }
+      </details>
+
+      <details class="section" [open]="value.notificationDeadLetters.length > 0">
+        <summary><span><strong>Bildirim teslimatı</strong><small>Alıcı veya hata içeriği bu görünümde tutulmaz.</small></span><b>{{ value.notifications?.deadLetter ?? 0 }}</b></summary>
+        @if (readFailed('notifications') || readFailed('notificationDeadLetters')) { <p class="unavailable">Bu sinyal şu anda alınamadı.</p> } @else {
+          <dl class="metrics"><div><dt>Sırada</dt><dd>{{ value.notifications?.pending ?? 0 }}</dd></div><div><dt>Gönderildi</dt><dd>{{ value.notifications?.sent ?? 0 }}</dd></div><div><dt>Müdahale</dt><dd>{{ value.notifications?.deadLetter ?? 0 }}</dd></div></dl>
+          <div class="action-list">@for (item of value.notificationDeadLetters; track item.id) { <article><div><strong>{{ notificationLabel(item.type) }}</strong><span>{{ item.attempts }} deneme sonrası bekliyor</span></div><button type="button" (click)="replayNotification(item.id)" [disabled]="mutationLocked()">Yeniden dene</button></article> } @empty { <p class="empty">Müdahale bekleyen bildirim yok.</p> }</div>
+        }
+      </details>
+
+      <details class="section">
+        <summary><span><strong>Bağımlılık sağlığı</strong><small>Devre, hata ve gecikme sinyalleri.</small></span><b>{{ value.dependencies?.dependencies?.length ?? 0 }}</b></summary>
+        @if (readFailed('dependencies')) { <p class="unavailable">Bu sinyal şu anda alınamadı.</p> } @else { <div class="dependency-list">@for (item of value.dependencies?.dependencies ?? []; track item.dependency) { <article [class.attention]="dependencyNeedsAttention(item)"><div><strong>{{ dependencyLabel(item.dependency) }}</strong><span>{{ dependencyState(item) }}</span></div><dl><div><dt>İşlem</dt><dd>{{ item.executions }}</dd></div><div><dt>Hata</dt><dd>{{ item.failed }}</dd></div><div><dt>Ort. süre</dt><dd>{{ item.averageLatencyMilliseconds.toFixed(1) }} ms</dd></div></dl></article> } @empty { <p class="empty">Henüz sağlık sinyali yok.</p> }</div> }
+      </details>
+
+      <details class="section">
+        <summary><span><strong>Dosya güvenliği</strong><small>Karantina içeriği ve nesne anahtarları gösterilmez.</small></span><b>{{ value.storage?.quarantined ?? 0 }}</b></summary>
+        @if (readFailed('storage')) { <p class="unavailable">Bu sinyal şu anda alınamadı.</p> } @else { <dl class="metrics"><div><dt>Karantina</dt><dd>{{ value.storage?.quarantined ?? 0 }}</dd></div><div><dt>Temiz</dt><dd>{{ value.storage?.clean ?? 0 }}</dd></div><div><dt>Reddedildi</dt><dd>{{ value.storage?.rejected ?? 0 }}</dd></div></dl><p class="empty">{{ value.storage?.quarantined ? 'Karantina kayıtları müdahale bekliyor.' : 'Karantinada bekleyen dosya yok.' }}</p><button class="full-action" type="button" (click)="maintainStorage()" [disabled]="mutationLocked()">Karantinayı yeniden denetle</button> }
+      </details>
+
+      <details class="section">
+        <summary><span><strong>Arama görünümü</strong><small>Yalnızca ihtiyaç halinde kayıtlarla uzlaştırın.</small></span></summary>
+        @if (searchResult(); as result) { <p class="result">{{ result.indexed }} kayıt indekslendi · {{ result.removed }} eski kayıt kaldırıldı.</p> } @else { <p class="empty">Uzlaştırma, arama sonucunun güncel kayıtlardan farklı olduğundan şüphelenildiğinde kullanılmalıdır.</p> }
+        <button class="full-action" type="button" (click)="reconcile()" [disabled]="mutationLocked()">Aramayı uzlaştır</button>
+      </details>
+    }
+  </main>
+</ion-content>

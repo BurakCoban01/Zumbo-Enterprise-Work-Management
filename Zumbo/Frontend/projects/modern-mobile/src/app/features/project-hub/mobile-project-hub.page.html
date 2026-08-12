@@ -13,6 +13,9 @@
       <section class="hub-band"><header><div><h2>Yaklaşan riskler</h2><p>Önümüzdeki 14 günde dikkat isteyen ilk işler</p></div><ion-icon name="warning-outline"/></header><div class="compact-list">@for(item of topRisks();track item.id){<a [routerLink]="['/tasks',item.id]"><span><strong>{{item.title}}</strong><small>{{item.status}}</small></span><time>{{date(item.dueDate)}}</time></a>}@empty{<p class="empty">Yaklaşan tarih riski yok.</p>}</div></section>
       <section class="hub-band"><header><div><h2>Teslimat kataloğu</h2><p>Sürüm, yayın, kilometre taşı ve proje şablonları</p></div></header><a class="primary-link" [routerLink]="['/workspace/projects',projectId,'catalog']">Kataloğu aç</a></section>
       <section class="hub-band"><header><div><h2>Talep merkezi</h2><p>İç talepleri oluşturun, formları yönetin ve triage kuyruğunu inceleyin</p></div></header><a class="primary-link" [routerLink]="['/workspace/projects',projectId,'intake']">Talep merkezini aç</a></section>
+      <section class="hub-band"><header><div><h2>Otomasyon</h2><p>Kurallar, çalıştırmalar, iş şablonları ve tekrarlar</p></div></header><a class="primary-link" [routerLink]="['/workspace/projects',projectId,'automation']">Otomasyonu aç</a></section>
+      <section class="hub-band"><header><div><h2>İş merkezi</h2><p>İçe ve dışa aktarımları başlatın, ilerlemeyi ve sonuçları izleyin</p></div></header><a class="primary-link" [routerLink]="['/workspace/projects',projectId,'jobs']">İş merkezini aç</a></section>
+      <section class="hub-band"><header><div><h2>İçgörüler</h2><p>İş yükü, teslimat raporları ve kaydedilmiş dashboardlar</p></div></header><a class="primary-link" [routerLink]="['/workspace/projects',projectId,'insights']">İçgörüleri aç</a></section>
       <a class="primary-link" [routerLink]="['/workspace/projects',projectId,'work']">Tüm proje işlerini aç</a>
     }
 
