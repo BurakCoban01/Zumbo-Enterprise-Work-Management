@@ -6,6 +6,7 @@ import { IonBackButton, IonButtons, IonContent, IonHeader, IonRefresher, IonRefr
 import { ZumboSessionService, normalizeApiError } from '@zumbo/modern-shared';
 import { finalize, Observable } from 'rxjs';
 import { MobileConnectivityService } from '../../shell/mobile-connectivity.service';
+import { priorityLabel } from '../../shell/mobile-workspace.models';
 import { hasMobileAutomationPermission, mobileAutomationActionNeedsValue, mobileAutomationActionTypeLabel, mobileAutomationActionTypes, mobileAutomationAuditActionLabel, mobileAutomationConditionFieldLabel, mobileAutomationConditionFields, mobileAutomationConditionNeedsValue, mobileAutomationConditionOperatorLabel, mobileAutomationConditionOperators, mobileAutomationError, mobileAutomationEventTypes, mobileAutomationLabels, mobileAutomationLimits, mobileAutomationRuleDraft, mobileAutomationRuleState, mobileAutomationRunState, mobileAutomationTriggerLabel, mobileWorkOccurrenceState, mobileWorkRecurrenceFrequency, mobileWorkRecurrenceState, mobileWorkTemplateDraft, newMobileAutomationRuleDraft, newMobileWorkRecurrenceDraft, newMobileWorkTemplateDraft, validMobileAutomationRule, validMobileWorkRecurrence } from './mobile-automation.core';
 import { MobileAutomationActionDraft, MobileAutomationAudit, MobileAutomationConditionDraft, MobileAutomationContext, MobileAutomationDryRun, MobileAutomationDryRunInput, MobileAutomationRuleDraft, MobileAutomationRuleSummary, MobileAutomationRun, MobileAutomationTab, MobileWorkRecurrence, MobileWorkRecurrenceDraft, MobileWorkRecurrenceOccurrence, MobileWorkRecurrencePreview, MobileWorkTemplate, MobileWorkTemplateDraft } from './mobile-automation.models';
 import { MobileAutomationService } from './mobile-automation.service';
@@ -48,6 +49,7 @@ export class MobileAutomationPage {
   protected readonly runStatus = signal('');
 
   protected readonly limits = mobileAutomationLimits;
+  protected readonly priorityLabel = priorityLabel;
   protected readonly eventTypes = mobileAutomationEventTypes;
   protected readonly conditionFields = mobileAutomationConditionFields;
   protected readonly conditionOperators = mobileAutomationConditionOperators;

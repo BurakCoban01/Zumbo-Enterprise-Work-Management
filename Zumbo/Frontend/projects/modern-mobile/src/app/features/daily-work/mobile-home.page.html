@@ -8,17 +8,17 @@
     @if (store.partial()) { <p class="state" role="status">Bazı projeler yenilenemedi; erişilebilen işler gösteriliyor.</p> }
     @if (store.ready()) {
       <nav class="metric-strip" aria-label="Kişisel çalışma özeti">
-        <a routerLink="/workspace/work" [queryParams]="{mode:'assigned'}"><strong>{{ open().length }}</strong><span>Açık</span></a>
-        <a routerLink="/workspace/work" [queryParams]="{mode:'due'}"><strong>{{ due().length }}</strong><span>Tarihli</span></a>
-        <a routerLink="/workspace/work" [queryParams]="{mode:'blocked'}"><strong>{{ blocked().length }}</strong><span>Engelli</span></a>
-        <a routerLink="/workspace/inbox"><strong>{{ unread().length }}</strong><span>Okunmamış</span></a>
+        <a routerLink="/workspace/work" [queryParams]="{mode:'assigned'}"><strong>{{ open().length }}</strong><span>Açık işler</span></a>
+        <a routerLink="/workspace/work" [queryParams]="{mode:'due'}"><strong>{{ due().length }}</strong><span>Tarihi olan</span></a>
+        <a routerLink="/workspace/work" [queryParams]="{mode:'blocked'}"><strong>{{ blocked().length }}</strong><span>Bloke işler</span></a>
+        <a routerLink="/workspace/inbox"><strong>{{ unread().length }}</strong><span>Yeni bildirim</span></a>
       </nav>
       <section class="priority-section"><header><h2>Yaklaşan işler</h2><a routerLink="/workspace/work" [queryParams]="{mode:'due'}">Tümünü gör</a></header><div class="work-list">
-        @for (item of due().slice(0, 5); track item.id) { <article class="work-row"><span><strong>{{ item.title }}</strong><small>{{ item.projectName }} · {{ item.status }}</small></span><time>{{ formatDate(item.dueDate) }}</time></article> }
+        @for (item of due().slice(0, 5); track item.id) { <a class="work-row" [routerLink]="['/tasks', item.id]"><span><strong>{{ item.title }}</strong><small>{{ item.projectName }} · {{ item.status }}</small></span><time>{{ formatDate(item.dueDate) }}</time></a> }
         @empty { <p class="empty">Yaklaşan iş yok.</p> }
       </div></section>
       <section class="priority-section"><header><h2>Eylem bildirimleri</h2><a routerLink="/workspace/inbox">Gelen kutusu</a></header><div class="notification-list">
-        @for (item of unread().slice(0, 4); track item.id) { <button type="button" (click)="store.markRead(item.id)"><i></i><span><strong>{{ label(item) }}</strong><small>{{ item.message }}</small></span><time>{{ formatDate(item.createdAt) }}</time></button> }
+        @for (item of unread().slice(0, 4); track item.id) { <article><i></i><a [routerLink]="item.sourceId ? ['/tasks', item.sourceId] : ['/workspace/inbox']"><strong>{{ label(item) }}</strong><small>{{ item.message }}</small><time>{{ formatDate(item.createdAt) }}</time></a><button type="button" (click)="markRead(item.id)" aria-label="Bildirimi okundu işaretle">Okundu</button></article> }
         @empty { <p class="empty">Yeni bildirim yok.</p> }
       </div></section>
     }

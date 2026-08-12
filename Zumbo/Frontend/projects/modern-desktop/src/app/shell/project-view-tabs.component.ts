@@ -38,9 +38,7 @@ export class ProjectViewTabsComponent {
     return this.viewsInGroup(group).some(view => view.id === this.activeView());
   }
 
-  protected toggleGroup(event: Event, group: ProjectViewDefinition['group']): void {
-    const details = event.currentTarget as HTMLDetailsElement;
-    if (details.open) this.openGroup.set(group);
-    else if (this.openGroup() === group) this.openGroup.set(null);
+  protected toggleGroup(group: ProjectViewDefinition['group']): void {
+    this.openGroup.update(current => current === group ? null : group);
   }
 }

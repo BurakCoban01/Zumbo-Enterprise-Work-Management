@@ -9,14 +9,16 @@
   @if (secondary().length) {
     <div class="secondary-groups" aria-label="Diğer proje çalışma alanları">
       @for (group of secondaryGroups; track group) {
-        <details [class.active]="isGroupActive(group)" [open]="openGroup() === group" (toggle)="toggleGroup($event, group)">
-          <summary><span>{{ groupLabels.get(group) }}</span><zumbo-icon name="chevron-down" [size]="15" /></summary>
-          <div class="view-menu">
+        <div class="view-group" [class.active]="isGroupActive(group)" [class.open]="openGroup() === group">
+          <button class="group-trigger" type="button" (click)="toggleGroup(group)" [attr.aria-expanded]="openGroup() === group" [attr.aria-controls]="group + '-project-views'">
+            <span>{{ groupLabels.get(group) }}</span><small>{{ viewsInGroup(group).length }}</small><zumbo-icon name="chevron-down" [size]="15" />
+          </button>
+          @if (openGroup() === group) { <div class="view-menu" [id]="group + '-project-views'">
             @for (view of viewsInGroup(group); track view.id) {
               <a [routerLink]="['/workspace', projectId(), view.id]" [class.active]="activeView() === view.id" [attr.aria-current]="activeView() === view.id ? 'page' : null" (click)="openGroup.set(null)">{{ view.label }}</a>
             }
-          </div>
-        </details>
+          </div> }
+        </div>
       }
     </div>
   }

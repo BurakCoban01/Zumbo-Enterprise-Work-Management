@@ -39,9 +39,12 @@ test('work item detail has one scroll owner and places bounded operational conte
   assert.match(styles, /\.work-detail-body\s*>\s*main,\s*\.work-detail-properties\s*\{[^}]*overflow:\s*visible/s);
   assert.ok(template.indexOf('id="attachments-title"') < template.indexOf('id="activity-title"'));
   assert.ok(template.indexOf('id="development-title"') < template.indexOf('id="activity-title"'));
-  assert.match(responsive, /@media \(max-width:\s*840px\)/);
+  assert.match(responsive, /@media \(max-width:\s*1180px\)/);
   assert.match(responsive, /\.work-detail-properties\s*\{\s*order:\s*3/);
   assert.match(responsive, /\.work-detail-properties\s*\{[^}]*min-height:\s*auto/);
+  assert.match(responsive, /\.work-detail-properties\s*\{[^}]*grid-template-columns:\s*repeat\(2,/);
+  const extensions = await read('projects/modern-desktop/src/app/features/work-items/work-item-detail-extensions.scss');
+  assert.match(extensions, /\.activity-list\s*\{[^}]*max-height:\s*min\(52vh,\s*520px\)[^}]*overflow-y:\s*auto/s);
 });
 
 test('project navigation exposes named secondary work groups without a generic overflow label', async () => {
@@ -56,11 +59,13 @@ test('project navigation exposes named secondary work groups without a generic o
   assert.match(component, /\['plan', 'operate', 'insights'\] as const/);
   assert.match(template, /class="primary-views"/);
   assert.match(template, /class="secondary-groups"/);
-  assert.match(template, /\[open\]="openGroup\(\) === group"/);
-  assert.match(template, /\(toggle\)="toggleGroup\(\$event, group\)"/);
+  assert.match(template, /class="group-trigger"/);
+  assert.match(template, /\(click\)="toggleGroup\(group\)"/);
+  assert.match(template, /\[attr\.aria-expanded\]="openGroup\(\) === group"/);
   assert.match(component, /openGroup = signal/);
+  assert.match(component, /current === group \? null : group/);
   assert.match(styles, /\.secondary-groups\s*\{[^}]*margin-left:\s*12px/s);
-  assert.match(styles, /details:not\(\[open\]\)\s*>\s*\.view-menu\s*\{\s*display:\s*none/s);
+  assert.match(styles, /\.group-trigger small\s*\{/);
   assert.match(styles, /@media \(min-width:\s*761px\) and \(max-width:\s*960px\)[\s\S]*left:\s*256px/s);
   assert.match(styles, /@media \(max-width:\s*960px\)\s*\{\s*\.project-tabs\s*\{\s*display:\s*grid/);
   for (const label of ['Planlama', 'Operasyon', 'İçgörüler']) assert.match(component, new RegExp(label));

@@ -2,22 +2,14 @@ using Zumbo.Modules.WorkItems;
 using Zumbo.BuildingBlocks.Application.Messaging;
 using Zumbo.BuildingBlocks.Application.Security;
 using Zumbo.SharedKernel;
-using Zumbo.Api.Presentation.Endpoints.WorkItems.Activity;
 using Zumbo.Api.Presentation.Endpoints.WorkItems.Attachments;
-using Zumbo.Api.Presentation.Endpoints.WorkItems.Approvals;
 using Zumbo.Api.Presentation.Endpoints.WorkItems.BulkOperations;
-using Zumbo.Api.Presentation.Endpoints.WorkItems.Checklist;
-using Zumbo.Api.Presentation.Endpoints.WorkItems.Comments;
-using Zumbo.Api.Presentation.Endpoints.WorkItems.Labels;
 using Zumbo.Api.Presentation.Endpoints.WorkItems.Planning;
-using Zumbo.Api.Presentation.Endpoints.WorkItems.Realtime;
 using Zumbo.Api.Presentation.Endpoints.WorkItems.Recurrences;
-using Zumbo.Api.Presentation.Endpoints.WorkItems.Relations;
 using Zumbo.Api.Presentation.Endpoints.WorkItems.Reports;
 using Zumbo.Api.Presentation.Endpoints.WorkItems.Search;
 using Zumbo.Api.Presentation.Endpoints.WorkItems.Schema;
 using Zumbo.Api.Presentation.Endpoints.WorkItems.Sprints;
-using Zumbo.Api.Presentation.Endpoints.WorkItems.Worklogs;
 using Zumbo.Api.Presentation.Endpoints.WorkItems.WorkItemsCore;
 
 using static ApiEndpointResults;
@@ -48,14 +40,6 @@ internal static partial class WorkItemEndpoints
         SearchWorkItemsEndpoint.Map(group);
 
         GetWorkItemEndpoint.Map(group);
-
-        GetCollaborationEndpoint.Map(group);
-
-        SetWatchEndpoint.Map(group);
-
-        SetVoteEndpoint.Map(group);
-
-        GetWorkItemActivityEndpoint.Map(group);
 
         ListTemplatesEndpoint.Map(group);
 
@@ -117,41 +101,7 @@ internal static partial class WorkItemEndpoints
 
         SetTeamEndpoint.Map(group);
 
-        RequestApprovalEndpoint.Map(group);
-
-        DecideApprovalEndpoint.Map(group);
-
-        AddChecklistItemEndpoint.Map(group);
-
-        SetChecklistItemCompletionEndpoint.Map(group);
-
-        AddLabelEndpoint.Map(group);
-
-        RemoveLabelEndpoint.Map(group);
-
-        AddCommentEndpoint.Map(group);
-
-        ListCommentsEndpoint.Map(group);
-
-        ListCommentRevisionsEndpoint.Map(group);
-
-        EditCommentEndpoint.Map(group);
-
-        DeleteCommentEndpoint.Map(group);
-
         ListAttachmentsEndpoint.Map(group);
-
-        AddWorkLogEndpoint.Map(group);
-
-        ListWorkLogsEndpoint.Map(group);
-
-        ListApprovalsEndpoint.Map(group);
-
-        GetWorkItemTimelineEndpoint.Map(group);
-
-        LinkWorkItemEndpoint.Map(group);
-
-        UnlinkWorkItemEndpoint.Map(group);
 
         ArchiveWorkItemEndpoint.Map(group);
 

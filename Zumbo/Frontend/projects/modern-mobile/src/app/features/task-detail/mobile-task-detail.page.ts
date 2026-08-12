@@ -6,7 +6,7 @@ import { IonBackButton, IonButtons, IonContent, IonHeader, IonTitle, IonToolbar 
 import { ZumboRealtimeService, ZumboSessionService } from '@zumbo/modern-shared';
 import { Observable, finalize, firstValueFrom } from 'rxjs';
 import { MobileConnectivityService } from '../../shell/mobile-connectivity.service';
-import { MobileTaskAttachment, MobileTaskDetail } from '../../shell/mobile-workspace.models';
+import { MobileTaskAttachment, MobileTaskDetail, priorityLabel } from '../../shell/mobile-workspace.models';
 import { MobileWorkspaceStore } from '../../shell/mobile-workspace.store';
 import { MobileTaskDetailContext, MobileTaskDetailTab, MobileTaskDraft, MobileTaskStream } from './mobile-task-detail.models';
 import { MobileTaskDetailService } from './mobile-task-detail.service';
@@ -26,6 +26,7 @@ export class MobileTaskDetailPage implements OnInit {
   private realtimeReloading = false;
   protected readonly connectivity = inject(MobileConnectivityService);
   protected readonly store = inject(MobileWorkspaceStore);
+  protected readonly priorityLabel = priorityLabel;
   protected readonly context = signal<MobileTaskDetailContext | null>(null);
   protected readonly task = computed(() => this.context()?.detail ?? null);
   protected readonly loading = signal(true);

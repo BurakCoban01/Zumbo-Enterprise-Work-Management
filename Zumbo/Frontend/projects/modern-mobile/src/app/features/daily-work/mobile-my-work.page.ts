@@ -1,15 +1,16 @@
 import { Component, computed, inject, signal } from '@angular/core';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, RouterLink } from '@angular/router';
 import { IonContent, IonHeader, IonRefresher, IonRefresherContent, IonTitle, IonToolbar } from '@ionic/angular/standalone';
 import { MobileWorkspaceStore } from '../../shell/mobile-workspace.store';
-import { MobileWorkMode, dueTime, isBlocked, isOpen } from '../../shell/mobile-workspace.models';
+import { MobileWorkMode, dueTime, isBlocked, isOpen, priorityLabel } from '../../shell/mobile-workspace.models';
 
 const MODES: readonly MobileWorkMode[] = ['assigned', 'due', 'blocked', 'recent'];
-@Component({ selector: 'zumbo-mobile-my-work', imports: [IonContent, IonHeader, IonRefresher, IonRefresherContent, IonTitle, IonToolbar], templateUrl: './mobile-my-work.page.html', styleUrls: ['./mobile-my-work.page.scss', './mobile-daily-work.shared.scss'] })
+@Component({ selector: 'zumbo-mobile-my-work', imports: [RouterLink, IonContent, IonHeader, IonRefresher, IonRefresherContent, IonTitle, IonToolbar], templateUrl: './mobile-my-work.page.html', styleUrls: ['./mobile-my-work.page.scss', './mobile-daily-work.shared.scss'] })
 export class MobileMyWorkPage {
   protected readonly store = inject(MobileWorkspaceStore);
   private readonly route = inject(ActivatedRoute);
   protected readonly mode = signal<MobileWorkMode>(readMode(this.route.snapshot.queryParamMap.get('mode')));
+  protected readonly priorityLabel = priorityLabel;
   protected readonly projectId = this.route.snapshot.queryParamMap.get('project');
   protected readonly visible = computed(() => {
     const scoped = this.projectId ? this.store.tasks().filter(item => item.projectId === this.projectId) : this.store.tasks();

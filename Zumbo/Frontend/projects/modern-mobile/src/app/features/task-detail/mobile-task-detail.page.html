@@ -6,7 +6,7 @@
     @if(notice()){<p class="state notice" role="status">{{notice()}}</p>}
     @if(context()?.partial){<p class="state partial" role="status">Bazı ikincil bilgiler şu anda gösterilemiyor. Ana iş kaydı güncel.</p>}
     @if(task();as item){
-      <header><p>{{project()?.key||'İş'}} · {{item.type}}</p><h1>{{item.title}}</h1><div><span>{{item.status}}</span><span>{{item.priority}}</span></div></header>
+      <header><p>{{project()?.key||'İş'}} · {{item.type}}</p><h1>{{item.title}}</h1><div><span>{{item.status}}</span><span>{{priorityLabel(item.priority)}}</span></div></header>
       <nav class="detail-tabs" role="tablist" aria-label="İş ayrıntısı görünümü">
         <button type="button" role="tab" [class.active]="tab()==='summary'" [attr.aria-selected]="tab()==='summary'" (click)="setTab('summary')">Özet</button>
         <button type="button" role="tab" [class.active]="tab()==='work'" [attr.aria-selected]="tab()==='work'" (click)="setTab('work')">Çalışma</button>

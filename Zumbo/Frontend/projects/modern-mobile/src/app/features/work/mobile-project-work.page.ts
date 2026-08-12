@@ -4,7 +4,7 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
 import { IonContent, IonHeader, IonRefresher, IonRefresherContent, IonTitle, IonToolbar } from '@ionic/angular/standalone';
 import { firstValueFrom } from 'rxjs';
 import { ZumboRealtimeService } from '@zumbo/modern-shared';
-import { MobileWorkItemRecord, MobileWorkflowStatus } from '../../shell/mobile-workspace.models';
+import { MobileWorkItemRecord, MobileWorkflowStatus, priorityLabel } from '../../shell/mobile-workspace.models';
 import { MobileWorkspaceStore } from '../../shell/mobile-workspace.store';
 import { mergeUniqueWorkItems } from './mobile-work.core';
 import { MobileWorkService } from './mobile-work.service';
@@ -24,6 +24,7 @@ export class MobileProjectWorkPage implements OnInit {
   protected readonly store = inject(MobileWorkspaceStore);
   protected readonly projectId = this.route.snapshot.paramMap.get('projectId') ?? '';
   protected readonly project = computed(() => this.store.projects().find(item => item.id === this.projectId));
+  protected readonly priorityLabel = priorityLabel;
   protected readonly items = signal<readonly MobileWorkItemRecord[]>([]);
   protected readonly statuses = signal<readonly MobileWorkflowStatus[]>([]);
   protected readonly selectedStatus = signal('');
