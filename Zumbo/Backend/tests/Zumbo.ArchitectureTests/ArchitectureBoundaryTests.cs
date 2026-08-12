@@ -788,23 +788,15 @@ public sealed class ArchitectureBoundaryTests
     {
         var expected = new Dictionary<string, string?>
         {
-            ["AuditEndpoints.cs"] = "Zumbo.Modules.Audit",
             ["AutomationEndpoints.cs"] = "Zumbo.Modules.Workflows",
-            ["BoardsEndpoints.cs"] = "Zumbo.Modules.Boards",
             ["CapacityPlanningEndpoints.cs"] = "Zumbo.Modules.WorkItems",
             ["DashboardEndpoints.cs"] = "Zumbo.Modules.WorkItems",
             ["DevelopmentIntegrationEndpoints.cs"] = "Zumbo.Modules.WorkItems",
-            ["GoalEndpoints.cs"] = "Zumbo.Modules.Projects",
             ["IdentityEndpoints.cs"] = "Zumbo.Modules.Identity",
             ["IntakeEndpoints.cs"] = "Zumbo.Modules.WorkItems",
             ["KnowledgeEndpoints.cs"] = "Zumbo.Modules.Projects",
-            ["NotificationEndpoints.cs"] = "Zumbo.Modules.Notifications",
-            ["OperationsEndpoints.cs"] = null,
-            ["OrganizationsEndpoints.cs"] = "Zumbo.Modules.Organizations",
-            ["PortfolioEndpoints.cs"] = "Zumbo.Modules.Projects",
             ["ProjectsEndpoints.cs"] = "Zumbo.Modules.Projects",
             ["SprintEndpoints.cs"] = "Zumbo.Modules.WorkItems",
-            ["TeamsEndpoints.cs"] = "Zumbo.Modules.Teams",
             ["WebhookEndpoints.cs"] = "Zumbo.Modules.WorkItems",
             ["WorkflowEndpoints.cs"] = "Zumbo.Modules.Workflows",
             ["WorkItemTypeSchemaEndpoints.cs"] = "Zumbo.Modules.WorkItems"
@@ -1149,10 +1141,11 @@ public sealed class ArchitectureBoundaryTests
         Assert.Contains("createOrganizationHandler.HandleAsync", facade, StringComparison.Ordinal);
         Assert.Contains("listOrganizationsHandler.HandleAsync", facade, StringComparison.Ordinal);
 
-        var endpointHost = File.ReadAllText(EndpointHostPath("OrganizationsEndpoints.cs"));
-        Assert.Contains("services.AddOrganizationServices()", endpointHost, StringComparison.Ordinal);
-        Assert.DoesNotContain("IDocumentRepository", endpointHost, StringComparison.Ordinal);
-        Assert.DoesNotContain("OrganizationDocument", endpointHost, StringComparison.Ordinal);
+        var registration = File.ReadAllText(Path.Combine(
+            SourceDirectory, "Zumbo.Api", "Composition", "Modules", "Organizations", "OrganizationModuleRegistration.cs"));
+        Assert.Contains("services.AddOrganizationServices()", registration, StringComparison.Ordinal);
+        Assert.DoesNotContain("IDocumentRepository", registration, StringComparison.Ordinal);
+        Assert.DoesNotContain("OrganizationDocument", registration, StringComparison.Ordinal);
 
         var composition = File.ReadAllText(Path.Combine(
             SourceDirectory,
@@ -1208,10 +1201,16 @@ public sealed class ArchitectureBoundaryTests
         Assert.Contains("createTeamHandler.HandleAsync", facade, StringComparison.Ordinal);
         Assert.Contains("listTeamsHandler.HandleAsync", facade, StringComparison.Ordinal);
 
-        var endpointHost = File.ReadAllText(EndpointHostPath("TeamsEndpoints.cs"));
-        Assert.Contains("services.AddTeamServices()", endpointHost, StringComparison.Ordinal);
-        Assert.DoesNotContain("IDocumentRepository", endpointHost, StringComparison.Ordinal);
-        Assert.DoesNotContain("TeamDocument", endpointHost, StringComparison.Ordinal);
+        var registration = File.ReadAllText(Path.Combine(
+            SourceDirectory,
+            "Zumbo.Api",
+            "Composition",
+            "Modules",
+            "Teams",
+            "TeamModuleRegistration.cs"));
+        Assert.Contains("services.AddTeamServices()", registration, StringComparison.Ordinal);
+        Assert.DoesNotContain("IDocumentRepository", registration, StringComparison.Ordinal);
+        Assert.DoesNotContain("TeamDocument", registration, StringComparison.Ordinal);
 
         var composition = File.ReadAllText(Path.Combine(
             SourceDirectory,
@@ -1686,10 +1685,26 @@ public sealed class ArchitectureBoundaryTests
         Assert.Contains("addColumnHandler.HandleAsync", columnsFacade, StringComparison.Ordinal);
         Assert.Contains("updateColumnHandler.HandleAsync", columnsFacade, StringComparison.Ordinal);
 
-        var endpointHost = File.ReadAllText(EndpointHostPath("BoardsEndpoints.cs"));
-        Assert.Contains("services.AddBoardServices()", endpointHost, StringComparison.Ordinal);
-        Assert.DoesNotContain("IDocumentRepository", endpointHost, StringComparison.Ordinal);
-        Assert.DoesNotContain("BoardDocument", endpointHost, StringComparison.Ordinal);
+        var registration = File.ReadAllText(Path.Combine(
+            SourceDirectory,
+            "Zumbo.Api",
+            "Composition",
+            "Modules",
+            "Boards",
+            "BoardModuleRegistration.cs"));
+        Assert.Contains("services.AddBoardServices()", registration, StringComparison.Ordinal);
+
+        var controllersDirectory = Path.Combine(
+            SourceDirectory,
+            "Zumbo.Api",
+            "Presentation",
+            "Controllers",
+            "Boards");
+        var controllerHost = string.Join(
+            Environment.NewLine,
+            Directory.GetFiles(controllersDirectory, "*.cs").Select(File.ReadAllText));
+        Assert.DoesNotContain("IDocumentRepository", controllerHost, StringComparison.Ordinal);
+        Assert.DoesNotContain("BoardDocument", controllerHost, StringComparison.Ordinal);
 
         var composition = File.ReadAllText(Path.Combine(
             SourceDirectory,
@@ -1701,17 +1716,17 @@ public sealed class ArchitectureBoundaryTests
         Assert.Contains("AddScoped<CreateBoardHandler>(provider =>", composition, StringComparison.Ordinal);
         Assert.Contains("AddScoped<ListBoardsByProjectHandler>(provider =>", composition, StringComparison.Ordinal);
         Assert.Contains("AddScoped<UpdateBoardHandler>()", composition, StringComparison.Ordinal);
-        Assert.Contains("UpdateBoardHandler handler", endpointHost, StringComparison.Ordinal);
+        Assert.Contains("UpdateBoardHandler handler", controllerHost, StringComparison.Ordinal);
         Assert.Contains("AddScoped<ArchiveBoardHandler>()", composition, StringComparison.Ordinal);
-        Assert.Contains("ArchiveBoardHandler handler", endpointHost, StringComparison.Ordinal);
+        Assert.Contains("ArchiveBoardHandler handler", controllerHost, StringComparison.Ordinal);
         Assert.Contains("AddScoped<RestoreBoardHandler>()", composition, StringComparison.Ordinal);
-        Assert.Contains("RestoreBoardHandler handler", endpointHost, StringComparison.Ordinal);
+        Assert.Contains("RestoreBoardHandler handler", controllerHost, StringComparison.Ordinal);
         Assert.Contains("AddScoped<UpdateSwimlaneHandler>()", composition, StringComparison.Ordinal);
-        Assert.Contains("UpdateSwimlaneHandler handler", endpointHost, StringComparison.Ordinal);
+        Assert.Contains("UpdateSwimlaneHandler handler", controllerHost, StringComparison.Ordinal);
         Assert.Contains("AddScoped<AddColumnHandler>()", composition, StringComparison.Ordinal);
-        Assert.Contains("AddColumnHandler handler", endpointHost, StringComparison.Ordinal);
+        Assert.Contains("AddColumnHandler handler", controllerHost, StringComparison.Ordinal);
         Assert.Contains("AddScoped<UpdateColumnHandler>()", composition, StringComparison.Ordinal);
-        Assert.Contains("UpdateColumnHandler handler", endpointHost, StringComparison.Ordinal);
+        Assert.Contains("UpdateColumnHandler handler", controllerHost, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -2192,14 +2207,9 @@ public sealed class ArchitectureBoundaryTests
                 StringComparison.Ordinal);
         }
 
-        var endpoint = File.ReadAllText(Path.Combine(
-            SourceDirectory,
-            "Zumbo.Api",
-            "Presentation",
-            "Endpoints",
-            "Projects",
-            "Portfolio",
-            "PortfolioEndpoints.cs"));
+        var controllerDirectory = Path.Combine(SourceDirectory, "Zumbo.Api", "Presentation", "Controllers", "Strategy");
+        var endpoint = string.Join(Environment.NewLine, Directory.GetFiles(controllerDirectory, "Portfolio*Controller.cs").Select(File.ReadAllText));
+        var composition = File.ReadAllText(Path.Combine(SourceDirectory, "Zumbo.Api", "Composition", "Modules", "Projects", "PortfolioModuleRegistration.cs"));
         Assert.Contains("ListPortfoliosHandler handler", endpoint, StringComparison.Ordinal);
         Assert.Contains("GetPortfolioHandler handler", endpoint, StringComparison.Ordinal);
         Assert.Contains("GetPortfolioRoadmapHandler handler", endpoint, StringComparison.Ordinal);
@@ -2216,14 +2226,14 @@ public sealed class ArchitectureBoundaryTests
         Assert.DoesNotContain("service.SaveInitiativeAsync(", endpoint, StringComparison.Ordinal);
         Assert.DoesNotContain("service.AddStatusUpdateAsync(", endpoint, StringComparison.Ordinal);
         Assert.DoesNotContain("service.SaveDependencyAsync(", endpoint, StringComparison.Ordinal);
-        Assert.Contains("AddScoped<ListPortfoliosHandler>(provider =>", endpoint, StringComparison.Ordinal);
-        Assert.Contains("AddScoped<GetPortfolioHandler>(provider =>", endpoint, StringComparison.Ordinal);
-        Assert.Contains("AddScoped<GetPortfolioRoadmapHandler>(provider =>", endpoint, StringComparison.Ordinal);
-        Assert.Contains("AddScoped<SavePortfolioHandler>(provider =>", endpoint, StringComparison.Ordinal);
-        Assert.Contains("AddScoped<ArchivePortfolioHandler>(provider =>", endpoint, StringComparison.Ordinal);
-        Assert.Contains("AddScoped<SaveInitiativeHandler>(provider =>", endpoint, StringComparison.Ordinal);
-        Assert.Contains("AddScoped<AddInitiativeStatusUpdateHandler>(provider =>", endpoint, StringComparison.Ordinal);
-        Assert.Contains("AddScoped<SavePortfolioDependencyHandler>(provider =>", endpoint, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<ListPortfoliosHandler>(provider =>", composition, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<GetPortfolioHandler>(provider =>", composition, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<GetPortfolioRoadmapHandler>(provider =>", composition, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<SavePortfolioHandler>(provider =>", composition, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<ArchivePortfolioHandler>(provider =>", composition, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<SaveInitiativeHandler>(provider =>", composition, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<AddInitiativeStatusUpdateHandler>(provider =>", composition, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<SavePortfolioDependencyHandler>(provider =>", composition, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -2294,14 +2304,9 @@ public sealed class ArchitectureBoundaryTests
                 StringComparison.Ordinal);
         }
 
-        var endpoint = File.ReadAllText(Path.Combine(
-            SourceDirectory,
-            "Zumbo.Api",
-            "Presentation",
-            "Endpoints",
-            "Projects",
-            "Goals",
-            "GoalEndpoints.cs"));
+        var controllerDirectory = Path.Combine(SourceDirectory, "Zumbo.Api", "Presentation", "Controllers", "Strategy");
+        var endpoint = string.Join(Environment.NewLine, Directory.GetFiles(controllerDirectory, "Goal*Controller.cs").Select(File.ReadAllText));
+        var composition = File.ReadAllText(Path.Combine(SourceDirectory, "Zumbo.Api", "Composition", "Modules", "Projects", "GoalModuleRegistration.cs"));
         Assert.Contains("ListGoalsHandler handler", endpoint, StringComparison.Ordinal);
         Assert.Contains("GetGoalHandler handler", endpoint, StringComparison.Ordinal);
         Assert.Contains("GetGoalRollupHandler handler", endpoint, StringComparison.Ordinal);
@@ -2318,14 +2323,14 @@ public sealed class ArchitectureBoundaryTests
         Assert.DoesNotContain("service.SaveAsync(", endpoint, StringComparison.Ordinal);
         Assert.DoesNotContain("service.SaveKeyResultAsync(", endpoint, StringComparison.Ordinal);
         Assert.DoesNotContain("service.ArchiveAsync(", endpoint, StringComparison.Ordinal);
-        Assert.Contains("AddScoped<ListGoalsHandler>(provider =>", endpoint, StringComparison.Ordinal);
-        Assert.Contains("AddScoped<GetGoalHandler>(provider =>", endpoint, StringComparison.Ordinal);
-        Assert.Contains("AddScoped<GetGoalRollupHandler>(provider =>", endpoint, StringComparison.Ordinal);
-        Assert.Contains("AddScoped<AddKeyResultProgressHandler>(provider =>", endpoint, StringComparison.Ordinal);
-        Assert.Contains("AddScoped<AddGoalStatusUpdateHandler>(provider =>", endpoint, StringComparison.Ordinal);
-        Assert.Contains("AddScoped<SaveGoalHandler>(provider =>", endpoint, StringComparison.Ordinal);
-        Assert.Contains("AddScoped<SaveKeyResultHandler>(provider =>", endpoint, StringComparison.Ordinal);
-        Assert.Contains("AddScoped<ArchiveGoalHandler>(provider =>", endpoint, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<ListGoalsHandler>(provider =>", composition, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<GetGoalHandler>(provider =>", composition, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<GetGoalRollupHandler>(provider =>", composition, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<AddKeyResultProgressHandler>(provider =>", composition, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<AddGoalStatusUpdateHandler>(provider =>", composition, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<SaveGoalHandler>(provider =>", composition, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<SaveKeyResultHandler>(provider =>", composition, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<ArchiveGoalHandler>(provider =>", composition, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -3475,20 +3480,10 @@ public sealed class ArchitectureBoundaryTests
                 .Order(StringComparer.Ordinal)
                 .ToArray());
 
-        var endpointHost = File.ReadAllText(EndpointHostPath("NotificationEndpoints.cs"));
-        Assert.Contains("services.AddNotificationServices(configuration)", endpointHost, StringComparison.Ordinal);
-        Assert.DoesNotContain("IDocumentRepository", endpointHost, StringComparison.Ordinal);
-        Assert.DoesNotContain("NotificationDocument", endpointHost, StringComparison.Ordinal);
-        Assert.Contains("UpdateNotificationPreferencesHandler handler", endpointHost, StringComparison.Ordinal);
-        Assert.DoesNotContain("service.GetPreferencesAsync(", endpointHost, StringComparison.Ordinal);
-        Assert.DoesNotContain("service.UpdatePreferencesAsync(", endpointHost, StringComparison.Ordinal);
-        Assert.Contains("GetNotificationDeliveryMetricsHandler handler", endpointHost, StringComparison.Ordinal);
-        Assert.Contains("ListNotificationDeadLettersHandler handler", endpointHost, StringComparison.Ordinal);
-        Assert.Contains("ReplayNotificationDeadLetterHandler handler", endpointHost, StringComparison.Ordinal);
-        Assert.DoesNotContain("service.GetDeliveryMetricsAsync(", endpointHost, StringComparison.Ordinal);
-        Assert.DoesNotContain("service.ListDeadLettersAsync(", endpointHost, StringComparison.Ordinal);
-        Assert.DoesNotContain("service.ReplayDeadLetterAsync(", endpointHost, StringComparison.Ordinal);
-        Assert.Contains("NotificationDeliveryReplayed", endpointHost, StringComparison.Ordinal);
+        Assert.Empty(Directory.GetFiles(
+            Path.Combine(SourceDirectory, "Zumbo.Api", "Presentation", "Endpoints"),
+            "NotificationEndpoints.cs",
+            SearchOption.AllDirectories));
 
         var preferencesController = File.ReadAllText(Path.Combine(
             SourceDirectory,
@@ -3498,8 +3493,35 @@ public sealed class ArchitectureBoundaryTests
             "Notifications",
             "NotificationPreferencesController.cs"));
         Assert.Contains("GetNotificationPreferencesHandler handler", preferencesController, StringComparison.Ordinal);
+        Assert.Contains("UpdateNotificationPreferencesHandler handler", preferencesController, StringComparison.Ordinal);
         Assert.DoesNotContain("IDocumentRepository", preferencesController, StringComparison.Ordinal);
         Assert.DoesNotContain("NotificationDocument", preferencesController, StringComparison.Ordinal);
+
+        var inboxController = File.ReadAllText(Path.Combine(
+            SourceDirectory,
+            "Zumbo.Api",
+            "Presentation",
+            "Controllers",
+            "Notifications",
+            "NotificationInboxController.cs"));
+        Assert.Contains("ListNotificationsHandler handler", inboxController, StringComparison.Ordinal);
+        Assert.Contains("MarkNotificationAsReadHandler handler", inboxController, StringComparison.Ordinal);
+        Assert.DoesNotContain("IDocumentRepository", inboxController, StringComparison.Ordinal);
+        Assert.DoesNotContain("NotificationDocument", inboxController, StringComparison.Ordinal);
+
+        var deliveryController = File.ReadAllText(Path.Combine(
+            SourceDirectory,
+            "Zumbo.Api",
+            "Presentation",
+            "Controllers",
+            "Notifications",
+            "NotificationDeliveryOperationsController.cs"));
+        Assert.Contains("GetNotificationDeliveryMetricsHandler handler", deliveryController, StringComparison.Ordinal);
+        Assert.Contains("ListNotificationDeadLettersHandler handler", deliveryController, StringComparison.Ordinal);
+        Assert.Contains("ReplayNotificationDeadLetterHandler handler", deliveryController, StringComparison.Ordinal);
+        Assert.Contains("NotificationDeliveryReplayed", deliveryController, StringComparison.Ordinal);
+        Assert.DoesNotContain("IDocumentRepository", deliveryController, StringComparison.Ordinal);
+        Assert.DoesNotContain("NotificationDocument", deliveryController, StringComparison.Ordinal);
 
         var composition = File.ReadAllText(Path.Combine(
             SourceDirectory,
@@ -3517,6 +3539,15 @@ public sealed class ArchitectureBoundaryTests
         Assert.Contains("AddScoped<ReplayNotificationDeadLetterHandler>(provider =>", composition, StringComparison.Ordinal);
         Assert.Contains("AddScoped<CreateNotificationHandler>(provider =>", composition, StringComparison.Ordinal);
         Assert.Contains("AddScoped<DispatchNotificationEmailsHandler>(provider =>", composition, StringComparison.Ordinal);
+
+        var registration = File.ReadAllText(Path.Combine(
+            SourceDirectory,
+            "Zumbo.Api",
+            "Composition",
+            "Modules",
+            "Notifications",
+            "NotificationModuleRegistration.cs"));
+        Assert.Contains("services.AddNotificationServices(configuration)", registration, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -3705,14 +3736,12 @@ public sealed class ArchitectureBoundaryTests
 
         var notificationAdapters = ReadSourceScope(
             Path.Combine(SourceDirectory, "Zumbo.Api", "NotificationAdapters"));
-        var notificationHost = File.ReadAllText(EndpointHostPath("NotificationEndpoints.cs"));
         var gateway = ReadSourceScope(Path.Combine(SourceDirectory, "Zumbo.Gateway", "GatewayHost"));
         Assert.DoesNotContain("Zumbo.Modules.WorkItems", notificationAdapters, StringComparison.Ordinal);
         var notificationComposition = ReadSourceScope(
             Path.Combine(SourceDirectory, "Zumbo.Api", "Composition", "Modules", "Notifications"));
         var workItemBackgroundComposition = ReadSourceScope(
             Path.Combine(SourceDirectory, "Zumbo.Api", "Composition", "Modules", "WorkItems"));
-        Assert.DoesNotContain("DueDateReminderHostedService", notificationHost, StringComparison.Ordinal);
         Assert.DoesNotContain("DueDateReminderHostedService", notificationComposition, StringComparison.Ordinal);
         Assert.Contains("AddWorkItemBackgroundServices(configuration)", workItemBackgroundComposition, StringComparison.Ordinal);
         Assert.Contains("AddHostedService<DueDateReminderHostedService>()", workItemBackgroundComposition, StringComparison.Ordinal);

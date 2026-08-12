@@ -22,13 +22,13 @@
     <div class="board-empty"><strong>Bu projede pano yok</strong><p>Projede çalışmayı düzenlemek için bir pano gerekir.</p></div>
   } @else if (!error()) {
     <div class="board-scroll">
-      <div class="board-columns">
+      <div class="board-columns" [style.--board-column-count]="columns().length">
         @for (column of columns(); track column.id) {
           <section class="board-lane" [class.drop-active]="dropLaneId() === column.id" [class.at-limit]="atWipLimit(column)" (dragover)="dragOverLane($event, column)" (drop)="dropOnLane($event, column)" [attr.aria-label]="column.name + ' kolonu'">
             <header><div><h3>{{ column.name }}</h3><span>@if (column.tasks.length !== columnTaskCount(column)) { {{ column.tasks.length }} · }{{ columnTaskCount(column) }}@if (column.wipLimit) { / {{ column.wipLimit }} }</span></div>@if (atWipLimit(column)) { <small>WIP limiti</small> }</header>
             <div class="lane-cards">
               @for (task of column.tasks; track task.id) {
-                <article class="board-card" [class.pending]="pendingIds().has(task.id)" [class.dragging]="draggingId() === task.id" [class.drop-before]="dropTarget()?.taskId === task.id && dropTarget()?.placement === 'before'" [class.drop-after]="dropTarget()?.taskId === task.id && dropTarget()?.placement === 'after'" [draggable]="canMove() && !pendingIds().has(task.id)" (dragstart)="dragStart($event, task)" (dragover)="dragOverCard($event, task)" (drop)="dropOnCard($event, task)" (dragend)="finishDrag()" (keydown)="handleTaskKey($event, task)" tabindex="0" [attr.aria-busy]="pendingIds().has(task.id)" aria-keyshortcuts="Alt+ArrowLeft Alt+ArrowRight Alt+ArrowUp Alt+ArrowDown">
+                <article class="board-card" [class.pending]="pendingIds().has(task.id)" [class.dragging]="draggingId() === task.id" [class.drop-before]="dropTarget()?.taskId === task.id && dropTarget()?.placement === 'before'" [class.drop-after]="dropTarget()?.taskId === task.id && dropTarget()?.placement === 'after'" [draggable]="canMove() && !pendingIds().has(task.id)" (click)="openTask($event, task)" (dragstart)="dragStart($event, task)" (dragover)="dragOverCard($event, task)" (drop)="dropOnCard($event, task)" (dragend)="finishDrag()" (keydown)="handleTaskKey($event, task)" tabindex="0" [attr.aria-busy]="pendingIds().has(task.id)" aria-keyshortcuts="Alt+ArrowLeft Alt+ArrowRight Alt+ArrowUp Alt+ArrowDown">
                   <div class="card-top"><span>{{ task.type }}</span><span class="priority" [attr.data-priority]="task.priority">{{ priorityLabel(task.priority) }}</span></div>
                   <a class="card-title" [routerLink]="['/workspace', project().id, 'board', 'task', task.id]">{{ task.title }}</a>
                   <div class="card-meta"><span>{{ userName(task.assigneeUserId) }}</span>@if (task.dueDate) { <time>{{ formatDate(task.dueDate) }}</time> }@if (task.estimatePoints != null) { <span>{{ task.estimatePoints }} puan</span> }</div>

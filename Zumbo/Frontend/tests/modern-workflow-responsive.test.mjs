@@ -5,13 +5,24 @@ import test from 'node:test';
 
 const root = resolve(import.meta.dirname, '..');
 
-test('board uses document flow for vertical work and reserves scrolling for the horizontal board axis', async () => {
-  const styles = await read('projects/modern-desktop/src/app/features/board/project-board.page.scss');
-  const responsive = await read('projects/modern-desktop/src/app/features/board/project-board-responsive.scss');
+test('board uses document flow and fits columns without a horizontal board canvas', async () => {
+  const [template, component, styles, responsive] = await Promise.all([
+    read('projects/modern-desktop/src/app/features/board/project-board.page.html'),
+    read('projects/modern-desktop/src/app/features/board/project-board.page.ts'),
+    read('projects/modern-desktop/src/app/features/board/project-board.page.scss'),
+    read('projects/modern-desktop/src/app/features/board/project-board-responsive.scss')
+  ]);
 
   assert.doesNotMatch(styles, /\.board-lane\s*\{[^}]*max-height/s);
   assert.doesNotMatch(responsive, /\.board-lane\s*\{[^}]*max-height/s);
-  assert.match(styles, /\.board-scroll\s*\{[^}]*overflow-x:\s*auto/s);
+  assert.match(styles, /\.board-scroll\s*\{[^}]*overflow:\s*visible/s);
+  assert.match(styles, /\.board-columns\s*\{[^}]*grid-template-columns:\s*repeat\(var\(--board-column-count/s);
+  assert.doesNotMatch(responsive, /grid-template-columns:\s*repeat\(2/);
+  assert.match(responsive, /@media \(max-width:\s*960px\)[\s\S]*grid-template-columns:\s*repeat\(3/s);
+  assert.match(responsive, /@media \(max-width:\s*700px\)[\s\S]*grid-template-columns:\s*minmax\(0,\s*1fr\)/s);
+  assert.match(template, /\[style\.--board-column-count\]="columns\(\)\.length"/);
+  assert.match(template, /\(click\)="openTask\(\$event, task\)"/);
+  assert.match(component, /target\.closest\('a, button, input, select, textarea'\)/);
   assert.match(styles, /\.lane-cards\s*\{[^}]*overflow:\s*visible/s);
   assert.doesNotMatch(styles, /\.lane-cards\s*\{[^}]*overflow-y:\s*auto/s);
   assert.doesNotMatch(responsive, /\.lane-cards\s*\{[^}]*overflow-y:\s*auto/s);
@@ -45,6 +56,12 @@ test('project navigation exposes named secondary work groups without a generic o
   assert.match(component, /\['plan', 'operate', 'insights'\] as const/);
   assert.match(template, /class="primary-views"/);
   assert.match(template, /class="secondary-groups"/);
+  assert.match(template, /\[open\]="openGroup\(\) === group"/);
+  assert.match(template, /\(toggle\)="toggleGroup\(\$event, group\)"/);
+  assert.match(component, /openGroup = signal/);
+  assert.match(styles, /\.secondary-groups\s*\{[^}]*margin-left:\s*12px/s);
+  assert.match(styles, /details:not\(\[open\]\)\s*>\s*\.view-menu\s*\{\s*display:\s*none/s);
+  assert.match(styles, /@media \(min-width:\s*761px\) and \(max-width:\s*960px\)[\s\S]*left:\s*256px/s);
   assert.match(styles, /@media \(max-width:\s*960px\)\s*\{\s*\.project-tabs\s*\{\s*display:\s*grid/);
   for (const label of ['Planlama', 'Operasyon', 'İçgörüler']) assert.match(component, new RegExp(label));
 });

@@ -8,6 +8,22 @@ public abstract class ApiControllerBase : ControllerBase
 {
     protected ActionResult<ApiResponse<T>> OkEnvelope<T>(T data)
     {
+        ApplyEnvelopeHeaders(data);
+        return Ok(ApiResponse<T>.Ok(data, HttpContext.TraceIdentifier));
+    }
+
+    protected IActionResult OkEnvelopeResult<T>(T data) => OkEnvelope(data).Result!;
+
+    protected IActionResult CreatedEnvelopeResult<T>(T data)
+    {
+        ApplyEnvelopeHeaders(data);
+        return StatusCode(
+            StatusCodes.Status201Created,
+            ApiResponse<T>.Ok(data, HttpContext.TraceIdentifier));
+    }
+
+    private void ApplyEnvelopeHeaders<T>(T data)
+    {
         if (data is IVersionedResource { Version: > 0 } versioned)
         {
             Response.Headers.ETag = $"\"{versioned.Version}\"";
@@ -17,9 +33,5 @@ public abstract class ApiControllerBase : ControllerBase
         {
             Response.Headers["X-Correlation-Id"] = HttpContext.TraceIdentifier;
         }
-
-        return Ok(ApiResponse<T>.Ok(data, HttpContext.TraceIdentifier));
     }
-
-    protected IActionResult OkEnvelopeResult<T>(T data) => OkEnvelope(data).Result!;
 }
