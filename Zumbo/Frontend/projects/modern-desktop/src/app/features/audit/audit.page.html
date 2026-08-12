@@ -1,0 +1,35 @@
+<section class="audit-page">
+  <header class="audit-head">
+    <div><p class="eyebrow">Yönetim ve güvence</p><h2>Denetim merkezi</h2><p>Organizasyon olaylarını arayın, doğrulayın ve kanıt olarak dışa aktarın.</p></div>
+    @if (allowed()) {<div class="actions"><button class="button" type="button" (click)="verifyIntegrity()" [disabled]="integrityLoading()"><zumbo-icon name="check-check" />Bütünlüğü doğrula</button><button class="button primary" type="button" (click)="exportAudit()" [disabled]="exporting()"><zumbo-icon name="arrow-down" />NDJSON aktar</button></div>}
+  </header>
+  @if (capabilityLoading()) {
+    <div class="capability-loading" aria-label="Denetim yetkileri yükleniyor"><span></span><span></span></div>
+  } @else if (!allowed()) {
+    <div class="permission-notice"><zumbo-icon name="eye" /><span>Organizasyon denetim kayıtlarını görüntüleme yetkiniz yok.</span></div>
+  } @else {
+    <form class="audit-filters" (ngSubmit)="search()">
+      <label>İşlemi yapan<select name="actorUserId" [(ngModel)]="filters.actorUserId"><option value="">Tüm kullanıcılar</option>@for (user of organizationUsers(); track user.id) {<option [value]="user.id">{{ user.username || user.email }}</option>}</select></label>
+      <label>Olay<input name="action" [(ngModel)]="filters.action" placeholder="Olay adı"></label>
+      <label>Kaynak türü<select name="entityType" [(ngModel)]="filters.entityType"><option value="">Tüm kaynaklar</option><option value="WorkItem">İş</option><option value="Project">Proje</option><option value="Identity">Kullanıcı</option><option value="Organization">Organizasyon</option><option value="Team">Ekip</option><option value="Board">Pano</option><option value="Dashboard">Pano raporu</option><option value="AutomationRule">Otomasyon</option><option value="IntakeForm">Talep formu</option><option value="IntakeSubmission">Talep</option><option value="WorkItemBulkJob">Toplu iş</option></select></label>
+      <label>Kaynak kimliği<input name="entityId" [(ngModel)]="filters.entityId" placeholder="Tam kaynak kimliği"></label>
+      <label>Başlangıç<input name="from" type="date" [(ngModel)]="filters.from"></label><label>Bitiş<input name="to" type="date" [(ngModel)]="filters.to"></label>
+      <div class="filter-actions"><button class="button primary" type="submit" [disabled]="loading()"><zumbo-icon name="search" />Ara</button><button class="button" type="button" (click)="reset()" [disabled]="loading()"><zumbo-icon name="refresh" />Sıfırla</button></div>
+    </form>
+    @if (error()) {<p class="feedback error" role="alert">{{ error() }}<button class="icon-button" type="button" (click)="error.set(null)" aria-label="Hatayı kapat"><zumbo-icon name="x" /></button></p>}
+    @if (notice()) {<p class="feedback success" role="status">{{ notice() }}<button class="icon-button" type="button" (click)="notice.set(null)" aria-label="Bildirimi kapat"><zumbo-icon name="x" /></button></p>}
+    @if (integrity(); as result) {<section class="integrity" [attr.data-state]="integrityStatus()"><zumbo-icon [name]="integrityStatus()==='invalid'?'x':'check-check'" /><div><strong>@switch (integrityStatus()) {@case ('empty') {Doğrulanacak zincir kaydı yok}@case ('invalid') {Bütünlük doğrulanamadı}@case ('partial') {Saklanan kayıt aralığı doğrulandı}@case ('valid') {Denetim zinciri doğrulandı}@default {Doğrulama sonucu alınamadı}}</strong><span>{{ result.verified }} kayıt incelendi.</span></div></section>}
+    <div class="audit-workspace">
+      <section class="audit-stream" aria-labelledby="audit-stream-title">
+        <header class="panel-head"><div><h3 id="audit-stream-title">Olay akışı</h3><span>{{ entries().length }} kayıt</span></div><button class="icon-button" type="button" (click)="search()" [disabled]="loading()" aria-label="Denetim akışını yenile" title="Yenile"><zumbo-icon name="refresh" /></button></header>
+        @if (loading()) {<div class="audit-loading"><span></span><span></span><span></span></div>}
+        <div class="audit-events">@for (entry of entries(); track entry.id) {<button type="button" [class.selected]="selected()?.id===entry.id" (click)="select(entry)"><span class="event-icon"><zumbo-icon name="chart" /></span><span class="event-copy"><strong>{{ actionLabel(entry.action) }}</strong><small>{{ entityLabel(entry) }} · {{ actorName(entry.actorUserId) }}</small></span><time>{{ entry.createdAt | date:'dd.MM HH:mm' }}</time></button>} @empty {@if (!loading()) {<p class="empty"><zumbo-icon name="list" />Bu filtrelerle eşleşen denetim kaydı yok.</p>}}</div>
+        @if (nextCursor()) {<button class="button load-more" type="button" (click)="search(false)" [disabled]="loadingMore()"><zumbo-icon name="chevron-down" />Daha fazla yükle</button>}
+      </section>
+      <aside class="audit-detail" aria-labelledby="audit-detail-title">
+        <header class="panel-head"><div><h3 id="audit-detail-title">Olay ayrıntısı</h3>@if (selected(); as entry) {<span>{{ entry.createdAt | date:'dd.MM.yyyy HH:mm:ss' }}</span>}</div></header>
+        @if (selected(); as entry) {<div class="detail-body"><div class="detail-title"><span class="event-icon"><zumbo-icon name="briefcase" /></span><div><strong>{{ actionLabel(entry.action) }}</strong><span>{{ entityLabel(entry) }}</span></div></div><dl><div><dt>İşlemi yapan</dt><dd>{{ actorName(entry.actorUserId) }}</dd></div><div><dt>Kaynak</dt><dd>{{ entityLabel(entry) }}</dd></div>@if (entry.correlationId) {<div><dt>Korelasyon</dt><dd>{{ referenceLabel(entry.correlationId) }}</dd></div>}</dl>@if (selectedChanges().length) {<section class="change-list"><h4>Güvenli değişiklik özeti</h4>@for (change of selectedChanges(); track change.field) {<div><span>{{ fieldLabel(change.field) }}</span><strong>{{ change.oldValue || 'Boş' }} → {{ change.newValue || 'Boş' }}</strong></div>}</section>}<p class="redaction"><zumbo-icon name="eye" />Hassas önceki ve sonraki değerler bu görünümde gösterilmez.</p></div>} @else {<p class="empty">İncelemek için akıştan bir olay seçin.</p>}
+      </aside>
+    </div>
+  }
+</section>

@@ -12,8 +12,11 @@ const desktopHtml = await readFile(resolve(root, 'desktop-bulma/index.html'), 'u
 const mobile = await readFile(resolve(root, 'mobile-ionic/integration-center.js'), 'utf8');
 const mobileApi = await readFile(resolve(root, 'mobile-ionic/api.js'), 'utf8');
 const mobileHtml = await readFile(resolve(root, 'mobile-ionic/index.html'), 'utf8');
-const endpoint = await readFile(resolve(root, '../Backend/src/Zumbo.Api/Endpoints/WebhookEndpoints.cs'), 'utf8');
-const service = await readFile(resolve(root, '../Backend/src/Zumbo.Modules.WorkItems/Webhooks.cs'), 'utf8');
+const endpoint = await readFile(resolve(root, '../Backend/src/Zumbo.Api/Presentation/Endpoints/WorkItems/PlatformCore/WebhookEndpoints.cs'), 'utf8');
+const service = (await Promise.all([
+  '../Backend/src/Zumbo.Modules.WorkItems/Application/Compatibility/Webhooks/WorkItemWebhookService.Deliveries.cs',
+  '../Backend/src/Zumbo.Modules.WorkItems/Application/Features/Webhooks/Deliveries/QueueTestDeliveryHandler.cs'
+].map(path => readFile(resolve(root, path), 'utf8')))).join('\n');
 
 test('webhook draft validation normalizes bounded known scopes', () => {
   const draft = core.validateDraft({
@@ -45,8 +48,11 @@ test('safe target projection redacts query data and delivery payload stays out o
 });
 
 test('integration permission is role aware without granting ordinary users', () => {
-  const customRoles = [{ name: 'IntegrationOperator', permissions: ['IntegrationManage'] }];
-  assert.equal(core.hasPermission({ roles: ['OrganizationAdmin'] }, []), true);
+  const customRoles = [
+    { name: 'OrganizationAdmin', permissions: ['IntegrationManage'] },
+    { name: 'IntegrationOperator', permissions: ['IntegrationManage'] }
+  ];
+  assert.equal(core.hasPermission({ roles: ['OrganizationAdmin'] }, customRoles), true);
   assert.equal(core.hasPermission({ roles: ['IntegrationOperator'] }, customRoles), true);
   assert.equal(core.hasPermission({ roles: ['User'] }, customRoles), false);
   assert.match(desktopHtml, /ng-if="vm\.canManageIntegrations\(\)"/);

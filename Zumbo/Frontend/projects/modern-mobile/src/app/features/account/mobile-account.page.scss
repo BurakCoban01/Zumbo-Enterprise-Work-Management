@@ -1,0 +1,31 @@
+.account-tabs ion-segment { width:min(100% - 24px,680px); margin:auto; }
+.account-page { width:min(100%,720px); margin:auto; padding:16px 16px calc(30px + env(safe-area-inset-bottom)); }
+.identity { display:flex; align-items:center; gap:12px; padding:2px 0 18px; }
+.avatar { display:grid; width:48px; height:48px; flex:0 0 48px; place-items:center; border-radius:50%; background:var(--accent); color:#fff; font-size:18px; font-weight:800; }
+.identity h1 { margin:0; color:var(--ink); font-size:20px; }
+.identity p { margin:3px 0 0; color:var(--muted); font-size:13px; overflow-wrap:anywhere; }
+.settings-band { padding:20px 0 22px; border-top:1px solid var(--line); }
+.settings-band:first-of-type { border-top:0; }
+.settings-band>header { display:grid; grid-template-columns:26px minmax(0,1fr) auto; gap:11px; align-items:start; margin-bottom:16px; }
+.settings-band>header ion-icon { margin-top:2px; color:var(--accent); font-size:22px; }
+.settings-band h2 { margin:0; color:var(--ink); font-size:17px; }
+.settings-band header p { margin:4px 0 0; color:var(--muted); font-size:13px; line-height:1.45; }
+.status { align-self:center; padding:4px 7px; border:1px solid var(--line); border-radius:6px; color:var(--muted); font-size:11px; font-weight:750; }
+.status.active { border-color:var(--success); color:var(--success); }
+.state-banner { margin:0 0 12px; padding:10px 12px; border-left:3px solid var(--accent); background:var(--panel); color:var(--ink); font-size:13px; line-height:1.45; }
+.state-banner.error { border-color:var(--danger); }.state-banner.success{border-color:var(--success)}.state-banner.offline{border-color:var(--warning)}
+.loading { display:flex; min-height:220px; align-items:center; justify-content:center; gap:10px; color:var(--muted); }
+.list-rows { border-top:1px solid var(--line); }
+.list-rows.expanded { max-height:420px; overflow-y:auto; overscroll-behavior:contain; border-bottom:1px solid var(--line); }
+.device-row,.key-row { display:grid; grid-template-columns:minmax(0,1fr) 44px; gap:12px; align-items:center; min-height:68px; border-bottom:1px solid var(--line); }
+.device-row strong,.device-row span,.device-row small,.key-row strong,.key-row small { display:block; }
+.device-row span,.device-row small,.key-row small { margin-top:2px; color:var(--muted); font-size:12px; }
+.key-row code { display:block; margin-top:3px; color:var(--accent); font-size:12px; }
+.icon-only { display:grid; width:44px; height:44px; place-items:center; border:0; background:transparent; color:var(--danger); font-size:20px; }
+.empty { color:var(--muted); font-size:13px; }
+.show-all { width:100%; min-height:44px; margin-top:8px; border:0; background:transparent; color:var(--accent); font-weight:750; }
+.danger-zone { border-top-color:color-mix(in srgb,var(--danger) 45%,var(--line)); }
+.danger-zone>header ion-icon,.danger-zone h2 { color:var(--danger); }
+.job-state { display:flex; justify-content:space-between; gap:12px; padding:12px; background:var(--panel); color:var(--ink); }
+@media (min-width:700px){.account-page{padding-inline:24px}.settings-band{padding-block:24px}}
+@media (max-width:360px){.account-page{padding-inline:12px}.settings-band>header{grid-template-columns:24px minmax(0,1fr)}.settings-band>header .status{grid-column:2;justify-self:start}.account-tabs ion-segment{width:100%}}

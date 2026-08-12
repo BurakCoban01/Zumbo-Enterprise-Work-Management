@@ -118,11 +118,13 @@ internal sealed class ApprovalMutationPipeline(
             $"Approval {approval.Status.ToLowerInvariant()}",
             correlationId,
             ct);
-        await notifications.NotifyAsync(
+        await notifications.NotifyWithSourceAsync(
             approval.RequestedByUserId,
             "Approval",
             $"Approval for {workItem.Title} was {approval.Status.ToLowerInvariant()}.",
-            ct);
+            ct,
+            sourceId: workItem.Id,
+            projectId: workItem.ProjectId);
         return WorkItemResponseMapper.ToResponse(workItem);
     }
 

@@ -49,9 +49,9 @@ function viewModel() {
     session: { currentUser: { id: 'user-1' } },
     projects: [{ id: 'project-1', name: 'Platform' }, { id: 'project-2', name: 'Mobil' }],
     notifications: [
-      { id: 'n1', type: 'Mention', message: 'Bir yorumda bahsedildiniz', read: false },
-      { id: 'n2', type: 'Assignment', message: 'Görev atandı', read: true },
-      { id: 'n3', type: 'Assignment', message: 'Onay kapsamı size atandı', read: false }
+      { id: 'n1', type: 'Mention', category: 'Action', actionKind: 'OpenWorkItem', message: 'Bir yorumda bahsedildiniz', read: false },
+      { id: 'n2', type: 'Assignment', category: 'Action', actionKind: 'OpenWorkItem', message: 'Görev atandı', read: true },
+      { id: 'n3', type: 'DueDateReminder', category: 'Awareness', actionKind: 'OpenWorkItem', message: 'Tarih yaklaşıyor', read: false }
     ]
   };
 }
@@ -61,7 +61,7 @@ test('personal work aggregates accessible projects and derives due, blocked, rec
   const responses = {
     'project-1': { items: [
       { id: 'due', projectId: 'project-1', title: 'Tarihli', status: 'In Progress', dueDate: new Date(now + 86400000).toISOString(), approvals: [] },
-      { id: 'blocked', projectId: 'project-1', title: 'Engelli', status: 'Blocked', approvals: [] }
+      { id: 'blocked', projectId: 'project-1', title: 'Engelli', status: 'Bekliyor', relations: [{ relationType: 'BlockedBy' }], approvals: [] }
     ], totalCount: 2 },
     'project-2': { items: [
       { id: 'approval', projectId: 'project-2', title: 'Onay', status: 'Review', statusHistory: [{ changedAt: new Date(now).toISOString() }], approvals: [{ status: 'Pending' }] }
@@ -77,7 +77,9 @@ test('personal work aggregates accessible projects and derives due, blocked, rec
   assert.deepEqual(Array.from(vm.pendingApprovals(), task => task.id), ['approval']);
   assert.deepEqual(Array.from(vm.inboxNotifications(), item => item.id), ['n1', 'n3']);
   vm.setInboxMode('actions');
-  assert.deepEqual(Array.from(vm.inboxNotifications(), item => item.id), ['n1']);
+  assert.deepEqual(Array.from(vm.inboxNotifications(), item => item.id), ['n1', 'n2']);
+  assert.doesNotMatch(source, /approval\|mention\|onay\|bahset/i);
+  assert.doesNotMatch(source, /tamamland/i);
   assert.equal(vm.personalPartial, false);
 });
 

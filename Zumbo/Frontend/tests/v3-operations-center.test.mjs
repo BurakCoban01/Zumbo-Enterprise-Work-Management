@@ -11,20 +11,21 @@ const desktop = await readFile(resolve(root, 'desktop-bulma/operations-center.js
 const desktopHtml = await readFile(resolve(root, 'desktop-bulma/index.html'), 'utf8');
 const mobile = await readFile(resolve(root, 'mobile-ionic/operations-center.js'), 'utf8');
 const mobileHtml = await readFile(resolve(root, 'mobile-ionic/index.html'), 'utf8');
-const workItemEndpoints = await readFile(
-  resolve(root, '../Backend/src/Zumbo.Api/Endpoints/WorkItemEndpoints.cs'),
-  'utf8'
-);
+const workItemEndpoints = (await Promise.all([
+  '../Backend/src/Zumbo.Api/Presentation/Endpoints/WorkItems/WorkItemsCore/ListDurableMessageDeadLettersEndpoint.cs',
+  '../Backend/src/Zumbo.Api/Presentation/Endpoints/WorkItems/WorkItemsCore/ReplayDurableMessageDeadLetterEndpoint.cs',
+  '../Backend/src/Zumbo.Api/Presentation/Endpoints/WorkItems/Search/ReconcileSearchIndexEndpoint.cs'
+].map(path => readFile(resolve(root, path), 'utf8')))).join('\n');
 const notificationEndpoints = await readFile(
-  resolve(root, '../Backend/src/Zumbo.Api/Endpoints/NotificationEndpoints.cs'),
+  resolve(root, '../Backend/src/Zumbo.Api/Presentation/Endpoints/Notifications/NotificationsCore/NotificationEndpoints.cs'),
   'utf8'
 );
 const operationsEndpoints = await readFile(
-  resolve(root, '../Backend/src/Zumbo.Api/Endpoints/OperationsEndpoints.cs'),
+  resolve(root, '../Backend/src/Zumbo.Api/Presentation/Endpoints/Platform/PlatformCore/OperationsEndpoints.cs'),
   'utf8'
 );
 const operationsAdapters = await readFile(
-  resolve(root, '../Backend/src/Zumbo.Api/OperationsAdapters.cs'),
+  resolve(root, '../Backend/src/Zumbo.Api/Infrastructure/Adapters/Platform/Storage/OperationsAdapters.cs'),
   'utf8'
 );
 const desktopOperationsTemplate = desktopHtml.slice(
@@ -37,9 +38,14 @@ const mobileOperationsTemplate = mobileHtml.slice(
 );
 
 test('operations permission remains restricted to system administrators', () => {
-  assert.equal(core.hasPermission({ roles: ['SystemAdmin'] }), true);
-  assert.equal(core.hasPermission({ roles: ['OrganizationAdmin'] }), false);
-  assert.equal(core.hasPermission({ roles: ['User'] }), false);
+  const roles = [
+    { name: 'SystemAdmin', permissions: ['OperationsManage'] },
+    { name: 'OrganizationAdmin', permissions: ['OrganizationManage'] },
+    { name: 'User', permissions: ['ProfileRead'] }
+  ];
+  assert.equal(core.hasPermission({ roles: ['SystemAdmin'] }, roles), true);
+  assert.equal(core.hasPermission({ roles: ['OrganizationAdmin'] }, roles), false);
+  assert.equal(core.hasPermission({ roles: ['User'] }, roles), false);
   assert.match(desktopHtml, /ng-if="vm\.canManageOperations\(\)"/);
   assert.match(mobileHtml, /vm\.forbidden/);
 });

@@ -80,6 +80,8 @@ public sealed partial class MongoMigrationRunner(
         "20260803_037_user_version_backfill";
     public const string LegacyMigrationMarkerCleanupId =
         "20260803_038_legacy_migration_marker_cleanup";
+    public const string IdentityAuthorizationIndexMigrationId =
+        "20260811_039_identity_authorization_indexes";
 
     private const string LedgerCollection = "__zumbo_migrations";
     private const string BackupCollection = "__zumbo_migration_rank_backups";
@@ -199,6 +201,10 @@ public sealed partial class MongoMigrationRunner(
             await ApplyIndexesAsync(
                 HighCardinalityIndexMigrationId,
                 MongoHighCardinalityIndexes.All,
+                cancellationToken),
+            await ApplyIndexesAsync(
+                IdentityAuthorizationIndexMigrationId,
+                MongoIdentityAuthorizationIndexes.All,
                 cancellationToken),
             await ApplyIndexesAsync(
                 AuditTenantIndexMigrationId,

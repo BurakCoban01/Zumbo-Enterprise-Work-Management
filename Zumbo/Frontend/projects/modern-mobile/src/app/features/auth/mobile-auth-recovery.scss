@@ -1,0 +1,11 @@
+.recovery-page { display:grid; width:min(100% - 32px,460px); min-height:100%; align-content:center; margin:auto; padding:28px 0; }
+.recovery-page header { margin-bottom:20px; }
+.recovery-page h1 { margin:0 0 6px; color:var(--ink); font-size:26px; }
+.recovery-page p { margin:0; color:var(--muted); line-height:1.5; }
+.recovery-page form { display:grid; gap:12px; }
+.recovery-page ion-item { --background:var(--panel); --border-color:var(--line); --min-height:58px; }
+.recovery-page ion-button { min-height:48px; margin-top:6px; }
+.recovery-state { display:grid; gap:14px; padding:18px 0; }
+.recovery-message { color:var(--ink)!important; }
+.recovery-error { color:var(--danger)!important; }
+.back-link { min-height:44px; display:grid; place-items:center; color:var(--accent); font-weight:700; text-decoration:none; }

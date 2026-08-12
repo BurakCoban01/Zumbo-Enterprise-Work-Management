@@ -1,0 +1,84 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-buttons slot="start"><ion-back-button defaultHref="/projects"></ion-back-button></ion-buttons>
+    <ion-title>İş merkezi</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content [fullscreen]="true">
+  <ion-refresher slot="fixed" (ionRefresh)="refresh($event)"><ion-refresher-content></ion-refresher-content></ion-refresher>
+  <main [attr.aria-busy]="loading() || busy()">
+    <header class="intro">
+      <p>{{ project()?.key || 'Proje' }} · Kalıcı işlemler</p>
+      <h1>İş merkezi</h1>
+      <span>İçe ve dışa aktarma işlemlerini başlatın, durumlarını takip edin.</span>
+    </header>
+
+    @if (connectivity.offline()) { <p class="feedback warning" role="status">Çevrimdışısınız. Yeni işlemler ve dosya indirme bağlantı kurulana kadar kilitli.</p> }
+    @if (error()) { <p class="feedback error" role="alert"><span>{{ error() }}</span><button type="button" (click)="dismissError()" aria-label="Hatayı kapat">Kapat</button></p> }
+    @if (notice()) { <p class="feedback success" role="status"><span>{{ notice() }}</span><button type="button" (click)="dismissNotice()" aria-label="Bildirimi kapat">Kapat</button></p> }
+
+    @if (loading()) {
+      <section class="loading" aria-label="İş merkezi yükleniyor"><ion-spinner name="crescent"></ion-spinner><span></span><span></span></section>
+    } @else {
+      <section class="summary" aria-label="İş merkezi özeti">
+        <div><small>Toplam</small><strong>{{ total() }}</strong></div>
+        <div><small>Etkin</small><strong>{{ activeCount() }}</strong></div>
+        <div><small>Hatalı</small><strong>{{ failedCount() }}</strong></div>
+      </section>
+
+      <section class="history" aria-labelledby="job-history-heading">
+        <header class="section-head">
+          <div><h2 id="job-history-heading">İş geçmişi</h2><span>Yalnızca sizin başlattığınız proje işleri.</span></div>
+          <button class="refresh" type="button" (click)="reload()" [disabled]="busy()" aria-label="İş geçmişini yenile">Yenile</button>
+        </header>
+        <div class="job-list">
+          @for (job of jobs(); track job.id) {
+            <button class="job-row" type="button" [class.selected]="selectedId() === job.id" (click)="select(job)" [attr.aria-pressed]="selectedId() === job.id">
+              <span class="job-copy"><strong>{{ type(job) }}</strong><small>{{ job.processedItems }}/{{ job.totalItems }} işlendi · {{ job.createdAt | date:'dd MMM HH:mm' }}</small><ion-progress-bar [value]="progress(job) / 100" [attr.aria-label]="'%' + progress(job) + ' tamamlandı'"></ion-progress-bar></span>
+              <i [attr.data-tone]="state(job).tone">{{ state(job).label }}</i>
+            </button>
+          } @empty { <p class="empty">Bu projede henüz kalıcı iş başlatmadınız.</p> }
+        </div>
+      </section>
+
+      @if (selected(); as job) {
+        <section class="detail" aria-live="polite">
+          <header class="section-head"><div><p>{{ job.createdAt | date:'dd MMM HH:mm' }}</p><h2>{{ type(job) }}</h2></div><i [attr.data-tone]="state(job).tone">{{ state(job).label }}</i></header>
+          <dl><div><dt>İşlenen</dt><dd>{{ job.processedItems }} / {{ job.totalItems }}</dd></div><div><dt>Başarılı</dt><dd>{{ job.succeededItems }}</dd></div><div><dt>Başarısız</dt><dd>{{ job.failedItems }}</dd></div><div><dt>Dosya süresi</dt><dd>{{ job.artifactsExpireAt ? (job.artifactsExpireAt | date:'dd MMM HH:mm') : 'Tamamlanınca başlar' }}</dd></div></dl>
+          @if (job.lastErrorMessage) { <p class="job-error">{{ job.lastErrorCode }} · {{ job.lastErrorMessage }}</p> }
+          @if (expired(job)) { <p class="feedback warning">Bu işin sonuç dosyalarının saklama süresi doldu.</p> }
+          <div class="actions">
+            @if (job.hasResult && !expired(job)) { <button type="button" (click)="download(job, false)" [disabled]="mutationLocked()">Sonucu indir</button> }
+            @if (job.hasErrorFile && !expired(job)) { <button type="button" (click)="download(job, true)" [disabled]="mutationLocked()">Hataları indir</button> }
+            @if (canManage() && canRetryJob(job)) { <button type="button" (click)="retry(job)" [disabled]="mutationLocked()">Başarısızları yinele</button> }
+            @if (canManage() && canCancelJob(job)) { <button class="danger" type="button" (click)="requestCancel(job)" [disabled]="mutationLocked()">İptal et</button> }
+          </div>
+        </section>
+      }
+
+      <section class="start" [class.open]="showStartControls()">
+        <header class="section-head"><div><h2>Yeni işlem</h2><span>İçe veya dışa aktarma başlatın.</span></div><button type="button" (click)="toggleStartControls()" [attr.aria-expanded]="showStartControls()">{{ showStartControls() ? 'Kapat' : 'Başlat' }}</button></header>
+        @if (showStartControls()) {
+          <div class="start-options">
+            <section>
+              <h3>JSON içe aktar</h3>
+              @if (canImport()) {
+                <label class="file-picker"><span>{{ importFile()?.name || 'JSON dosyası seç' }}</span><input type="file" accept=".json,application/json" (change)="chooseFile($event)"></label>
+                @if (parsed(); as result) { <p class="parse-result" [class.invalid]="!result.valid"><strong>{{ result.rows.length }} geçerli satır</strong>@if (result.totalErrors) { <span>{{ result.totalErrors }} hata</span> }@for (message of result.errors.slice(0, 2); track message) { <small>{{ message }}</small> }</p> }
+                <div class="actions"><button type="button" (click)="submitImport(true)" [disabled]="mutationLocked() || !parsed()?.valid">Önizle</button><button class="primary" type="button" (click)="submitImport(false)" [disabled]="mutationLocked() || !parsed()?.valid">İçe aktar</button></div>
+              } @else { <p class="empty">Bu proje yetkisi içe aktarma başlatmaya izin vermiyor.</p> }
+            </section>
+            <section>
+              <h3>Proje dışa aktarımı</h3>
+              @if (canExport()) {
+                <label class="checkbox"><input type="checkbox" [checked]="includeArchived()" (change)="updateIncludeArchived($event)" [disabled]="mutationLocked()"><span>Arşivlenmiş işleri dahil et</span></label>
+                <div class="actions"><button type="button" (click)="submitExport(true)" [disabled]="mutationLocked()">Kapsamı doğrula</button><button class="primary" type="button" (click)="submitExport(false)" [disabled]="mutationLocked()">Dışa aktar</button></div>
+              } @else { <p class="empty">Bu proje yetkisi dışa aktarma başlatmaya izin vermiyor.</p> }
+            </section>
+          </div>
+        }
+      </section>
+    }
+  </main>
+</ion-content>

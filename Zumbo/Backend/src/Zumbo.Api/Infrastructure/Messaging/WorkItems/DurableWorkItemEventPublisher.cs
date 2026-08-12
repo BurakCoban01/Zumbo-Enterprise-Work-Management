@@ -76,6 +76,27 @@ public sealed class DurableWorkItemEventPublisher(
             ct);
     }
 
+    Task IWorkItemNotificationPublisher.NotifyWithSourceAsync(
+        string userId,
+        string type,
+        string message,
+        CancellationToken ct,
+        string? deduplicationKey,
+        string? sourceId,
+        string? projectId)
+    {
+        var correlationId = CorrelationId();
+        var key = string.IsNullOrWhiteSpace(deduplicationKey)
+            ? Key("notification", userId, type, message, correlationId)
+            : deduplicationKey.Trim();
+        return EnqueueAsync(
+            WorkItemDurableEventTypes.Notification,
+            new WorkItemNotificationEvent(userId, type, message, key, "WorkItem", sourceId, projectId),
+            correlationId,
+            key,
+            ct);
+    }
+
     public Task IndexAsync(WorkItemSearchRecord record, CancellationToken ct)
     {
         var correlationId = CorrelationId();

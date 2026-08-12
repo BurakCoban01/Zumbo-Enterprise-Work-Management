@@ -1,0 +1,6 @@
+import {PermissionDefinition,SettingsContext,SettingsRole} from '../settings.models';import {Department,SettingsUser} from './organization-access.models';
+export function organizationUsers(users:readonly SettingsUser[],organizationId:string){return users.filter(user=>user.organizationId===organizationId);}
+export function permissionGroups(catalog:readonly PermissionDefinition[]){const map=new Map<string,PermissionDefinition[]>();for(const permission of catalog.filter(item=>item.isActive)){const values=map.get(permission.category)??[];values.push(permission);map.set(permission.category,values);}return [...map].map(([name,permissions])=>({name,permissions:permissions.sort((a,b)=>a.displayOrder-b.displayOrder)}));}
+export function canAssignRole(context:SettingsContext,roles:readonly SettingsRole[],role:SettingsRole){const systemAdmin=roles.some(item=>item.isActive&&context.roleNames.includes(item.name)&&item.permissions.includes('*'));return systemAdmin||!role.isProtected;}
+export function departmentParents(departments:readonly Department[],id:string){return departments.filter(item=>item.id!==id);}
+export function roleDrafts(users:readonly SettingsUser[]){return Object.fromEntries(users.map(user=>[user.id,[...user.roles]]));}

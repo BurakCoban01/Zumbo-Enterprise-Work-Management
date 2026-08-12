@@ -8,8 +8,12 @@ const require = createRequire(import.meta.url);
 const root = resolve(import.meta.dirname, '..');
 const security = require(resolve(root, 'shared/account-security-core.js'));
 const desktop = await readFile(resolve(root, 'desktop-bulma/settings.js'), 'utf8');
+const desktopApp = await readFile(resolve(root, 'desktop-bulma/app.js'), 'utf8');
+const desktopManagement = await readFile(resolve(root, 'desktop-bulma/management.js'), 'utf8');
+const desktopProjectDirectory = await readFile(resolve(root, 'desktop-bulma/project-directory.js'), 'utf8');
 const desktopHtml = await readFile(resolve(root, 'desktop-bulma/index.html'), 'utf8');
 const mobile = await readFile(resolve(root, 'mobile-ionic/profile-security.js'), 'utf8');
+const mobileDetails = await readFile(resolve(root, 'mobile-ionic/details.js'), 'utf8');
 const mobileHtml = await readFile(resolve(root, 'mobile-ionic/index.html'), 'utf8');
 const api = await readFile(resolve(root, 'mobile-ionic/api.js'), 'utf8');
 
@@ -68,6 +72,27 @@ test('desktop settings expose current-session revoke and recovery-code lifecycle
   assert.match(desktop, /apiClient\.clearSession\('current-session-revoked'\)/);
   assert.match(desktopHtml, /session\.isCurrent/);
   assert.match(desktopHtml, /Bu liste kapatıldıktan sonra yeniden gösterilmez/);
+});
+
+test('desktop role editor consumes permission metadata from the backend catalog', () => {
+  assert.match(desktop, /apiClient\.get\('\/api\/auth\/permissions'\)/);
+  assert.match(desktop, /permission\.category/);
+  assert.match(desktop, /vm\.permissionCatalogGroups = groups/);
+  assert.match(desktop, /vm\.permissionGroups = function\(\) \{ return vm\.permissionCatalogGroups; \}/);
+  assert.match(desktopHtml, /permission\.label/);
+  assert.match(desktopHtml, /permission\.description/);
+  assert.doesNotMatch(desktopApp, /'UserRoleManage',\s*'AuditReadAll'/);
+  assert.match(desktopManagement, /\/api\/auth\/roles\?scope=Project/);
+  assert.match(desktopManagement, /projectRoleHasPermission/);
+  assert.match(desktopProjectDirectory, /vm\.projectRoleLabel\(membership\.role\)/);
+  assert.match(desktopHtml, /vm\.projectRoleLabel\(member\.role\)/);
+  assert.match(desktopHtml, /vm\.projectRoleLabel\(vm\.projectMembership\.role\)/);
+  assert.doesNotMatch(desktopHtml, /<option>ProjectAdmin<\/option>|<option>Developer<\/option>|<option>Viewer<\/option>/);
+  assert.match(mobileDetails, /zumboApi\.projectRoles\(\)/);
+  assert.match(api, /projectRoles: function/);
+  assert.match(mobileHtml, /vm\.projectRoleLabel\(member\.role\)/);
+  assert.equal((mobileHtml.match(/vm\.projectRoleLabel\(vm\.membership\.role\)/g) || []).length, 3);
+  assert.doesNotMatch(mobileHtml, /<option>ProjectAdmin<\/option>|<option>Developer<\/option>|<option>Viewer<\/option>/);
 });
 
 test('mobile profile provides notification, MFA and targeted session parity', () => {

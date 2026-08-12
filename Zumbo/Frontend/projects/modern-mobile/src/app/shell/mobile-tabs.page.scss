@@ -1,0 +1,10 @@
+:host { display: block; height: 100%; }
+.connectivity-banner { position: fixed; z-index: 20; top: env(safe-area-inset-top); right: 10px; left: 10px; min-height: 40px; padding: 10px 14px; border: 1px solid #d6a820; border-radius: 6px; background: #fff7d6; color: #543f00; font-size: 13px; text-align: center; }
+ion-tab-bar { --background: var(--panel); --border: 1px solid var(--line); height: calc(62px + env(safe-area-inset-bottom)); padding-bottom: env(safe-area-inset-bottom); }
+ion-tab-button { --color: var(--muted); --color-selected: var(--accent); min-width: 0; font-size: 11px; }
+ion-tab-button.context-selected, ion-tab-button.tab-selected { color: var(--accent); }
+ion-icon { font-size: 22px; }
+.create-tab ion-icon { font-size: 28px; }
+ion-badge { position: absolute; top: 4px; left: calc(50% + 8px); min-width: 18px; height: 18px; padding: 2px 4px; font-size: 10px; }
+@media (max-width: 365px) { ion-tab-button { font-size: 10px; } ion-icon { font-size: 20px; } }
+@media (orientation: landscape) and (max-height: 500px) { ion-tab-bar { height: calc(52px + env(safe-area-inset-bottom)); } ion-tab-button { flex-direction: row; gap: 5px; } }

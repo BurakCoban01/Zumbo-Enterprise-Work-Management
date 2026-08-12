@@ -1,0 +1,17 @@
+export type CapacityTab='people'|'projects'|'scenario'|'definition';
+export interface CapacityPage{readonly items:readonly CapacityPlan[];readonly totalCount:number}
+export interface CapacityPlan{readonly id:string;readonly ownerUserId:string;readonly name:string;readonly description?:string|null;readonly periodStart:string;readonly periodEnd:string;readonly portfolioId?:string|null;readonly projectIds:readonly string[];readonly members:readonly CapacityMember[];readonly allocations:readonly CapacityAllocation[];readonly viewerUserIds:readonly string[];readonly canEdit:boolean;readonly archived:boolean;readonly updatedAt:string;readonly version:number}
+export interface CapacityMember{userId:string;teamId?:string|null;weeklyCapacityHours:number}
+export interface CapacityAllocation{id?:string|null;userId:string;projectId:string;startDate:string;endDate:string;percent:number}
+export interface CapacitySummary{readonly people:number;readonly capacityHours:number;readonly allocatedHours:number;readonly remainingHours:number;readonly overCapacityPeople:number;readonly openItems:number;readonly estimatedPoints:number;readonly unestimatedItems:number;readonly unscheduledItems:number}
+export interface CapacitySnapshot{readonly planId:string;readonly planVersion:number;readonly sourceStatus:string;readonly periodStart:string;readonly periodEnd:string;readonly generatedAt:string;readonly truncated:boolean;readonly unavailableProjectIds:readonly string[];readonly summary:CapacitySummary;readonly members:readonly CapacityMemberSnapshot[];readonly projects:readonly CapacityProjectSnapshot[]}
+export interface CapacityMemberSnapshot extends CapacityMember{readonly capacityHours:number;readonly allocatedHours:number;readonly remainingHours:number;readonly allocationPercent:number;readonly state:string;readonly estimatedPoints:number;readonly unestimatedItems:number;readonly unscheduledItems:number;readonly openItems:number;readonly weeks:readonly CapacityWeek[];readonly tasks:readonly CapacityTask[]}
+export interface CapacityWeek{readonly weekStart:string;readonly capacityHours:number;readonly allocatedHours:number;readonly remainingHours:number;readonly allocationPercent:number;readonly state:string;readonly estimatedPoints:number;readonly unestimatedItems:number;readonly scheduledItems:number}
+export interface CapacityTask{readonly id:string;readonly projectId:string;readonly title:string;readonly dueDate?:string|null;readonly estimatePoints?:number|null}
+export interface CapacityProjectSnapshot{readonly projectId:string;readonly key:string;readonly name:string;readonly allocatedPeople:number;readonly allocatedHours:number;readonly openItems:number;readonly estimatedPoints:number;readonly unestimatedItems:number}
+export interface CapacityScenario{readonly baseline:CapacitySnapshot;readonly candidate:CapacitySnapshot}
+export interface CapacityUser{readonly id:string;readonly username?:string|null;readonly email?:string|null}
+export interface CapacityRole{readonly name:string;readonly isActive:boolean;readonly permissions:readonly string[]}
+export interface CapacityPortfolio{readonly id:string;readonly name:string}
+export interface CapacityTeam{readonly id:string;readonly name:string}
+export interface CapacityDraft{id?:string;name:string;description:string;periodStart:string;periodEnd:string;portfolioId:string;projectIds:string[];members:CapacityMember[];allocations:CapacityAllocation[];viewerUserIds:string[];version?:number}

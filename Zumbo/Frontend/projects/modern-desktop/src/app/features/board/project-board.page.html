@@ -1,0 +1,53 @@
+<section class="project-board" [attr.data-density]="density()" aria-labelledby="board-title">
+  <header class="board-heading">
+    <div><p class="zumbo-kicker">{{ project().key }} · Günlük çalışma</p><h2 id="board-title">{{ board()?.name || 'Pano' }}</h2></div>
+    <div class="board-context"><strong>{{ filteredTasks().length }}</strong><span>görünen kart</span></div>
+  </header>
+
+  <section class="board-toolbar" aria-label="Pano araçları">
+    @if (boards().length > 1) { <label><span>Pano</span><select [value]="board()?.id" (change)="selectBoard($event)">@for (item of boards(); track item.id) { <option [value]="item.id">{{ item.name }}</option> }</select></label> }
+    <label class="board-search"><zumbo-icon name="search" /><input type="search" [value]="query()" (input)="setQuery($event)" placeholder="Kartlarda ara" aria-label="Kartlarda ara"></label>
+    <label><span>Öncelik</span><select [value]="priority()" (change)="setPriority($event)"><option value="">Tümü</option><option value="Critical">Kritik</option><option value="High">Yüksek</option><option value="Medium">Orta</option><option value="Low">Düşük</option></select></label>
+    <div class="density-switch" role="group" aria-label="Kart yoğunluğu"><button type="button" [class.active]="density() === 'comfortable'" (click)="setDensity('comfortable')" title="Rahat görünüm" aria-label="Rahat görünüm"><zumbo-icon name="rows" /></button><button type="button" [class.active]="density() === 'compact'" (click)="setDensity('compact')" title="Sıkı görünüm" aria-label="Sıkı görünüm"><zumbo-icon name="list" /></button></div>
+    <button class="refresh-board" type="button" (click)="load()" [disabled]="loading()" title="Panoyu yenile" aria-label="Panoyu yenile"><zumbo-icon name="refresh" /></button>
+  </section>
+
+  @if (notice()) { <div class="board-notice" role="status"><span>{{ notice() }}</span><button type="button" (click)="notice.set(null)" aria-label="Bildirimi kapat"><zumbo-icon name="x" /></button></div> }
+  @if (data()?.degraded) { <p class="board-degraded" role="status">Arama hizmeti sınırlı; kartlar güvenli yedek kaynaktan gösteriliyor.</p> }
+  @if (error()) { <div class="board-error" role="alert"><span>{{ error() }}</span><button type="button" (click)="load()">Yeniden dene</button></div> }
+
+  @if (loading() && !data()) {
+    <div class="board-loading" role="status" aria-label="Pano yükleniyor"><span class="zumbo-skeleton"></span><span class="zumbo-skeleton"></span><span class="zumbo-skeleton"></span></div>
+  } @else if (!board()) {
+    <div class="board-empty"><strong>Bu projede pano yok</strong><p>Projede çalışmayı düzenlemek için bir pano gerekir.</p></div>
+  } @else if (!error()) {
+    <div class="board-scroll">
+      <div class="board-columns">
+        @for (column of columns(); track column.id) {
+          <section class="board-lane" [class.drop-active]="dropLaneId() === column.id" [class.at-limit]="atWipLimit(column)" (dragover)="dragOverLane($event, column)" (drop)="dropOnLane($event, column)" [attr.aria-label]="column.name + ' kolonu'">
+            <header><div><h3>{{ column.name }}</h3><span>@if (column.tasks.length !== columnTaskCount(column)) { {{ column.tasks.length }} · }{{ columnTaskCount(column) }}@if (column.wipLimit) { / {{ column.wipLimit }} }</span></div>@if (atWipLimit(column)) { <small>WIP limiti</small> }</header>
+            <div class="lane-cards">
+              @for (task of column.tasks; track task.id) {
+                <article class="board-card" [class.pending]="pendingIds().has(task.id)" [class.dragging]="draggingId() === task.id" [class.drop-before]="dropTarget()?.taskId === task.id && dropTarget()?.placement === 'before'" [class.drop-after]="dropTarget()?.taskId === task.id && dropTarget()?.placement === 'after'" [draggable]="canMove() && !pendingIds().has(task.id)" (dragstart)="dragStart($event, task)" (dragover)="dragOverCard($event, task)" (drop)="dropOnCard($event, task)" (dragend)="finishDrag()" (keydown)="handleTaskKey($event, task)" tabindex="0" [attr.aria-busy]="pendingIds().has(task.id)" aria-keyshortcuts="Alt+ArrowLeft Alt+ArrowRight Alt+ArrowUp Alt+ArrowDown">
+                  <div class="card-top"><span>{{ task.type }}</span><span class="priority" [attr.data-priority]="task.priority">{{ priorityLabel(task.priority) }}</span></div>
+                  <a class="card-title" [routerLink]="['/workspace', project().id, 'board', 'task', task.id]">{{ task.title }}</a>
+                  <div class="card-meta"><span>{{ userName(task.assigneeUserId) }}</span>@if (task.dueDate) { <time>{{ formatDate(task.dueDate) }}</time> }@if (task.estimatePoints != null) { <span>{{ task.estimatePoints }} puan</span> }</div>
+                  @if (task.labels.length) { <div class="card-labels">@for (label of task.labels.slice(0, 3); track label) { <span>{{ label }}</span> }</div> }
+                  @if (canMove()) {
+                    <div class="card-move-actions" aria-label="Kart taşıma eylemleri">
+                      <button type="button" (click)="moveVertical(task, -1)" [disabled]="!canMoveVertical(task, -1) || pendingIds().has(task.id)" [attr.aria-label]="task.title + ' kartını yukarı taşı'" title="Yukarı taşı"><zumbo-icon name="arrow-up" /></button>
+                      <button type="button" (click)="moveVertical(task, 1)" [disabled]="!canMoveVertical(task, 1) || pendingIds().has(task.id)" [attr.aria-label]="task.title + ' kartını aşağı taşı'" title="Aşağı taşı"><zumbo-icon name="arrow-down" /></button>
+                      <button type="button" (click)="moveHorizontal(task, -1)" [disabled]="!canMoveHorizontal(task, -1) || pendingIds().has(task.id)" [attr.aria-label]="task.title + ' kartını önceki kolona taşı'" title="Önceki kolona taşı"><zumbo-icon name="arrow-left" /></button>
+                      <button type="button" (click)="moveHorizontal(task, 1)" [disabled]="!canMoveHorizontal(task, 1) || pendingIds().has(task.id)" [attr.aria-label]="task.title + ' kartını sonraki kolona taşı'" title="Sonraki kolona taşı"><zumbo-icon name="arrow-right" /></button>
+                    </div>
+                  }
+                </article>
+              } @empty { <div class="lane-empty">Kart yok@if (canCreate()) { <span>Yeni kartlar buraya taşınabilir.</span> }</div> }
+            </div>
+          </section>
+        }
+      </div>
+    </div>
+    @if (data() && data()!.totalCount > data()!.tasks.length) { <p class="board-page-note">İlk {{ data()!.tasks.length }} / {{ data()!.totalCount }} kart gösteriliyor.</p> }
+  }
+</section>

@@ -33,7 +33,7 @@ test('mobile search preserves paging and exposes degraded state on all search su
 });
 
 test('backend fallback is bounded and returns an explicit degraded API response', async () => {
-  const source = await read('../Backend/src/Zumbo.Modules.WorkItems/WorkItemSearchFallback.cs');
+  const source = await read('../Backend/src/Zumbo.Modules.WorkItems/Application/Compatibility/WorkItemService/WorkItemService.SearchFallback.cs');
   assert.match(source, /DegradedFallbackMaxItems/);
   assert.match(source, /Math\.Clamp\([^;]+1, 10_000\)/s);
   assert.match(source, /WorkItemSearchPageResponse\([^;]+true\)/s);

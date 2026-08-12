@@ -1,0 +1,119 @@
+<div class="modern-page workspace-shell" [class.theme-dark]="theme() === 'dark'" [class.nav-collapsed]="navCollapsed()" [class.mobile-nav-open]="mobileNavOpen()">
+  <a class="skip-link" href="#main-content">Ana içeriğe geç</a>
+  <aside class="side-nav" aria-label="Çalışma alanı navigasyonu">
+    <header class="nav-brand">
+      <a class="modern-brand" routerLink="/workspace"><img src="shared/zumbo-mark.svg" alt=""><span class="nav-label">Zumbo</span></a>
+      <button class="icon-button nav-collapse" type="button" (click)="toggleNav()" [title]="navCollapsed() ? 'Navigasyonu genişlet' : 'Navigasyonu daralt'">
+        <zumbo-icon name="chevrons-left" />
+      </button>
+    </header>
+    @if (!navCollapsed()) {
+      <zumbo-project-switcher [organizationName]="organizationName()" [projects]="projects()" [selectedProjectId]="selectedProjectId()" (projectChange)="selectProject($event)" />
+    }
+    <zumbo-desktop-navigation [activeSection]="section()" [currentProject]="selectedProject()" [unreadCount]="unreadCount()" [showAudit]="canViewAudit()" [favorites]="favorites()" [recentProjects]="recentProjects()" />
+    <footer class="side-footer">
+      <span class="user-avatar" aria-hidden="true">{{ session.currentUser()?.username?.slice(0, 1)?.toUpperCase() }}</span>
+      <span class="nav-label user-name">{{ session.currentUser()?.username }}</span>
+      <button class="icon-button" type="button" (click)="logout()" title="Çıkış yap"><zumbo-icon name="logout" /></button>
+    </footer>
+  </aside>
+
+  <section class="workspace">
+    <header class="topbar">
+      <button class="icon-button mobile-menu" type="button" (click)="mobileNavOpen.set(!mobileNavOpen())" title="Navigasyonu aç"><zumbo-icon name="menu" /></button>
+      <div class="title-context">
+        <p>{{ organizationName() }} @if (selectedProject()) { <span aria-hidden="true">/</span> {{ selectedProject()?.key }} }</p>
+        <h1>{{ section() === 'project' ? selectedProject()?.name : pageTitle() }}</h1>
+      </div>
+      <div class="topbar-actions">
+        <zumbo-command-palette [project]="selectedProject()" [availableViews]="availableViews()" [showAudit]="canViewAudit()" />
+        @if (selectedProject() && session.currentUser(); as user) { <zumbo-work-item-create [project]="selectedProject()!" [boards]="boards()" [userId]="user.id" [contextReady]="!projectContextLoading()" (created)="openCreatedTask($event)" /> }
+        @if (selectedProject() && section() === 'project') {
+          <button class="icon-button" type="button" (click)="toggleFavorite()" [class.active]="favorite()" [title]="favorite() ? 'Favorilerden kaldır' : 'Favorilere ekle'"><zumbo-icon name="star" /></button>
+        }
+        <button class="icon-button" type="button" (click)="toggleTheme()" [title]="theme() === 'dark' ? 'Açık temaya geç' : 'Koyu temaya geç'">
+          <zumbo-icon [name]="theme() === 'dark' ? 'sun' : 'moon'" />
+        </button>
+        <zumbo-notification-popover [initialUnreadCount]="unreadCount()" (unreadChange)="unreadCount.set($event)" />
+      </div>
+    </header>
+
+    @if (selectedProject() && section() === 'project') {
+      <zumbo-project-view-tabs [projectId]="selectedProject()!.id" [activeView]="activeView()" [views]="availableViews()" />
+    }
+
+    <main id="main-content" class="workspace-main" tabindex="-1">
+      @if (error()) { <p class="zumbo-message danger" role="alert"><span>{{ error() }}</span></p> }
+      @if (loading()) {
+        <div class="loading-state" role="status" aria-label="Çalışma alanı yükleniyor">
+          <span class="zumbo-skeleton"></span><span class="zumbo-skeleton"></span><span class="zumbo-skeleton"></span>
+        </div>
+      } @else if (!projects().length) {
+        <section class="empty-state"><h2>Proje bulunmuyor</h2><p>Bu çalışma alanında erişebileceğiniz bir proje yok.</p></section>
+      } @else {
+        @if (section() !== 'home' && section() !== 'mywork' && section() !== 'inbox' && section() !== 'projects' && !(section() === 'project' && (activeView() === 'overview' || activeView() === 'board' || activeView() === 'list' || activeView() === 'backlog' || activeView() === 'sprint' || activeView() === 'calendar' || activeView() === 'timeline' || activeView() === 'roadmap'))) {
+          <header class="content-heading">
+            <div><p class="zumbo-kicker">{{ section() === 'project' ? selectedProject()?.key : 'Çalışma alanı' }}</p><h2>{{ pageTitle() }}</h2></div>
+            @if (selectedProject()) { <span class="project-key">{{ selectedProject()?.key }}</span> }
+          </header>
+        }
+        @if (section() === 'home' && session.currentUser(); as user) {
+          <zumbo-home-page [projects]="projects()" [userId]="user.id" [username]="user.username" (unreadChange)="unreadCount.set($event)" />
+        } @else if (section() === 'mywork' && session.currentUser(); as user) {
+          <zumbo-my-work-page [projects]="projects()" [userId]="user.id" />
+        } @else if (section() === 'inbox' && session.currentUser(); as user) {
+          <zumbo-inbox-page [projects]="projects()" [userId]="user.id" (unreadChange)="unreadCount.set($event)" />
+        } @else if (section() === 'projects' && session.currentUser(); as user) {
+          <zumbo-project-directory-page [projects]="projects()" [userId]="user.id" [selectedProjectId]="selectedProjectId()" [favorites]="favorites()" [recentProjects]="recentProjects()" (favoriteToggle)="toggleProjectFavorite($event)" (projectOpen)="openProject($event)" (projectUpdated)="updateProject($event)" (projectArchived)="removeProject($event)" />
+        } @else if (section() === 'portfolios' && session.currentUser(); as user) {
+          <zumbo-portfolio-page [projects]="projects()" [userId]="user.id" />
+        } @else if (section() === 'goals' && session.currentUser(); as user) {
+          <zumbo-goal-page [projects]="projects()" [userId]="user.id" />
+        } @else if (section() === 'capacity' && session.currentUser(); as user) {
+          <zumbo-capacity-page [projects]="projects()" [userId]="user.id" />
+        } @else if (section() === 'knowledge' && session.currentUser(); as user) {
+          <zumbo-knowledge-page [projects]="projects()" [userId]="user.id" />
+        } @else if (section() === 'teams' && session.currentUser(); as user) {
+          <zumbo-teams-page [context]="{ id: user.id, organizationId: user.organizationId, roleNames: user.roles }" />
+        } @else if (section() === 'audit' && session.currentUser(); as user) {
+          <zumbo-audit-page [context]="{ organizationId: user.organizationId, roleNames: user.roles }" [projects]="projects()" />
+        } @else if (section() === 'archive' && session.currentUser(); as user) {
+          <zumbo-archive-page [context]="{ organizationId: user.organizationId, projectId: selectedProjectId(), roleNames: user.roles }" (restored)="refreshAfterArchiveRestore()" />
+        } @else if (section() === 'settings' && session.currentUser(); as user) {
+          <zumbo-settings-page [context]="{ id: user.id, username: user.username, email: user.email, organizationId: user.organizationId, roleNames: user.roles }" (currentSessionRevoked)="logout()" />
+        } @else if (section() === 'project' && activeView() === 'overview' && selectedProject(); as project) {
+          @if (session.currentUser(); as user) { <zumbo-project-overview-page [project]="project" [boards]="boards()" [contextReady]="!projectContextLoading()" [userId]="user.id" /> }
+        } @else if (section() === 'project' && activeView() === 'board' && selectedProject(); as project) {
+          @if (session.currentUser(); as user) { <zumbo-project-board-page [project]="project" [boards]="boards()" [contextReady]="!projectContextLoading()" [userId]="user.id" /> }
+        } @else if (section() === 'project' && activeView() === 'list' && selectedProject(); as project) {
+          @if (session.currentUser(); as user) { <zumbo-project-list-page [project]="project" [boards]="boards()" [contextReady]="!projectContextLoading()" [userId]="user.id" /> }
+        } @else if (section() === 'project' && activeView() === 'backlog' && selectedProject(); as project) {
+          @if (session.currentUser(); as user) { <zumbo-project-backlog-page [project]="project" [contextReady]="!projectContextLoading()" [userId]="user.id" /> }
+        } @else if (section() === 'project' && activeView() === 'sprint' && selectedProject(); as project) {
+          @if (session.currentUser(); as user) { <zumbo-project-sprint-page [project]="project" [contextReady]="!projectContextLoading()" [userId]="user.id" /> }
+        } @else if (section() === 'project' && (activeView() === 'calendar' || activeView() === 'timeline' || activeView() === 'roadmap') && selectedProject(); as project) {
+          @if (session.currentUser(); as user) { <zumbo-project-planning-view-page [project]="project" [contextReady]="!projectContextLoading()" [userId]="user.id" [view]="activeView()" /> }
+        } @else if (section() === 'project' && (activeView() === 'workload' || activeView() === 'reports' || activeView() === 'dashboards') && selectedProject(); as project) {
+          <zumbo-project-reporting-page [project]="project" [projects]="projects()" [contextReady]="!projectContextLoading()" [view]="activeView()" />
+        } @else if (section() === 'project' && activeView() === 'catalog' && selectedProject(); as project) {
+          @if (session.currentUser(); as user) { <zumbo-project-catalog-page [project]="project" [contextReady]="!projectContextLoading()" [userId]="user.id" (projectChange)="updateProject($event)" /> }
+        } @else if (section() === 'project' && activeView() === 'intake' && selectedProject(); as project) {
+          @if (session.currentUser(); as user) { <zumbo-intake-page [project]="project" [boards]="boards()" [contextReady]="!projectContextLoading()" [userId]="user.id" (openWorkItem)="openIntakeWorkItem($event)" /> }
+        } @else if (section() === 'project' && activeView() === 'automation' && selectedProject(); as project) {
+          @if (session.currentUser(); as user) { <zumbo-automation-page [project]="project" [boards]="boards()" [contextReady]="!projectContextLoading()" [userId]="user.id" (openWorkItem)="openAutomationWorkItem($event)" /> }
+        } @else if (section() === 'project' && activeView() === 'jobs' && selectedProject(); as project) {
+          @if (session.currentUser(); as user) { <zumbo-jobs-page [project]="project" [contextReady]="!projectContextLoading()" [userId]="user.id" /> }
+        } @else {
+          <section class="surface-placeholder" aria-labelledby="surface-title">
+            <h3 id="surface-title">{{ pageTitle() }}</h3>
+            <p>{{ selectedProject()?.name || organizationName() }}</p>
+          </section>
+        }
+      }
+    </main>
+  </section>
+  @if (selectedProject() && selectedTaskId() && session.currentUser(); as user) {
+    <zumbo-work-item-detail [project]="selectedProject()!" [userId]="user.id" [taskId]="selectedTaskId()!" (closed)="closeTaskDetail()" (archived)="closeTaskDetail()" />
+  }
+  @if (mobileNavOpen()) { <button class="nav-backdrop" type="button" (click)="mobileNavOpen.set(false)" aria-label="Navigasyonu kapat"></button> }
+</div>

@@ -1,0 +1,35 @@
+.app-update {
+  align-items: center;
+  background: #172033;
+  border: 1px solid #34425c;
+  bottom: calc(.75rem + env(safe-area-inset-bottom));
+  color: #f8fafc;
+  display: flex;
+  gap: .75rem;
+  justify-content: space-between;
+  left: .75rem;
+  padding: .75rem;
+  position: fixed;
+  right: .75rem;
+  z-index: 20000;
+
+  span { display: grid; gap: .125rem; min-width: 0; }
+  strong { font-size: .875rem; }
+  small { color: #cbd5e1; font-size: .75rem; }
+  button {
+    background: #f8fafc;
+    border: 0;
+    border-radius: 4px;
+    color: #172033;
+    flex: 0 0 auto;
+    font: inherit;
+    font-weight: 700;
+    min-height: 44px;
+    padding: .5rem .75rem;
+  }
+  button:disabled { opacity: .7; }
+}
+
+@media (max-width: 340px) {
+  .app-update small { display: none; }
+}

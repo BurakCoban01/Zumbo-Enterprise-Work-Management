@@ -74,7 +74,8 @@ public sealed partial class PostgreSqlMigrationRunner
             Migration.Create(34, "capacity_plans", V034CapacityPlansMigration.Definition.UpSql, V034CapacityPlansMigration.Definition.DownSql),
             Migration.Create(35, "knowledge_documents", V035KnowledgeDocumentsMigration.Definition.UpSql, V035KnowledgeDocumentsMigration.Definition.DownSql),
             Migration.Create(36, "development_integrations", V036DevelopmentIntegrationsMigration.Definition.UpSql, V036DevelopmentIntegrationsMigration.Definition.DownSql),
-            Migration.Create(37, "high_cardinality_indexes", V037HighCardinalityIndexesMigration.Definition.UpSql, V037HighCardinalityIndexesMigration.Definition.DownSql)
+            Migration.Create(37, "high_cardinality_indexes", V037HighCardinalityIndexesMigration.Definition.UpSql, V037HighCardinalityIndexesMigration.Definition.DownSql),
+            Migration.Create(38, "permission_definitions", V038PermissionDefinitionsMigration.Definition.UpSql, V038PermissionDefinitionsMigration.Definition.DownSql)
         ];
     }
 

@@ -1,0 +1,36 @@
+@media (max-width: 700px) {
+  .project-list { gap: 12px; }
+  .list-heading { align-items: center; }
+  .list-heading h2 { font-size: 20px; }
+  .list-toolbar { align-items: stretch; }
+  .list-toolbar > label, .list-search { width: 100%; }
+  .list-toolbar select, .list-search { min-width: 0; height: 44px; }
+  .density-switch, .density-switch button, .icon-tool { height: 44px; }
+  .density-switch button { width: 44px; }
+  .icon-tool { width: 44px; }
+  .column-menu { position: fixed; z-index: 20; top: auto; right: 12px; bottom: 12px; left: 12px; width: auto; }
+  .column-menu label { min-height: 44px; }
+  .bulk-toolbar { align-items: stretch; }
+  .bulk-toolbar label { flex: 1 1 100%; }
+  .bulk-toolbar select, .bulk-toolbar button { min-height: 44px; }
+  .bulk-toolbar .clear-selection { margin-left: 0; }
+  .list-notice button { width: 44px; height: 44px; }
+  .list-table-scroll { max-height: none; overflow: visible; border: 0; }
+  table, tbody { display: grid; min-width: 0; gap: 9px; }
+  thead { position: static; display: none; }
+  tr { display: grid; min-width: 0; grid-template-columns: 38px minmax(0, 1fr) auto; border: 1px solid var(--line); background: var(--panel); }
+  td { display: grid; min-width: 0; height: auto; min-height: 44px; grid-column: 2 / 4; grid-template-columns: minmax(88px, .45fr) minmax(0, 1fr); align-items: center; gap: 8px; border-bottom: 1px solid var(--line); padding: 8px 10px; }
+  td::before { content: attr(data-label); color: var(--muted); font-size: 12px; }
+  .select-cell { width: auto; grid-row: 1; grid-column: 1; grid-template-columns: 1fr; padding: 10px; }
+  .select-cell::before { display: none; }
+  .title-cell { min-width: 0; grid-row: 1; grid-column: 2 / 3; grid-template-columns: 1fr; }
+  .title-cell::before { display: none; }
+  .title-cell a { max-width: 100%; white-space: normal; }
+  .action-cell { width: auto; grid-row: 1; grid-column: 3; grid-template-columns: repeat(2, 44px); padding: 5px; }
+  .action-cell::before { display: none; }
+  .action-cell button, .action-cell a { width: 44px; height: 44px; }
+  td input[type='text'], td input[type='date'], td select { min-width: 0; height: 44px; }
+  td .inline-title { min-width: 0; }
+  .empty-row { display: grid; min-height: 170px; grid-column: 1 / 4; grid-template-columns: 1fr; place-content: center; }
+  .empty-row::before { display: none; }
+}

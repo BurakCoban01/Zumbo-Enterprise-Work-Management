@@ -62,7 +62,7 @@ public sealed class PostgreSqlParallelMigrationTests(PostgreSqlFixture fixture)
                 second.MigrateAsync(CancellationToken.None));
 
             var applied = await fixture.Api.GetAppliedMigrationsAsync(CancellationToken.None);
-            Assert.Equal(37, applied.Count);
+            Assert.Equal(38, applied.Count);
             Assert.Equal(applied.Count, applied.Distinct(StringComparer.Ordinal).Count());
         }
         finally

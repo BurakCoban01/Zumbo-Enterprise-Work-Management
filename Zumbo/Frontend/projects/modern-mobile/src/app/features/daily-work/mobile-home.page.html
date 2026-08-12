@@ -1,0 +1,26 @@
+<ion-header><ion-toolbar><ion-title>Ana sayfa</ion-title></ion-toolbar></ion-header>
+<ion-content [fullscreen]="true">
+  <ion-refresher slot="fixed" (ionRefresh)="refresh($event)"><ion-refresher-content pullingText="Yenile" /></ion-refresher>
+  <main>
+    <header class="page-intro"><p class="eyebrow">Bugünün odağı</p><h1>Merhaba, {{ session.currentUser()?.username }}</h1><p>Önce yaklaşan işleri ve eylem bekleyen bildirimleri ele alın.</p></header>
+    @if (store.loading() && !store.ready()) { <p class="state" role="status">Çalışma alanı yükleniyor...</p> }
+    @if (store.error()) { <div class="state error" role="alert">{{ store.error() }}<button type="button" (click)="store.load(true)">Yeniden dene</button></div> }
+    @if (store.partial()) { <p class="state" role="status">Bazı projeler yenilenemedi; erişilebilen işler gösteriliyor.</p> }
+    @if (store.ready()) {
+      <nav class="metric-strip" aria-label="Kişisel çalışma özeti">
+        <a routerLink="/workspace/work" [queryParams]="{mode:'assigned'}"><strong>{{ open().length }}</strong><span>Açık</span></a>
+        <a routerLink="/workspace/work" [queryParams]="{mode:'due'}"><strong>{{ due().length }}</strong><span>Tarihli</span></a>
+        <a routerLink="/workspace/work" [queryParams]="{mode:'blocked'}"><strong>{{ blocked().length }}</strong><span>Engelli</span></a>
+        <a routerLink="/workspace/inbox"><strong>{{ unread().length }}</strong><span>Okunmamış</span></a>
+      </nav>
+      <section class="priority-section"><header><h2>Yaklaşan işler</h2><a routerLink="/workspace/work" [queryParams]="{mode:'due'}">Tümünü gör</a></header><div class="work-list">
+        @for (item of due().slice(0, 5); track item.id) { <article class="work-row"><span><strong>{{ item.title }}</strong><small>{{ item.projectName }} · {{ item.status }}</small></span><time>{{ formatDate(item.dueDate) }}</time></article> }
+        @empty { <p class="empty">Yaklaşan iş yok.</p> }
+      </div></section>
+      <section class="priority-section"><header><h2>Eylem bildirimleri</h2><a routerLink="/workspace/inbox">Gelen kutusu</a></header><div class="notification-list">
+        @for (item of unread().slice(0, 4); track item.id) { <button type="button" (click)="store.markRead(item.id)"><i></i><span><strong>{{ label(item) }}</strong><small>{{ item.message }}</small></span><time>{{ formatDate(item.createdAt) }}</time></button> }
+        @empty { <p class="empty">Yeni bildirim yok.</p> }
+      </div></section>
+    }
+  </main>
+</ion-content>

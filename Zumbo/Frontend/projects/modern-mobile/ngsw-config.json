@@ -1,0 +1,39 @@
+{
+  "$schema": "../../node_modules/@angular/service-worker/config/schema.json",
+  "index": "/modern-mobile/index.html",
+  "assetGroups": [
+    {
+      "name": "mobile-shell",
+      "installMode": "prefetch",
+      "resources": {
+        "files": [
+          "/manifest.webmanifest",
+          "/*.css",
+          "/*.js",
+          "!/runtime-config.js"
+        ],
+        "urls": ["/modern-mobile/index.html"]
+      }
+    },
+    {
+      "name": "mobile-assets",
+      "installMode": "lazy",
+      "updateMode": "prefetch",
+      "resources": {
+        "files": ["/shared/**"]
+      }
+    }
+  ],
+  "dataGroups": [
+    {
+      "name": "mobile-runtime-config",
+      "urls": ["/modern-mobile/runtime-config.js"],
+      "cacheConfig": {
+        "strategy": "freshness",
+        "maxSize": 1,
+        "maxAge": "1d",
+        "timeout": "2s"
+      }
+    }
+  ]
+}

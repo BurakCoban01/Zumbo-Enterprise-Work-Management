@@ -65,7 +65,10 @@ test('knowledge core limits editable scopes and normalizes version payloads', ()
       { id: 'initiative-owned', name: 'Owned initiative', ownerUserId: 'user-1' },
       { id: 'initiative-hidden', name: 'Hidden initiative', ownerUserId: 'user-2' }
     ]
-  }], 'user-1');
+  }], 'user-1', [
+    { name: 'ProjectOwner', permissions: ['BoardManage'] },
+    { name: 'Viewer', permissions: ['WorkItemView'] }
+  ]);
 
   assert.deepEqual(scopes.map((scope) => scope.key), [
     'Project:project-owner',

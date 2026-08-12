@@ -112,7 +112,8 @@ async function stopOwnedFrontend() {
   const normalizedCommand = identity.commandLine.replaceAll('\\', '/').toLowerCase();
   if (!identity.name.toLowerCase().startsWith('node')
     || !normalizedCommand.includes('tests/static-server.mjs')
-    || !normalizedCommand.includes(' dist')) {
+    || !normalizedCommand.includes(' dist-modern')
+    || !normalizedCommand.includes('--canonical')) {
     throw new Error('The recorded PID is not the owned Zumbo frontend preview process.');
   }
 

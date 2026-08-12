@@ -1,0 +1,21 @@
+.session-disclosure {
+  width: 100%;
+  margin-top: 10px;
+  background: transparent !important;
+  color: var(--accent) !important;
+}
+
+.settings-band > header > span {
+  color: var(--muted);
+}
+
+.toggle-row strong {
+  color: var(--ink);
+}
+
+@media (max-width: 520px) {
+  .page-heading .icon-button {
+    width: 44px;
+    height: 44px;
+  }
+}

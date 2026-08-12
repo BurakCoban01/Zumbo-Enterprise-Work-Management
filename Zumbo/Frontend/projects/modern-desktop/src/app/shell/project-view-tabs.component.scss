@@ -1,0 +1,14 @@
+:host { display: block; border-bottom: 1px solid var(--line); }
+.project-tabs { display: flex; min-width: 0; align-items: stretch; gap: 2px; }
+.primary-views, .secondary-groups { display: flex; min-width: 0; align-items: stretch; gap: 2px; }
+.secondary-groups { margin-left: auto; }
+.primary-views > a, summary { display: inline-flex; min-height: 42px; flex: 0 0 auto; align-items: center; gap: 7px; border-bottom: 2px solid transparent; padding: 0 11px; color: var(--muted); font-size: 13px; font-weight: 650; }
+.primary-views > a:hover, .primary-views > a.active, details.active summary { border-bottom-color: var(--accent); color: var(--ink); }
+details { position: relative; flex: 0 0 auto; }
+summary { cursor: pointer; list-style: none; }
+summary::-webkit-details-marker { display: none; }
+.view-menu { position: absolute; z-index: 30; top: 42px; left: 0; width: 210px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); box-shadow: var(--shadow); padding: 8px; }
+details:last-child .view-menu { right: 0; left: auto; }
+.view-menu a { display: block; border-radius: 4px; padding: 7px 8px; color: var(--ink); font-size: 13px; }
+.view-menu a:hover, .view-menu a.active { background: var(--accent-soft); color: var(--accent-strong); }
+@media (max-width: 960px) { .project-tabs { display: grid; grid-template-columns: minmax(0, 1fr); }.primary-views, .secondary-groups { overflow-x: auto; scrollbar-width: thin; }.secondary-groups { margin-left: 0; border-top: 1px solid var(--line); }details { position: static; }.view-menu, details:last-child .view-menu { position: fixed; top: 150px; right: 12px; left: 12px; width: auto; max-height: calc(100vh - 162px); overflow-y: auto; } }

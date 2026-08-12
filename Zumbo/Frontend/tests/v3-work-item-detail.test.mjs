@@ -94,6 +94,8 @@ function model({ role = 'Developer', put } = {}) {
     projectMembership: { role }, tasks: [current], users: [{ id: 'user-1', username: 'Ada' }],
     teams: [], sprints: [], workItemSchema: { issueTypes: [], customFields: [], layouts: [] },
     workflow: { transitions: [] }, activeSection: 'board',
+    hasSystemPermission: () => false,
+    projectRoleHasPermission: (projectRole, permission) => projectRole !== 'Viewer' && permission === 'WorkItemUpdate',
     userName: id => id === 'user-1' ? 'Ada' : 'Mert',
     projectTeams: () => [], customFieldsFor: () => [], customFieldRequests: () => [],
     loadTasks: () => Promise.resolve(), notify(kind, message) { vm.notice = { kind, message }; }

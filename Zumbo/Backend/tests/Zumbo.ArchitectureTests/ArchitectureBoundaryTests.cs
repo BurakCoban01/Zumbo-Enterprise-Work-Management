@@ -226,9 +226,9 @@ public sealed class ArchitectureBoundaryTests
             .Order(StringComparer.Ordinal)
             .ToArray();
 
-        Assert.Equal(37, definitionFiles.Length);
+        Assert.Equal(38, definitionFiles.Length);
         Assert.Equal(
-            Enumerable.Range(1, 37).Select(version => $"V{version:000}").ToArray(),
+            Enumerable.Range(1, 38).Select(version => $"V{version:000}").ToArray(),
             definitionFiles.Select(path => (Path.GetFileName(path)!)[..4]).ToArray());
         Assert.All(definitionFiles, path =>
         {
@@ -288,7 +288,7 @@ public sealed class ArchitectureBoundaryTests
             runnerDirectory,
             "PostgreSqlMigrationRunner.Registry.cs");
         Assert.Equal(
-            37,
+            38,
             File.ReadLines(registryPath).Count(line => line.TrimStart().StartsWith(
                 "Migration.Create(",
                 StringComparison.Ordinal)));

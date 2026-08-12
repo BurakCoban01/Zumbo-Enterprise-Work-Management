@@ -1,0 +1,37 @@
+.login-layout {
+  display: grid;
+  place-items: center;
+  padding: 32px 20px;
+}
+
+.login-panel {
+  width: min(100%, 420px);
+  border-top: 4px solid var(--accent);
+  padding: 30px 32px;
+  background: var(--panel);
+  box-shadow: var(--shadow-medium);
+}
+
+header {
+  margin: 30px 0 24px;
+}
+
+h1 {
+  margin: 0 0 6px;
+  color: var(--ink);
+  font-size: 28px;
+}
+
+p {
+  color: var(--muted);
+}
+
+.login-error {
+  margin: 0 0 14px;
+  color: var(--danger);
+}
+
+@media (max-width: 480px) {
+  .login-layout { padding: 0; place-items: stretch; }
+  .login-panel { min-height: 100vh; padding: 24px 20px; box-shadow: none; }
+}

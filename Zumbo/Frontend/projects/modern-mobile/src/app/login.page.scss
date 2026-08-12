@@ -1,0 +1,9 @@
+.mobile-login { display: grid; width: min(100% - 32px, 460px); min-height: 100%; align-content: center; margin: 0 auto; padding: calc(28px + env(safe-area-inset-top)) 0 calc(28px + env(safe-area-inset-bottom)); }
+header { margin: 28px 0 20px; }
+h1 { margin: 0 0 6px; color: var(--ink); font-size: 26px; }
+p { color: var(--muted); }
+form { display: grid; gap: 12px; }
+ion-item { --background: var(--panel); --border-color: var(--line); --min-height: 58px; }
+ion-button { min-height: 48px; margin-top: 8px; }
+.mobile-error { margin: 0; color: var(--danger); }
+.forgot-link { min-height: 44px; display: grid; place-items: center; color: var(--accent); font-weight: 700; text-decoration: none; }

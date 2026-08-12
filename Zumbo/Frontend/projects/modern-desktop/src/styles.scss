@@ -1,0 +1,46 @@
+html,
+body {
+  min-height: 100%;
+  margin: 0;
+  color: var(--ink);
+  background: var(--surface);
+}
+
+body {
+  font-family: var(--font-family-sans);
+}
+
+button,
+input {
+  font: inherit;
+}
+
+.modern-page {
+  min-height: 100vh;
+  background: var(--surface);
+}
+
+.modern-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--ink);
+  font-size: 20px;
+  font-weight: 750;
+}
+
+.modern-brand img {
+  width: 36px;
+  height: 36px;
+}
+
+/* System permission identifiers remain internal; editable roles use catalog labels. */
+.organization-access .system .permission-tags span {
+  display: none;
+}
+
+.organization-access .system .permission-tags::before {
+  content: "Sistem rolü izinleri merkezi katalog tarafından yönetilir.";
+  color: var(--muted);
+  font-size: 11px;
+}

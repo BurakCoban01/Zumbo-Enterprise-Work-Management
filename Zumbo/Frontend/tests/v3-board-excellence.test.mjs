@@ -54,9 +54,16 @@ function model({ role = 'Developer', api = {} } = {}) {
     selectedTaskIds: {},
     pendingTaskIds: {},
     priorityFilter: '',
+    projectRoleHasPermission(roleName, permission) {
+      const roles = [
+        { name: 'Developer', permissions: ['WorkItemUpdate'] },
+        { name: 'Viewer', permissions: ['WorkItemView'] }
+      ];
+      return roles.some(item => item.name === roleName && item.permissions.includes(permission));
+    },
     userName: id => id === 'user-1' ? 'Ada' : 'Mert',
     moveTaskToColumn: (id, target) => Promise.resolve({ id, target }),
-    dropTaskBefore: (id, anchor) => Promise.resolve({ id, anchor }),
+    dropTaskBefore(id, anchor, placement) { vm.dropCall = { id, anchor, placement }; return Promise.resolve(); },
     refreshBoardModel() {},
     loadTasks() { vm.reloads = (vm.reloads || 0) + 1; return Promise.resolve(); },
     selectedIds() { return Object.keys(vm.selectedTaskIds).filter(id => vm.selectedTaskIds[id]); },
@@ -205,6 +212,36 @@ test('board WIP state uses the whole loaded column, not each swimlane subset', (
   }
 });
 
+test('movement affordance is disabled before requesting a visibly WIP-full column', async () => {
+  const { vm } = installExcellence();
+  vm.board.columns[2].wipLimit = 1;
+  vm.tasks.push(task('review-task', 'Review item', 'Medium', 'review', 'Review', 30));
+  vm.refreshBoardModel();
+
+  const moving = vm.tasks.find(item => item.id === 'task-high');
+  assert.equal(vm.canMoveTaskDirection(moving, 1), false);
+  await vm.moveTaskDirection(moving, 1);
+  assert.equal(vm.pendingTaskIds[moving.id], undefined);
+});
+
+test('keyboard vertical movement reuses before-after rank placement', async () => {
+  const { vm } = installExcellence();
+  const first = vm.tasks.find(item => item.id === 'task-high');
+  const second = vm.tasks.find(item => item.id === 'task-low');
+  second.columnId = first.columnId;
+  second.status = first.status;
+  vm.boardRows = [{ columns: [{ tasks: [first, second] }] }];
+  const event = { key: 'ArrowDown', altKey: true, preventDefault() { this.prevented = true; } };
+
+  vm.handleTaskKey(event, first);
+  await Promise.resolve();
+
+  assert.equal(event.prevented, true);
+  assert.equal(vm.dropCall.id, first.id);
+  assert.equal(vm.dropCall.anchor.id, second.id);
+  assert.equal(vm.dropCall.placement, 'after');
+});
+
 test('templates expose semantic table, keyboard/touch movement and permission-aware controls', () => {
   assert.match(desktopHtml, /<table class="work-table" aria-label="Proje işleri">/);
   assert.match(desktopHtml, /vm\.moveTaskDirection\(task, -1\)/);
@@ -224,5 +261,5 @@ test('templates expose semantic table, keyboard/touch movement and permission-aw
   assert.match(mobileAuth, /var restorePromise = null/);
   assert.match(mobileAuth, /restorePromise = apiClient\.get\('\/api\/browser-auth\/session'\)/);
   assert.match(mobileTasks, /BOARD_WIP_LIMIT_EXCEEDED/);
-  assert.match(mobileTasks, /membership\.role !== 'Viewer'/);
+  assert.match(mobileTasks, /hasProjectPermission\(membership\.role, 'WorkItemUpdate'\)/);
 });

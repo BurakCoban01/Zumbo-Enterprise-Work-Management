@@ -175,16 +175,19 @@ try {
   assert.equal(moved.dueDate.slice(0, 10), movedDay);
   checks.push('real-reschedule-if-match');
 
-  await page.getByRole('tab', { name: 'Zaman çizelgesi', exact: true }).click();
+  await page.getByRole('button', { name: 'Daha fazla', exact: true }).click();
+  await page.getByRole('menuitem', { name: 'Zaman çizelgesi', exact: true }).click();
   await page.locator('.planning-risk-note').filter({ hasText: '1 bağımlılık' }).waitFor();
   await page.getByRole('button', { name: 'Tabloyu göster' }).click();
   assert.ok(await page.locator('.planning-table tbody tr').count() >= 3);
   checks.push('real-gantt-dependency-table');
   await page.screenshot({ path: resolve(outputDir, 'owner-timeline-table.png'), fullPage: true });
 
-  await page.getByRole('tab', { name: 'Yol haritası', exact: true }).click();
+  await page.getByRole('button', { name: 'Daha fazla', exact: true }).click();
+  await page.getByRole('menuitem', { name: 'Yol haritası', exact: true }).click();
   await page.getByText('Teslimat yol haritası', { exact: true }).waitFor();
   await page.getByText(`Gerçek plan sprinti ${stamp.slice(-4)}`, { exact: true }).waitFor();
+  assert.ok(await page.locator('.roadmap-segment').count() >= 1);
   checks.push('real-roadmap-rollup');
 
   const viewerContext = await browser.newContext({ viewport: { width: 1280, height: 900 }, reducedMotion: 'reduce' });

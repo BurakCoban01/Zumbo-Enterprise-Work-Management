@@ -1,0 +1,18 @@
+<button class="command-trigger" type="button" (click)="open()" title="Komut menüsünü aç">
+  <zumbo-icon name="search" [size]="17" /><span>Ara veya komut çalıştır</span><kbd>Ctrl K</kbd>
+</button>
+@if (opened()) {
+  <div class="command-backdrop" (click)="close()">
+    <section class="command-dialog" role="dialog" aria-modal="true" aria-labelledby="command-title" (click)="$event.stopPropagation()">
+      <h2 id="command-title">Komut menüsü</h2>
+      <label><zumbo-icon name="search" /><span class="is-sr-only">Komut ara</span><input type="search" placeholder="Sayfa veya görünüm ara" [value]="query()" (input)="updateQuery($event)"></label>
+      <nav aria-label="Komutlar">
+        @for (command of commands(); track command.id) {
+          <a [routerLink]="command.route" (click)="close()"><span>{{ command.label }}</span><small>{{ command.group }}</small></a>
+        } @empty {
+          <p>Bu aramayla eşleşen komut yok.</p>
+        }
+      </nav>
+    </section>
+  </div>
+}

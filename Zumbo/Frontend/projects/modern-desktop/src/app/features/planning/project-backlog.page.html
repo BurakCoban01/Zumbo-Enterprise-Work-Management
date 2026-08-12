@@ -1,0 +1,61 @@
+<section class="project-backlog" aria-labelledby="backlog-title">
+  <header class="backlog-heading">
+    <div><p class="zumbo-kicker">{{ project().key }} · Sprint planlama</p><h2 id="backlog-title">Backlog</h2></div>
+    <div class="backlog-context"><strong>{{ data()?.backlog?.length ?? 0 }}</strong><span>hazır iş</span></div>
+  </header>
+
+  <section class="backlog-toolbar" aria-label="Backlog araçları">
+    <label class="backlog-search"><zumbo-icon name="search" /><input type="search" [value]="query()" (input)="setQuery($event)" placeholder="Backlog'da ara" aria-label="Backlog'da ara"></label>
+    <label><span>Öncelik</span><select [value]="priority()" (change)="setPriority($event)"><option value="">Tümü</option><option value="Critical">Kritik</option><option value="High">Yüksek</option><option value="Medium">Orta</option><option value="Low">Düşük</option></select></label>
+    <label class="sprint-target"><span>Hedef sprint</span><select [value]="selectedSprintId()" (change)="selectSprint($event)" aria-label="Hedef sprint">@for (sprint of data()?.sprints ?? []; track sprint.id) { <option [value]="sprint.id" [selected]="sprint.id === selectedSprintId()">{{ sprintLabel(sprint) }}</option> }</select></label>
+    <button class="icon-tool" type="button" (click)="load()" [disabled]="loading()" title="Planı yenile" aria-label="Planı yenile"><zumbo-icon name="refresh" /></button>
+  </section>
+
+  @if (selectedSprint(); as sprint) {
+    <section class="sprint-strip" [attr.data-status]="sprint.status">
+      <div><span>{{ statusLabel(sprint.status) }}</span><strong>{{ sprint.name }}</strong><small>{{ sprint.goal || 'Hedef belirtilmedi' }}</small></div>
+      <div><span>Süre</span><strong>{{ sprint.startDate }} – {{ sprint.endDate }}</strong><small>{{ sprint.status === 'Planned' ? 'Kapsam değiştirilebilir' : sprint.status === 'Active' ? 'Aktif sprint kapsamı kilitli' : 'Tamamlanmış sprint' }}</small></div>
+      <div><span>Plan</span><strong>{{ sprintItems().length }} iş · {{ planningPoints() }} puan</strong><small>@if (capacityBaseline() != null) { Son 3 sprint ortalaması {{ capacityBaseline()!.toFixed(1) }} puan } @else { Geçmiş hız verisi yok }</small></div>
+    </section>
+  }
+
+  @if (notice()) { <div class="backlog-notice" role="status"><span>{{ notice() }}</span><div>@if (lastPlanned()) { <button class="undo-action" type="button" (click)="undoLastPlan()">Geri al</button> }<button type="button" (click)="notice.set(null); lastPlanned.set(null)" aria-label="Bildirimi kapat"><zumbo-icon name="x" /></button></div></div> }
+  @if (data()?.degraded) { <p class="backlog-degraded" role="status">İş öğesi araması sınırlı; sprint kapsamı güvenli yedek kaynaktan gösteriliyor.</p> }
+  @if (error()) { <div class="backlog-error" role="alert"><span>{{ error() }}</span><button type="button" (click)="load()">Yeniden dene</button></div> }
+
+  @if (loading() && !data()) {
+    <div class="backlog-loading" role="status" aria-label="Backlog yükleniyor"><span class="zumbo-skeleton"></span><span class="zumbo-skeleton"></span></div>
+  } @else if (!error()) {
+    <div class="planning-workspace">
+      <section class="planning-column" aria-labelledby="ready-heading">
+        <header><div><h3 id="ready-heading">Hazır işler</h3><p>Öncelik ve eforu tarayın; uygun sprint kapsamına alın.</p></div><strong>{{ filteredBacklog().length }} / {{ data()?.backlog?.length ?? 0 }}</strong></header>
+        <div class="planning-list">
+          @for (item of filteredBacklog(); track item.id) {
+            <article [class.pending]="pendingIds().has(item.id)" tabindex="0" (keydown)="handleItemKey($event, item)" aria-keyshortcuts="Alt+ArrowRight">
+              <a class="planning-main" [routerLink]="['/workspace', project().id, 'backlog', 'task', item.id]"><strong>{{ item.title }}</strong><span>{{ item.type }} · {{ priorityLabel(item.priority) }} · {{ item.estimatePoints }} puan</span></a>
+              @if (canChangeScope()) { <button class="move-action" type="button" (click)="planItem(item)" [disabled]="pendingIds().has(item.id)" [attr.aria-label]="item.title + ' işini sprint kapsamına al'" title="Sprint kapsamına al"><zumbo-icon name="arrow-right" /></button> }
+            </article>
+          } @empty { <div class="planning-empty"><strong>Backlog boş</strong><span>Arama ve filtreleri değiştirin veya yeni işler ekleyin.</span></div> }
+        </div>
+        @if (data()?.backlogNextCursor) { <button class="load-more" type="button" (click)="loadMore()" [disabled]="loadingMore()">{{ loadingMore() ? 'Yükleniyor' : 'Daha fazla backlog işi yükle' }}</button> }
+      </section>
+
+      <section class="planning-column sprint-scope" aria-labelledby="scope-heading">
+        <header><div><h3 id="scope-heading">{{ selectedSprint()?.name || 'Sprint kapsamı' }}</h3><p>{{ selectedSprint()?.goal || 'Planlama için bir sprint seçin.' }}</p></div><strong>{{ planningPoints() }} puan</strong></header>
+        @if (selectedSprint()) {
+          <div class="capacity-line" [attr.data-capacity-state]="capacityState()">
+            <div><span>Geçmiş hıza göre kapasite</span><strong>@if (capacityPercent() != null) { %{{ capacityPercent() }} } @else { Veri yok }</strong></div>
+            <progress max="140" [value]="capacityPercent() ?? 0">{{ capacityPercent() ?? 0 }}</progress>
+            <small>@if (capacityBaseline() != null) { {{ planningPoints() }} planlanan · {{ capacityBaseline()!.toFixed(1) }} puan geçmiş ortalama } @else { İlk tamamlanan sprintten sonra kapasite karşılaştırması oluşur. }</small>
+          </div>
+        }
+        <div class="planning-list">
+          @for (item of sprintItems(); track item.id) {
+            <article><a class="planning-main" [routerLink]="['/workspace', project().id, 'backlog', 'task', item.id]"><strong>{{ item.title }}</strong><span>{{ item.status }} · {{ priorityLabel(item.priority) }} · {{ item.estimatePoints ?? 0 }} puan</span></a></article>
+          } @empty { <div class="planning-empty"><strong>Bu sprintte iş yok</strong><span>@if (selectedSprint()?.status === 'Planned') { Backlog işlerini sağ ok eylemiyle kapsama alın. } @else { Seçili sprintte görünür iş bulunmuyor. }</span></div> }
+        </div>
+      </section>
+    </div>
+    @if (!canPlan()) { <p class="read-only-note"><zumbo-icon name="eye" /> Bu proje rolü sprint kapsamını salt okunur görüntülüyor.</p> }
+  }
+</section>

@@ -1,0 +1,90 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-buttons slot="start"><ion-back-button defaultHref="/workspace/more"></ion-back-button></ion-buttons>
+    <ion-title>Entegrasyonlar</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content [fullscreen]="true">
+  <ion-refresher slot="fixed" (ionRefresh)="refresh($event)"><ion-refresher-content></ion-refresher-content></ion-refresher>
+  <main [attr.aria-busy]="loading() || busy() !== null">
+    <header class="intro">
+      <p>Kurumsal bağlantılar</p>
+      <h1>Entegrasyonlar</h1>
+      <span>Olay teslimatlarını ve geliştirme sağlayıcılarını güvenli yaşam döngüleriyle yönetin.</span>
+      <button class="refresh" type="button" (click)="reload()" [disabled]="loading() || busy() !== null" aria-label="Entegrasyonları yenile">Yenile</button>
+    </header>
+
+    <nav class="tabs" aria-label="Entegrasyon türleri">
+      <button type="button" [class.active]="tab() === 'webhooks'" [attr.aria-current]="tab() === 'webhooks' ? 'page' : null" (click)="selectTab('webhooks')">Webhook'lar</button>
+      <button type="button" [class.active]="tab() === 'development'" [attr.aria-current]="tab() === 'development' ? 'page' : null" (click)="selectTab('development')">Geliştirme</button>
+    </nav>
+
+    @if (connectivity.offline()) { <p class="feedback warning" role="status">Çevrimdışısınız. Yeni veya değişiklik yapan işlemler bağlantı kurulana kadar kilitli.</p> }
+    @if (error()) { <p class="feedback error" role="alert"><span>{{ error() }}</span><button type="button" (click)="dismissError()">Kapat</button></p> }
+    @if (notice()) { <p class="feedback success" role="status"><span>{{ notice() }}</span><button type="button" (click)="dismissNotice()">Kapat</button></p> }
+    @if (secret(); as receipt) {
+      <section class="secret" aria-labelledby="secret-heading" role="status">
+        <header><div><h2 id="secret-heading">Bu sır yalnızca şimdi gösterilir</h2><span>Güvenli bir yere kaydedin; sayfadan ayrıldığınızda kaldırılır.</span></div><button class="icon" type="button" (click)="dismissSecret()" aria-label="Sır makbuzunu kapat">×</button></header>
+        <code>{{ receipt.secret }}</code>
+        <p>Parmak izi {{ receipt.fingerprint }} · sürüm {{ receipt.version }}</p>
+        <button type="button" (click)="copySecret()">Sırrı kopyala</button>
+      </section>
+    }
+
+    @if (loading()) {
+      <section class="loading" aria-label="Entegrasyonlar yükleniyor"><ion-spinner name="crescent"></ion-spinner><span></span><span></span></section>
+    } @else if (!canManage()) {
+      <section class="state"><h2>Erişim gerekli</h2><p>Bu alanı görüntülemek ve yönetmek için entegrasyon yönetimi yetkisi gerekir.</p></section>
+    } @else if (tab() === 'webhooks') {
+      <section class="metrics" aria-label="Webhook teslimat özeti">
+        <div><small>Sırada</small><strong>{{ metrics()?.pending ?? 0 }}</strong></div><div><small>Gönderiliyor</small><strong>{{ metrics()?.processing ?? 0 }}</strong></div>
+        <div><small>Teslim</small><strong>{{ metrics()?.delivered ?? 0 }}</strong></div><div><small>Müdahale</small><strong>{{ metrics()?.deadLetter ?? 0 }}</strong></div>
+      </section>
+
+      @if (view() === 'webhook-editor') {
+        <section class="section" aria-labelledby="webhook-editor-heading">
+          <header class="section-head"><div><h2 id="webhook-editor-heading">{{ selectedWebhook() ? 'Webhook’u düzenle' : 'Yeni webhook' }}</h2><span>HTTPS uç noktası ve olay kapsamlarını tanımlayın.</span></div><button class="icon" type="button" (click)="closeEditor()" aria-label="Düzenleyiciyi kapat">×</button></header>
+          <form (ngSubmit)="saveWebhook()">
+            <label>Ad<input name="webhookName" [(ngModel)]="webhookDraft.name" maxlength="100" required autocomplete="off"></label>
+            <label>HTTPS uç noktası<input type="url" name="webhookTargetUrl" [(ngModel)]="webhookDraft.targetUrl" maxlength="2048" required autocomplete="url"></label>
+            <fieldset><legend>Olay kapsamları</legend>@for (scope of scopes; track scope.value) { <label class="check"><input type="checkbox" [checked]="scopeSelected(scope.value)" (change)="toggleScope(scope.value)"><span>{{ scope.label }}</span></label> }</fieldset>
+            <div class="actions"><button type="button" (click)="closeEditor()">Vazgeç</button><button class="primary" type="submit" [disabled]="mutationLocked() || !webhookDraft.eventScopes.length">Kaydet</button></div>
+          </form>
+        </section>
+      } @else if (view() === 'webhook-detail' && selectedWebhook(); as selected) {
+        <section class="section detail" aria-labelledby="webhook-detail-heading">
+          <header class="section-head"><div><p>{{ selected.isActive ? 'Etkin' : 'Duraklatıldı' }}</p><h2 id="webhook-detail-heading">{{ selected.name }}</h2><span>{{ safeUrl(selected.targetUrl) }}</span></div><button class="icon" type="button" (click)="editWebhook()" [disabled]="mutationLocked()" aria-label="Webhook’u düzenle">✎</button></header>
+          <div class="tags">@for (scope of selected.eventScopes; track scope) { <span>{{ scopeLabel(scope) }}</span> }</div>
+          <dl><div><dt>Sır parmak izi</dt><dd>{{ selected.secretFingerprint }}</dd></div><div><dt>Sürüm</dt><dd>v{{ selected.secretVersion }}</dd></div></dl>
+          <div class="actions"><button type="button" (click)="testWebhook()" [disabled]="mutationLocked() || !selected.isActive">Test gönder</button><button type="button" (click)="rotateWebhook()" [disabled]="mutationLocked()">Sırrı döndür</button><button [class.danger]="selected.isActive" type="button" (click)="setWebhookActive()" [disabled]="mutationLocked()">{{ selected.isActive ? 'Durdur' : 'Etkinleştir' }}</button></div>
+          <section class="deliveries" aria-labelledby="delivery-heading"><header class="section-head"><div><h3 id="delivery-heading">Son teslimatlar</h3><span>En yeni kayıtlar önce gösterilir.</span></div></header>
+            @for (delivery of deliveries(); track delivery.id) { <article><div><strong>{{ scopeLabel(delivery.eventScope) }}</strong><span>{{ deliveryLabel(delivery.status) }} · {{ delivery.attempts ?? 0 }} deneme</span>@if (deliveryError(delivery.lastErrorCode)) { <small>{{ deliveryError(delivery.lastErrorCode) }}</small> }</div>@if (delivery.status === 'DeadLetter') { <button type="button" (click)="replay(delivery)" [disabled]="mutationLocked()">Yeniden dene</button> }</article> } @empty { <p class="empty">Bu uç nokta için teslimat yok.</p> }
+            @if (nextCursor()) { <button class="more" type="button" (click)="loadMoreDeliveries()" [disabled]="busy() !== null || connectivity.offline()">Daha fazla göster</button> }
+          </section>
+        </section>
+      } @else {
+        <section class="section" aria-labelledby="webhook-list-heading"><header class="section-head"><div><h2 id="webhook-list-heading">Uç noktalar</h2><span>Bir uç nokta seçin veya yeni bir olay akışı ekleyin.</span></div><button class="primary" type="button" (click)="newWebhook()" [disabled]="mutationLocked()">Ekle</button></header>
+          <div class="register-list">@for (webhook of webhooks(); track webhook.id) { <button type="button" (click)="selectWebhook(webhook)"><span><strong>{{ webhook.name }}</strong><small>{{ safeUrl(webhook.targetUrl) }}</small></span><i [class.warning]="!webhook.isActive">{{ webhook.isActive ? 'Etkin' : 'Duraklatıldı' }}</i></button> } @empty { <p class="empty">Henüz webhook yok. İlk olay akışını ekleyin.</p> }</div>
+        </section>
+      }
+    } @else {
+      @if (view() === 'development-editor') {
+        <section class="section" aria-labelledby="development-editor-heading"><header class="section-head"><div><h2 id="development-editor-heading">Yeni bağlantı</h2><span>Sağlayıcı erişimini ve webhook imzasını güvenli biçimde başlatın.</span></div><button class="icon" type="button" (click)="closeDevelopmentEditor()" aria-label="Düzenleyiciyi kapat">×</button></header>
+          <form (ngSubmit)="createDevelopment()"><label>Ad<input name="developmentName" [(ngModel)]="developmentDraft.name" maxlength="100" required autocomplete="off"></label><label>Sağlayıcı<select name="developmentProvider" [ngModel]="developmentDraft.provider" (ngModelChange)="setProvider($event)"><option value="GitHub">GitHub</option><option value="GitLab">GitLab</option></select></label><label>API adresi<input type="url" name="developmentBaseUrl" [(ngModel)]="developmentDraft.baseUrl" required autocomplete="url"></label><label>Erişim anahtarı<input type="password" name="developmentAccessToken" [(ngModel)]="developmentDraft.accessToken" minlength="16" maxlength="512" required autocomplete="new-password"></label><div class="actions"><button type="button" (click)="closeDevelopmentEditor()">Vazgeç</button><button class="primary" type="submit" [disabled]="mutationLocked()">Bağlantı oluştur</button></div></form>
+        </section>
+      } @else if (view() === 'development-detail' && selectedDevelopment(); as selected) {
+        <section class="section detail" aria-labelledby="development-detail-heading"><header class="section-head"><div><p>{{ healthLabel(selected) }}</p><h2 id="development-detail-heading">{{ selected.name }}</h2><span>{{ selected.provider }} · {{ safeUrl(selected.baseUrl) }}</span></div></header>
+          <div class="actions"><button type="button" (click)="checkHealth()" [disabled]="mutationLocked() || !selected.isConnected">Sağlığı denetle</button><button type="button" (click)="rotateDevelopmentSecret()" [disabled]="mutationLocked()">Webhook sırrını döndür</button><button class="danger" type="button" (click)="disconnectDevelopment()" [disabled]="mutationLocked() || !selected.isConnected">Bağlantıyı kes</button><button class="danger" type="button" (click)="deleteDevelopment()" [disabled]="mutationLocked()">Bağlantıyı sil</button></div>
+          <form class="credential" (ngSubmit)="rotateCredential()"><label>Yeni erişim anahtarı<input type="password" name="credential" [(ngModel)]="credentialDraft" minlength="16" maxlength="512" autocomplete="new-password"></label><button type="submit" [disabled]="mutationLocked() || credentialDraft.trim().length < 16">Anahtarı döndür</button></form>
+          <section class="repositories" aria-labelledby="repository-heading"><header class="section-head"><div><h3 id="repository-heading">Repository eşlemeleri</h3><span>{{ repositoryStatus() || 'Eşleme oluşturmak için repository listesini getirin.' }}</span></div><button type="button" (click)="discoverRepositories()" [disabled]="mutationLocked() || !selected.isConnected">Repository’leri getir</button></header>
+            @if (repositories().length) { <form class="mapping" (ngSubmit)="createMapping()"><label>Proje<select name="mappingProject" [(ngModel)]="mappingDraft.projectId" required><option value="">Proje seçin</option>@for (project of projects(); track project.id) { <option [value]="project.id">{{ project.key }} · {{ project.name }}</option> }</select></label><label>Repository<select name="mappingRepository" [(ngModel)]="mappingDraft.repositoryId" required><option value="">Repository seçin</option>@for (repository of repositories(); track repository.externalRepositoryId) { <option [value]="repository.externalRepositoryId">{{ repository.fullName }}</option> }</select></label><button class="primary" type="submit" [disabled]="mutationLocked()">Eşle</button></form> }
+            <div class="mapping-list">@for (mapping of mappings(); track mapping.id) { <article><div><strong>{{ mapping.repositoryFullName }}</strong><span>{{ mapping.projectName || mapping.projectId }} · {{ mapping.defaultBranch }}</span></div><button class="danger" type="button" (click)="deleteMapping(mapping)" [disabled]="mutationLocked()">Kaldır</button></article> } @empty { <p class="empty">Bu bağlantıda henüz proje-repository eşlemesi yok.</p> }</div>
+          </section>
+        </section>
+      } @else {
+        <section class="section" aria-labelledby="development-list-heading"><header class="section-head"><div><h2 id="development-list-heading">Sağlayıcı bağlantıları</h2><span>Geliştirme teslimatlarını proje bağlamına bağlayın.</span></div><button class="primary" type="button" (click)="newDevelopment()" [disabled]="mutationLocked()">Ekle</button></header><div class="register-list">@for (connection of development(); track connection.id) { <button type="button" (click)="selectDevelopment(connection)"><span><strong>{{ connection.name }}</strong><small>{{ connection.provider }} · {{ safeUrl(connection.baseUrl) }}</small></span><i>{{ healthLabel(connection) }}</i></button> } @empty { <p class="empty">Henüz geliştirme sağlayıcısı bağlantısı yok.</p> }</div></section>
+      }
+    }
+  </main>
+</ion-content>

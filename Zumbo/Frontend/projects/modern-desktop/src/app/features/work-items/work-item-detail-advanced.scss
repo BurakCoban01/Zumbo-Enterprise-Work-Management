@@ -1,0 +1,24 @@
+.comment-actions { display: flex; gap: 5px; margin-left: auto; }
+.comment-actions button { display: grid; width: 32px; height: 32px; border: 1px solid var(--line-strong); border-radius: 4px; background: var(--panel); color: var(--ink); place-items: center; }
+.comment-actions .danger { color: var(--danger); }
+.comment-editor { display: grid; gap: 7px; margin-top: 7px; }
+.comment-editor > div { display: flex; justify-content: flex-end; gap: 7px; }
+.comment-editor button { display: inline-flex; min-height: 36px; align-items: center; gap: 6px; border: 1px solid var(--line-strong); border-radius: 4px; background: var(--panel); padding: 0 10px; color: var(--ink); }
+.comment-editor button:last-child { border-color: var(--accent); background: var(--accent); color: var(--accent-contrast); }
+.comments article > div > small { color: var(--muted); font-size: 12px; }
+.comment-history { margin-top: 7px; color: var(--muted); font-size: 12px; }
+.comment-history summary { cursor: pointer; }
+.comment-history p { display: grid; gap: 2px; border-left: 2px solid var(--line-strong); padding-left: 8px; color: var(--muted); }
+.comment-history small { color: var(--muted); font-size: 11px; }
+.planning-fields, .custom-field-form { display: grid; gap: 8px; }
+.planning-fields { grid-template-columns: minmax(0, 1fr) 90px; }
+.custom-field-form label, .planning-fields label { display: grid; gap: 5px; }
+.custom-field-form b { color: var(--danger); }
+.field-message { margin: 7px 0 0; color: var(--muted); font-size: 12px; }
+.field-message.danger { color: var(--danger); }
+@media (max-width: 760px) {
+  .comment-actions button, .comment-editor button { min-width: 44px; min-height: 44px; }
+  .planning-fields { grid-template-columns: 1fr; }
+  .comments header { flex-wrap: wrap; }
+  .comment-actions { margin-left: 0; }
+}

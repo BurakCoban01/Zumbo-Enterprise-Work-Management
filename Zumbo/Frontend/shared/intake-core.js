@@ -49,8 +49,11 @@
     return member ? member.role : null;
   }
 
-  function canManage(role) {
-    return role === 'ProjectOwner' || role === 'ProjectAdmin';
+  function canManage(role, definitions) {
+    var definition = (definitions || []).find(function(item) { return item.name === role && item.isActive !== false; });
+    return !!definition && (definition.permissions || []).some(function(permission) {
+      return permission === '*' || permission === 'BoardManage';
+    });
   }
 
   function keyFromLabel(label, index) {

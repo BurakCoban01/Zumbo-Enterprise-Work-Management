@@ -1,0 +1,19 @@
+<ion-header><ion-toolbar><ion-title>{{project()?.name||'Proje işleri'}}</ion-title></ion-toolbar></ion-header>
+<ion-content [fullscreen]="true">
+  <ion-refresher slot="fixed" (ionRefresh)="refresh($event)"><ion-refresher-content pullingText="Yenile"/></ion-refresher>
+  <main class="work-page">
+    <header class="work-intro"><p>{{project()?.key||'Proje'}}</p><h1>{{project()?.name||'Proje işleri'}}</h1><span>Duruma göre filtreleyin ve işin ayrıntısına geçin.</span></header>
+    <nav class="status-filter" aria-label="İş durumu">
+      <button type="button" [class.active]="!selectedStatus()" (click)="setStatus('')">Tümü</button>
+      @for(status of statuses();track status.name){<button type="button" [class.active]="selectedStatus()===status.name" (click)="setStatus(status.name)">{{status.name}}</button>}
+    </nav>
+    @if(degraded()){<p class="work-state degraded" role="status">Liste geçici olarak sınırlı bir kaynaktan gösteriliyor.</p>}
+    @if(error()){<p class="work-state error" role="alert">{{error()}}</p>}
+    @if(loading()&&!items().length){<p class="work-state" role="status">Proje işleri yükleniyor...</p>}
+    <section class="work-list" aria-label="Proje işleri">
+      @for(item of items();track item.id){<a class="work-card" [routerLink]="['/tasks',item.id]"><span><strong>{{item.title}}</strong><small>{{item.type}} · {{item.status}} · {{item.priority}}</small></span><time>{{date(item.dueDate)}}</time></a>}
+      @empty{<p class="work-state">Bu görünümde iş yok.</p>}
+    </section>
+    @if(hasMore()){<button class="load-more" type="button" (click)="loadMore()" [disabled]="loading()">Daha fazla iş</button>}
+  </main>
+</ion-content>

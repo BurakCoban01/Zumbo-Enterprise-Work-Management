@@ -11,7 +11,7 @@ const desktop = await readFile(resolve(root, 'desktop-bulma/reporting-views.js')
 const desktopHtml = await readFile(resolve(root, 'desktop-bulma/index.html'), 'utf8');
 const mobile = await readFile(resolve(root, 'mobile-ionic/reporting-views.js'), 'utf8');
 const mobileHtml = await readFile(resolve(root, 'mobile-ionic/index.html'), 'utf8');
-const backend = await readFile(resolve(root, '../Backend/src/Zumbo.Modules.WorkItems/WorkItemReports.cs'), 'utf8');
+const backend = await readFile(resolve(root, '../Backend/src/Zumbo.Modules.WorkItems/Application/Features/Reports/StatusDistribution/StatusDistributionPipeline.cs'), 'utf8');
 
 test('report response metadata preserves freshness, source version and stale state', () => {
   const values = {
@@ -73,5 +73,5 @@ test('desktop and mobile expose freshness, drill-down, tables and permission-sco
   assert.doesNotMatch(mobile, /projectId: vm\.project\.id/);
   assert.match(mobileHtml, /templates\/project-reporting\.html/);
   assert.match(mobileHtml, /aria-label="Mobil içgörü görünümü"/);
-  assert.match(backend, /EnsurePermissionAsync\(projectId, "WorkItemView", ct\)/);
+  assert.match(backend, /EnsurePermissionAsync\(query\.ProjectId, PermissionCatalog\.WorkItemView, ct\)/);
 });

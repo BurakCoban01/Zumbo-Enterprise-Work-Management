@@ -68,9 +68,21 @@ test('audit projection redacts marked values and bounds visible payloads', () =>
   assert.doesNotMatch(JSON.stringify(changes), /old-secret|new-secret/);
 });
 
+test('audit presentation localizes known action keys without leaking enum labels', () => {
+  assert.equal(core.auditActionLabel('ProjectMemberAdded'), 'Proje üyesi eklendi');
+  assert.equal(core.auditActionLabel('WorkItemMoved'), 'İş taşındı');
+  assert.equal(core.auditActionLabel(null), 'Bilinmeyen olay');
+  assert.doesNotMatch(mobileHtml, /\{\{entry\.action\}\}/);
+  assert.match(mobileHtml, /vm\.auditActionLabel\(entry\.action\)/);
+});
+
 test('audit role and integrity states do not overclaim access or empty history', () => {
   assert.equal(core.hasPermission({ roles: ['OrganizationAdmin'] }, [], 'AuditReadAll'), false);
-  assert.equal(core.hasPermission({ roles: ['AuditReader'] }, [], 'AuditReadAll'), true);
+  assert.equal(core.hasPermission(
+    { roles: ['AuditReader'] },
+    [{ name: 'AuditReader', permissions: ['AuditReadAll'] }],
+    'AuditReadAll'
+  ), true);
   assert.equal(core.hasPermission(
     { roles: ['Compliance'] },
     [{ name: 'Compliance', permissions: ['AuditReadAll'] }],

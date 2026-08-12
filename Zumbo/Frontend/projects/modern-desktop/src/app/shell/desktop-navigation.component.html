@@ -1,0 +1,32 @@
+<nav aria-label="Ana navigasyon">
+  @for (group of groups; track group.label) {
+    <section class="nav-group">
+      <h2>{{ group.label }}</h2>
+      @for (item of group.items; track item.section) {
+        @if (item.section !== 'audit' || showAudit()) {
+          <a class="nav-item" [routerLink]="routeFor(item)" [class.active]="isActive(item)" [attr.aria-current]="isActive(item) ? 'page' : null" [title]="item.label">
+            <zumbo-icon [name]="item.icon" />
+            <span class="nav-label">{{ item.label }}</span>
+            @if (item.section === 'inbox' && unreadCount()) { <span class="nav-count">{{ unreadCount() }}</span> }
+          </a>
+        }
+      }
+    </section>
+  }
+</nav>
+@if (favorites().length) {
+  <section class="project-shortcuts">
+    <h2>Favoriler</h2>
+    @for (project of favorites().slice(0, 3); track project.id) {
+      <a [routerLink]="['/workspace', project.id, 'overview']">{{ project.name }}</a>
+    }
+  </section>
+}
+@if (recentProjects().length) {
+  <section class="project-shortcuts">
+    <h2>Son projeler</h2>
+    @for (project of recentProjects().slice(0, 3); track project.id) {
+      <a [routerLink]="['/workspace', project.id, 'overview']">{{ project.name }}</a>
+    }
+  </section>
+}

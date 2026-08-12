@@ -38,7 +38,7 @@ test('sprint yasam dongusu gercek create plan unplan start complete komutlarini 
 });
 
 test('sprint komutlari viewer icin istemci tarafinda gizlenir ve API yetkisi esas kalir', () => {
-  assert.match(planning, /vm\.projectMembership\.role !== 'Viewer'/);
+  assert.match(planning, /projectRoleHasPermission\(vm\.projectMembership\.role, 'WorkItemMove'\)/);
   assert.match(desktopHtml, /ng-if="vm\.canPlanSprint\(\)[^"]*"/);
   assert.doesNotMatch(planning, /permission\s*=|role\s*=\s*'ProjectOwner'/);
 });

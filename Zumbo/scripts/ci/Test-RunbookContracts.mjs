@@ -70,7 +70,7 @@ try {
 
   const apiHealthRegistration = readFileSync(resolve(
     repositoryRoot,
-    'Backend/src/Zumbo.Api/Composition/Hosting/ApiHostRegistration/AddZumboHost/ApiHostRegistration.ConfigureBackgroundJobsAndHealth.cs'
+    'Backend/src/Zumbo.Api/Composition/Hosting/Registrars/ApiHostOperationsRegistrar.cs'
   ), 'utf8');
   assert.match(apiHealthRegistration, /GetValue\("HealthChecks:DependencyTimeoutSeconds", 5\)/);
   assert.match(apiHealthRegistration, /dependencyHealthTimeoutSeconds is < 1 or > 120/);

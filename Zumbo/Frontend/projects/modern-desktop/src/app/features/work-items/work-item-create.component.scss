@@ -1,0 +1,17 @@
+:host { display: block; }
+.work-create-trigger { display: inline-flex; min-height: 38px; align-items: center; gap: 7px; border: 1px solid var(--accent); border-radius: 5px; background: var(--accent); padding: 0 12px; color: var(--accent-contrast); white-space: nowrap; }
+.work-create-backdrop { position: fixed; z-index: var(--z-overlay); inset: 0; display: grid; place-items: center; background: rgb(10 20 24 / 50%); padding: 16px; }
+.work-create-dialog { width: min(620px, 100%); border: 1px solid var(--line); border-radius: 8px; background: var(--panel); box-shadow: var(--elevation-overlay); padding: 16px; }
+.work-create-dialog header, .work-create-dialog footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.work-create-dialog h2 { margin: 2px 0 0; color: var(--ink); font-size: 20px; }
+.work-create-dialog header button { display: grid; width: 38px; height: 38px; border: 1px solid var(--line); border-radius: 4px; background: transparent; color: var(--muted); place-items: center; }
+.work-create-dialog > label { display: grid; gap: 5px; margin-top: 16px; }
+.work-create-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px; }
+.work-create-grid label { display: grid; gap: 5px; }
+.work-create-dialog label span { color: var(--muted); font-size: 12px; }
+.work-create-dialog input, .work-create-dialog select { width: 100%; min-height: 40px; border: 1px solid var(--line-strong); border-radius: 4px; background: var(--panel); padding: 0 10px; color: var(--ink); }
+.work-create-error { margin: 12px 0 0; border-left: 3px solid var(--danger); padding: 8px 10px; color: var(--danger); font-size: 12px; }
+.work-create-dialog footer { justify-content: end; margin-top: 16px; }
+.work-create-dialog footer button { display: inline-flex; min-height: 40px; align-items: center; gap: 7px; border: 1px solid var(--line-strong); border-radius: 4px; background: var(--panel); padding: 0 14px; color: var(--ink); }
+.work-create-dialog footer .primary { border-color: var(--accent); background: var(--accent); color: var(--accent-contrast); }
+@media (max-width: 760px) { .work-create-trigger { width: 44px; min-height: 44px; justify-content: center; padding: 0; } .work-create-trigger span { display: none; } .work-create-grid { grid-template-columns: 1fr; } .work-create-dialog { max-height: calc(100dvh - 24px); overflow-y: auto; } .work-create-dialog header button, .work-create-dialog footer button { min-height: 44px; } }

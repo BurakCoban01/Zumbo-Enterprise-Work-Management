@@ -7,19 +7,26 @@ import { fileURLToPath } from 'node:url';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const read = relativePath => fs.readFileSync(path.join(root, relativePath), 'utf8');
 
-const workflow = read('Backend/src/Zumbo.Modules.Workflows/WorkflowsModule.cs');
-const workflowPolicy = read('Backend/src/Zumbo.Modules.Workflows/WorkflowRetentionPolicy.cs');
-const workflowContracts = read('Backend/src/Zumbo.Modules.Workflows/Features/RepresentativeWorkflowSlices.cs');
-const goals = read('Backend/src/Zumbo.Modules.Projects/GoalService.cs');
-const portfolios = read('Backend/src/Zumbo.Modules.Projects/PortfolioService.cs');
+const workflow = read('Backend/src/Zumbo.Modules.Workflows/Application/Compatibility/WorkflowDefinitions/WorkflowService.cs');
+const workflowPolicy = read('Backend/src/Zumbo.Modules.Workflows/Application/Policies/WorkflowDefinitions/WorkflowRetentionPolicy.cs');
+const workflowContracts = read('Backend/src/Zumbo.Modules.Workflows/Application/Features/WorkflowDefinitions/WorkflowResponse.cs');
+const goals = read('Backend/src/Zumbo.Modules.Projects/Application/Compatibility/Goals/GoalService/MappingSupport.cs');
+const portfolios = read('Backend/src/Zumbo.Modules.Projects/Application/Compatibility/Portfolio/PortfolioService/MappingSupport.cs');
+const goalContracts = [
+  read('Backend/src/Zumbo.Modules.Projects/Application/Features/Goals/GoalResponse.cs'),
+  read('Backend/src/Zumbo.Modules.Projects/Application/Features/Goals/KeyResultResponse.cs')
+].join('\n');
+const portfolioContracts = read('Backend/src/Zumbo.Modules.Projects/Application/Features/Portfolio/InitiativeResponse.cs');
 const developmentDocuments = read(
-  'Backend/src/Zumbo.Modules.WorkItems/DevelopmentIntegrationDocuments.cs');
+  'Backend/src/Zumbo.Modules.WorkItems/Domain/DevelopmentIntegrations/DevelopmentIntegrationLimits.cs');
 const developmentSecurity = read(
-  'Backend/src/Zumbo.Modules.WorkItems/DevelopmentWebhookSecurity.cs');
+  'Backend/src/Zumbo.Modules.WorkItems/Application/Features/Webhooks/DevelopmentWebhookSecurity.cs');
 const developmentService = read(
-  'Backend/src/Zumbo.Modules.WorkItems/DevelopmentIntegrationService.cs');
-const developmentReferencePolicy = read(
-  'Backend/src/Zumbo.Modules.WorkItems/DevelopmentWebhookReferencePolicy.cs');
+  'Backend/src/Zumbo.Modules.WorkItems/Application/Compatibility/DevelopmentIntegrations/DevelopmentIntegrationService/DevelopmentIntegrationService.ResolveReferencedWorkItemsAsync.cs');
+const developmentReferencePolicy = [
+  read('Backend/src/Zumbo.Modules.WorkItems/Application/Features/Webhooks/DevelopmentWebhookReferencePolicy.cs'),
+  read('Backend/src/Zumbo.Modules.WorkItems/Application/Features/Webhooks/DevelopmentWebhookReferenceLimitException.cs')
+].join('\n');
 const desktop = read('Frontend/desktop-bulma/index.html');
 const mobile = read('Frontend/mobile-ionic/index.html');
 
@@ -46,9 +53,9 @@ test('capped product histories use named policies instead of silent literal trun
 
 test('retention limits are explicit in API contracts and desktop/mobile history surfaces', () => {
   assert.match(workflowContracts, /PublishedVersionRetentionLimit/);
-  assert.match(goals, /StatusUpdateRetentionLimit/);
-  assert.match(goals, /ProgressUpdateRetentionLimit/);
-  assert.match(portfolios, /StatusUpdateRetentionLimit/);
+  assert.match(goalContracts, /StatusUpdateRetentionLimit/);
+  assert.match(goalContracts, /ProgressUpdateRetentionLimit/);
+  assert.match(portfolioContracts, /StatusUpdateRetentionLimit/);
   assert.match(desktop, /publishedVersionRetentionLimit/);
   assert.match(desktop, /statusUpdateRetentionLimit/);
   assert.match(desktop, /progressUpdateRetentionLimit/);

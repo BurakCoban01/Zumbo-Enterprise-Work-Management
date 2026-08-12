@@ -1,0 +1,4 @@
+export type SettingsTab = 'account' | 'organization' | 'access' | 'integrations' | 'operations';
+export interface SettingsContext { readonly id: string; readonly username: string; readonly email: string; readonly organizationId: string; readonly roleNames: readonly string[]; }
+export interface SettingsRole { readonly id:string;readonly name:string;readonly displayName?:string|null;readonly description?:string|null;readonly scope:string;readonly organizationId?:string|null;readonly isSystem:boolean;readonly isActive:boolean;readonly isProtected:boolean;readonly isDefault:boolean;readonly displayOrder:number;readonly permissions:readonly string[];readonly version:number; }
+export interface PermissionDefinition { readonly key:string;readonly label:string;readonly description:string;readonly category:string;readonly scope:string;readonly displayOrder:number;readonly isActive:boolean;readonly version:number; }

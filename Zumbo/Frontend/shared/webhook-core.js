@@ -92,10 +92,9 @@
 
   function hasPermission(user, roles) {
     var names = (user && user.roles) || [];
-    if (names.indexOf('SystemAdmin') >= 0 || names.indexOf('OrganizationAdmin') >= 0) return true;
     return (roles || []).some(function(role) {
       var permissions = role.permissions || [];
-      return names.indexOf(role.name) >= 0
+      return role.isActive !== false && names.indexOf(role.name) >= 0
         && (permissions.indexOf('*') >= 0 || permissions.indexOf('IntegrationManage') >= 0);
     });
   }

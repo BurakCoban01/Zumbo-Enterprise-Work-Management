@@ -26,8 +26,14 @@
     'privacy.workflow.requested.v1': 'Gizlilik iş akışı olayı'
   });
 
-  function hasPermission(user) {
-    return !!(user && (user.roles || []).indexOf('SystemAdmin') >= 0);
+  function hasPermission(user, roles) {
+    var assigned = user && user.roles || [];
+    return (roles || []).some(function(role) {
+      return role.isActive !== false && assigned.indexOf(role.name) >= 0
+        && (role.permissions || []).some(function(permission) {
+          return permission === '*' || permission === 'OperationsManage';
+        });
+    });
   }
 
   function dependencyLabel(value) {

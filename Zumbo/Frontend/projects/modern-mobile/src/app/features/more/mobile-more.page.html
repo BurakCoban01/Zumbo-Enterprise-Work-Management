@@ -1,0 +1,40 @@
+<ion-header><ion-toolbar><ion-title>Daha fazla</ion-title></ion-toolbar></ion-header>
+<ion-content [fullscreen]="true">
+  <main>
+    <header>
+      <span class="avatar">{{session.currentUser()?.username?.slice(0,1)?.toUpperCase()}}</span>
+      <div><h1>{{session.currentUser()?.username}}</h1><p>{{session.currentUser()?.email}}</p></div>
+    </header>
+    <section>
+      <h2>Çalışma alanı</h2>
+      <a routerLink="/workspace/projects">
+        <ion-icon name="folder-open-outline"/>
+        <span><strong>Projeler</strong><small>{{store.projects().length}} erişilebilir proje</small></span>
+        <ion-icon name="chevron-forward-outline"/>
+      </a>
+      <a routerLink="/workspace/search">
+        <ion-icon name="search-outline"/>
+        <span><strong>Arama</strong><small>Proje kapsamındaki işlere ulaşın</small></span>
+        <ion-icon name="chevron-forward-outline"/>
+      </a>
+      <a routerLink="/workspace/teams"><ion-icon name="people-outline"/><span><strong>Ekipler</strong><small>Üyelikler, davetler ve ekip bağlamı</small></span><ion-icon name="chevron-forward-outline"/></a>
+    </section>
+    <section>
+      <h2>Planlama ve bilgi</h2>
+      <a routerLink="/workspace/portfolios"><ion-icon name="layers-outline"/><span><strong>Portföyler</strong><small>Stratejik teslimat ve bağımlılıklar</small></span><ion-icon name="chevron-forward-outline"/></a>
+      <a routerLink="/workspace/goals"><ion-icon name="flag-outline"/><span><strong>Hedefler</strong><small>Anahtar sonuçlar ve ilerleme</small></span><ion-icon name="chevron-forward-outline"/></a>
+      <a routerLink="/workspace/capacity"><ion-icon name="people-outline"/><span><strong>Kapasite</strong><small>Kişi yükü ve proje tahsisleri</small></span><ion-icon name="chevron-forward-outline"/></a>
+      <a routerLink="/workspace/knowledge"><ion-icon name="book-outline"/><span><strong>Bilgi</strong><small>Kararlar, runbook'lar ve yorumlar</small></span><ion-icon name="chevron-forward-outline"/></a>
+    </section>
+    <section>
+      <h2>Hesap</h2>
+      <a routerLink="/workspace/account">
+        <ion-icon name="person-circle-outline"/>
+        <span><strong>Hesap ve güvenlik</strong><small>Parola, bildirimler, cihazlar ve veri tercihleri</small></span>
+        <ion-icon name="chevron-forward-outline"/>
+      </a>
+    </section>
+    @if (canIntegrations() || canOperations()) { <section><h2>Yönetim</h2>@if (canIntegrations()) { <a routerLink="/workspace/integrations"><ion-icon name="link-outline"/><span><strong>Entegrasyonlar</strong><small>Webhook ve geliştirme bağlantıları</small></span><ion-icon name="chevron-forward-outline"/></a> }@if (canOperations()) { <a routerLink="/workspace/operations"><ion-icon name="server-outline"/><span><strong>Operasyonlar</strong><small>Sistem sağlığı ve müdahale kuyrukları</small></span><ion-icon name="chevron-forward-outline"/></a> }</section> }
+    <section><h2>Oturum</h2><button type="button" (click)="logout()"><ion-icon name="log-out-outline"/><span>Çıkış yap</span></button></section>
+  </main>
+</ion-content>

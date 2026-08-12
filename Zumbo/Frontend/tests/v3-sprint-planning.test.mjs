@@ -71,6 +71,9 @@ function model(apiOverrides = {}) {
   };
   const vm = {
     project: { id: 'project-1' }, projectMembership: { role: 'ProjectOwner' },
+    projectRoleHasPermission(roleName, permission) {
+      return roleName === 'ProjectOwner' && permission === 'WorkItemMove';
+    },
     tasks: [task], backlogItems: [task], sprints: [sprint], velocity: [
       { completedPoints: 8 }, { completedPoints: 13 }, { completedPoints: 13 }
     ],
@@ -96,6 +99,17 @@ test('planning capacity uses the last completed velocity points and current plan
   vm.tasks.push({ id: 'work-2', estimatePoints: 8, sprintId: 'sprint-1' });
   vm.selectPlanningSprint();
   assert.equal(vm.capacityState(), 'over');
+});
+
+test('status distribution reconciliation applies a stale delta once and accepts an already fresh report', () => {
+  const { vm } = model();
+  const before = [{ status: 'To Do', count: 3 }];
+  vm.statusDistribution = angular.copy(before);
+  vm.reconcileStatusDistribution('To Do', 'Doğrulama', before);
+  assert.deepEqual(vm.statusDistribution.map(item => [item.status, item.count]), [['To Do', 2], ['Doğrulama', 1]]);
+
+  vm.reconcileStatusDistribution('To Do', 'Doğrulama', before);
+  assert.deepEqual(vm.statusDistribution.map(item => [item.status, item.count]), [['To Do', 2], ['Doğrulama', 1]]);
 });
 
 test('plan conflict rolls optimistic scope back and reloads authoritative state', async () => {
@@ -150,8 +164,11 @@ test('mobile surface provides permission-aware essential sprint lifecycle parity
   for (const method of ['openCreateSprint', 'planBacklogItem', 'unplanSprintItem', 'startSprint', 'completeSprint']) {
     assert.match(mobileTasks, new RegExp(`vm\\.${method} = function`));
   }
-  assert.match(mobileTasks, /membership\.role !== 'Viewer'/);
+  assert.match(mobileTasks, /hasProjectPermission\(membership\.role, 'WorkItemUpdate'\)/);
+  assert.match(mobileTasks, /zumboApi\.workflow\(projectId\)/);
   assert.match(mobileHtml, /templates\/create-sprint\.html/);
   assert.match(mobileHtml, /vm\.canEditTasks\(\) && vm\.selectedSprint\(\)\.status === 'Planned'/);
+  assert.match(mobileHtml, /vm\.statusOptions\(\)/);
+  assert.doesNotMatch(mobileHtml, /vm\.filter\('To Do'\)|vm\.filter\('In Progress'\)|vm\.filter\('Done'\)/);
   assert.match(mobileHtml, /vm\.carryoverTargets\(\)/);
 });

@@ -10,4 +10,13 @@ public interface IWorkItemNotificationPublisher
         string message,
         CancellationToken ct,
         string? deduplicationKey = null);
+
+    Task NotifyWithSourceAsync(
+        string userId,
+        string type,
+        string message,
+        CancellationToken ct,
+        string? deduplicationKey = null,
+        string? sourceId = null,
+        string? projectId = null);
 }

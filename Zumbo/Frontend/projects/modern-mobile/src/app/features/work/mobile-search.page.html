@@ -1,0 +1,20 @@
+<ion-header><ion-toolbar><ion-title>Arama</ion-title></ion-toolbar></ion-header>
+<ion-content [fullscreen]="true">
+  <main class="work-page">
+    <header class="work-intro"><p>Hızlı erişim</p><h1>İş ara</h1><span>Bir proje seçip başlık veya içerikte arayın.</span></header>
+    <form class="search-form" (ngSubmit)="search()">
+      <label><span>Proje</span><select name="project" [(ngModel)]="projectId" (ngModelChange)="changeProject()" aria-label="Arama projesi">@for(item of store.projects();track item.id){<option [value]="item.id">{{item.key}} · {{item.name}}</option>}</select></label>
+      <label class="query"><span class="sr-only">İşlerde ara</span><input name="query" type="search" [(ngModel)]="query" minlength="2" maxlength="120" placeholder="Başlık veya içerik ara" autocomplete="off" enterkeyhint="search"><button type="button" (click)="clear()" [hidden]="!query" aria-label="Aramayı temizle">×</button></label>
+      <button class="submit" type="submit" [disabled]="loading()">{{loading()?'Aranıyor':'Ara'}}</button>
+    </form>
+    @if(degraded()){<p class="work-state degraded" role="status">Arama geçici olarak sınırlı. Sonuçlar güvenli yedek görünümden gösteriliyor.</p>}
+    @if(error()){<p class="work-state error" role="alert">{{error()}}</p>}
+    @if(loading()&&!items().length){<p class="work-state" role="status">Sonuçlar aranıyor...</p>}
+    @if(items().length){
+      <section class="work-list" aria-label="Arama sonuçları">
+        @for(item of items();track item.id){<a class="work-card" [routerLink]="['/tasks',item.id]"><span><strong>{{item.title}}</strong><small>{{item.type}} · {{item.status}} · {{item.priority}}</small></span><time>{{date(item.dueDate)}}</time></a>}
+      </section>
+      @if(hasMore()){<button class="load-more" type="button" (click)="loadMore()" [disabled]="loading()">Daha fazla sonuç</button>}
+    }@else if(searched()&&!loading()&&!error()){<p class="work-state">Sonuç bulunamadı. Daha genel bir ifadeyle yeniden arayın.</p>}
+  </main>
+</ion-content>

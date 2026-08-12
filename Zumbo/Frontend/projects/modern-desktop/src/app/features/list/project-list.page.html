@@ -1,0 +1,113 @@
+<section class="project-list" [attr.data-density]="preferences().density" aria-labelledby="list-title">
+  <header class="list-heading">
+    <div><p class="zumbo-kicker">{{ project().key }} · İş öğeleri</p><h2 id="list-title">Liste</h2></div>
+    <div class="list-context"><strong>{{ visibleTasks().length }}</strong><span>görünen satır</span></div>
+  </header>
+
+  <section class="list-toolbar" aria-label="Liste araçları">
+    @if (boards().length > 1) {
+      <label><span>Pano</span><select [value]="board()?.id" (change)="selectBoard($event)">@for (item of boards(); track item.id) { <option [value]="item.id">{{ item.name }}</option> }</select></label>
+    }
+    <label class="list-search"><zumbo-icon name="search" /><input type="search" [value]="query()" (input)="setQuery($event)" placeholder="İş öğelerinde ara" aria-label="İş öğelerinde ara"></label>
+    <label><span>Öncelik</span><select [value]="priority()" (change)="setPriority($event)"><option value="">Tümü</option><option value="Critical">Kritik</option><option value="High">Yüksek</option><option value="Medium">Orta</option><option value="Low">Düşük</option></select></label>
+    <div class="density-switch" role="group" aria-label="Satır yoğunluğu">
+      <button type="button" [class.active]="preferences().density === 'comfortable'" (click)="setDensity('comfortable')" title="Rahat görünüm" aria-label="Rahat görünüm"><zumbo-icon name="rows" /></button>
+      <button type="button" [class.active]="preferences().density === 'compact'" (click)="setDensity('compact')" title="Sıkı görünüm" aria-label="Sıkı görünüm"><zumbo-icon name="list" /></button>
+    </div>
+    <div class="column-control">
+      <button class="icon-tool" type="button" (click)="columnMenuOpen.set(!columnMenuOpen())" [attr.aria-expanded]="columnMenuOpen()" title="Sütunları düzenle" aria-label="Sütunları düzenle"><zumbo-icon name="columns" /></button>
+      @if (columnMenuOpen()) {
+        <div class="column-menu" role="group" aria-label="Görünür sütunlar">
+          <strong>Sütunlar</strong>
+          <label><input type="checkbox" [checked]="columnVisible('status')" (change)="toggleColumn('status')"> Durum</label>
+          <label><input type="checkbox" [checked]="columnVisible('priority')" (change)="toggleColumn('priority')"> Öncelik</label>
+          <label><input type="checkbox" [checked]="columnVisible('assignee')" (change)="toggleColumn('assignee')"> Atanan</label>
+          <label><input type="checkbox" [checked]="columnVisible('dueDate')" (change)="toggleColumn('dueDate')"> Bitiş tarihi</label>
+          <label><input type="checkbox" [checked]="columnVisible('estimate')" (change)="toggleColumn('estimate')"> Efor</label>
+        </div>
+      }
+    </div>
+    <button class="icon-tool" type="button" (click)="load()" [disabled]="loading()" title="Listeyi yenile" aria-label="Listeyi yenile"><zumbo-icon name="refresh" /></button>
+  </section>
+
+  @if (selectedIds().length && canEdit()) {
+    <section class="bulk-toolbar" aria-label="Toplu işlemler">
+      <strong>{{ selectedIds().length }} seçili</strong>
+      @if (canMove() && bulkTransitionOptions().length) {
+        <label><span>Yeni durum</span><select [value]="bulkTargetStatus()" (change)="bulkTargetStatus.set($any($event.target).value)"><option value="">Durum seç</option>@for (status of bulkTransitionOptions(); track status) { <option [value]="status">{{ status }}</option> }</select></label>
+        <button type="button" (click)="bulkMove()" [disabled]="!bulkTransitionOptions().includes(bulkTargetStatus()) || pending()">Taşı</button>
+      }
+      @if (canAssign()) { <button type="button" (click)="bulkAssignToMe()" [disabled]="pending()"><zumbo-icon name="users" /> Bana ata</button> }
+      @if (canArchive()) { <button class="danger-action" type="button" (click)="bulkArchive()" [disabled]="pending()"><zumbo-icon name="archive" /> Arşivle</button> }
+      <button class="icon-tool clear-selection" type="button" (click)="clearSelection()" aria-label="Seçimi temizle" title="Seçimi temizle"><zumbo-icon name="x" /></button>
+    </section>
+  }
+
+  @if (notice()) { <div class="list-notice" role="status"><span>{{ notice() }}</span><button type="button" (click)="notice.set(null)" aria-label="Bildirimi kapat"><zumbo-icon name="x" /></button></div> }
+  @if (data()?.degraded) { <p class="list-degraded" role="status">Arama hizmeti sınırlı; iş öğeleri güvenli yedek kaynaktan gösteriliyor.</p> }
+  @if (error()) { <div class="list-error" role="alert"><span>{{ error() }}</span><button type="button" (click)="load()">Yeniden dene</button></div> }
+
+  @if (loading() && !data()) {
+    <div class="list-loading" role="status" aria-label="Liste yükleniyor"><span class="zumbo-skeleton"></span><span class="zumbo-skeleton"></span><span class="zumbo-skeleton"></span></div>
+  } @else if (!board()) {
+    <div class="list-empty"><strong>Bu projede pano yok</strong><p>İş öğelerini listelemek için projede bir pano gerekir.</p></div>
+  } @else if (!error()) {
+    <div class="list-table-scroll">
+      <table>
+        <thead><tr>
+          @if (canEdit()) { <th class="select-cell"><input type="checkbox" [checked]="allVisibleSelected()" (change)="toggleAllVisible()" aria-label="Görünen satırların tümünü seç"></th> }
+          <th><button type="button" (click)="sortBy('title')">İş öğesi <span>{{ sortLabel('title') }}</span></button></th>
+          @if (columnVisible('status')) { <th><button type="button" (click)="sortBy('status')">Durum <span>{{ sortLabel('status') }}</span></button></th> }
+          @if (columnVisible('priority')) { <th><button type="button" (click)="sortBy('priority')">Öncelik <span>{{ sortLabel('priority') }}</span></button></th> }
+          @if (columnVisible('assignee')) { <th><button type="button" (click)="sortBy('assignee')">Atanan <span>{{ sortLabel('assignee') }}</span></button></th> }
+          @if (columnVisible('dueDate')) { <th><button type="button" (click)="sortBy('dueDate')">Bitiş tarihi <span>{{ sortLabel('dueDate') }}</span></button></th> }
+          @if (columnVisible('estimate')) { <th>Efor</th> }
+          <th class="action-cell"><span class="visually-hidden">Eylemler</span></th>
+        </tr></thead>
+        <tbody>
+          @for (task of visibleTasks(); track task.id) {
+            <tr [class.selected]="selected().has(task.id)" [class.pending]="pending() && editTaskId() === task.id">
+              @if (canEdit()) { <td class="select-cell" data-label="Seç"><input type="checkbox" [checked]="selected().has(task.id)" (change)="toggleTask(task.id)" [attr.aria-label]="task.title + ' satırını seç'"></td> }
+              <td class="title-cell" data-label="İş öğesi">
+                @if (editTaskId() === task.id && editDraft(); as draft) {
+                  <input class="inline-title" type="text" [value]="draft.title" (input)="updateDraft('title', $event)" [attr.aria-label]="task.title + ' başlığını düzenle'">
+                } @else {
+                  <a [routerLink]="['/workspace', project().id, 'list', 'task', task.id]">{{ task.title }}</a><span>{{ task.type }}</span>
+                }
+              </td>
+              @if (columnVisible('status')) { <td data-label="Durum"><span class="status-chip">{{ task.status }}</span></td> }
+              @if (columnVisible('priority')) {
+                <td data-label="Öncelik">
+                  @if (editTaskId() === task.id && editDraft(); as draft) {
+                    <select [value]="draft.priority" (change)="updateDraft('priority', $event)" aria-label="Öncelik"><option value="Critical">Kritik</option><option value="High">Yüksek</option><option value="Medium">Orta</option><option value="Low">Düşük</option></select>
+                  } @else { <span class="priority-chip" [attr.data-priority]="task.priority">{{ priorityLabel(task.priority) }}</span> }
+                </td>
+              }
+              @if (columnVisible('assignee')) { <td data-label="Atanan">{{ userName(task.assigneeUserId) }}</td> }
+              @if (columnVisible('dueDate')) {
+                <td data-label="Bitiş tarihi">
+                  @if (editTaskId() === task.id && editDraft(); as draft) { <input type="date" [value]="draft.dueDate" (input)="updateDraft('dueDate', $event)" aria-label="Bitiş tarihi"> }
+                  @else { <span [class.muted-value]="!task.dueDate">{{ formatDate(task.dueDate) }}</span> }
+                </td>
+              }
+              @if (columnVisible('estimate')) { <td data-label="Efor">{{ task.estimatePoints == null ? '—' : task.estimatePoints + ' puan' }}</td> }
+              <td class="action-cell" data-label="Eylemler">
+                @if (editTaskId() === task.id) {
+                  <button type="button" (click)="saveEdit(task)" [disabled]="pending() || !editDraft()?.title?.trim()" title="Kaydet" aria-label="Satırı kaydet"><zumbo-icon name="save" /></button>
+                  <button type="button" (click)="cancelEdit()" [disabled]="pending()" title="İptal" aria-label="Düzenlemeyi iptal"><zumbo-icon name="x" /></button>
+                } @else if (canEdit()) {
+                  <button type="button" (click)="startEdit(task)" [disabled]="pending()" title="Satırı düzenle" [attr.aria-label]="task.title + ' satırını düzenle'"><zumbo-icon name="edit" /></button>
+                } @else {
+                  <a [routerLink]="['/workspace', project().id, 'list', 'task', task.id]" title="İş öğesini aç" [attr.aria-label]="task.title + ' iş öğesini aç'"><zumbo-icon name="eye" /></a>
+                }
+              </td>
+            </tr>
+          } @empty {
+            <tr><td class="empty-row" [attr.colspan]="8"><strong>Eşleşen iş öğesi yok</strong><span>Arama veya filtreleri değiştirin.</span></td></tr>
+          }
+        </tbody>
+      </table>
+    </div>
+    @if (data() && data()!.totalCount > data()!.tasks.length) { <p class="list-page-note">İlk {{ data()!.tasks.length }} / {{ data()!.totalCount }} iş öğesi gösteriliyor.</p> }
+  }
+</section>

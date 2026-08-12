@@ -220,8 +220,9 @@ internal sealed class CreateWorkItemSlice(
         await PublishRealtimeAsync("created", workItem, correlationId, ct);
         if (!string.IsNullOrWhiteSpace(workItem.AssigneeUserId))
         {
-            await notifications.NotifyAsync(
-                workItem.AssigneeUserId, "Assignment", $"Assigned to {workItem.Title}", ct);
+            await notifications.NotifyWithSourceAsync(
+                workItem.AssigneeUserId, "Assignment", $"Assigned to {workItem.Title}", ct,
+                sourceId: workItem.Id, projectId: workItem.ProjectId);
         }
 
         await cacheInvalidationPublisher.InvalidateProjectAsync(workItem.ProjectId, ct);

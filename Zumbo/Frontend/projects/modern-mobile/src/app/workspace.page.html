@@ -1,0 +1,19 @@
+<ion-header><ion-toolbar><ion-title>Projeler</ion-title></ion-toolbar></ion-header>
+<ion-content [fullscreen]="true">
+  <ion-refresher slot="fixed" (ionRefresh)="refresh($event)"><ion-refresher-content pullingText="Yenile"/></ion-refresher>
+  <main class="mobile-workspace">
+    <header class="mobile-heading">
+      <div><p>Çalışma alanı</p><h1>Projeler</h1><span>İşlerinizi proje bağlamında bulun.</span></div>
+      <input type="search" placeholder="Proje ara" aria-label="Proje ara" [ngModel]="query()" (ngModelChange)="query.set($event)">
+    </header>
+    @if(store.loading()&&!store.ready()){<p class="mobile-state" role="status">Projeler yükleniyor...</p>}
+    @if(store.error()){<p class="mobile-state is-error" role="alert">{{store.error()}}</p>}
+    <section class="project-list" aria-label="Projeler">
+      @for(project of visible();track project.id){
+        <a class="project-row" [routerLink]="['/workspace/projects',project.id]">
+          <span><small>{{project.key}}</small><strong>{{project.name}}</strong></span><b>Projeyi aç</b>
+        </a>
+      }@empty{<p class="mobile-state">Aramanızla eşleşen proje yok.</p>}
+    </section>
+  </main>
+</ion-content>

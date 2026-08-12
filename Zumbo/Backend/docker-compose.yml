@@ -32,6 +32,7 @@ services:
       RateLimiting__Redis__ConnectionString: redis:6379,abortConnect=false
       RateLimiting__ApiPermitLimit: 1000
       Cors__AllowedOrigins__0: ${ZUMBO_FRONTEND_URL:-http://127.0.0.1:58177}
+      Cors__AllowedOrigins__1: ${ZUMBO_MODERN_FRONTEND_URL:-http://127.0.0.1:58178}
       PasswordReset__FrontendResetUrl: ${ZUMBO_FRONTEND_URL:-http://127.0.0.1:58177}/#/reset-password
       Storage__Provider: Minio
       Storage__Minio__Endpoint: http://minio:9000
@@ -89,6 +90,7 @@ services:
       Gateway__PermitLimit: 1000
       Gateway__RateWindowSeconds: 60
       Cors__AllowedOrigins__0: ${ZUMBO_FRONTEND_URL:-http://127.0.0.1:58177}
+      Cors__AllowedOrigins__1: ${ZUMBO_MODERN_FRONTEND_URL:-http://127.0.0.1:58178}
       AllowedHosts: localhost;127.0.0.1;gateway
     ports:
       - "${ZUMBO_GATEWAY_BIND_HOST:-127.0.0.1}:${ZUMBO_GATEWAY_PORT:-58089}:8080"

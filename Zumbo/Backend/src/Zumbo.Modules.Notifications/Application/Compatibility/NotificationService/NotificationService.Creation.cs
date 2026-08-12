@@ -13,7 +13,10 @@ public sealed partial class NotificationService
         string type,
         string message,
         CancellationToken ct,
-        string? deduplicationKey = null)
+        string? deduplicationKey = null,
+        string? sourceKind = null,
+        string? sourceId = null,
+        string? projectId = null)
         => await new CreateNotificationHandler(
             notifications,
             preferences,
@@ -26,7 +29,10 @@ public sealed partial class NotificationService
                     userId,
                     type,
                     message,
-                    deduplicationKey),
+                    deduplicationKey,
+                    sourceKind,
+                    sourceId,
+                    projectId),
                 ct);
 
     private async Task CreateNotificationAsync(

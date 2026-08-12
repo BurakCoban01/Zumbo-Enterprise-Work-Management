@@ -1,0 +1,15 @@
+:host { display: block; }
+.command-trigger { display: grid; width: min(330px, 30vw); min-height: 38px; grid-template-columns: 18px minmax(0, 1fr) auto; align-items: center; gap: 8px; border: 1px solid var(--line); border-radius: 5px; background: var(--panel); color: var(--muted); padding: 0 8px 0 10px; text-align: left; }
+kbd { border: 1px solid var(--line); border-radius: 3px; background: var(--surface); padding: 2px 5px; color: var(--muted); font-size: 11px; }
+.command-backdrop { position: fixed; z-index: var(--z-overlay); inset: 0; display: grid; place-items: start center; background: rgb(10 20 24 / 44%); padding: min(18vh, 150px) 16px 16px; }
+.command-dialog { width: min(620px, 100%); max-height: min(620px, 70vh); border: 1px solid var(--line); border-radius: 8px; background: var(--panel); box-shadow: var(--elevation-overlay); padding: 14px; overflow: hidden; }
+.command-dialog h2 { margin: 0 0 10px; color: var(--ink); font-size: 15px; }
+.command-dialog label { display: grid; min-height: 44px; grid-template-columns: 20px minmax(0, 1fr); align-items: center; gap: 9px; border: 1px solid var(--line-strong); border-radius: 5px; padding: 0 11px; color: var(--muted); }
+.command-dialog input { width: 100%; border: 0; outline: 0; background: transparent; color: var(--ink); }
+.command-dialog nav { max-height: min(470px, 54vh); margin-top: 10px; overflow-y: auto; }
+.command-dialog a { display: flex; min-height: 44px; align-items: center; justify-content: space-between; gap: 16px; border-radius: 4px; padding: 7px 10px; color: var(--ink); font-size: 13px; }
+.command-dialog a:hover, .command-dialog a:focus { background: var(--accent-soft); color: var(--accent-strong); }
+.command-dialog small { color: var(--muted); font-size: 11px; }
+.command-dialog p { margin: 18px 10px; color: var(--muted); font-size: 13px; }
+@media (max-width: 1024px) { .command-trigger { width: 38px; grid-template-columns: 1fr; place-items: center; padding: 0; } .command-trigger span, .command-trigger kbd { display: none; } }
+@media (max-width: 760px) { :host { display: none; } }

@@ -10,6 +10,14 @@ namespace Zumbo.Modules.Identity;
 public sealed record RoleResponse(
     string Id,
     string Name,
+    string DisplayName,
+    string Description,
+    string Scope,
     string? OrganizationId,
     bool IsSystem,
-    IReadOnlyCollection<string> Permissions);
+    bool IsActive,
+    bool IsProtected,
+    bool IsDefault,
+    int DisplayOrder,
+    IReadOnlyCollection<string> Permissions,
+    long Version);

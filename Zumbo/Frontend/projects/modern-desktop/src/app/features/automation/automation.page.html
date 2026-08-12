@@ -1,0 +1,107 @@
+<section class="automation-page" [attr.aria-busy]="loading() || busy()">
+  <header class="automation-head">
+    <div>
+      <p class="eyebrow">{{ project().key }} · İş akışı yönetimi</p>
+      <h2>Otomasyon merkezi</h2>
+      <p>Kurallar, zamanlamalar ve tekrar kullanılabilir iş şablonları.</p>
+    </div>
+    <div class="head-actions">
+      <dl class="summary" aria-label="Otomasyon özeti">
+        <div><dt>Etkin kural</dt><dd>{{ activeRules().length }}</dd></div>
+        <div><dt>Çalıştırma</dt><dd>{{ runs().length }}</dd></div>
+        <div><dt>Yineleme</dt><dd>{{ activeRecurrences().length }}</dd></div>
+      </dl>
+      <button class="icon-button" type="button" (click)="load()" [disabled]="loading()" aria-label="Otomasyon merkezini yenile" title="Yenile"><zumbo-icon name="refresh" /></button>
+    </div>
+  </header>
+
+  <nav class="automation-tabs" role="tablist" aria-label="Otomasyon çalışma alanları">
+    <button type="button" role="tab" aria-label="Kurallar" [class.active]="tab() === 'rules'" [attr.aria-selected]="tab() === 'rules'" (click)="setTab('rules')"><span class="tab-full">Kurallar</span><span class="tab-short">Kural</span></button>
+    <button type="button" role="tab" aria-label="Çalıştırmalar" [class.active]="tab() === 'runs'" [attr.aria-selected]="tab() === 'runs'" (click)="setTab('runs')"><span class="tab-full">Çalıştırmalar</span><span class="tab-short">Geçmiş</span></button>
+    <button type="button" role="tab" aria-label="Zamanlamalar" [class.active]="tab() === 'schedules'" [attr.aria-selected]="tab() === 'schedules'" (click)="setTab('schedules')"><span class="tab-full">Zamanlamalar</span><span class="tab-short">Takvim</span></button>
+    <button type="button" role="tab" aria-label="Şablonlar" [class.active]="tab() === 'templates'" [attr.aria-selected]="tab() === 'templates'" (click)="setTab('templates')"><span class="tab-full">Şablonlar</span><span class="tab-short">Şablon</span></button>
+    <button type="button" role="tab" aria-label="Aktivite" [class.active]="tab() === 'activity'" [attr.aria-selected]="tab() === 'activity'" (click)="setTab('activity')"><span>Aktivite</span></button>
+  </nav>
+
+  @if (loading()) { <div class="automation-loading" role="status" aria-label="Otomasyon merkezi yükleniyor"><span></span><span></span></div> }
+  @if (!loading() && error()) { <p class="feedback error" role="alert">{{ error() }}</p> }
+  @if (!loading() && notice()) { <p class="feedback success" role="status">{{ notice() }}</p> }
+  @if (!loading() && !canManageRules() && tab() === 'rules') { <p class="permission"><zumbo-icon name="eye" />{{ roleName() || 'Üye olmayan' }} rolüyle kurallar salt okunur gösteriliyor.</p> }
+
+  @if (!loading() && tab() === 'rules') {
+    <div class="rules-layout" [class.readonly]="!canManageRules()">
+      <section class="register" aria-labelledby="automation-rule-list">
+        <header><div><h3 id="automation-rule-list">Kurallar</h3><p>{{ rules().length }} kayıt</p></div>@if (canManageRules()) { <button class="button primary" type="button" (click)="newRule()"><zumbo-icon name="plus" />Yeni kural</button> }</header>
+        <div class="record-list">
+          @for (rule of rules(); track rule.id) {
+            <button class="record-row" type="button" [class.selected]="selectedRuleId() === rule.id" (click)="selectRule(rule)">
+              <span><strong>{{ rule.name }}</strong><small>{{ triggerLabel(rule) }} · v{{ rule.publishedVersion || 'taslak' }}</small></span><i [attr.data-state]="ruleState(rule)">{{ ruleState(rule) }}</i>
+            </button>
+          } @empty { <p class="empty">Bu projede henüz otomasyon kuralı yok.</p> }
+        </div>
+      </section>
+
+      @if (ruleEditorLoading()) { <section class="editor"><div class="automation-loading"><span></span></div></section> }
+      @else if (ruleEditorOpen() && canManageRules()) {
+        <section class="editor" aria-labelledby="automation-rule-editor">
+          <header><div><h3 id="automation-rule-editor">{{ ruleDraft().id ? ruleDraft().name : 'Yeni kural' }}</h3><p>Tetikleyici, koşul ve eylem zinciri</p></div><button class="icon-button" type="button" (click)="ruleEditorOpen.set(false)" aria-label="Kural düzenleyicisini kapat"><zumbo-icon name="x" /></button></header>
+          <form (submit)="$event.preventDefault(); saveRule()">
+            <div class="form-grid">
+              <label><span>Kural adı</span><input [value]="ruleDraft().name" (input)="updateRule('name', $event)" maxlength="120" required></label>
+              <label><span>Tetikleyici</span><select [value]="ruleDraft().triggerType" (change)="setRuleTrigger($any($event.target).value)"><option value="Event">Olay</option><option value="Schedule">Zamanlama</option></select></label>
+              <label class="wide"><span>Açıklama</span><textarea [value]="ruleDraft().description" (input)="updateRule('description', $event)" rows="2"></textarea></label>
+              @if (ruleDraft().triggerType === 'Event') { <label><span>Olay</span><select [value]="ruleDraft().eventType" (change)="updateRule('eventType', $event)">@for (event of eventTypes; track event.value) { <option [value]="event.value" [selected]="ruleDraft().eventType === event.value">{{ event.label }}</option> }</select></label> }
+              @else { <label><span>Aralık (dakika)</span><input type="number" min="5" [value]="ruleDraft().intervalMinutes" (input)="updateRule('intervalMinutes', $event)"></label><label><span>Başlangıç</span><input type="datetime-local" [value]="ruleDraft().startAtLocal" (input)="updateRule('startAtLocal', $event)"></label> }
+            </div>
+
+            <section class="builder"><header><div><h4>Koşullar</h4><p>Tümü veya herhangi biri eşleştiğinde</p></div><div class="segmented"><button type="button" [class.active]="ruleDraft().conditionMode === 'All'" (click)="setConditionMode('All')">Tümü</button><button type="button" [class.active]="ruleDraft().conditionMode === 'Any'" (click)="setConditionMode('Any')">Herhangi</button></div></header>
+              @for (condition of ruleDraft().conditions; track $index; let index = $index) { <div class="builder-row"><select [value]="condition.field" (change)="updateCondition(index, 'field', $event)" aria-label="Koşul alanı">@for (field of conditionFields; track field) { <option [value]="field" [selected]="condition.field === field">{{ conditionFieldLabel(field) }}</option> }</select><select [value]="condition.operator" (change)="updateCondition(index, 'operator', $event)" aria-label="Koşul işleci">@for (operator of conditionOperators; track operator) { <option [value]="operator" [selected]="condition.operator === operator">{{ conditionOperatorLabel(operator) }}</option> }</select>@if (conditionNeedsValue(condition.operator)) { <input [value]="condition.value" (input)="updateCondition(index, 'value', $event)" placeholder="Değer" aria-label="Koşul değeri"> }<button class="icon-button danger" type="button" (click)="removeCondition(index)" aria-label="Koşulu kaldır"><zumbo-icon name="trash" /></button></div> }
+              <button class="button" type="button" (click)="addCondition()" [disabled]="ruleDraft().conditions.length >= limits.ruleConditions"><zumbo-icon name="plus" />Koşul ekle</button>
+            </section>
+
+            <section class="builder"><header><div><h4>Eylemler</h4><p>Sırayla uygulanır</p></div></header>
+              @for (action of ruleDraft().actions; track $index; let index = $index) { <div class="builder-row action"><select [value]="action.type" (change)="updateAction(index, 'type', $event)" aria-label="Eylem türü">@for (type of actionTypes; track type) { <option [value]="type" [selected]="action.type === type">{{ actionLabel(type) }}</option> }</select>@if (actionNeedsValue(action.type)) { <input [value]="action.value" (input)="updateAction(index, 'value', $event)" placeholder="Değer" aria-label="Eylem değeri"> }<button class="icon-button danger" type="button" (click)="removeAction(index)" [disabled]="ruleDraft().actions.length <= 1" aria-label="Eylemi kaldır"><zumbo-icon name="trash" /></button></div> }
+              <button class="button" type="button" (click)="addAction()" [disabled]="ruleDraft().actions.length >= limits.ruleActions"><zumbo-icon name="plus" />Eylem ekle</button>
+            </section>
+
+            <div class="form-grid limits"><label><span>Saatlik yürütme sınırı</span><input type="number" min="1" [max]="limits.ruleHourlyLimit" [value]="ruleDraft().maximumExecutionsPerHour" (input)="updateRule('maximumExecutionsPerHour', $event)"></label><label><span>Zincir derinliği</span><input type="number" min="1" [max]="limits.ruleChainDepth" [value]="ruleDraft().maximumChainDepth" (input)="updateRule('maximumChainDepth', $event)"></label></div>
+            <div class="form-actions"><button class="button primary" type="submit" [disabled]="busy() || !validRule()"><zumbo-icon name="save" />Taslağı kaydet</button>@if (ruleDraft().id) { <button class="button" type="button" (click)="publishRule()" [disabled]="busy()">Yayınla</button><button class="button" type="button" (click)="runDryRun()" [disabled]="busy()">Dry-run</button> }</div>
+          </form>
+          @if (dryRun(); as result) { <div class="result"><strong>{{ result.outcome }}</strong><span>Tetikleyici: {{ result.triggerMatched ? 'eşleşti' : 'eşleşmedi' }} · Koşul: {{ result.conditionMatched ? 'eşleşti' : 'eşleşmedi' }}</span><small>{{ result.plannedActions.length }} planlanan eylem</small></div> }
+        </section>
+      } @else if (selectedRuleId()) {
+        @if (rules().find(rule => rule.id === selectedRuleId()); as selected) { <section class="readonly-detail"><header><div><h3>{{ selected.name }}</h3><p>{{ triggerLabel(selected) }}</p></div><i [attr.data-state]="ruleState(selected)">{{ ruleState(selected) }}</i></header><dl><div><dt>Yayınlanan sürüm</dt><dd>{{ selected.publishedVersion || 'Yok' }}</dd></div><div><dt>Sonraki çalışma</dt><dd>{{ selected.nextRunAtUtc ? (selected.nextRunAtUtc | date:'dd MMM yyyy HH:mm') : 'Olay bekleniyor' }}</dd></div></dl></section> }
+      }
+    </div>
+    @if (canManageRules() && rules().length) { <section class="rule-actions" aria-label="Kural durum işlemleri">@for (rule of rules(); track rule.id) { <div><span><strong>{{ rule.name }}</strong><small>{{ ruleState(rule) }}</small></span>@if (!rule.archived && rule.publishedVersion) { <button class="button" type="button" (click)="setRuleState(rule, !rule.active)" [disabled]="busy()">{{ rule.active ? 'Duraklat' : 'Etkinleştir' }}</button> }@if (!rule.archived) { <button class="icon-button danger" type="button" (click)="archiveRule(rule)" [disabled]="busy()" [attr.aria-label]="rule.name + ' kuralını arşivle'"><zumbo-icon name="archive" /></button> }</div> }</section> }
+  }
+
+  @if (!loading() && tab() === 'runs') {
+    <section class="runs" aria-labelledby="automation-runs-heading">
+      <header><div><h3 id="automation-runs-heading">Çalıştırma geçmişi</h3><p>{{ runs().length }} kayıt · {{ timeZone }}</p></div><label><span>Durum</span><select [value]="runStatus()" (change)="chooseRunStatus($event)"><option value="">Tümü</option><option value="Succeeded">Başarılı</option><option value="Skipped">Atlandı</option><option value="Running">Çalışıyor</option><option value="RetryScheduled">Yeniden denenecek</option><option value="DeadLetter">Müdahale gerekli</option></select></label></header>
+      <div class="run-layout"><div class="record-list">@for (run of runs(); track run.id) { <button class="record-row" type="button" [class.selected]="selectedRunId() === run.id" (click)="selectedRunId.set(run.id)"><span><strong>{{ run.ruleName }}</strong><small>{{ run.createdAtUtc | date:'dd MMM yyyy HH:mm' }} · {{ run.outcome }}</small></span><i [attr.data-state]="run.status">{{ runState(run.status) }}</i></button> } @empty { <p class="empty">Henüz bir kural çalıştırılmadı.</p> }</div>
+        @if (selectedRun(); as run) { <article class="run-detail"><header><div><h3>{{ run.ruleName }}</h3><p>v{{ run.ruleVersion }} · deneme {{ run.attempt }}/{{ run.maximumAttempts }}</p></div><i [attr.data-state]="run.status">{{ runState(run.status) }}</i></header><dl><div><dt>Sonuç</dt><dd>{{ run.outcome }}</dd></div><div><dt>Kaynak</dt><dd>{{ run.sourceId || 'Zamanlanmış çalışma' }}</dd></div><div><dt>Zincir</dt><dd>{{ run.chainDepth }}</dd></div></dl><ol class="steps">@for (step of run.steps; track step.index) { <li><span>{{ step.index + 1 }}</span><div><strong>{{ actionLabel(step.actionType) }}</strong><small>{{ runState(step.status) }}</small></div></li> } @empty { <li class="empty">Eylem adımı kaydedilmedi.</li> }</ol>@if (canManageRules() && (run.status === 'DeadLetter' || run.status === 'Failed')) { <button class="button" type="button" (click)="replayRun(run)" [disabled]="busy()">Yeniden çalıştır</button> }</article> }
+      </div>
+    </section>
+  }
+
+  @if (!loading() && tab() === 'schedules') {
+    <div class="schedules-layout">
+      @if (canCreateWork()) { <section class="schedule-editor" aria-labelledby="schedule-editor-heading"><header><div><h3 id="schedule-editor-heading">Yeni yineleme</h3><p>Şablondan düzenli iş üretin.</p></div></header><form (submit)="$event.preventDefault(); createRecurrence()"><label><span>İş şablonu</span><select [value]="recurrenceDraft().templateId" (change)="updateRecurrence('templateId', $event)" required><option value="">Şablon seçin</option>@for (template of activeTemplates(); track template.id) { <option [value]="template.id" [selected]="recurrenceDraft().templateId === template.id">{{ template.name }}</option> }</select></label><div class="form-grid"><label><span>Sıklık</span><select [value]="recurrenceDraft().frequency" (change)="updateRecurrence('frequency', $event)"><option value="Daily">Günlük</option><option value="Weekly">Haftalık</option><option value="Monthly">Aylık</option></select></label><label><span>Aralık</span><input type="number" min="1" [value]="recurrenceDraft().interval" (input)="updateRecurrence('interval', $event)"></label><label><span>Başlangıç</span><input type="datetime-local" [value]="recurrenceDraft().startAtLocal" (input)="updateRecurrence('startAtLocal', $event)" required></label><label><span>Bitiş (isteğe bağlı)</span><input type="datetime-local" [value]="recurrenceDraft().endAtLocal" (input)="updateRecurrence('endAtLocal', $event)"></label><label><span>En fazla üretim</span><input type="number" min="1" [value]="recurrenceDraft().maxOccurrences" (input)="updateRecurrence('maxOccurrences', $event)"></label></div><div class="form-actions"><button class="button" type="button" (click)="previewRecurrence()" [disabled]="busy() || !recurrenceDraft().templateId">Önizle</button><button class="button primary" type="submit" [disabled]="busy() || !recurrenceDraft().templateId">Yinelemeyi başlat</button></div></form>@if (recurrencePreview(); as preview) { <ol class="preview">@for (date of preview.occurrencesUtc; track date) { <li>{{ date | date:'dd MMM yyyy HH:mm' }}</li> }</ol> }</section> }
+      <section class="schedule-register" aria-labelledby="schedule-register-heading"><header><div><h3 id="schedule-register-heading">Yinelemeler</h3><p>{{ recurrences().length }} kayıt</p></div></header><div class="record-list">@for (recurrence of recurrences(); track recurrence.id) { <article class="schedule-row" [class.selected]="selectedRecurrenceId() === recurrence.id"><button type="button" (click)="selectRecurrence(recurrence)"><span><strong>{{ templateName(recurrence.templateId) }}</strong><small>{{ frequencyLabel(recurrence) }} · sonraki {{ recurrence.nextRunAtUtc ? (recurrence.nextRunAtUtc | date:'dd MMM HH:mm') : 'tamamlandı' }}</small></span><i [attr.data-state]="recurrenceState(recurrence)">{{ recurrenceState(recurrence) }}</i></button>@if (canUpdateWork() && !recurrence.archived) { <div><button class="button" type="button" (click)="setRecurrenceState(recurrence, !recurrence.active)" [disabled]="busy()">{{ recurrence.active ? 'Duraklat' : 'Etkinleştir' }}</button><button class="icon-button danger" type="button" (click)="archiveRecurrence(recurrence)" [disabled]="busy()" aria-label="Yinelemeyi arşivle"><zumbo-icon name="archive" /></button></div> }</article> } @empty { <p class="empty">Etkin bir yineleme yok.</p> }</div>
+        @if (selectedRecurrence()) { <div class="occurrences"><h4>Üretim geçmişi</h4>@for (occurrence of occurrences(); track occurrence.id) { <div><span>{{ occurrence.scheduledForUtc | date:'dd MMM yyyy HH:mm' }}</span><i>{{ occurrence.status }}</i>@if (occurrence.createdWorkItemId) { <button class="text-button" type="button" (click)="openWorkItem.emit(occurrence.createdWorkItemId!)">İşi aç</button> }</div> } @empty { <p class="empty">Bu yineleme henüz iş üretmedi.</p> }</div> }
+      </section>
+    </div>
+  }
+
+  @if (!loading() && tab() === 'templates') {
+    <div class="templates-layout">
+      <section class="register" aria-labelledby="template-register-heading"><header><div><h3 id="template-register-heading">İş şablonları</h3><p>{{ activeTemplates().length }} etkin</p></div>@if (canCreateWork()) { <button class="button primary" type="button" (click)="newTemplate()"><zumbo-icon name="plus" />Yeni şablon</button> }</header><div class="template-list">@for (template of templates(); track template.id) { <article><button type="button" (click)="editTemplate(template)"><span><strong>{{ template.name }}</strong><small>{{ template.title }} · {{ template.type }} · {{ template.priority }}</small></span>@if (template.archived) { <i data-state="Arşiv">Arşiv</i> }</button>@if (canUpdateWork() && !template.archived) { <button class="icon-button danger" type="button" (click)="archiveTemplate(template)" [disabled]="busy()" [attr.aria-label]="template.name + ' şablonunu arşivle'"><zumbo-icon name="archive" /></button> }</article> } @empty { <p class="empty">Henüz iş şablonu yok.</p> }</div></section>
+      @if (templateDraft(); as draft) { <section class="editor" aria-labelledby="template-editor-heading"><header><div><h3 id="template-editor-heading">{{ draft.id ? draft.name : 'Yeni iş şablonu' }}</h3><p>Tekrarlanan işler için başlangıç değerleri</p></div><button class="icon-button" type="button" (click)="templateDraft.set(null)" aria-label="Şablon düzenleyicisini kapat"><zumbo-icon name="x" /></button></header><form (submit)="$event.preventDefault(); saveTemplate()"><div class="form-grid"><label><span>Şablon adı</span><input [value]="draft.name" (input)="updateTemplate('name', $event)" required></label><label><span>Hedef pano</span><select [value]="draft.boardId" (change)="updateTemplate('boardId', $event)" required>@for (board of boards(); track board.id) { <option [value]="board.id" [selected]="draft.boardId === board.id">{{ board.name }}</option> }</select></label><label class="wide"><span>İş başlığı</span><input [value]="draft.title" (input)="updateTemplate('title', $event)" required></label><label class="wide"><span>Açıklama</span><textarea [value]="draft.description" (input)="updateTemplate('description', $event)" rows="4"></textarea></label><label><span>Tür</span><select [value]="draft.type" (change)="updateTemplate('type', $event)">@for (type of issueTypes(); track type.key) { <option [value]="type.key" [selected]="draft.type === type.key">{{ type.name }}</option> }</select></label><label><span>Öncelik</span><select [value]="draft.priority" (change)="updateTemplate('priority', $event)"><option>Critical</option><option>High</option><option>Medium</option><option>Low</option></select></label><label><span>Atanan</span><select [value]="draft.assigneeUserId" (change)="updateTemplate('assigneeUserId', $event)"><option value="">Atanmamış</option>@for (user of context()?.users || []; track user.id) { <option [value]="user.id" [selected]="draft.assigneeUserId === user.id">{{ user.username || user.email }}</option> }</select></label><label><span>Bitiş süresi (gün)</span><input type="number" min="0" [value]="draft.dueAfterDays" (input)="updateTemplate('dueAfterDays', $event)"></label><label class="wide"><span>Etiketler</span><input [value]="draft.labelsText" (input)="updateTemplate('labelsText', $event)" placeholder="rapor, rutin"></label></div><div class="form-actions"><button class="button primary" type="submit" [disabled]="busy() || !draft.name.trim() || !draft.title.trim() || !draft.boardId"><zumbo-icon name="save" />{{ draft.id ? 'Şablonu güncelle' : 'Şablon oluştur' }}</button></div></form></section> }
+    </div>
+  }
+
+  @if (!loading() && tab() === 'activity') {
+    <section class="activity" aria-labelledby="automation-activity-heading"><header><div><h3 id="automation-activity-heading">Değişiklik geçmişi</h3><p>{{ auditTarget() || 'Bir kural, şablon veya yineleme seçin' }}</p></div></header>@for (entry of audit(); track entry.id) { <article><span class="avatar" aria-hidden="true">{{ userName(entry.actorUserId).slice(0, 1).toUpperCase() }}</span><div><strong>{{ entry.action }}</strong><p>{{ userName(entry.actorUserId) }} · {{ entry.createdAt | date:'dd MMM yyyy HH:mm' }}</p></div></article> } @empty { <p class="empty">Seçilen kayıt için aktivite bulunmuyor.</p> }</section>
+  }
+</section>

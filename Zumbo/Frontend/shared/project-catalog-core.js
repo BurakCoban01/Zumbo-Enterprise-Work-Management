@@ -25,12 +25,19 @@
     return member ? member.role : null;
   }
 
-  function canManage(role) {
-    return role === 'ProjectOwner' || role === 'ProjectAdmin';
+  function definitionFor(role, definitions) {
+    return (definitions || []).find(function(item) { return item.name === role && item.isActive !== false; }) || null;
   }
 
-  function canRelease(role) {
-    return role === 'ProjectOwner';
+  function canManage(role, definitions) {
+    var definition = definitionFor(role, definitions);
+    return !!definition && (definition.permissions || []).some(function(permission) {
+      return permission === '*' || permission === 'BoardManage';
+    });
+  }
+
+  function canRelease(role, definitions) {
+    return !!(definitionFor(role, definitions) || {}).isProtected;
   }
 
   function normalizeComponentNames(value) {

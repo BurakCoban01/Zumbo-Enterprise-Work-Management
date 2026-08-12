@@ -75,6 +75,8 @@ internal static class IdentityEndpoints
             PrivacyWorkflowDurableHandler>();
         services.AddScoped<IIdentityAuditWriter, IdentityAuditWriterAdapter>();
         services.AddScoped<IdentityPermissionService>();
+        services.AddScoped<IdentityPermissionCatalogService>();
+        services.AddScoped<IdentityRoleCatalogService>();
         services.AddScoped<IdentityAdministrationService>();
         return services;
     }
@@ -282,10 +284,25 @@ internal static class IdentityEndpoints
             .RequireAuthorization()
             .WithZumboPermission(PermissionCatalog.ProfileRead);
 
-        group.MapGet("/roles", async (IdentityAdministrationService service, HttpContext http, CancellationToken ct) =>
-            Ok(await service.ListRolesAsync(ct), http))
+        group.MapGet("/roles", async (string? scope, IdentityAdministrationService service, HttpContext http, CancellationToken ct) =>
+            Ok(await service.ListRolesAsync(ct, scope), http))
             .RequireAuthorization()
             .WithZumboPermission(PermissionCatalog.ProfileRead);
+
+        group.MapGet("/permissions", async (IdentityPermissionCatalogService service, HttpContext http, CancellationToken ct) =>
+            Ok(await service.ListAsync(ct), http))
+            .RequireAuthorization()
+            .WithZumboPermission(PermissionCatalog.ProfileRead);
+
+        group.MapPut("/permissions/{key}", async (
+            string key,
+            UpdatePermissionDefinitionRequest request,
+            IdentityPermissionCatalogService service,
+            HttpContext http,
+            CancellationToken ct) =>
+            Ok(await service.UpdateAsync(key, request, CorrelationId(http), ct), http))
+            .RequireAuthorization()
+            .WithZumboPermission(PermissionCatalog.UserRoleManage, isGlobal: true);
 
         group.MapPost("/roles", async (CreateRoleRequest request, IdentityAdministrationService service, HttpContext http, CancellationToken ct) =>
             Created(await service.CreateRoleAsync(request, CorrelationId(http), ct), http))

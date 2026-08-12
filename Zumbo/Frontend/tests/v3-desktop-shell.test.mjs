@@ -39,6 +39,7 @@ function createViewModel() {
       { id: 'task-2', title: 'Dağıtım notları', status: 'Done', priority: 'Low' }
     ],
     showSection: value => calls.push(['section', value]),
+    projectRoleHasPermission: (role, permission) => role === 'Developer' && permission === 'WorkItemCreate',
     openEntityCreator: value => calls.push(['create', value]),
     toggleTheme: () => calls.push(['theme']),
     setDensity: value => calls.push(['density', value]),
@@ -108,9 +109,11 @@ test('command template exposes combobox, listbox, selected state and permission-
 test('desktop shell tracks recent projects by stable identity and keeps shell metadata legible', () => {
   assert.match(html, /ng-repeat="recent in vm\.recentProjects \| limitTo:3 track by recent\.id"/);
   assert.match(styles, /\.context-selectors label,\s*\.nav-secondary > span\s*\{[^}]*font-size:\s*12px;/s);
-  assert.match(styles, /kbd\s*\{[^}]*font-size:\s*11px;/s);
+  assert.match(styles, /kbd\s*\{[^}]*font-size:\s*var\(--font-size-caption\);/s);
   assert.match(styles, /\.notification-button > span\s*\{[^}]*color:\s*var\(--color-text-inverse\);[^}]*font-size:\s*12px;/s);
   assert.match(styles, /\.notification-popover > button span,\s*\.notification-popover > p,\s*\.popover-heading span\s*\{[^}]*font-size:\s*12px;/s);
   assert.match(styles, /\.breadcrumbs\s*\{[^}]*font-size:\s*12px;/s);
   assert.match(styles, /\.nav-count\s*\{[^}]*color:\s*var\(--color-text-inverse\);[^}]*font-size:\s*12px;/s);
+  assert.match(styles, /@media \(max-width: 1060px\)[\s\S]*html,\s*body\s*\{[^}]*overflow-x:\s*hidden;/);
+  assert.match(styles, /@media \(max-width: 1060px\)[\s\S]*body\s*\{[^}]*position:\s*relative;[^}]*overflow-y:\s*auto;/);
 });

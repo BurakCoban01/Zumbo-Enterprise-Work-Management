@@ -14,6 +14,32 @@
     Expired: 'Süresi doldu'
   });
 
+  var auditActionLabels = Object.freeze({
+    UserRegistered: 'Kullanıcı kaydı',
+    UserRolesChanged: 'Kullanıcı rolleri değişti',
+    OrganizationCreated: 'Organizasyon oluşturuldu',
+    OrganizationUpdated: 'Organizasyon güncellendi',
+    ProjectCreated: 'Proje oluşturuldu',
+    ProjectUpdated: 'Proje güncellendi',
+    ProjectMemberAdded: 'Proje üyesi eklendi',
+    ProjectMemberRemoved: 'Proje üyesi kaldırıldı',
+    BoardCreated: 'Pano oluşturuldu',
+    BoardUpdated: 'Pano güncellendi',
+    TeamCreated: 'Ekip oluşturuldu',
+    TeamUpdated: 'Ekip güncellendi',
+    WorkItemCreated: 'İş oluşturuldu',
+    WorkItemUpdated: 'İş güncellendi',
+    WorkItemMoved: 'İş taşındı',
+    WorkItemBulkJobCompleted: 'Toplu iş tamamlandı',
+    WorkItemBulkJobArtifactsExpired: 'Toplu iş dosyaları silindi',
+    AccountAnonymized: 'Hesap anonimleştirildi'
+  });
+
+  function auditActionLabel(action) {
+    return auditActionLabels[action] || String(action || 'Bilinmeyen olay')
+      .replace(/([a-z0-9])([A-Z])/g, '$1 $2');
+  }
+
   function text(value, maximum) {
     var normalized = String(value || '').trim();
     return normalized.slice(0, maximum || 200);
@@ -106,10 +132,8 @@
 
   function hasPermission(user, roles, permission) {
     var names = (user && user.roles) || [];
-    if (names.indexOf('SystemAdmin') >= 0) return true;
-    if (permission === 'AuditReadAll' && names.indexOf('AuditReader') >= 0) return true;
     return (roles || []).some(function(role) {
-      return names.indexOf(role.name) >= 0
+      return role.isActive !== false && names.indexOf(role.name) >= 0
         && ((role.permissions || []).indexOf('*') >= 0 || (role.permissions || []).indexOf(permission) >= 0);
     });
   }
@@ -208,6 +232,7 @@
     auditSearchUrl: function(filters, context) { return auditUrl('/api/audit', filters, context); },
     auditExportUrl: function(filters, context) { return auditUrl('/api/audit/export', filters, context); },
     safeAuditChanges: safeAuditChanges,
+    auditActionLabel: auditActionLabel,
     hasPermission: hasPermission,
     integrityState: integrityState,
     privacyStorageKey: privacyStorageKey,

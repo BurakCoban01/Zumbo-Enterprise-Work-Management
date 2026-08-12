@@ -14,21 +14,30 @@ public sealed class IdentityAdministrationService(
     IRefreshSessionStore sessions,
     IDurableTransactionRunner transactions,
     IdentityPermissionService permissionService,
+    IdentityRoleCatalogService roleCatalog,
+    IdentityPermissionCatalogService permissionCatalog,
     IIdentityAuditWriter audit,
     IDistributedLockProvider distributedLockProvider,
     IOptions<DistributedLockOptions> distributedLockOptions,
     IClock clock,
     ICurrentUser currentUser)
 {
-    public async Task<IReadOnlyList<RoleResponse>> ListRolesAsync(CancellationToken ct)
+    public async Task<IReadOnlyList<RoleResponse>> ListRolesAsync(CancellationToken ct, string? scope = null)
     {
         var actor = await GetActorAsync(ct);
         await EnsureSystemRolesAsync(ct);
-        var result = await roles.ListByFilterAsync(
-            x => x.IsSystem || x.OrganizationId == actor.OrganizationId,
-            x => x.Name,
-            pageSize: 200,
-            cancellationToken: ct);
+        var normalizedScope = scope?.Trim();
+        var result = string.IsNullOrEmpty(normalizedScope)
+            ? await roles.ListByFilterAsync(
+                x => x.Scope != "Project" && (x.IsSystem || x.OrganizationId == actor.OrganizationId),
+                x => x.Name,
+                pageSize: 200,
+                cancellationToken: ct)
+            : await roles.ListByFilterAsync(
+                x => x.Scope == normalizedScope && (x.IsSystem || x.OrganizationId == actor.OrganizationId),
+                x => x.Name,
+                pageSize: 200,
+                cancellationToken: ct);
         return result.Select(ToResponse).ToList();
     }
 
@@ -39,10 +48,10 @@ public sealed class IdentityAdministrationService(
     {
         var actor = await RequireRoleManagerAsync(ct);
         var organizationId = NormalizeOrganizationId(request.OrganizationId);
-        EnsureOrganizationScope(actor, organizationId);
+        await EnsureOrganizationScopeAsync(actor, organizationId, ct);
         var name = NormalizeRoleName(request.Name);
         EnsureNotReserved(name);
-        var permissions = NormalizePermissions(request.Permissions);
+        var permissions = await NormalizePermissionsAsync(actor, request.Permissions, ct);
         await using var roleLock = await AcquireLockAsync("identity-roles:" + organizationId, ct);
         if (await roles.SelectAsync(x => x.OrganizationId == organizationId && x.Name.ToLower() == name.ToLower(), ct) is not null)
         {
@@ -53,7 +62,11 @@ public sealed class IdentityAdministrationService(
         var role = new IdentityRoleDocument
         {
             Name = name,
+            DisplayName = name,
+            Description = "Özel organizasyon rolü.",
+            Scope = "Organization",
             OrganizationId = organizationId,
+            DisplayOrder = 1000,
             Permissions = permissions,
             CreatedAt = now,
             UpdatedAt = now
@@ -73,7 +86,7 @@ public sealed class IdentityAdministrationService(
         await using var roleLock = await AcquireLockAsync("identity-role:" + roleId, ct);
         var role = await roles.SelectAsync(x => x.Id == roleId, ct)
             ?? throw new NotFoundException("ROLE_NOT_FOUND", "Role was not found.");
-        EnsureCustomRoleAccess(actor, role);
+        await EnsureCustomRoleAccessAsync(actor, role, ct);
         var name = NormalizeRoleName(request.Name);
         EnsureNotReserved(name);
         if (await roles.SelectAsync(x =>
@@ -94,9 +107,21 @@ public sealed class IdentityAdministrationService(
 
         var oldValue = role.Name + ":" + string.Join(',', role.Permissions);
         role.Name = name;
-        role.Permissions = NormalizePermissions(request.Permissions);
+        role.Permissions = await NormalizePermissionsAsync(actor, request.Permissions, ct);
+        role.IsActive = request.IsActive ?? role.IsActive;
         role.UpdatedAt = clock.UtcNow;
-        await roles.ReplaceByFilterAsync(x => x.Id == role.Id, role, ct);
+        if (request.Version is not null && request.Version != role.Version)
+        {
+            throw new ConflictException("ROLE_VERSION_CONFLICT", "Role changed concurrently; reload and retry.");
+        }
+
+        var result = await roles.ReplaceByVersionAsync(x => x.Id == role.Id, role, role.Version, ct);
+        if (!result.Found)
+        {
+            throw new ConflictException("ROLE_VERSION_CONFLICT", "Role changed concurrently; reload and retry.");
+        }
+
+        role.Version = result.Version!.Value;
         await audit.WriteAsync("RoleUpdated", role.Id, oldValue, role.Name + ":" + string.Join(',', role.Permissions), correlationId, ct);
         return ToResponse(role);
     }
@@ -107,7 +132,7 @@ public sealed class IdentityAdministrationService(
         await using var roleLock = await AcquireLockAsync("identity-role:" + roleId, ct);
         var role = await roles.SelectAsync(x => x.Id == roleId, ct)
             ?? throw new NotFoundException("ROLE_NOT_FOUND", "Role was not found.");
-        EnsureCustomRoleAccess(actor, role);
+        await EnsureCustomRoleAccessAsync(actor, role, ct);
         if (await users.SelectAsync(x => x.Roles.Contains(role.Name), ct) is not null)
         {
             throw new ConflictException("ROLE_IN_USE", "A role assigned to users cannot be deleted.");
@@ -127,15 +152,23 @@ public sealed class IdentityAdministrationService(
         await using var userLock = await AcquireLockAsync("identity-user:" + userId, ct);
         var target = await users.SelectAsync(x => x.Id == userId, ct)
             ?? throw new NotFoundException("USER_NOT_FOUND", "User was not found.");
-        EnsureOrganizationScope(actor, target.OrganizationId);
+        await EnsureOrganizationScopeAsync(actor, target.OrganizationId, ct);
         var requestedRoles = (request.Roles ?? [])
             .Where(x => !string.IsNullOrWhiteSpace(x))
             .Select(x => x.Trim())
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
-        if (!requestedRoles.Contains("User", StringComparer.OrdinalIgnoreCase))
+        await EnsureSystemRolesAsync(ct);
+        var available = await roles.ListByFilterAsync(
+            x => x.IsActive && x.Scope != "Project" && (x.IsSystem || x.OrganizationId == target.OrganizationId),
+            pageSize: 200,
+            cancellationToken: ct);
+        foreach (var defaultRole in available.Where(role => role.IsDefault))
         {
-            requestedRoles.Insert(0, "User");
+            if (!requestedRoles.Contains(defaultRole.Name, StringComparer.OrdinalIgnoreCase))
+            {
+                requestedRoles.Insert(0, defaultRole.Name);
+            }
         }
 
         if (requestedRoles.Count > 20)
@@ -143,21 +176,22 @@ public sealed class IdentityAdministrationService(
             throw new ValidationException("A user cannot have more than 20 roles.");
         }
 
-        await EnsureSystemRolesAsync(ct);
-        var available = await roles.ListByFilterAsync(
-            x => x.IsSystem || x.OrganizationId == target.OrganizationId,
-            pageSize: 200,
-            cancellationToken: ct);
         if (requestedRoles.Any(requested => available.All(x => !x.Name.Equals(requested, StringComparison.OrdinalIgnoreCase))))
         {
             throw new ValidationException("Every assigned role must be a defined system or organization role.");
         }
 
-        var actorIsSystemAdmin = PermissionCatalog.IsSystemAdministrator(actor.Roles);
+        var actorIsSystemAdmin = available.Any(role =>
+            actor.Roles.Contains(role.Name, StringComparer.OrdinalIgnoreCase)
+            && role.Permissions.Contains(PermissionCatalog.All, StringComparer.OrdinalIgnoreCase));
         if (!actorIsSystemAdmin)
         {
-            if (target.Roles.Any(IsPrivilegedSystemRole)
-                || requestedRoles.Any(IsPrivilegedSystemRole))
+            var protectedRoleNames = available
+                .Where(role => role.IsProtected)
+                .Select(role => role.Name)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            if (target.Roles.Any(protectedRoleNames.Contains)
+                || requestedRoles.Any(protectedRoleNames.Contains))
             {
                 throw new ForbiddenException("Organization admins cannot manage privileged system roles.");
             }
@@ -205,24 +239,7 @@ public sealed class IdentityAdministrationService(
 
     private async Task EnsureSystemRolesAsync(CancellationToken ct)
     {
-        await using var roleLock = await AcquireLockAsync("identity-system-roles", ct);
-        foreach (var definition in PermissionCatalog.SystemRoles)
-        {
-            if (await roles.SelectAsync(x => x.IsSystem && x.Name == definition.Key, ct) is not null)
-            {
-                continue;
-            }
-
-            await roles.CreateAsync(new IdentityRoleDocument
-            {
-                Id = "system-role-" + definition.Key.ToLowerInvariant(),
-                Name = definition.Key,
-                IsSystem = true,
-                Permissions = definition.Value.ToList(),
-                CreatedAt = clock.UtcNow,
-                UpdatedAt = clock.UtcNow
-            }, ct);
-        }
+        await roleCatalog.EnsureSeededAsync(ct);
     }
 
     private async Task<UserDocument> RequireRoleManagerAsync(CancellationToken ct)
@@ -244,29 +261,34 @@ public sealed class IdentityAdministrationService(
             ?? throw new UnauthorizedException("Authenticated user was not found.");
     }
 
-    private static void EnsureOrganizationScope(UserDocument actor, string organizationId)
+    private async Task EnsureOrganizationScopeAsync(
+        UserDocument actor,
+        string organizationId,
+        CancellationToken ct)
     {
-        if (!PermissionCatalog.IsSystemAdministrator(actor.Roles)
+        if (!await roleCatalog.HasPermissionAsync(
+                actor.Roles,
+                actor.OrganizationId,
+                PermissionCatalog.All,
+                ct)
             && actor.OrganizationId != organizationId)
         {
             throw new ForbiddenException("Role management is limited to the current organization.");
         }
     }
 
-    private static void EnsureCustomRoleAccess(UserDocument actor, IdentityRoleDocument role)
+    private async Task EnsureCustomRoleAccessAsync(
+        UserDocument actor,
+        IdentityRoleDocument role,
+        CancellationToken ct)
     {
         if (role.IsSystem)
         {
             throw new ConflictException("SYSTEM_ROLE_LOCKED", "System roles cannot be changed or deleted.");
         }
 
-        EnsureOrganizationScope(actor, role.OrganizationId!);
+        await EnsureOrganizationScopeAsync(actor, role.OrganizationId!, ct);
     }
-
-    private static bool IsPrivilegedSystemRole(string role) =>
-        role.Equals("SystemAdmin", StringComparison.OrdinalIgnoreCase)
-        || role.Equals("OrganizationAdmin", StringComparison.OrdinalIgnoreCase)
-        || role.Equals("AuditReader", StringComparison.OrdinalIgnoreCase);
 
     private static string NormalizeOrganizationId(string? organizationId)
     {
@@ -297,7 +319,10 @@ public sealed class IdentityAdministrationService(
         }
     }
 
-    private static List<string> NormalizePermissions(IReadOnlyCollection<string>? permissions)
+    private async Task<List<string>> NormalizePermissionsAsync(
+        UserDocument actor,
+        IReadOnlyCollection<string>? permissions,
+        CancellationToken ct)
     {
         var result = (permissions ?? [])
             .Where(x => !string.IsNullOrWhiteSpace(x))
@@ -309,9 +334,20 @@ public sealed class IdentityAdministrationService(
             throw new ValidationException("A role requires 1-100 valid permission names.");
         }
 
-        if (result.Any(x => !PermissionCatalog.IsKnownAssignablePermission(x)))
+        var assignable = await permissionCatalog.ListAsync(ct);
+        if (result.Any(x => assignable.All(definition =>
+            !definition.Key.Equals(x, StringComparison.OrdinalIgnoreCase))))
         {
             throw new ValidationException("Every permission must exist in the permission catalog.");
+        }
+
+        if (!await roleCatalog.CanGrantPermissionsAsync(
+                actor.Roles,
+                actor.OrganizationId,
+                result,
+                ct))
+        {
+            throw new ForbiddenException("A role manager cannot grant permissions they do not hold.");
         }
 
         return result;
@@ -329,5 +365,18 @@ public sealed class IdentityAdministrationService(
     }
 
     private static RoleResponse ToResponse(IdentityRoleDocument role) =>
-        new(role.Id, role.Name, role.OrganizationId, role.IsSystem, role.Permissions);
+        new(
+            role.Id,
+            role.Name,
+            string.IsNullOrWhiteSpace(role.DisplayName) ? role.Name : role.DisplayName,
+            role.Description,
+            role.Scope,
+            role.OrganizationId,
+            role.IsSystem,
+            role.IsActive,
+            role.IsProtected,
+            role.IsDefault,
+            role.DisplayOrder,
+            role.Permissions,
+            role.Version);
 }

@@ -5,7 +5,7 @@ import test from 'node:test';
 
 const root = resolve(import.meta.dirname, '..');
 const html = await readFile(resolve(root, 'desktop-bulma/index.html'), 'utf8');
-const desktopScripts = ['app.js', 'realtime.js', 'task-board.js', 'settings.js', 'privacy-center.js', 'audit-center.js', 'integration-center.js', 'planning.js', 'planning-views.js', 'reporting-views.js', 'portfolio-center.js', 'goal-center.js', 'capacity-center.js', 'knowledge-center.js', 'board-view.js', 'board-excellence.js', 'work-items.js', 'management.js', 'directives.js', 'shell.js', 'work-automation.js', 'bulk-job-center.js', 'intake-center.js'];
+const desktopScripts = ['app.js', 'realtime.js', 'task-board.js', 'personal-work.js', 'settings.js', 'privacy-center.js', 'audit-center.js', 'integration-center.js', 'planning.js', 'planning-views.js', 'reporting-views.js', 'portfolio-center.js', 'goal-center.js', 'capacity-center.js', 'knowledge-center.js', 'board-view.js', 'board-excellence.js', 'work-items.js', 'management.js', 'directives.js', 'shell.js', 'work-automation.js', 'bulk-job-center.js', 'intake-center.js'];
 const scriptSources = await Promise.all(desktopScripts.map(file =>
   readFile(resolve(root, 'desktop-bulma', file), 'utf8').catch(() => '')));
 const sourceByName = Object.fromEntries(desktopScripts.map((file, index) => [file, scriptSources[index]]));
@@ -165,15 +165,20 @@ test('board view modeli ve status helper board feature service tarafindan sahipl
 test('task list, bulk, archive ve notification feature service tarafindan sahiplenilir', () => {
   const main = sourceByName['app.js'];
   const taskBoard = sourceByName['task-board.js'];
+  const personalWork = sourceByName['personal-work.js'];
   assert.match(main, /desktopTaskBoardFeature\.install\(vm, \{/);
   assert.match(taskBoard, /factory\('desktopTaskBoardFeature'/);
   assert.match(taskBoard, /return \{ apiActionError: apiActionError \}/);
   for (const method of [
     'seed', 'openEntityCreator', 'submitEntityCreator', 'bulkMove',
     'dropTaskBefore', 'moveTaskToColumn', 'loadTasks', 'loadArchivedTasks',
-    'restoreTask', 'restoreLifecycleEntity', 'loadNotifications', 'readNotification'
+    'restoreTask', 'restoreLifecycleEntity'
   ]) {
     assert.doesNotMatch(main, new RegExp(`vm\\.${method}\\s*=\\s*function`));
     assert.match(taskBoard, new RegExp(`vm\\.${method}\\s*=\\s*function`));
+  }
+  for (const method of ['loadNotifications', 'readNotification']) {
+    assert.doesNotMatch(main, new RegExp(`vm\\.${method}\\s*=\\s*function`));
+    assert.match(personalWork, new RegExp(`vm\\.${method}\\s*=\\s*function`));
   }
 });

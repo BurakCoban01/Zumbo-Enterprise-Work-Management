@@ -1,0 +1,39 @@
+{
+  "$schema": "../../node_modules/@angular/service-worker/config/schema.json",
+  "index": "/modern-desktop/index.html",
+  "assetGroups": [
+    {
+      "name": "desktop-shell",
+      "installMode": "prefetch",
+      "resources": {
+        "files": [
+          "/manifest.webmanifest",
+          "/*.css",
+          "/*.js",
+          "!/runtime-config.js"
+        ],
+        "urls": ["/modern-desktop/index.html"]
+      }
+    },
+    {
+      "name": "desktop-assets",
+      "installMode": "lazy",
+      "updateMode": "prefetch",
+      "resources": {
+        "files": ["/shared/**"]
+      }
+    }
+  ],
+  "dataGroups": [
+    {
+      "name": "desktop-runtime-config",
+      "urls": ["/modern-desktop/runtime-config.js"],
+      "cacheConfig": {
+        "strategy": "freshness",
+        "maxSize": 1,
+        "maxAge": "1d",
+        "timeout": "2s"
+      }
+    }
+  ]
+}

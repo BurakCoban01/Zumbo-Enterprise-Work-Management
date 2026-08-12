@@ -1,0 +1,32 @@
+:root {
+  --ion-color-primary: #0d6170;
+  --ion-color-primary-rgb: 13, 97, 112;
+  --ion-color-primary-contrast: #ffffff;
+  --ion-background-color: var(--surface);
+  --ion-text-color: var(--ink);
+  --ion-font-family: var(--font-family-sans);
+}
+
+ion-content {
+  --background: var(--surface);
+}
+
+ion-toolbar {
+  --background: var(--panel);
+  --color: var(--ink);
+  --border-color: var(--line);
+}
+
+.modern-mobile-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  color: var(--ink);
+  font-size: 19px;
+  font-weight: 750;
+}
+
+.modern-mobile-brand img {
+  width: 36px;
+  height: 36px;
+}
