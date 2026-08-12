@@ -106,6 +106,18 @@ public sealed class OperationsCenterApiTests(WebApplicationFactory<Program> base
         }
 
         Authenticate(client, admin.AccessToken);
+        var missingOrganization = await client.GetAsync("/api/operations/storage/security");
+        Assert.Equal(HttpStatusCode.BadRequest, missingOrganization.StatusCode);
+        Assert.Equal(string.Empty, await missingOrganization.Content.ReadAsStringAsync());
+        var missingMaintenanceOrganization = await client.PostAsync(
+            "/api/operations/storage/security/maintenance",
+            null);
+        Assert.Equal(HttpStatusCode.BadRequest, missingMaintenanceOrganization.StatusCode);
+        Assert.Equal(string.Empty, await missingMaintenanceOrganization.Content.ReadAsStringAsync());
+        var missingRetentionOrganization = await client.PostAsync("/api/audit/retention/purge", null);
+        Assert.Equal(HttpStatusCode.BadRequest, missingRetentionOrganization.StatusCode);
+        Assert.Equal(string.Empty, await missingRetentionOrganization.Content.ReadAsStringAsync());
+
         var dependencies = await client.GetStringAsync("/api/operations/external-dependencies");
         Assert.DoesNotContain("connectionString", dependencies, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("password", dependencies, StringComparison.OrdinalIgnoreCase);
@@ -143,6 +155,10 @@ public sealed class OperationsCenterApiTests(WebApplicationFactory<Program> base
         Assert.Contains(audit.Items, item => item.Action == "NotificationDeliveryReplayed");
         Assert.Contains(audit.Items, item => item.Action == "AttachmentSecurityMaintenanceRun");
         Assert.DoesNotContain("password", System.Text.Json.JsonSerializer.Serialize(audit), StringComparison.OrdinalIgnoreCase);
+        var retention = await client.PostAsync(
+            $"/api/audit/retention/purge?organizationId={organizationId}",
+            null);
+        retention.EnsureSuccessStatusCode();
     }
 
     private static async Task<AuthResponse> RegisterAsync(HttpClient client, RegisterUserRequest request)

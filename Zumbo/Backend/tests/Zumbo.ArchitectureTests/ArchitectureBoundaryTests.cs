@@ -3479,7 +3479,6 @@ public sealed class ArchitectureBoundaryTests
         Assert.Contains("services.AddNotificationServices(configuration)", endpointHost, StringComparison.Ordinal);
         Assert.DoesNotContain("IDocumentRepository", endpointHost, StringComparison.Ordinal);
         Assert.DoesNotContain("NotificationDocument", endpointHost, StringComparison.Ordinal);
-        Assert.Contains("GetNotificationPreferencesHandler handler", endpointHost, StringComparison.Ordinal);
         Assert.Contains("UpdateNotificationPreferencesHandler handler", endpointHost, StringComparison.Ordinal);
         Assert.DoesNotContain("service.GetPreferencesAsync(", endpointHost, StringComparison.Ordinal);
         Assert.DoesNotContain("service.UpdatePreferencesAsync(", endpointHost, StringComparison.Ordinal);
@@ -3490,6 +3489,17 @@ public sealed class ArchitectureBoundaryTests
         Assert.DoesNotContain("service.ListDeadLettersAsync(", endpointHost, StringComparison.Ordinal);
         Assert.DoesNotContain("service.ReplayDeadLetterAsync(", endpointHost, StringComparison.Ordinal);
         Assert.Contains("NotificationDeliveryReplayed", endpointHost, StringComparison.Ordinal);
+
+        var preferencesController = File.ReadAllText(Path.Combine(
+            SourceDirectory,
+            "Zumbo.Api",
+            "Presentation",
+            "Controllers",
+            "Notifications",
+            "NotificationPreferencesController.cs"));
+        Assert.Contains("GetNotificationPreferencesHandler handler", preferencesController, StringComparison.Ordinal);
+        Assert.DoesNotContain("IDocumentRepository", preferencesController, StringComparison.Ordinal);
+        Assert.DoesNotContain("NotificationDocument", preferencesController, StringComparison.Ordinal);
 
         var composition = File.ReadAllText(Path.Combine(
             SourceDirectory,

@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
+using Zumbo.Api.Presentation.Authorization;
 using Zumbo.Modules.Audit;
 using Zumbo.Modules.Boards;
 using Zumbo.Modules.Identity;
@@ -67,7 +68,7 @@ public sealed class RouteInventoryCharacterizationTests : IClassFixture<WebAppli
                 continue;
             }
 
-            var metadata = endpoint.Metadata.GetOrderedMetadata<EndpointPermissionMetadata>().LastOrDefault();
+            var metadata = endpoint.Metadata.GetOrderedMetadata<IEndpointPermissionMetadata>().LastOrDefault();
             if (metadata is null)
             {
                 missing.Add(endpoint.RoutePattern.RawText ?? string.Empty);
@@ -122,7 +123,9 @@ public sealed class RouteInventoryCharacterizationTests : IClassFixture<WebAppli
     private static IEnumerable<string> Describe(RouteEndpoint endpoint)
     {
         var methods = endpoint.Metadata.GetMetadata<HttpMethodMetadata>()?.HttpMethods ?? ["*"];
-        var route = endpoint.RoutePattern.RawText ?? string.Empty;
+        var rawRoute = endpoint.RoutePattern.RawText ?? string.Empty;
+        var rootedRoute = rawRoute.StartsWith("/", StringComparison.Ordinal) ? rawRoute : $"/{rawRoute}";
+        var route = rootedRoute.Length > 1 ? rootedRoute.TrimEnd('/') : rootedRoute;
         var authorization = DescribeAuthorization(endpoint);
         var permission = DescribePermission(endpoint);
         var rateLimit = DescribeRateLimit(endpoint);
@@ -138,7 +141,7 @@ public sealed class RouteInventoryCharacterizationTests : IClassFixture<WebAppli
 
     private static string DescribePermission(RouteEndpoint endpoint)
     {
-        var metadata = endpoint.Metadata.GetOrderedMetadata<EndpointPermissionMetadata>().LastOrDefault();
+        var metadata = endpoint.Metadata.GetOrderedMetadata<IEndpointPermissionMetadata>().LastOrDefault();
         return metadata is null ? "none" : $"{metadata.Permission}:{(metadata.IsGlobal ? "global" : "resource")}";
     }
 

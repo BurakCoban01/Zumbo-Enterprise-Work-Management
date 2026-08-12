@@ -51,6 +51,7 @@ internal static class ApiPipeline
             .WithZumboPermission(PermissionCatalog.WorkItemView);
 
         var api = app.MapGroup("/api").RequireRateLimiting("api");
+        app.MapControllers();
         api.MapIdentityEndpoints();
         api.MapOrganizationsEndpoints();
         api.MapTeamsEndpoints();
@@ -70,8 +71,6 @@ internal static class ApiPipeline
         api.MapWorkItemTypeSchemaEndpoints();
         api.MapIntakeEndpoints();
         api.MapNotificationEndpoints();
-        api.MapAuditEndpoints();
-        api.MapOperationsEndpoints();
 
         if (app.Environment.IsDevelopment())
         {

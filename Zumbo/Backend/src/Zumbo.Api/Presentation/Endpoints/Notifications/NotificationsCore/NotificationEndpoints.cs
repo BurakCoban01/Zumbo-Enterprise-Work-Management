@@ -43,12 +43,6 @@ internal static class NotificationEndpoints
             CancellationToken ct) =>
             Ok(await handler.HandleAsync(new ListNotificationsQuery(userId, page ?? 1, pageSize ?? 50, unreadOnly ?? false), ct), http));
 
-        group.MapGet("/preferences/me", async (
-            GetNotificationPreferencesHandler handler,
-            HttpContext http,
-            CancellationToken ct) =>
-            Ok(await handler.HandleAsync(new GetNotificationPreferencesQuery(), ct), http));
-
         group.MapPut("/preferences/me", async (
             UpdateNotificationPreferencesRequest request,
             UpdateNotificationPreferencesHandler handler,

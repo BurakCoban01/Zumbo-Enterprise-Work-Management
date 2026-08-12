@@ -1448,8 +1448,6 @@ public sealed class RefactorRuntimeContractTests
         + "Results.Ok(awaithandler.HandleAsync(newListNotificationDeadLettersQuery(organizationId,Math.Clamp(pageSize??20,1,50)),ct))).WithZumboPermission(PermissionCatalog.OperationsManage,isGlobal:true).RequireRateLimiting(\"report\");",
         "group.MapPost(\"/delivery/{notificationId}/replay\",async(stringnotificationId,stringorganizationId,ReplayNotificationDeadLetterHandlerhandler,INotificationAuditWriteraudit,HttpContexthttp,CancellationTokenct)=>"
         + "{if(!awaithandler.HandleAsync(newReplayNotificationDeadLetterCommand(organizationId,notificationId),ct)){returnResults.NotFound();}awaitaudit.WriteAsync(\"NotificationDeliveryReplayed\",notificationId,\"DeadLetter\",\"Pending\",CorrelationId(http),ct);returnResults.Ok();}).WithZumboPermission(PermissionCatalog.OperationsManage,isGlobal:true).RequireRateLimiting(\"bulk\");",
-        "group.MapGet(\"/preferences/me\",async(GetNotificationPreferencesHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
-        + "Ok(awaithandler.HandleAsync(newGetNotificationPreferencesQuery(),ct),http));",
         "group.MapPut(\"/preferences/me\",async(UpdateNotificationPreferencesRequestrequest,UpdateNotificationPreferencesHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
         + "Ok(awaithandler.HandleAsync(newUpdateNotificationPreferencesCommand(request),ct),http)).WithZumboPermission(PermissionCatalog.NotificationManage);",
         "group.MapPost(\"/{portfolioId}/dependencies\",async(stringportfolioId,SavePortfolioDependencyRequestrequest,[FromServices]SavePortfolioDependencyHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
