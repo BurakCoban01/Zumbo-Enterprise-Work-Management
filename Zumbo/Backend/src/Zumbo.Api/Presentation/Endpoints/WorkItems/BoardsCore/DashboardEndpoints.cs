@@ -1,4 +1,3 @@
-using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
 using Zumbo.Api.Composition.Modules.WorkItems;
 using Zumbo.BuildingBlocks.Application.Security;
@@ -86,21 +85,6 @@ internal static class DashboardEndpoints
             await service.ArchiveAsync(dashboardId, CorrelationId(http), ct);
             return Ok(new { archived = true }, http);
         });
-
-        group.MapGet("/{dashboardId}/export", async (
-            string dashboardId,
-            [FromServices] DashboardService service,
-            CancellationToken ct) =>
-        {
-            var dashboard = await service.GetAsync(dashboardId, includeArchived: false, ct);
-            var bytes = JsonSerializer.SerializeToUtf8Bytes(
-                dashboard,
-                new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true });
-            return Results.File(
-                bytes,
-                "application/json",
-                $"zumbo-dashboard-{dashboard.Id}.json");
-        }).RequireRateLimiting("report");
 
         group.MapGet("/{dashboardId}/render", async (
             string dashboardId,

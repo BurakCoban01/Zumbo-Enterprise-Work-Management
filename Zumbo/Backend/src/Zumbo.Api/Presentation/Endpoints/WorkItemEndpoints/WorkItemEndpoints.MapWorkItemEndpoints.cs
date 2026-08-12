@@ -95,10 +95,6 @@ internal static partial class WorkItemEndpoints
 
         RetryBulkJobEndpoint.Map(group);
 
-        GetBulkJobResultEndpoint.Map(group);
-
-        ListBulkJobErrorsEndpoint.Map(group);
-
         BulkMoveWorkItemsEndpoint.Map(group);
 
         BulkAssignWorkItemsEndpoint.Map(group);
@@ -142,14 +138,6 @@ internal static partial class WorkItemEndpoints
         EditCommentEndpoint.Map(group);
 
         DeleteCommentEndpoint.Map(group);
-
-        UploadAttachmentEndpoint.Map(group);
-
-        DownloadAttachmentEndpoint.Map(group);
-
-        PreviewAttachmentEndpoint.Map(group);
-
-        DeleteAttachmentEndpoint.Map(group);
 
         ListAttachmentsEndpoint.Map(group);
 

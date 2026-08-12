@@ -53,18 +53,14 @@ internal static class ApiPipeline
         var api = app.MapGroup("/api").RequireRateLimiting("api");
         app.MapControllers();
         api.MapIdentityEndpoints();
-        api.MapProjectsEndpoints();
         api.MapKnowledgeEndpoints();
         api.MapWorkflowEndpoints();
         api.MapAutomationEndpoints();
         api.MapWorkItemEndpoints();
         api.MapDashboardEndpoints();
         api.MapCapacityPlanningEndpoints();
-        api.MapWebhookEndpoints();
-        api.MapDevelopmentIntegrationEndpoints();
         api.MapSprintEndpoints();
         api.MapWorkItemTypeSchemaEndpoints();
-        api.MapIntakeEndpoints();
 
         if (app.Environment.IsDevelopment())
         {

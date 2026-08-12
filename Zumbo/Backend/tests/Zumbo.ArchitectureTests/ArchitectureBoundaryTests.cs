@@ -791,13 +791,9 @@ public sealed class ArchitectureBoundaryTests
             ["AutomationEndpoints.cs"] = "Zumbo.Modules.Workflows",
             ["CapacityPlanningEndpoints.cs"] = "Zumbo.Modules.WorkItems",
             ["DashboardEndpoints.cs"] = "Zumbo.Modules.WorkItems",
-            ["DevelopmentIntegrationEndpoints.cs"] = "Zumbo.Modules.WorkItems",
             ["IdentityEndpoints.cs"] = "Zumbo.Modules.Identity",
-            ["IntakeEndpoints.cs"] = "Zumbo.Modules.WorkItems",
             ["KnowledgeEndpoints.cs"] = "Zumbo.Modules.Projects",
-            ["ProjectsEndpoints.cs"] = "Zumbo.Modules.Projects",
             ["SprintEndpoints.cs"] = "Zumbo.Modules.WorkItems",
-            ["WebhookEndpoints.cs"] = "Zumbo.Modules.WorkItems",
             ["WorkflowEndpoints.cs"] = "Zumbo.Modules.Workflows",
             ["WorkItemTypeSchemaEndpoints.cs"] = "Zumbo.Modules.WorkItems"
         };
@@ -1270,10 +1266,16 @@ public sealed class ArchitectureBoundaryTests
         Assert.Contains("createProjectHandler.HandleAsync", facade, StringComparison.Ordinal);
         Assert.Contains("listProjectsHandler.HandleAsync", facade, StringComparison.Ordinal);
 
-        var endpointHost = File.ReadAllText(EndpointHostPath("ProjectsEndpoints.cs"));
-        Assert.Contains("services.AddProjectServices()", endpointHost, StringComparison.Ordinal);
-        Assert.DoesNotContain("IDocumentRepository", endpointHost, StringComparison.Ordinal);
-        Assert.DoesNotContain("ProjectDocument", endpointHost, StringComparison.Ordinal);
+        var registration = File.ReadAllText(Path.Combine(
+            SourceDirectory,
+            "Zumbo.Api",
+            "Composition",
+            "Modules",
+            "Projects",
+            "ProjectModuleRegistration.cs"));
+        Assert.Contains("services.AddProjectServices()", registration, StringComparison.Ordinal);
+        Assert.DoesNotContain("IDocumentRepository", registration, StringComparison.Ordinal);
+        Assert.DoesNotContain("ProjectDocument", registration, StringComparison.Ordinal);
 
         var composition = File.ReadAllText(Path.Combine(
             SourceDirectory,
@@ -2676,11 +2678,7 @@ public sealed class ArchitectureBoundaryTests
         var directory = Path.Combine(SourceDirectory, "Zumbo.Api", "Presentation", "Endpoints", "WorkItems", "Attachments");
         var endpointFiles = new Dictionary<string, string>
         {
-            ["UploadAttachmentEndpoint.cs"] = "UploadAttachmentEndpoint",
-            ["ListAttachmentsEndpoint.cs"] = "ListAttachmentsEndpoint",
-            ["DownloadAttachmentEndpoint.cs"] = "DownloadAttachmentEndpoint",
-            ["PreviewAttachmentEndpoint.cs"] = "PreviewAttachmentEndpoint",
-            ["DeleteAttachmentEndpoint.cs"] = "DeleteAttachmentEndpoint"
+            ["ListAttachmentsEndpoint.cs"] = "ListAttachmentsEndpoint"
         };
 
         foreach (var endpointFile in endpointFiles)
@@ -2942,8 +2940,6 @@ public sealed class ArchitectureBoundaryTests
             ["CreateBulkJobEndpoint.cs"] = "CreateBulkJobEndpoint",
             ["ListBulkJobsEndpoint.cs"] = "ListBulkJobsEndpoint",
             ["GetBulkJobEndpoint.cs"] = "GetBulkJobEndpoint",
-            ["ListBulkJobErrorsEndpoint.cs"] = "ListBulkJobErrorsEndpoint",
-            ["GetBulkJobResultEndpoint.cs"] = "GetBulkJobResultEndpoint",
             ["CancelBulkJobEndpoint.cs"] = "CancelBulkJobEndpoint",
             ["RetryBulkJobEndpoint.cs"] = "RetryBulkJobEndpoint",
             ["CreateBulkExportJobEndpoint.cs"] = "CreateBulkExportJobEndpoint",
