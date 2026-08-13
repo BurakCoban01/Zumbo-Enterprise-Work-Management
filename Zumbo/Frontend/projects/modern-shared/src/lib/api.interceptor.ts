@@ -21,12 +21,10 @@ export const zumboApiInterceptor: HttpInterceptorFn = (request, next) => {
   const session = inject(ZumboSessionService);
   if (!request.url.startsWith(runtime.apiBaseUrl)) return next(request);
 
+  const path = new URL(request.url).pathname;
   const correlationId = request.context.get(ZUMBO_CORRELATION_ID) || createIdentifier('web-');
   const idempotencyKey = request.context.get(ZUMBO_IDEMPOTENCY_KEY);
-  const decorated = decorate(request, session, correlationId, idempotencyKey);
-
-  return next(decorated).pipe(catchError(error => {
-    const path = new URL(request.url).pathname;
+  const dispatch = () => next(decorate(request, session, correlationId, idempotencyKey)).pipe(catchError(error => {
     if (error?.status !== 401 || PUBLIC_AUTH_PATHS.has(path) || request.context.get(ZUMBO_SKIP_REFRESH)) {
       return throwError(() => normalizeApiError(error, correlationId));
     }
@@ -45,6 +43,11 @@ export const zumboApiInterceptor: HttpInterceptorFn = (request, next) => {
       catchError(refreshError => throwError(() => normalizeApiError(refreshError, correlationId)))
     );
   }));
+
+  if (!isSafeMethod(request.method) && !PUBLIC_AUTH_PATHS.has(path) && session.currentUser() && !session.getCsrf()) {
+    return session.restore().pipe(switchMap(() => dispatch()));
+  }
+  return dispatch();
 };
 
 function decorate(

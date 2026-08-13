@@ -21,7 +21,7 @@ public sealed class NotificationExtractionContractTests
         Assert.Equal("work-item.notification.v1", WorkItemDurableEventTypes.Notification);
         Assert.Equal("team.invitation-notification.v1", TeamDurableEventTypes.InvitationNotification);
         Assert.Equal(
-            ["DeduplicationKey", "Message", "Type", "UserId"],
+            ["DeduplicationKey", "Message", "ProjectId", "SourceId", "SourceKind", "Type", "UserId"],
             PropertyNames(JsonSerializer.Serialize(workItem)));
         Assert.Equal(
             ["DeduplicationKey", "InviteId", "InvitedByUserId", "TeamId", "TeamName", "UserId"],

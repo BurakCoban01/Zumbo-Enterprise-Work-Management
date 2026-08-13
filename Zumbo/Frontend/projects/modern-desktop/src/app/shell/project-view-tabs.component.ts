@@ -1,4 +1,4 @@
-import { Component, input } from '@angular/core';
+import { Component, input, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { ProjectViewDefinition, ProjectViewId } from './desktop-shell.models';
 import { ZumboIconComponent } from './zumbo-icon.component';
@@ -20,6 +20,7 @@ export class ProjectViewTabsComponent {
     ['insights', 'İçgörüler']
   ]);
   protected readonly secondaryGroups = ['plan', 'operate', 'insights'] as const;
+  protected readonly openGroup = signal<ProjectViewDefinition['group'] | null>(null);
 
   protected primary(): readonly ProjectViewDefinition[] {
     return this.views().filter(view => view.group === 'primary');
@@ -35,5 +36,9 @@ export class ProjectViewTabsComponent {
 
   protected isGroupActive(group: ProjectViewDefinition['group']): boolean {
     return this.viewsInGroup(group).some(view => view.id === this.activeView());
+  }
+
+  protected toggleGroup(group: ProjectViewDefinition['group']): void {
+    this.openGroup.update(current => current === group ? null : group);
   }
 }

@@ -44,3 +44,67 @@ input {
   color: var(--muted);
   font-size: 11px;
 }
+
+/* The application rail reduces feature width before viewport-only component breakpoints apply. */
+@media (max-width: 1180px) {
+  .modern-page zumbo-goal-page .goal-shell,
+  .modern-page zumbo-capacity-page .capacity-shell,
+  .modern-page zumbo-teams-page .teams-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .modern-page zumbo-goal-page .goal-list,
+  .modern-page zumbo-capacity-page .plan-list,
+  .modern-page zumbo-teams-page .team-list {
+    display: flex;
+    overflow: auto;
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .modern-page zumbo-goal-page .goal-list header,
+  .modern-page zumbo-capacity-page .plan-list header {
+    flex: 0 0 120px;
+  }
+
+  .modern-page zumbo-goal-page .goal-item,
+  .modern-page zumbo-capacity-page .plan-item,
+  .modern-page zumbo-teams-page .team-list button {
+    flex: 0 0 220px;
+  }
+
+  .modern-page zumbo-goal-page .goal-summary,
+  .modern-page zumbo-capacity-page .plan-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .modern-page zumbo-goal-page .summary-title,
+  .modern-page zumbo-capacity-page .summary-title {
+    grid-column: 1 / -1;
+  }
+
+  .modern-page zumbo-goal-page .result-row {
+    grid-template-columns: minmax(0, 1fr) 100px auto;
+  }
+
+  .modern-page zumbo-capacity-page .person-row {
+    grid-template-columns: minmax(0, 1fr) 140px auto;
+  }
+
+  .modern-page zumbo-capacity-page .allocation-row,
+  .modern-page zumbo-capacity-page .member-row {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .modern-page zumbo-teams-page .team-list button {
+    border-right: 1px solid var(--border);
+  }
+
+  .modern-page zumbo-teams-page .team-workspace {
+    padding: 15px;
+  }
+
+  .modern-page zumbo-teams-page .member-row {
+    grid-template-columns: minmax(210px, 1.4fr) 110px 120px 90px;
+  }
+}

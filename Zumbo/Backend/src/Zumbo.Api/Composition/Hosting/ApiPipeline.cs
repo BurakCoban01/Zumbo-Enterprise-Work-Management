@@ -51,28 +51,7 @@ internal static class ApiPipeline
             .WithZumboPermission(PermissionCatalog.WorkItemView);
 
         var api = app.MapGroup("/api").RequireRateLimiting("api");
-        api.MapIdentityEndpoints();
-        api.MapOrganizationsEndpoints();
-        api.MapTeamsEndpoints();
-        api.MapProjectsEndpoints();
-        api.MapPortfolioEndpoints();
-        api.MapGoalEndpoints();
-        api.MapKnowledgeEndpoints();
-        api.MapBoardsEndpoints();
-        api.MapWorkflowEndpoints();
-        api.MapAutomationEndpoints();
-        api.MapWorkItemEndpoints();
-        api.MapDashboardEndpoints();
-        api.MapCapacityPlanningEndpoints();
-        api.MapWebhookEndpoints();
-        api.MapDevelopmentIntegrationEndpoints();
-        api.MapSprintEndpoints();
-        api.MapWorkItemTypeSchemaEndpoints();
-        api.MapIntakeEndpoints();
-        api.MapNotificationEndpoints();
-        api.MapAuditEndpoints();
-        api.MapOperationsEndpoints();
-
+        app.MapControllers();
         if (app.Environment.IsDevelopment())
         {
             app.MapGet("/", () => Results.Redirect("/swagger"));

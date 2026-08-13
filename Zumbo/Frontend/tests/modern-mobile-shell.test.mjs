@@ -13,6 +13,7 @@ test('modern Ionic shell exposes five functional lazy routes and safe daily-work
   const store = await read('projects/modern-mobile/src/app/shell/mobile-workspace.store.ts');
   const create = await read('projects/modern-mobile/src/app/features/create/mobile-create.page.ts');
   const more = await read('projects/modern-mobile/src/app/features/more/mobile-more.page.html');
+  const theme = await read('projects/modern-mobile/src/app/shell/mobile-theme.service.ts');
 
   for (const path of ['home', 'work', 'create', 'inbox', 'more', 'projects']) assert.match(routes, new RegExp(`path: '${path}'`));
   assert.equal((tabs.match(/<ion-tab-button/g) ?? []).length, 5);
@@ -21,6 +22,9 @@ test('modern Ionic shell exposes five functional lazy routes and safe daily-work
   assert.match(store, /assigneeUserId: user\.id/);
   assert.match(create, /idempotencyKey\s*:\s*this\.api\.newIdempotencyKey\(\)/);
   assert.match(create, /WorkItemCreate/);
+  assert.match(more, /theme\.toggle\(\)/);
+  assert.match(theme, /zumbo\.mobileTheme/);
+  assert.match(theme, /body\.classList\.toggle\('theme-dark'/);
   assert.doesNotMatch(more, /M09|sonraki faz|sonraki görev|taşınacak/i);
 });
 
@@ -80,6 +84,9 @@ test('mobile task detail keeps permission, offline and bounded collaboration con
   assert.match(page, /realtime\.connect\(context\.detail\.projectId\)/);
   assert.match(page, /realtime\.resync\$/);
   assert.equal((template.match(/role="tab"/g) ?? []).length, 3);
+  for (const label of ['İş başlığı', 'İş açıklaması', 'İş son tarihi']) {
+    assert.ok(template.includes(`aria-label="${label}"`), `missing task-detail accessible name ${label}`);
+  }
   assert.match(template, /İlk \{\{context\(\)\?\.activity\?\.items\?\.length\|\|0\}\}/);
   for (const endpoint of ['/collaboration', '/checklist', '/status', '/watch', '/vote']) {
     assert.ok(service.includes(endpoint), `missing task-detail endpoint ${endpoint}`);

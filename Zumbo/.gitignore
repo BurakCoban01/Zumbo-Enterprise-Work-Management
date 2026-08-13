@@ -10,6 +10,7 @@
 **/dist/
 **/coverage/
 Frontend/dist-modern/
+Frontend/dist-modern-dev/
 Frontend/.angular/
 **/.playwright/
 **/.playwright-mcp/

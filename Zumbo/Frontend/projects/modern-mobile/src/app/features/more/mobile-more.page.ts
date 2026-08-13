@@ -3,9 +3,10 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Router, RouterLink } from '@angular/router';
 import { IonContent, IonHeader, IonIcon, IonTitle, IonToolbar } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
-import { bookOutline, chevronForwardOutline, flagOutline, folderOpenOutline, layersOutline, linkOutline, logOutOutline, peopleOutline, personCircleOutline, searchOutline, serverOutline } from 'ionicons/icons';
+import { bookOutline, chevronForwardOutline, flagOutline, folderOpenOutline, layersOutline, linkOutline, logOutOutline, moonOutline, peopleOutline, personCircleOutline, searchOutline, serverOutline, sunnyOutline } from 'ionicons/icons';
 import { ZumboApiClient, ZumboRealtimeService, ZumboSessionService } from '@zumbo/modern-shared';
 import { MobileWorkspaceStore } from '../../shell/mobile-workspace.store';
+import { MobileThemeService } from '../../shell/mobile-theme.service';
 
 @Component({
   selector: 'zumbo-mobile-more',
@@ -16,6 +17,7 @@ import { MobileWorkspaceStore } from '../../shell/mobile-workspace.store';
 export class MobileMorePage {
   protected readonly session = inject(ZumboSessionService);
   protected readonly store = inject(MobileWorkspaceStore);
+  protected readonly theme = inject(MobileThemeService);
   private readonly realtime = inject(ZumboRealtimeService);
   private readonly router = inject(Router);
   private readonly api = inject(ZumboApiClient);
@@ -25,7 +27,7 @@ export class MobileMorePage {
   protected readonly canOperations = computed(() => this.hasSystemPermission('OperationsManage'));
 
   constructor() {
-    addIcons({ bookOutline, folderOpenOutline, linkOutline, logOutOutline, chevronForwardOutline, flagOutline, layersOutline, peopleOutline, personCircleOutline, searchOutline, serverOutline });
+    addIcons({ bookOutline, folderOpenOutline, linkOutline, logOutOutline, moonOutline, chevronForwardOutline, flagOutline, layersOutline, peopleOutline, personCircleOutline, searchOutline, serverOutline, sunnyOutline });
     this.api.get<readonly { readonly name: string; readonly permissions: readonly string[]; readonly isActive: boolean }[]>('/api/auth/roles?scope=System').pipe(takeUntilDestroyed(this.destroyRef)).subscribe({ next: roles => this.systemRoles.set(roles) });
   }
 

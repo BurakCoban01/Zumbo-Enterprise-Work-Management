@@ -27,18 +27,21 @@ export class MobileWorkspaceStore {
     this.loadPromise = firstValueFrom(this.api.get<readonly MobileProject[]>(`/api/projects?organizationId=${encodeURIComponent(user.organizationId)}`).pipe(
       map(projects => ({ projects })),
       catchError(() => { throw new Error('Projeler yüklenemedi.'); })
-    )).then(({ projects }) => firstValueFrom(forkJoin({
-      work: projects.length ? forkJoin(projects.map(project => this.api.post<MobileSearchResult>('/api/work-items/search', {
-        projectId: project.id, assigneeUserId: user.id, page: 1, pageSize: 50
-      }).pipe(map(result => ({ project, result })), catchError(() => of({ project, result: null }))))) : of([]),
-      notifications: this.api.get<readonly MobileNotification[]>('/api/notifications?page=1&pageSize=50').pipe(catchError(() => of([])))
-    })).then(({ work, notifications }) => {
+    )).then(({ projects }) => {
+      const workProjects = projects.filter(project => project.members?.some(member => member.userId === user.id));
+      return firstValueFrom(forkJoin({
+        work: workProjects.length ? forkJoin(workProjects.map(project => this.api.post<MobileSearchResult>('/api/work-items/search', {
+          projectId: project.id, assigneeUserId: user.id, page: 1, pageSize: 50
+        }).pipe(map(result => ({ project, result })), catchError(() => of({ project, result: null }))))) : of([]),
+        notifications: this.api.get<readonly MobileNotification[]>('/api/notifications?page=1&pageSize=50').pipe(catchError(() => of([])))
+      })).then(result => ({ projects, ...result }));
+    }).then(({ projects, work, notifications }) => {
       this.projects.set(projects);
       this.tasks.set(work.flatMap(({ project, result }) => (result?.items ?? []).map(item => ({ ...item, projectName: project.name }))));
       this.notifications.set(notifications);
       this.partial.set(work.some(({ result }) => result === null));
       this.ready.set(true);
-    })).catch(error => {
+    }).catch(error => {
       this.error.set(error instanceof Error ? error.message : 'Çalışma alanı yüklenemedi.');
       throw error;
     }).finally(() => {

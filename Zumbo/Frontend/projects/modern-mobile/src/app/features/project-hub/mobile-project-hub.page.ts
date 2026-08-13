@@ -6,6 +6,7 @@ import { addIcons } from 'ionicons';
 import { arrowBackOutline, arrowForwardOutline, calendarOutline, warningOutline } from 'ionicons/icons';
 import { finalize } from 'rxjs';
 import { normalizeApiError, ZumboRealtimeService, ZumboSessionService } from '@zumbo/modern-shared';
+import { priorityLabel } from '../../shell/mobile-workspace.models';
 import { MobileWorkspaceStore } from '../../shell/mobile-workspace.store';
 import { MobileProjectHubData, MobileProjectHubTab } from './mobile-project-hub.models';
 import { MobileProjectHubService } from './mobile-project-hub.service';
@@ -17,10 +18,13 @@ export class MobileProjectHubPage {
   protected readonly store=inject(MobileWorkspaceStore); protected readonly projectId=this.route.snapshot.paramMap.get('projectId')||'';
   protected readonly project=computed(()=>this.store.projects().find(item=>item.id===this.projectId)); protected readonly tab=signal<MobileProjectHubTab>('overview');
   protected readonly data=signal<MobileProjectHubData|null>(null); protected readonly selectedStatus=signal(''); protected readonly loading=signal(true); protected readonly busy=signal<string|null>(null); protected readonly error=signal<string|null>(null);
+  protected readonly metricFocus=signal<'total'|'active'|'done'|'overdue'|null>(null);
+  protected readonly priorityLabel=priorityLabel;
   protected readonly statuses=computed(()=>[...(this.data()?.workflow.statuses??[])].sort((a,b)=>(a.position??0)-(b.position??0)));
   protected readonly boardItems=computed(()=>this.data()?.tasks.filter(item=>item.status===this.selectedStatus())??[]);
   protected readonly activeSprint=computed(()=>this.data()?.sprints.find(item=>item.status==='Active')??null);
   protected readonly topRisks=computed(()=>this.data()?.risks.slice(0,5)??[]);
+  protected readonly metricItems=computed(()=>{const items=this.data()?.tasks??[];const focus=this.metricFocus();const firstStatus=this.statuses()[0]?.name;const now=Date.now();if(focus==='active')return items.filter(item=>!item.completedAt&&item.status!==firstStatus);if(focus==='done')return items.filter(item=>!!item.completedAt);if(focus==='overdue')return items.filter(item=>!item.completedAt&&!!item.dueDate&&new Date(item.dueDate).getTime()<now);return items;});
   protected readonly canMove=computed(()=>this.hasPermission('WorkItemMove'));
   protected readonly online=signal(navigator.onLine);
 
@@ -29,6 +33,8 @@ export class MobileProjectHubPage {
   protected load(done?:()=>void,showLoading=true):void{if(!this.projectId||this.loadInFlight){done?.();return;}this.loadInFlight=true;if(showLoading)this.loading.set(true);this.error.set(null);void this.store.load().then(()=>{this.api.load(this.projectId).pipe(finalize(()=>{this.loadInFlight=false;this.loading.set(false);done?.();})).subscribe({next:value=>{this.data.set(value);this.realtime.synchronize(value.tasks);if(!this.statuses().some(item=>item.name===this.selectedStatus()))this.selectedStatus.set(this.statuses()[0]?.name||'');if(value.failures.length)this.error.set(`${value.failures.join(', ')} geçici olarak alınamadı.`);},error:()=>this.error.set('Proje merkezi yüklenemedi.')});}).catch(()=>{this.loadInFlight=false;this.loading.set(false);this.error.set('Proje bulunamadı.');done?.();});}
   protected refresh(event:Event):void{this.load(()=>void(event.target as unknown as{complete():Promise<void>}).complete());}
   protected setStatus(value:string):void{this.selectedStatus.set(value);}
+  protected showMetric(value:'total'|'active'|'done'|'overdue'):void{this.metricFocus.update(current=>current===value?null:value);}
+  protected metricTitle():string{return({total:'Tüm proje işleri',active:'Devam eden işler',done:'Tamamlanan işler',overdue:'Geciken işler'} as const)[this.metricFocus()??'total'];}
   protected move(itemId:string,direction:-1|1):void{const snapshot=this.data();if(!snapshot||this.busy()||!this.online()||!this.canMove())return;const item=snapshot.tasks.find(value=>value.id===itemId);const index=this.statuses().findIndex(value=>value.name===item?.status);const target=this.statuses()[index+direction];if(!item||!target)return;this.busy.set(item.id);this.error.set(null);this.data.set({...snapshot,tasks:snapshot.tasks.map(value=>value.id===item.id?{...value,status:target.name}:value)});this.api.changeStatus(item.id,target.name).pipe(finalize(()=>this.busy.set(null))).subscribe({next:value=>{this.realtime.remember(value);this.data.update(current=>current?{...current,tasks:current.tasks.map(existing=>existing.id===value.id?value:existing)}:current);},error:response=>{this.data.set(snapshot);this.error.set(normalizeApiError(response).message||'İş taşınamadı; önceki durum geri yüklendi.');}});}
   protected canMoveDirection(status:string,direction:-1|1):boolean{const index=this.statuses().findIndex(item=>item.name===status);return this.canMove()&&this.online()&&!!this.statuses()[index+direction];}
   protected statusCount(status:string):number{return this.data()?.tasks.filter(item=>item.status===status).length??0;}

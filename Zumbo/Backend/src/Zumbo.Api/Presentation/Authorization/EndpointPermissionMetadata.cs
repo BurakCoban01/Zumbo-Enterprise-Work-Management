@@ -1,3 +1,4 @@
-using Zumbo.BuildingBlocks.Application.Security;
+namespace Zumbo.Api.Presentation.Authorization;
 
-public sealed record EndpointPermissionMetadata(string Permission, bool IsGlobal = false);
+public sealed record EndpointPermissionMetadata(string Permission, bool IsGlobal = false)
+    : IEndpointPermissionMetadata;

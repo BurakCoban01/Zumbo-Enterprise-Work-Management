@@ -12,7 +12,7 @@
     @if(loading()&&!items().length){<p class="work-state" role="status">Sonuçlar aranıyor...</p>}
     @if(items().length){
       <section class="work-list" aria-label="Arama sonuçları">
-        @for(item of items();track item.id){<a class="work-card" [routerLink]="['/tasks',item.id]"><span><strong>{{item.title}}</strong><small>{{item.type}} · {{item.status}} · {{item.priority}}</small></span><time>{{date(item.dueDate)}}</time></a>}
+        @for(item of items();track item.id){<a class="work-card" [routerLink]="['/tasks',item.id]"><span><strong>{{item.title}}</strong><small>{{item.type}} · {{item.status}} · {{priorityLabel(item.priority)}}</small></span><time>{{date(item.dueDate)}}</time></a>}
       </section>
       @if(hasMore()){<button class="load-more" type="button" (click)="loadMore()" [disabled]="loading()">Daha fazla sonuç</button>}
     }@else if(searched()&&!loading()&&!error()){<p class="work-state">Sonuç bulunamadı. Daha genel bir ifadeyle yeniden arayın.</p>}

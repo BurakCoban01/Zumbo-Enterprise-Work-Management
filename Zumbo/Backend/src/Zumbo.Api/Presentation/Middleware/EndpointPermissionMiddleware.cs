@@ -1,4 +1,5 @@
 using Zumbo.BuildingBlocks.Application.Security;
+using Zumbo.Api.Presentation.Authorization;
 using Zumbo.Modules.Identity;
 using Zumbo.SharedKernel;
 
@@ -6,7 +7,7 @@ public sealed class EndpointPermissionMiddleware(RequestDelegate next)
 {
     public async Task InvokeAsync(HttpContext context, IdentityPermissionService permissions)
     {
-        var metadata = context.GetEndpoint()?.Metadata.GetOrderedMetadata<EndpointPermissionMetadata>().LastOrDefault();
+        var metadata = context.GetEndpoint()?.Metadata.GetOrderedMetadata<IEndpointPermissionMetadata>().LastOrDefault();
         var apiKeyIdentity = context.User.Identities.FirstOrDefault(identity =>
             identity.IsAuthenticated
             && identity.AuthenticationType == ZumboAuthenticationSchemes.ApiKey);

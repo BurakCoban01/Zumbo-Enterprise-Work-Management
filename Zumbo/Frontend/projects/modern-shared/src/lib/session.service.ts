@@ -32,6 +32,7 @@ const TENANT_SESSION_KEYS = [CSRF_KEY];
 export class ZumboSessionService {
   private readonly runtime = inject(ZUMBO_RUNTIME_CONFIG);
   private readonly rawHttp = new HttpClient(inject(HttpBackend));
+  private restorePromise: Promise<AuthResponse | null> | null = null;
   private refreshPromise: Promise<AuthResponse> | null = null;
   private readonly userState = signal<ZumboUser | null>(readStoredUser());
 
@@ -51,13 +52,18 @@ export class ZumboSessionService {
   }
 
   restore(): Observable<AuthResponse | null> {
-    return this.authGet('/api/browser-auth/session').pipe(
-      tap(auth => this.accept(auth)),
-      catchError(() => {
-        this.clear();
-        return of(null);
-      })
-    );
+    if (!this.restorePromise) {
+      this.restorePromise = firstValueFrom(
+        this.authGet('/api/browser-auth/session').pipe(
+          tap(auth => this.accept(auth)),
+          catchError(() => {
+            this.clear();
+            return of(null);
+          })
+        )
+      ).finally(() => { this.restorePromise = null; });
+    }
+    return from(this.restorePromise);
   }
 
   refresh(): Observable<AuthResponse> {

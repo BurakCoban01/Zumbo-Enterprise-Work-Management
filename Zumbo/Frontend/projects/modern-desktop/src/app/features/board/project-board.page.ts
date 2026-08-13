@@ -1,6 +1,6 @@
 import { Component, DestroyRef, computed, effect, inject, input, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { RouterLink } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { ZumboApiError, ZumboRealtimeService } from '@zumbo/modern-shared';
 import { Observable, catchError, finalize, of, switchMap } from 'rxjs';
 import { BoardColumnSummary, BoardSummary, ProjectSummary } from '../../shell/desktop-shell.models';
@@ -25,7 +25,9 @@ export class ProjectBoardPage {
 
   private readonly destroyRef = inject(DestroyRef);
   private readonly realtime = inject(ZumboRealtimeService);
+  private readonly router = inject(Router);
   private contextProjectId = '';
+  private suppressCardOpen = false;
   protected readonly data = signal<ProjectBoardData | null>(null);
   protected readonly loading = signal(true);
   protected readonly error = signal<string | null>(null);
@@ -99,6 +101,7 @@ export class ProjectBoardPage {
 
   protected dragStart(event: DragEvent, task: BoardWorkItem): void {
     if (!this.canMove() || this.pendingIds().has(task.id)) { event.preventDefault(); return; }
+    this.suppressCardOpen = true;
     this.draggingId.set(task.id);
     event.dataTransfer?.setData('text/plain', task.id);
     if (event.dataTransfer) event.dataTransfer.effectAllowed = 'move';
@@ -142,6 +145,13 @@ export class ProjectBoardPage {
     this.draggingId.set(null);
     this.dropTarget.set(null);
     this.dropLaneId.set(null);
+    setTimeout(() => { this.suppressCardOpen = false; });
+  }
+
+  protected openTask(event: MouseEvent, task: BoardWorkItem): void {
+    const target = event.target as HTMLElement;
+    if (this.suppressCardOpen || target.closest('a, button, input, select, textarea')) return;
+    void this.router.navigate(['/workspace', this.project().id, 'board', 'task', task.id]);
   }
 
   protected finishDrag(): void {

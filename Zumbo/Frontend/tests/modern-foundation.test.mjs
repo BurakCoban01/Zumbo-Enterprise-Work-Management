@@ -42,7 +42,7 @@ test('production frontend has no AngularJS or Ionic 1 dependency, source root or
   assert.equal(packageJson.dependencies['ionic-sdk'], undefined);
   assert.equal(packageJson.scripts.build, packageJson.scripts['build:modern']);
   assert.equal(packageJson.scripts.preview, 'node tests/static-server.mjs dist-modern --canonical');
-  assert.equal(packageJson.scripts.unit, 'node --test --test-concurrency=1 tests/modern-*.test.mjs');
+  assert.equal(packageJson.scripts.unit, 'node tests/run-modern-tests.mjs');
   assert.doesNotMatch(lockfile, /^\s{2}(?:angular@1\.8\.3|ionic-sdk@1\.3\.2):/m);
   for (const path of [
     'desktop-bulma/index.html',
@@ -202,6 +202,8 @@ test('typed session, interceptor, client and realtime adapters retain required t
   assert.match(session, /refreshPromise: Promise<AuthResponse> \| null/);
   assert.match(session, /withCredentials: true/g);
   assert.match(session, /X-CSRF-Token/);
+  assert.match(session, /restorePromise/);
+  assert.match(interceptor, /!session\.getCsrf\(\)/);
   assert.match(session, /zumbo\.modern\.currentUser/);
   assert.doesNotMatch(session, /['"]zumbo\.currentUser['"]/);
   assert.match(interceptor, /canReplay\(request\.method, idempotencyKey\)/);

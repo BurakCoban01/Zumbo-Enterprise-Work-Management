@@ -40,9 +40,10 @@ GET|/api/audit/entity/{entityType}/{entityId}|auth=required[policy=;roles=;schem
 GET|/api/audit/export|auth=required[policy=;roles=;schemes=]|permission=AuditRead:resource|rate=effective=report;chain=api>report|tags=Audit
 GET|/api/audit/integrity/{organizationId}|auth=required[policy=;roles=;schemes=]|permission=AuditReadAll:global|rate=effective=report;chain=api>report|tags=Audit
 GET|/api/audit/user/{actorUserId}|auth=required[policy=;roles=;schemes=]|permission=AuditRead:resource|rate=effective=api;chain=api|tags=Audit
-GET|/api/audit/|auth=required[policy=;roles=;schemes=]|permission=AuditRead:resource|rate=effective=api;chain=api|tags=Audit
+GET|/api/audit|auth=required[policy=;roles=;schemes=]|permission=AuditRead:resource|rate=effective=api;chain=api|tags=Audit
 GET|/api/auth/api-keys|auth=required[policy=;roles=;schemes=]|permission=ProfileRead:resource|rate=effective=api;chain=api|tags=Identity
 GET|/api/auth/mfa|auth=required[policy=;roles=;schemes=]|permission=ProfileRead:resource|rate=effective=api;chain=api|tags=Identity
+GET|/api/auth/permissions|auth=required[policy=;roles=;schemes=]|permission=ProfileRead:resource|rate=effective=api;chain=api|tags=Identity
 GET|/api/auth/privacy/export.ndjson|auth=required[policy=;roles=;schemes=]|permission=ProfileRead:resource|rate=effective=api;chain=api|tags=Identity
 GET|/api/auth/privacy/export|auth=required[policy=;roles=;schemes=]|permission=ProfileRead:resource|rate=effective=api;chain=api|tags=Identity
 GET|/api/auth/privacy/jobs/{jobId}/status|auth=anonymous|permission=none|rate=effective=api;chain=api|tags=Identity
@@ -53,58 +54,58 @@ GET|/api/auth/users|auth=required[policy=;roles=;schemes=]|permission=ProfileRea
 GET|/api/automations/runs/{runId}|auth=required[policy=;roles=;schemes=]|permission=WorkflowView:resource|rate=effective=api;chain=api|tags=Automations
 GET|/api/automations/runs|auth=required[policy=;roles=;schemes=]|permission=WorkflowView:resource|rate=effective=api;chain=api|tags=Automations
 GET|/api/automations/{ruleId}|auth=required[policy=;roles=;schemes=]|permission=WorkflowView:resource|rate=effective=api;chain=api|tags=Automations
-GET|/api/automations/|auth=required[policy=;roles=;schemes=]|permission=WorkflowView:resource|rate=effective=api;chain=api|tags=Automations
+GET|/api/automations|auth=required[policy=;roles=;schemes=]|permission=WorkflowView:resource|rate=effective=api;chain=api|tags=Automations
 GET|/api/boards/by-project/{projectId}|auth=required[policy=;roles=;schemes=]|permission=BoardView:resource|rate=effective=api;chain=api|tags=Boards
 GET|/api/browser-auth/session|auth=required[policy=;roles=;schemes=]|permission=ProfileRead:resource|rate=effective=api;chain=api|tags=BrowserIdentity
 GET|/api/capacity-plans/{planId}/snapshot|auth=required[policy=;roles=;schemes=]|permission=WorkItemView:resource|rate=effective=report;chain=api>report|tags=CapacityPlanning
 GET|/api/capacity-plans/{planId}|auth=required[policy=;roles=;schemes=]|permission=WorkItemView:resource|rate=effective=api;chain=api|tags=CapacityPlanning
-GET|/api/capacity-plans/|auth=required[policy=;roles=;schemes=]|permission=WorkItemView:resource|rate=effective=api;chain=api|tags=CapacityPlanning
+GET|/api/capacity-plans|auth=required[policy=;roles=;schemes=]|permission=WorkItemView:resource|rate=effective=api;chain=api|tags=CapacityPlanning
 GET|/api/dashboards/{dashboardId}/export|auth=required[policy=;roles=;schemes=]|permission=WorkItemView:resource|rate=effective=report;chain=api>report|tags=Dashboards
 GET|/api/dashboards/{dashboardId}/render|auth=required[policy=;roles=;schemes=]|permission=WorkItemView:resource|rate=effective=report;chain=api>report|tags=Dashboards
 GET|/api/dashboards/{dashboardId}|auth=required[policy=;roles=;schemes=]|permission=WorkItemView:resource|rate=effective=api;chain=api|tags=Dashboards
-GET|/api/dashboards/|auth=required[policy=;roles=;schemes=]|permission=WorkItemView:resource|rate=effective=api;chain=api|tags=Dashboards
+GET|/api/dashboards|auth=required[policy=;roles=;schemes=]|permission=WorkItemView:resource|rate=effective=api;chain=api|tags=Dashboards
 GET|/api/goals/{goalId}/rollup|auth=required[policy=;roles=;schemes=]|permission=ProjectView:resource|rate=effective=api;chain=api|tags=Goals
 GET|/api/goals/{goalId}|auth=required[policy=;roles=;schemes=]|permission=ProjectView:resource|rate=effective=api;chain=api|tags=Goals
-GET|/api/goals/|auth=required[policy=;roles=;schemes=]|permission=ProjectView:resource|rate=effective=api;chain=api|tags=Goals
+GET|/api/goals|auth=required[policy=;roles=;schemes=]|permission=ProjectView:resource|rate=effective=api;chain=api|tags=Goals
 GET|/api/intake/forms/{formId}/published|auth=required[policy=;roles=;schemes=]|permission=WorkItemCreate:resource|rate=effective=api;chain=api|tags=Intake
 GET|/api/intake/forms/{formId}/submissions|auth=required[policy=;roles=;schemes=]|permission=WorkItemView:resource|rate=effective=api;chain=api|tags=Intake
 GET|/api/intake/forms/{formId}|auth=required[policy=;roles=;schemes=]|permission=WorkItemView:resource|rate=effective=api;chain=api|tags=Intake
-GET|/api/intake/forms/|auth=required[policy=;roles=;schemes=]|permission=WorkItemView:resource|rate=effective=api;chain=api|tags=Intake
+GET|/api/intake/forms|auth=required[policy=;roles=;schemes=]|permission=WorkItemView:resource|rate=effective=api;chain=api|tags=Intake
 GET|/api/intake/public/forms/{publicId}|auth=none|permission=none|rate=effective=api;chain=api|tags=PublicIntake
 GET|/api/integrations/development/{connectionId}/mappings|auth=required[policy=;roles=;schemes=]|permission=IntegrationManage:resource|rate=effective=api;chain=api|tags=Development integrations
 GET|/api/integrations/development/{connectionId}/repositories|auth=required[policy=;roles=;schemes=]|permission=IntegrationManage:resource|rate=effective=bulk;chain=api>bulk|tags=Development integrations
 GET|/api/integrations/development/{connectionId}|auth=required[policy=;roles=;schemes=]|permission=IntegrationManage:resource|rate=effective=api;chain=api|tags=Development integrations
-GET|/api/integrations/development/|auth=required[policy=;roles=;schemes=]|permission=IntegrationManage:resource|rate=effective=api;chain=api|tags=Development integrations
+GET|/api/integrations/development|auth=required[policy=;roles=;schemes=]|permission=IntegrationManage:resource|rate=effective=api;chain=api|tags=Development integrations
 GET|/api/integrations/webhooks/deliveries/{deliveryId}|auth=required[policy=;roles=;schemes=]|permission=IntegrationManage:resource|rate=effective=api;chain=api|tags=Integrations
 GET|/api/integrations/webhooks/metrics|auth=required[policy=;roles=;schemes=]|permission=IntegrationManage:resource|rate=effective=api;chain=api|tags=Integrations
 GET|/api/integrations/webhooks/{id}/deliveries|auth=required[policy=;roles=;schemes=]|permission=IntegrationManage:resource|rate=effective=api;chain=api|tags=Integrations
 GET|/api/integrations/webhooks/{id}|auth=required[policy=;roles=;schemes=]|permission=IntegrationManage:resource|rate=effective=api;chain=api|tags=Integrations
-GET|/api/integrations/webhooks/|auth=required[policy=;roles=;schemes=]|permission=IntegrationManage:resource|rate=effective=api;chain=api|tags=Integrations
+GET|/api/integrations/webhooks|auth=required[policy=;roles=;schemes=]|permission=IntegrationManage:resource|rate=effective=api;chain=api|tags=Integrations
 GET|/api/knowledge-documents/scope-link-options|auth=required[policy=;roles=;schemes=]|permission=ProjectView:resource|rate=effective=search;chain=api>search|tags=Knowledge
 GET|/api/knowledge-documents/{documentId}/versions/{number:int}|auth=required[policy=;roles=;schemes=]|permission=ProjectView:resource|rate=effective=api;chain=api|tags=Knowledge
 GET|/api/knowledge-documents/{documentId}|auth=required[policy=;roles=;schemes=]|permission=ProjectView:resource|rate=effective=api;chain=api|tags=Knowledge
-GET|/api/knowledge-documents/|auth=required[policy=;roles=;schemes=]|permission=ProjectView:resource|rate=effective=search;chain=api>search|tags=Knowledge
+GET|/api/knowledge-documents|auth=required[policy=;roles=;schemes=]|permission=ProjectView:resource|rate=effective=search;chain=api>search|tags=Knowledge
 GET|/api/notifications/delivery/dead-letters|auth=required[policy=;roles=;schemes=]|permission=OperationsManage:global|rate=effective=report;chain=api>report|tags=Notifications
 GET|/api/notifications/delivery/status|auth=required[policy=;roles=;schemes=]|permission=OperationsManage:global|rate=effective=report;chain=api>report|tags=Notifications
 GET|/api/notifications/preferences/me|auth=required[policy=;roles=;schemes=]|permission=NotificationView:resource|rate=effective=api;chain=api|tags=Notifications
 GET|/api/notifications/{userId}|auth=required[policy=;roles=;schemes=]|permission=NotificationView:resource|rate=effective=api;chain=api|tags=Notifications
-GET|/api/notifications/|auth=required[policy=;roles=;schemes=]|permission=NotificationView:resource|rate=effective=api;chain=api|tags=Notifications
+GET|/api/notifications|auth=required[policy=;roles=;schemes=]|permission=NotificationView:resource|rate=effective=api;chain=api|tags=Notifications
 GET|/api/operations/external-dependencies|auth=required[policy=;roles=;schemes=]|permission=OperationsManage:global|rate=effective=report;chain=api>report|tags=Operations
 GET|/api/operations/storage/security|auth=required[policy=;roles=;schemes=]|permission=OperationsManage:global|rate=effective=report;chain=api>report|tags=Operations
 GET|/api/organizations/{organizationId}/members|auth=required[policy=;roles=;schemes=]|permission=OrganizationView:resource|rate=effective=api;chain=api|tags=Organizations
-GET|/api/organizations/|auth=required[policy=;roles=;schemes=]|permission=OrganizationView:resource|rate=effective=api;chain=api|tags=Organizations
+GET|/api/organizations|auth=required[policy=;roles=;schemes=]|permission=OrganizationView:resource|rate=effective=api;chain=api|tags=Organizations
 GET|/api/portfolios/{portfolioId}/roadmap|auth=required[policy=;roles=;schemes=]|permission=ProjectView:resource|rate=effective=api;chain=api|tags=Portfolios
 GET|/api/portfolios/{portfolioId}|auth=required[policy=;roles=;schemes=]|permission=ProjectView:resource|rate=effective=api;chain=api|tags=Portfolios
-GET|/api/portfolios/|auth=required[policy=;roles=;schemes=]|permission=ProjectView:resource|rate=effective=api;chain=api|tags=Portfolios
+GET|/api/portfolios|auth=required[policy=;roles=;schemes=]|permission=ProjectView:resource|rate=effective=api;chain=api|tags=Portfolios
 GET|/api/projects/{projectId}|auth=required[policy=;roles=;schemes=]|permission=ProjectView:resource|rate=effective=api;chain=api|tags=Projects
-GET|/api/projects/|auth=required[policy=;roles=;schemes=]|permission=ProjectView:resource|rate=effective=api;chain=api|tags=Projects
+GET|/api/projects|auth=required[policy=;roles=;schemes=]|permission=ProjectView:resource|rate=effective=api;chain=api|tags=Projects
 GET|/api/sprints/projects/{projectId}/backlog|auth=required[policy=;roles=;schemes=]|permission=WorkItemView:resource|rate=effective=api;chain=api|tags=Sprints
 GET|/api/sprints/projects/{projectId}/velocity|auth=required[policy=;roles=;schemes=]|permission=WorkItemView:resource|rate=effective=api;chain=api|tags=Sprints
 GET|/api/sprints/projects/{projectId}|auth=required[policy=;roles=;schemes=]|permission=WorkItemView:resource|rate=effective=api;chain=api|tags=Sprints
 GET|/api/sprints/{sprintId}/burndown|auth=required[policy=;roles=;schemes=]|permission=WorkItemView:resource|rate=effective=api;chain=api|tags=Sprints
 GET|/api/sprints/{sprintId}|auth=required[policy=;roles=;schemes=]|permission=WorkItemView:resource|rate=effective=api;chain=api|tags=Sprints
 GET|/api/teams/{teamId}/members|auth=required[policy=;roles=;schemes=]|permission=TeamView:resource|rate=effective=api;chain=api|tags=Teams
-GET|/api/teams/|auth=required[policy=;roles=;schemes=]|permission=TeamView:resource|rate=effective=api;chain=api|tags=Teams
+GET|/api/teams|auth=required[policy=;roles=;schemes=]|permission=TeamView:resource|rate=effective=api;chain=api|tags=Teams
 GET|/api/work-item-schemas/{projectId}/reports/custom-fields/{fieldKey}|auth=required[policy=;roles=;schemes=]|permission=WorkItemView:resource|rate=effective=api;chain=api|tags=WorkItemSchemas
 GET|/api/work-item-schemas/{projectId}/reports/issue-types|auth=required[policy=;roles=;schemes=]|permission=WorkItemView:resource|rate=effective=api;chain=api|tags=WorkItemSchemas
 GET|/api/work-item-schemas/{projectId}|auth=required[policy=;roles=;schemes=]|permission=WorkItemView:resource|rate=effective=api;chain=api|tags=WorkItemSchemas
@@ -138,8 +139,8 @@ GET|/api/work-items/{id}/timeline|auth=required[policy=;roles=;schemes=]|permiss
 GET|/api/work-items/{id}/worklogs|auth=required[policy=;roles=;schemes=]|permission=WorkItemView:resource|rate=effective=api;chain=api|tags=WorkItems
 GET|/api/work-items/{id}|auth=required[policy=;roles=;schemes=]|permission=WorkItemView:resource|rate=effective=api;chain=api|tags=WorkItems
 GET|/api/work-items/{workItemId}/development-links/mappings|auth=required[policy=;roles=;schemes=]|permission=WorkItemLink:resource|rate=effective=api;chain=api|tags=Development integrations
-GET|/api/work-items/{workItemId}/development-links/|auth=required[policy=;roles=;schemes=]|permission=WorkItemView:resource|rate=effective=api;chain=api|tags=Development integrations
-GET|/api/work-items/|auth=required[policy=;roles=;schemes=]|permission=WorkItemView:resource|rate=effective=search;chain=api>search|tags=WorkItems
+GET|/api/work-items/{workItemId}/development-links|auth=required[policy=;roles=;schemes=]|permission=WorkItemView:resource|rate=effective=api;chain=api|tags=Development integrations
+GET|/api/work-items|auth=required[policy=;roles=;schemes=]|permission=WorkItemView:resource|rate=effective=search;chain=api>search|tags=WorkItems
 GET|/api/workflows/{projectId}/draft|auth=required[policy=;roles=;schemes=]|permission=WorkflowView:resource|rate=effective=api;chain=api|tags=Workflows
 GET|/api/workflows/{projectId}/versions|auth=required[policy=;roles=;schemes=]|permission=WorkflowView:resource|rate=effective=api;chain=api|tags=Workflows
 GET|/api/workflows/{projectId}|auth=required[policy=;roles=;schemes=]|permission=WorkflowView:resource|rate=effective=api;chain=api|tags=Workflows
@@ -183,27 +184,27 @@ POST|/api/auth/roles|auth=required[policy=;roles=;schemes=]|permission=UserRoleM
 POST|/api/automations/runs/{runId}/replay|auth=required[policy=;roles=;schemes=]|permission=WorkflowManage:resource|rate=effective=api;chain=api|tags=Automations
 POST|/api/automations/{ruleId}/dry-run|auth=required[policy=;roles=;schemes=]|permission=WorkflowManage:resource|rate=effective=report;chain=api>report|tags=Automations
 POST|/api/automations/{ruleId}/publish|auth=required[policy=;roles=;schemes=]|permission=WorkflowManage:resource|rate=effective=api;chain=api|tags=Automations
-POST|/api/automations/|auth=required[policy=;roles=;schemes=]|permission=WorkflowManage:resource|rate=effective=api;chain=api|tags=Automations
+POST|/api/automations|auth=required[policy=;roles=;schemes=]|permission=WorkflowManage:resource|rate=effective=api;chain=api|tags=Automations
 POST|/api/boards/{boardId}/columns|auth=required[policy=;roles=;schemes=]|permission=BoardManage:resource|rate=effective=api;chain=api|tags=Boards
 POST|/api/boards/{boardId}/restore|auth=required[policy=;roles=;schemes=]|permission=BoardManage:resource|rate=effective=api;chain=api|tags=Boards
 POST|/api/boards/{boardId}/views|auth=required[policy=;roles=;schemes=]|permission=BoardManage:resource|rate=effective=api;chain=api|tags=Boards
-POST|/api/boards/|auth=required[policy=;roles=;schemes=]|permission=BoardManage:resource|rate=effective=api;chain=api|tags=Boards
+POST|/api/boards|auth=required[policy=;roles=;schemes=]|permission=BoardManage:resource|rate=effective=api;chain=api|tags=Boards
 POST|/api/browser-auth/login|auth=none|permission=none|rate=effective=login;chain=api>login|tags=BrowserIdentity
 POST|/api/browser-auth/logout|auth=none|permission=none|rate=effective=api;chain=api|tags=BrowserIdentity
 POST|/api/browser-auth/refresh|auth=none|permission=none|rate=effective=api;chain=api|tags=BrowserIdentity
 POST|/api/browser-auth/register|auth=none|permission=none|rate=effective=api;chain=api|tags=BrowserIdentity
 POST|/api/capacity-plans/{planId}/scenarios|auth=required[policy=;roles=;schemes=]|permission=WorkItemView:resource|rate=effective=report;chain=api>report|tags=CapacityPlanning
-POST|/api/capacity-plans/|auth=required[policy=;roles=;schemes=]|permission=WorkItemView:resource|rate=effective=api;chain=api|tags=CapacityPlanning
-POST|/api/dashboards/|auth=required[policy=;roles=;schemes=]|permission=WorkItemView:resource|rate=effective=api;chain=api|tags=Dashboards
+POST|/api/capacity-plans|auth=required[policy=;roles=;schemes=]|permission=WorkItemView:resource|rate=effective=api;chain=api|tags=CapacityPlanning
+POST|/api/dashboards|auth=required[policy=;roles=;schemes=]|permission=WorkItemView:resource|rate=effective=api;chain=api|tags=Dashboards
 POST|/api/goals/{goalId}/key-results/{keyResultId}/progress-updates|auth=required[policy=;roles=;schemes=]|permission=ProjectView:resource|rate=effective=api;chain=api|tags=Goals
 POST|/api/goals/{goalId}/key-results|auth=required[policy=;roles=;schemes=]|permission=ProjectView:resource|rate=effective=api;chain=api|tags=Goals
 POST|/api/goals/{goalId}/status-updates|auth=required[policy=;roles=;schemes=]|permission=ProjectView:resource|rate=effective=api;chain=api|tags=Goals
-POST|/api/goals/|auth=required[policy=;roles=;schemes=]|permission=ProjectView:resource|rate=effective=api;chain=api|tags=Goals
+POST|/api/goals|auth=required[policy=;roles=;schemes=]|permission=ProjectView:resource|rate=effective=api;chain=api|tags=Goals
 POST|/api/intake/forms/{formId}/archive|auth=required[policy=;roles=;schemes=]|permission=WorkflowManage:resource|rate=effective=api;chain=api|tags=Intake
 POST|/api/intake/forms/{formId}/publish|auth=required[policy=;roles=;schemes=]|permission=WorkflowManage:resource|rate=effective=api;chain=api|tags=Intake
 POST|/api/intake/forms/{formId}/submissions/{submissionId}/triage|auth=required[policy=;roles=;schemes=]|permission=WorkItemUpdate:resource|rate=effective=api;chain=api|tags=Intake
 POST|/api/intake/forms/{formId}/submissions|auth=required[policy=;roles=;schemes=]|permission=WorkItemCreate:resource|rate=effective=upload;chain=api>upload|tags=Intake
-POST|/api/intake/forms/|auth=required[policy=;roles=;schemes=]|permission=WorkflowManage:resource|rate=effective=api;chain=api|tags=Intake
+POST|/api/intake/forms|auth=required[policy=;roles=;schemes=]|permission=WorkflowManage:resource|rate=effective=api;chain=api|tags=Intake
 POST|/api/intake/public/forms/{publicId}/submissions|auth=none|permission=none|rate=effective=intake-public;chain=api>intake-public|tags=PublicIntake
 POST|/api/integrations/development/{connectionId}/disconnect|auth=required[policy=;roles=;schemes=]|permission=IntegrationManage:resource|rate=effective=api;chain=api|tags=Development integrations
 POST|/api/integrations/development/{connectionId}/health|auth=required[policy=;roles=;schemes=]|permission=IntegrationManage:resource|rate=effective=bulk;chain=api>bulk|tags=Development integrations
@@ -211,15 +212,15 @@ POST|/api/integrations/development/{connectionId}/mappings|auth=required[policy=
 POST|/api/integrations/development/{connectionId}/rotate-credential|auth=required[policy=;roles=;schemes=]|permission=IntegrationManage:resource|rate=effective=bulk;chain=api>bulk|tags=Development integrations
 POST|/api/integrations/development/{connectionId}/rotate-webhook-secret|auth=required[policy=;roles=;schemes=]|permission=IntegrationManage:resource|rate=effective=bulk;chain=api>bulk|tags=Development integrations
 POST|/api/integrations/development/{connectionId}/webhook|auth=anonymous|permission=none|rate=effective=api;chain=api|tags=Development integrations
-POST|/api/integrations/development/|auth=required[policy=;roles=;schemes=]|permission=IntegrationManage:resource|rate=effective=api;chain=api|tags=Development integrations
+POST|/api/integrations/development|auth=required[policy=;roles=;schemes=]|permission=IntegrationManage:resource|rate=effective=api;chain=api|tags=Development integrations
 POST|/api/integrations/webhooks/deliveries/{deliveryId}/replay|auth=required[policy=;roles=;schemes=]|permission=IntegrationManage:resource|rate=effective=bulk;chain=api>bulk|tags=Integrations
 POST|/api/integrations/webhooks/{id}/disable|auth=required[policy=;roles=;schemes=]|permission=IntegrationManage:resource|rate=effective=api;chain=api|tags=Integrations
 POST|/api/integrations/webhooks/{id}/enable|auth=required[policy=;roles=;schemes=]|permission=IntegrationManage:resource|rate=effective=api;chain=api|tags=Integrations
 POST|/api/integrations/webhooks/{id}/rotate-secret|auth=required[policy=;roles=;schemes=]|permission=IntegrationManage:resource|rate=effective=bulk;chain=api>bulk|tags=Integrations
 POST|/api/integrations/webhooks/{id}/test-delivery|auth=required[policy=;roles=;schemes=]|permission=IntegrationManage:resource|rate=effective=bulk;chain=api>bulk|tags=Integrations
-POST|/api/integrations/webhooks/|auth=required[policy=;roles=;schemes=]|permission=IntegrationManage:resource|rate=effective=api;chain=api|tags=Integrations
+POST|/api/integrations/webhooks|auth=required[policy=;roles=;schemes=]|permission=IntegrationManage:resource|rate=effective=api;chain=api|tags=Integrations
 POST|/api/knowledge-documents/{documentId}/comments|auth=required[policy=;roles=;schemes=]|permission=ProjectView:resource|rate=effective=api;chain=api|tags=Knowledge
-POST|/api/knowledge-documents/|auth=required[policy=;roles=;schemes=]|permission=ProjectView:resource|rate=effective=api;chain=api|tags=Knowledge
+POST|/api/knowledge-documents|auth=required[policy=;roles=;schemes=]|permission=ProjectView:resource|rate=effective=api;chain=api|tags=Knowledge
 POST|/api/notifications/delivery/{notificationId}/replay|auth=required[policy=;roles=;schemes=]|permission=OperationsManage:global|rate=effective=bulk;chain=api>bulk|tags=Notifications
 POST|/api/operations/storage/security/maintenance|auth=required[policy=;roles=;schemes=]|permission=OperationsManage:global|rate=effective=bulk;chain=api>bulk|tags=Operations
 POST|/api/organizations/{organizationId}/archive|auth=required[policy=;roles=;schemes=]|permission=OrganizationManage:resource|rate=effective=api;chain=api|tags=Organizations
@@ -228,11 +229,11 @@ POST|/api/organizations/{organizationId}/departments|auth=required[policy=;roles
 POST|/api/organizations/{organizationId}/ownership-transfer|auth=required[policy=;roles=;schemes=]|permission=OrganizationManage:resource|rate=effective=api;chain=api|tags=Organizations
 POST|/api/organizations/{organizationId}/restore|auth=required[policy=;roles=;schemes=]|permission=OrganizationManage:resource|rate=effective=api;chain=api|tags=Organizations
 POST|/api/organizations/{organizationId}/suspend|auth=required[policy=;roles=;schemes=]|permission=OrganizationManage:resource|rate=effective=api;chain=api|tags=Organizations
-POST|/api/organizations/|auth=required[policy=;roles=;schemes=]|permission=OrganizationManage:resource|rate=effective=api;chain=api|tags=Organizations
+POST|/api/organizations|auth=required[policy=;roles=;schemes=]|permission=OrganizationManage:resource|rate=effective=api;chain=api|tags=Organizations
 POST|/api/portfolios/{portfolioId}/dependencies|auth=required[policy=;roles=;schemes=]|permission=ProjectView:resource|rate=effective=api;chain=api|tags=Portfolios
 POST|/api/portfolios/{portfolioId}/initiatives/{initiativeId}/status-updates|auth=required[policy=;roles=;schemes=]|permission=ProjectView:resource|rate=effective=api;chain=api|tags=Portfolios
 POST|/api/portfolios/{portfolioId}/initiatives|auth=required[policy=;roles=;schemes=]|permission=ProjectView:resource|rate=effective=api;chain=api|tags=Portfolios
-POST|/api/portfolios/|auth=required[policy=;roles=;schemes=]|permission=ProjectView:resource|rate=effective=api;chain=api|tags=Portfolios
+POST|/api/portfolios|auth=required[policy=;roles=;schemes=]|permission=ProjectView:resource|rate=effective=api;chain=api|tags=Portfolios
 POST|/api/projects/{projectId}/components|auth=required[policy=;roles=;schemes=]|permission=ProjectManage:resource|rate=effective=api;chain=api|tags=Projects
 POST|/api/projects/{projectId}/members|auth=required[policy=;roles=;schemes=]|permission=ProjectManage:resource|rate=effective=api;chain=api|tags=Projects
 POST|/api/projects/{projectId}/milestones/{milestoneId}/complete|auth=required[policy=;roles=;schemes=]|permission=ProjectManage:resource|rate=effective=api;chain=api|tags=Projects
@@ -245,17 +246,17 @@ POST|/api/projects/{projectId}/restore|auth=required[policy=;roles=;schemes=]|pe
 POST|/api/projects/{projectId}/teams|auth=required[policy=;roles=;schemes=]|permission=ProjectManage:resource|rate=effective=api;chain=api|tags=Projects
 POST|/api/projects/{projectId}/templates|auth=required[policy=;roles=;schemes=]|permission=ProjectManage:resource|rate=effective=api;chain=api|tags=Projects
 POST|/api/projects/{projectId}/versions|auth=required[policy=;roles=;schemes=]|permission=ProjectManage:resource|rate=effective=api;chain=api|tags=Projects
-POST|/api/projects/|auth=required[policy=;roles=;schemes=]|permission=ProjectManage:resource|rate=effective=api;chain=api|tags=Projects
+POST|/api/projects|auth=required[policy=;roles=;schemes=]|permission=ProjectManage:resource|rate=effective=api;chain=api|tags=Projects
 POST|/api/sprints/{sprintId}/complete|auth=required[policy=;roles=;schemes=]|permission=WorkItemUpdate:resource|rate=effective=api;chain=api|tags=Sprints
 POST|/api/sprints/{sprintId}/start|auth=required[policy=;roles=;schemes=]|permission=WorkItemUpdate:resource|rate=effective=api;chain=api|tags=Sprints
-POST|/api/sprints/|auth=required[policy=;roles=;schemes=]|permission=WorkItemUpdate:resource|rate=effective=api;chain=api|tags=Sprints
+POST|/api/sprints|auth=required[policy=;roles=;schemes=]|permission=WorkItemUpdate:resource|rate=effective=api;chain=api|tags=Sprints
 POST|/api/teams/{teamId}/invites/accept|auth=required[policy=;roles=;schemes=]|permission=TeamView:resource|rate=effective=api;chain=api|tags=Teams
 POST|/api/teams/{teamId}/invites/decline|auth=required[policy=;roles=;schemes=]|permission=TeamView:resource|rate=effective=api;chain=api|tags=Teams
 POST|/api/teams/{teamId}/invites/{inviteId}/revoke|auth=required[policy=;roles=;schemes=]|permission=TeamManage:resource|rate=effective=api;chain=api|tags=Teams
 POST|/api/teams/{teamId}/members|auth=required[policy=;roles=;schemes=]|permission=TeamManage:resource|rate=effective=api;chain=api|tags=Teams
 POST|/api/teams/{teamId}/ownership-transfer|auth=required[policy=;roles=;schemes=]|permission=TeamManage:resource|rate=effective=api;chain=api|tags=Teams
 POST|/api/teams/{teamId}/restore|auth=required[policy=;roles=;schemes=]|permission=TeamManage:resource|rate=effective=api;chain=api|tags=Teams
-POST|/api/teams/|auth=required[policy=;roles=;schemes=]|permission=TeamManage:resource|rate=effective=api;chain=api|tags=Teams
+POST|/api/teams|auth=required[policy=;roles=;schemes=]|permission=TeamManage:resource|rate=effective=api;chain=api|tags=Teams
 POST|/api/work-items/bulk/archive|auth=required[policy=;roles=;schemes=]|permission=WorkItemDelete:resource|rate=effective=bulk;chain=api>bulk|tags=WorkItems
 POST|/api/work-items/bulk/assign|auth=required[policy=;roles=;schemes=]|permission=WorkItemAssign:resource|rate=effective=bulk;chain=api>bulk|tags=WorkItems
 POST|/api/work-items/bulk/jobs/export|auth=required[policy=;roles=;schemes=]|permission=WorkItemView:resource|rate=effective=bulk;chain=api>bulk|tags=WorkItems
@@ -281,9 +282,10 @@ POST|/api/work-items/{id}/labels|auth=required[policy=;roles=;schemes=]|permissi
 POST|/api/work-items/{id}/relations|auth=required[policy=;roles=;schemes=]|permission=WorkItemLink:resource|rate=effective=api;chain=api|tags=WorkItems
 POST|/api/work-items/{id}/restore|auth=required[policy=;roles=;schemes=]|permission=WorkItemDelete:resource|rate=effective=api;chain=api|tags=WorkItems
 POST|/api/work-items/{id}/worklogs|auth=required[policy=;roles=;schemes=]|permission=WorkLogCreate:resource|rate=effective=api;chain=api|tags=WorkItems
-POST|/api/work-items/{workItemId}/development-links/|auth=required[policy=;roles=;schemes=]|permission=WorkItemLink:resource|rate=effective=api;chain=api|tags=Development integrations
-POST|/api/work-items/|auth=required[policy=;roles=;schemes=]|permission=WorkItemCreate:resource|rate=effective=api;chain=api|tags=WorkItems
+POST|/api/work-items/{workItemId}/development-links|auth=required[policy=;roles=;schemes=]|permission=WorkItemLink:resource|rate=effective=api;chain=api|tags=Development integrations
+POST|/api/work-items|auth=required[policy=;roles=;schemes=]|permission=WorkItemCreate:resource|rate=effective=api;chain=api|tags=WorkItems
 POST|/api/workflows/{projectId}/publish|auth=required[policy=;roles=;schemes=]|permission=WorkflowManage:resource|rate=effective=api;chain=api|tags=Workflows
+PUT|/api/auth/permissions/{key}|auth=required[policy=;roles=;schemes=]|permission=UserRoleManage:global|rate=effective=api;chain=api|tags=Identity
 PUT|/api/auth/roles/{roleId}|auth=required[policy=;roles=;schemes=]|permission=UserRoleManage:global|rate=effective=api;chain=api|tags=Identity
 PUT|/api/auth/users/{userId}/roles|auth=required[policy=;roles=;schemes=]|permission=UserRoleManage:global|rate=effective=api;chain=api|tags=Identity
 PUT|/api/automations/{ruleId}/draft|auth=required[policy=;roles=;schemes=]|permission=WorkflowManage:resource|rate=effective=api;chain=api|tags=Automations

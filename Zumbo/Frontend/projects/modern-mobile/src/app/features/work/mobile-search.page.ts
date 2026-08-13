@@ -3,7 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { IonContent, IonHeader, IonTitle, IonToolbar } from '@ionic/angular/standalone';
 import { firstValueFrom } from 'rxjs';
-import { MobileSearchResult, MobileWorkItemRecord } from '../../shell/mobile-workspace.models';
+import { MobileSearchResult, MobileWorkItemRecord, priorityLabel } from '../../shell/mobile-workspace.models';
 import { MobileWorkspaceStore } from '../../shell/mobile-workspace.store';
 import { mergeUniqueWorkItems } from './mobile-work.core';
 import { MobileWorkService } from './mobile-work.service';
@@ -19,6 +19,7 @@ export class MobileSearchPage implements OnInit {
   private readonly router = inject(Router);
   private readonly service = inject(MobileWorkService);
   protected readonly store = inject(MobileWorkspaceStore);
+  protected readonly priorityLabel = priorityLabel;
   protected query = this.route.snapshot.queryParamMap.get('q') ?? '';
   protected projectId = this.route.snapshot.queryParamMap.get('project') ?? '';
   protected readonly items = signal<readonly MobileWorkItemRecord[]>([]);

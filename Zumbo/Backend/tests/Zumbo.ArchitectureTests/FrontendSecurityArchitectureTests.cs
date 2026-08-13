@@ -84,8 +84,8 @@ public sealed class FrontendSecurityArchitectureTests
         var violations = new List<string>();
         foreach (var path in new[]
                  {
-                     Path.Combine(RepositoryRoot(), "Frontend/desktop-bulma/index.html"),
-                     Path.Combine(RepositoryRoot(), "Frontend/mobile-ionic/index.html")
+                     Path.Combine(RepositoryRoot(), "Frontend/projects/modern-desktop/src/index.html"),
+                     Path.Combine(RepositoryRoot(), "Frontend/projects/modern-mobile/src/index.html")
                  })
         {
             var body = File.ReadAllText(path);
@@ -122,11 +122,13 @@ public sealed class FrontendSecurityArchitectureTests
     }
 
     private static IReadOnlyList<string> FrontendSources() =>
-        Directory.EnumerateFiles(Path.Combine(RepositoryRoot(), "Frontend"), "*.js", SearchOption.AllDirectories)
-            .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}node_modules{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
-            .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}tests{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
-            .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}vendor{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
-            .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}dist{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
+        Directory.EnumerateFiles(
+                Path.Combine(RepositoryRoot(), "Frontend", "projects"),
+                "*.*",
+                SearchOption.AllDirectories)
+            .Where(path => path.EndsWith(".ts", StringComparison.OrdinalIgnoreCase)
+                || path.EndsWith(".js", StringComparison.OrdinalIgnoreCase)
+                || path.EndsWith(".html", StringComparison.OrdinalIgnoreCase))
             .Order(StringComparer.Ordinal)
             .ToList();
 

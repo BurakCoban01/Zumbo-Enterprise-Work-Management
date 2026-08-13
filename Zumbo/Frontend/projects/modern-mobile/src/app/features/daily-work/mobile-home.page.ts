@@ -15,6 +15,11 @@ export class MobileHomePage {
   protected readonly unread = computed(() => this.store.notifications().filter(item => !item.read));
   protected readonly label = notificationLabel;
 
+  protected async markRead(id: string): Promise<void> {
+    try { await this.store.markRead(id); }
+    catch { this.store.error.set('Bildirim güncellenemedi.'); }
+  }
+
   protected async refresh(event: Event): Promise<void> { try { await this.store.load(true); } finally { await complete(event); } }
   protected formatDate(value?: string | null): string { return value ? new Intl.DateTimeFormat('tr-TR', { day: '2-digit', month: 'short' }).format(new Date(value)) : ''; }
 }

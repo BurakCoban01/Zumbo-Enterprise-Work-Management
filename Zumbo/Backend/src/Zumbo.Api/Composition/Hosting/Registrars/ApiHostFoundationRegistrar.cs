@@ -7,8 +7,10 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
+using Zumbo.Api.Presentation.OpenApi;
 using Zumbo.BuildingBlocks.Application.Concurrency;
 using Zumbo.BuildingBlocks.Application.Messaging;
 using Zumbo.BuildingBlocks.Application.Persistence;
@@ -67,7 +69,27 @@ internal static class ApiHostFoundationRegistrar
 
         builder.Services.AddEndpointsApiExplorer();
 
-        builder.Services.AddSwaggerGen();
+        builder.Services.AddControllers().ConfigureApiBehaviorOptions(options =>
+        {
+            options.InvalidModelStateResponseFactory = context =>
+            {
+                var message = string.Join(
+                    "; ",
+                    context.ModelState.Values
+                        .SelectMany(value => value.Errors)
+                        .Select(error => error.ErrorMessage)
+                        .Where(error => !string.IsNullOrWhiteSpace(error)));
+                var correlationId = context.HttpContext.TraceIdentifier;
+                context.HttpContext.Response.Headers["X-Correlation-Id"] = correlationId;
+                return new BadRequestObjectResult(ApiResponse<object>.Fail(
+                    "VALIDATION_ERROR",
+                    string.IsNullOrWhiteSpace(message) ? "Request validation failed." : message,
+                    correlationId));
+            };
+        });
+
+        builder.Services.AddSwaggerGen(options =>
+            options.OperationFilter<MinimalApiRequiredQueryOperationFilter>());
 
         builder.Services.AddHttpContextAccessor();
 

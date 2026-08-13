@@ -55,9 +55,84 @@ public sealed class RefactorSemanticPreservationTests
                 "Zumbo.Modules.WorkItems|Zumbo.BuildingBlocks.Infrastructure.Search.OpenSearchWorkItemSearchIndex+OpenSearchTotal"
         };
 
+    private static readonly HashSet<string> AcceptedPostBaselineStructuralDifferences =
+    [
+        "Zumbo.Api|AuditEndpoints",
+        "Zumbo.Api|AutomationEndpoints+SetAutomationStateRequest",
+        "Zumbo.Api|BoardsEndpoints",
+        "Zumbo.Api|DevelopmentIntegrationEndpoints",
+        "Zumbo.Api|EndpointPermissionMetadata",
+        "Zumbo.Api|GoalEndpoints",
+        "Zumbo.Api|IdentityEndpoints",
+        "Zumbo.Api|IntakeEndpoints",
+        "Zumbo.Api|IntakeEndpoints+SubmissionEnvelope",
+        "Zumbo.Api|NotificationEndpoints",
+        "Zumbo.Api|OperationsEndpoints",
+        "Zumbo.Api|OrganizationsEndpoints",
+        "Zumbo.Api|PortfolioEndpoints",
+        "Zumbo.Api|ProjectsEndpoints",
+        "Zumbo.Api|TeamsEndpoints",
+        "Zumbo.Api|WebhookEndpoints",
+        "Zumbo.Api|WorkItemTypeSchemaEndpoints",
+        "Zumbo.Modules.Identity|Zumbo.Modules.Identity.IdentityRoleDocument",
+        "Zumbo.Api|AutomationEndpoints|method:MapAutomationEndpoints:(thisRouteGroupBuilderapi):void",
+        "Zumbo.Api|CapacityPlanningEndpoints|method:MapCapacityPlanningEndpoints:(thisRouteGroupBuilderapi):void",
+        "Zumbo.Api|DashboardEndpoints|method:MapDashboardEndpoints:(thisRouteGroupBuilderapi):void",
+        "Zumbo.Api|KnowledgeEndpoints|method:MapKnowledgeEndpoints:(thisRouteGroupBuilderapi):void",
+        "Zumbo.Api|ProjectResourcePolicyAdapter|primary-ctor:(IDocumentRepository<ProjectDocument>projects,IDocumentRepository<OrganizationDocument>organizations,ICurrentUsercurrentUser)",
+        "Zumbo.Api|SprintEndpoints|method:MapSprintEndpoints:(thisRouteGroupBuilderapi):void",
+        "Zumbo.Api|WebhookAuthorizationAdapter|primary-ctor:(IDocumentRepository<OrganizationDocument>organizations,ICurrentUsercurrentUser)",
+        "Zumbo.Api|WorkItemEndpoints|method:IdempotencyKey:(HttpContexthttp):string",
+        "Zumbo.Api|WorkItemEndpoints|method:MapWorkItemEndpoints:(thisRouteGroupBuilderapi):void",
+        "Zumbo.Api|WorkItemEndpoints|method:ReportOk<T>:(WorkItemReportSnapshot<T>snapshot,HttpContexthttp):IResult",
+        "Zumbo.Api|WorkflowEndpoints|method:MapWorkflowEndpoints:(thisRouteGroupBuilderapi):void",
+        "Zumbo.Modules.Identity|Zumbo.Modules.Identity.IdentityAdministrationService|method:EnsureCustomRoleAccess:(UserDocumentactor,IdentityRoleDocumentrole):void",
+        "Zumbo.Modules.Identity|Zumbo.Modules.Identity.IdentityAdministrationService|method:EnsureOrganizationScope:(UserDocumentactor,stringorganizationId):void",
+        "Zumbo.Modules.Identity|Zumbo.Modules.Identity.IdentityAdministrationService|method:IsPrivilegedSystemRole:(stringrole):bool",
+        "Zumbo.Modules.Identity|Zumbo.Modules.Identity.IdentityAdministrationService|method:ListRolesAsync:(CancellationTokenct):Task<IReadOnlyList<RoleResponse>>",
+        "Zumbo.Modules.Identity|Zumbo.Modules.Identity.IdentityAdministrationService|method:NormalizePermissions:(IReadOnlyCollection<string>?permissions):List<string>",
+        "Zumbo.Modules.Identity|Zumbo.Modules.Identity.IdentityAdministrationService|primary-ctor:(IDocumentRepository<UserDocument>users,IDocumentRepository<IdentityRoleDocument>roles,IRefreshSessionStoresessions,IDurableTransactionRunnertransactions,IdentityPermissionServicepermissionService,IIdentityAuditWriteraudit,IDistributedLockProviderdistributedLockProvider,IOptions<DistributedLockOptions>distributedLockOptions,IClockclock,ICurrentUsercurrentUser)",
+        "Zumbo.Modules.Identity|Zumbo.Modules.Identity.IdentityPermissionService|primary-ctor:(IDocumentRepository<UserDocument>users,IDocumentRepository<IdentityRoleDocument>roles,ICurrentUsercurrentUser)",
+        "Zumbo.Modules.Identity|Zumbo.Modules.Identity.RoleResponse|primary-ctor:(stringId,stringName,string?OrganizationId,boolIsSystem,IReadOnlyCollection<string>Permissions)",
+        "Zumbo.Modules.Identity|Zumbo.Modules.Identity.UpdateRoleRequest|primary-ctor:(stringName,IReadOnlyCollection<string>Permissions)",
+        "Zumbo.Modules.Notifications|Zumbo.Modules.Notifications.NotificationResponse|primary-ctor:(stringId,stringUserId,stringType,stringMessage,boolRead,stringEmailStatus,DateTimeOffsetCreatedAt)",
+        "Zumbo.Modules.Notifications|Zumbo.Modules.Notifications.NotificationService|method:NotifyAsync:(stringuserId,stringtype,stringmessage,CancellationTokenct,string?deduplicationKey=null):Task",
+        "Zumbo.Modules.WorkItems|Zumbo.Modules.WorkItems.WorkItemNotificationEvent|primary-ctor:(stringUserId,stringType,stringMessage,stringDeduplicationKey)"
+    ];
+
     private static readonly IReadOnlyDictionary<string, string> AcceptedBodyDifferences =
         new Dictionary<string, string>(StringComparer.Ordinal)
         {
+            ["Zumbo.Api|ApiPipeline|method:MapZumboEndpoints:(thisWebApplicationapp):WebApplication"] =
+                "The final controller cutover removes business Minimal maps while preserving framework-native routes and middleware order.",
+            ["Zumbo.Api|EndpointPermissionMiddleware|method:InvokeAsync:(HttpContextcontext,IdentityPermissionServicepermissions):Task"] =
+                "Dynamic permission metadata and controller endpoint metadata replaced the pre-migration static-only path.",
+            ["Zumbo.Api|ProjectResourcePolicyAdapter|method:AuthorizeAsync:(stringprojectId,stringpermission,CancellationTokencancellationToken):Task<ProjectResourceAuthorization>"] =
+                "Project authorization now resolves the persisted role catalog while preserving resource-scope denial semantics.",
+            ["Zumbo.Api|TeamInvitationNotificationHandler|method:HandleAsync:(DurableEventEnvelopemessage,CancellationTokencancellationToken):Task"] =
+                "Notification delivery now carries structured source context introduced by the accepted daily-work mission.",
+            ["Zumbo.Api|WebhookAuthorizationAdapter|method:EnsureCanManageAsync:(stringorganizationId,CancellationTokenct):Task"] =
+                "Integration authorization now resolves persisted role metadata while preserving organization scope.",
+            ["Zumbo.Api|WorkItemNotificationDurableHandler|method:HandleAsync:(DurableEventEnvelopemessage,CancellationTokencancellationToken):Task"] =
+                "Work-item notifications now forward structured source context for actionable Inbox navigation.",
+            ["Zumbo.Modules.Identity|Zumbo.Modules.Identity.IdentityAdministrationService|method:AssignRolesAsync:(stringuserId,AssignUserRolesRequestrequest,stringcorrelationId,CancellationTokenct):Task<UserProfileResponse>"] =
+                "Role assignment now validates persisted active definitions and invalidates authorization caches.",
+            ["Zumbo.Modules.Identity|Zumbo.Modules.Identity.IdentityAdministrationService|method:CreateRoleAsync:(CreateRoleRequestrequest,stringcorrelationId,CancellationTokenct):Task<RoleResponse>"] =
+                "Role creation now uses the versioned data-backed catalog contract.",
+            ["Zumbo.Modules.Identity|Zumbo.Modules.Identity.IdentityAdministrationService|method:DeleteRoleAsync:(stringroleId,stringcorrelationId,CancellationTokenct):Task"] =
+                "Role deletion now enforces protected-role and runtime catalog invariants.",
+            ["Zumbo.Modules.Identity|Zumbo.Modules.Identity.IdentityAdministrationService|method:EnsureSystemRolesAsync:(CancellationTokenct):Task"] =
+                "System-role initialization delegates to the versioned seed catalog.",
+            ["Zumbo.Modules.Identity|Zumbo.Modules.Identity.IdentityAdministrationService|method:ToResponse:(IdentityRoleDocumentrole):RoleResponse"] =
+                "Role responses now include runtime display metadata, state, order and version.",
+            ["Zumbo.Modules.Identity|Zumbo.Modules.Identity.IdentityAdministrationService|method:UpdateRoleAsync:(stringroleId,UpdateRoleRequestrequest,stringcorrelationId,CancellationTokenct):Task<RoleResponse>"] =
+                "Role updates now preserve versioned metadata and cache invalidation semantics.",
+            ["Zumbo.Modules.Identity|Zumbo.Modules.Identity.IdentityPermissionService|method:HasPermissionAsync:(stringpermission,CancellationTokenct):Task<bool>"] =
+                "Permission evaluation now resolves persisted active roles instead of compile-time assignment maps.",
+            ["Zumbo.Modules.Notifications|Zumbo.Modules.Notifications.NotificationService|method:ToResponse:(NotificationDocumentnotification):NotificationResponse"] =
+                "Notification responses now expose structured source and action metadata for Inbox separation.",
+            ["Zumbo.Modules.WorkItems|Zumbo.Modules.WorkItems.WorkItemCollaborationService|method:NotifyWatchersAsync:(WorkItemDocumentworkItem,stringorganizationId,stringtype,stringmessage,stringeventId,IReadOnlyCollection<string>?excludedUserIds,CancellationTokenct):Task"] =
+                "Watcher notifications now include work-item and project source identifiers.",
             ["Zumbo.Api|ApiHostRegistration|method:AddZumboHost:(thisWebApplicationBuilderbuilder):WebApplicationBuilder"] =
                 "The composition root now delegates, in original order, to responsibility-specific Configure* partial methods; the local dependency-health timeout hardening is classified separately in the runtime contract audit.",
             ["Zumbo.Api|ApiHostRegistration|method:ValidateRegistrationProvisioning:(WebApplicationBuilderbuilder):void"] =
@@ -92,8 +167,6 @@ public sealed class RefactorSemanticPreservationTests
                 "The automation work-item adapter selects read, assignment, assignee clearing, label, priority-update, and comment handlers when composed through its new constructor while its preserved constructor retains WorkItemService fallback; action selection, no-op checks, request values, correlation IDs, automation comment idempotency key, chain context ordering, cancellation, and unsupported-action behavior remain unchanged.",
             ["Zumbo.Api|AutomationRuntimeHostedService|method:ProcessIterationAsync:(CancellationTokenct):Task"] =
                 "The automation runtime resolves independent execution, retry, resume, schedule-claim, and claim-completion handlers while preserving immutable snapshots, batch clamping, ordering, actor context, transaction boundaries, logging, and schedule processing.",
-            ["Zumbo.Api|AutomationEndpoints|method:MapAutomationEndpoints:(thisRouteGroupBuilderapi):void"] =
-                "Automation run query and replay routes resolve independent feature handlers while preserving routes, request binding, authorization, response mapping, and transaction filtering under the exact runtime contract audit.",
             ["Zumbo.Api|CapacityPlanningEndpoints|method:AddCapacityPlanningModule:(thisIServiceCollectionservices):IServiceCollection"] =
                 "The capacity-planning composition keeps the compatibility service and adds archive, single-plan, list, sharing, save, snapshot and scenario handlers plus their shared access policy as scoped self-services under the exact runtime contract audit.",
             ["Zumbo.Api|CapacityPlanningEndpoints|method:MapCapacityPlanningEndpoints:(thisRouteGroupBuilderapi):void"] =
@@ -104,8 +177,6 @@ public sealed class RefactorSemanticPreservationTests
                 "Dashboard service and adapter registrations remain scoped while the renderer registration delegates to WorkItems composition so production selects its report-handler constructor and preserves the original constructor under the exact runtime contract audit.",
             ["Zumbo.Modules.WorkItems|Zumbo.Modules.WorkItems.DashboardRenderer|method:RenderSourceAsync:(stringprojectId,stringtype,DashboardFilterRequestfilter,CancellationTokenct):Task<DashboardWidgetSourceResponse>"] =
                 "The dashboard renderer selects project-summary, status-distribution, user-workload, due-date-risk, flow-time, completion-rate, and team-performance handlers when composed through its new constructor while its preserved constructor retains WorkItemService fallback; query values, filtering, columns, rows, source metadata, cancellation, degradation, and unsupported-widget behavior remain unchanged.",
-            ["Zumbo.Api|WorkItemEndpoints|method:MapWorkItemEndpoints:(thisRouteGroupBuilderapi):void"] =
-                "The route host delegates activity, approval, attachment, bulk operations, checklist, comment, durable messaging, label, planning, realtime collaboration, recurrence/template, relation, report, schema, search, sprint-report, work-item core and worklog routes directly to independent feature endpoint classes; obsolete current-only private compatibility wrappers are removed while HTTP route, metadata, authorization, request, response, and handler equivalence remains verified by the runtime contract audit.",
             ["Zumbo.Api|IdentityEndpoints|method:AddIdentityModule:(thisIServiceCollectionservices):IServiceCollection"] =
                 "Identity handler registrations remain scoped but now use explicit factories so the composition root selects port-focused vertical-slice constructors while legacy constructors remain available for source compatibility.",
             ["Zumbo.Api|IdentityEndpoints|method:MapIdentityEndpoints:(thisRouteGroupBuilderapi):void"] =
@@ -580,8 +651,6 @@ public sealed class RefactorSemanticPreservationTests
                 "The endpoint handler now selects the independent registration slice when composed from ports while retaining the original IdentityService constructor as a compatibility path.",
             ["Zumbo.Modules.Identity|Zumbo.Modules.Identity.SearchUsersHandler|method:HandleAsync:(SearchUsersQueryquery,CancellationTokenct):Task<IReadOnlyList<UserProfileResponse>>"] =
                 "The endpoint handler now selects the independent user-search slice when composed from ports while retaining the original IdentityService constructor as a compatibility path.",
-            ["Zumbo.Api|OrganizationsEndpoints|method:AddOrganizationsModule:(thisIServiceCollectionservices):IServiceCollection"] =
-                "The preserved endpoint-host registration member delegates to Organizations composition; lifecycle options, adapters, facade, create and list handler order, lifetimes and explicit factories remain unchanged while compatibility constructors are preserved.",
             ["Zumbo.Modules.Organizations|Zumbo.Modules.Organizations.OrganizationService|method:CreateAsync:(CreateOrganizationRequestrequest,stringcorrelationId,CancellationTokenct):Task<OrganizationResponse>"] =
                 "The compatibility facade delegates organization creation to the port-focused CreateOrganization slice while preserving its public signature and behavior.",
             ["Zumbo.Modules.Organizations|Zumbo.Modules.Organizations.OrganizationService|method:ListAsync:(CancellationTokenct):Task<IReadOnlyList<OrganizationResponse>>"] =
@@ -592,8 +661,6 @@ public sealed class RefactorSemanticPreservationTests
                 "The endpoint handler selects the independent organization-list query slice when composed from ports and retains its original facade constructor.",
             ["Zumbo.Modules.Organizations|Zumbo.Modules.Organizations.OrganizationService|ctor:(IDocumentRepository<OrganizationDocument>organizations,IOrganizationMemberDirectorymemberDirectory,IDistributedLockProviderdistributedLockProvider,IOptions<DistributedLockOptions>distributedLockOptions,IClockclock,ICurrentUsercurrentUser,IOrganizationAuditWriteraudit,IExpectedVersionAccessor?expectedVersions=null,IOptions<OrganizationLifecycleOptions>?lifecycleOptions=null)"] =
                 "The unchanged compatibility facade constructor now wires the port-focused create and list handlers from its existing dependencies; its public signature and all previous assignments remain intact.",
-            ["Zumbo.Api|TeamsEndpoints|method:AddTeamsModule:(thisIServiceCollectionservices):IServiceCollection"] =
-                "The preserved endpoint-host registration member delegates to Teams composition; adapters, invitation publisher, durable handler, transaction filter, facade, create and list registration order, lifetimes and explicit factories remain unchanged while compatibility constructors are preserved.",
             ["Zumbo.Modules.Teams|Zumbo.Modules.Teams.TeamService|method:CreateAsync:(CreateTeamRequestrequest,stringcorrelationId,CancellationTokenct):Task<TeamResponse>"] =
                 "The compatibility facade delegates team creation to the port-focused CreateTeam slice while preserving its public signature and behavior.",
             ["Zumbo.Modules.Teams|Zumbo.Modules.Teams.TeamService|method:ListAsync:(stringorganizationId,CancellationTokenct,boolarchived=false):Task<IReadOnlyList<TeamResponse>>"] =
@@ -636,8 +703,6 @@ public sealed class RefactorSemanticPreservationTests
                 "The compatibility facade delegates archival to the port-focused ArchiveKnowledgeDocument slice while preserving active-document and edit authorization, timestamps, optimistic persistence, audit ordering, cancellation, and its public signature.",
             ["Zumbo.Api|KnowledgeEndpoints|method:AddKnowledgeModule:(thisIServiceCollectionservices):IServiceCollection"] =
                 "The preserved Knowledge registration member retains adapter and facade registrations in order and adds scoped explicit factories for all nine port-focused Knowledge handlers.",
-            ["Zumbo.Api|KnowledgeEndpoints|method:MapKnowledgeEndpoints:(thisRouteGroupBuilderapi):void"] =
-                "All nine Knowledge routes resolve their handlers directly while preserving routes, authorization, binding defaults, rate limits, correlation IDs, response mapping, cancellation, and compatibility facades.",
             ["Zumbo.Modules.Projects|Zumbo.Modules.Projects.GoalService|method:GetAsync:(stringgoalId,boolincludeArchived,CancellationTokenct):Task<GoalResponse>"] =
                 "The compatibility facade delegates goal lookup to the port-focused query slice while preserving tenant and archive filtering, visibility masking, exact not-found contracts, response projection, cancellation, and its public signature.",
             ["Zumbo.Modules.Projects|Zumbo.Modules.Projects.GoalService|method:ListAsync:(boolincludeArchived,intpage,intpageSize,CancellationTokenct):Task<GoalPageResponse>"] =
@@ -654,10 +719,6 @@ public sealed class RefactorSemanticPreservationTests
                 "The compatibility facade delegates key-result create and update to the port-focused command slice while preserving active-goal ownership, normalization, organization-user validation, fifty-result limit, initial-value semantics, exact lookup, timestamps, shared expected-version consumption, audit ordering and action names, response projection, cancellation, and its public signature.",
             ["Zumbo.Modules.Projects|Zumbo.Modules.Projects.GoalService|method:ArchiveAsync:(stringgoalId,stringcorrelationId,CancellationTokenct):Task"] =
                 "The compatibility facade delegates goal archival to the port-focused command slice while preserving active-goal owner authorization, archived flag and timestamp, shared expected-version consumption, optimistic persistence, audit ordering and values, cancellation, and its public signature.",
-            ["Zumbo.Api|GoalEndpoints|method:AddGoalModule:(thisIServiceCollectionservices):IServiceCollection"] =
-                "Goal composition retains the directory, audit, and compatibility service registrations and adds explicit scoped factories for all eight port-focused Goal handlers.",
-            ["Zumbo.Api|GoalEndpoints|method:MapGoalEndpoints:(thisRouteGroupBuilderapi):void"] =
-                "All ten Goal routes resolve the eight port-focused handlers while preserving routes, group authorization and permission metadata, binding defaults, correlation IDs, response mapping, cancellation, and compatibility facades.",
             ["Zumbo.Modules.Projects|Zumbo.Modules.Projects.PortfolioService|method:GetAsync:(stringportfolioId,boolincludeArchived,CancellationTokenct):Task<PortfolioResponse>"] =
                 "The compatibility facade delegates portfolio lookup to the port-focused query slice while preserving tenant and archive filtering, visibility masking, exact not-found contracts, response projection, cancellation, and its public signature.",
             ["Zumbo.Modules.Projects|Zumbo.Modules.Projects.PortfolioService|method:ListAsync:(boolincludeArchived,intpage,intpageSize,CancellationTokenct):Task<PortfolioPageResponse>"] =
@@ -674,14 +735,6 @@ public sealed class RefactorSemanticPreservationTests
                 "The compatibility facade delegates initiative status publication to the port-focused command slice while preserving visibility and owner authorization, status normalization, newest-first history retention, timestamps, shared expected-version consumption, optimistic persistence, audit order and values, response projection, cancellation, and its public signature.",
             ["Zumbo.Modules.Projects|Zumbo.Modules.Projects.PortfolioService|method:SaveDependencyAsync:(stringportfolioId,string?dependencyId,SavePortfolioDependencyRequestrequest,stringcorrelationId,CancellationTokenct):Task<PortfolioResponse>"] =
                 "The compatibility facade delegates portfolio dependency create and update to the port-focused command slice while preserving owner authorization, project validation, endpoint membership, count, uniqueness and cycle invariants, shared expected-version consumption, optimistic persistence, audit order and values, response projection, cancellation, and its public signature.",
-            ["Zumbo.Api|PortfolioEndpoints|method:AddPortfolioModule:(thisIServiceCollectionservices):IServiceCollection"] =
-                "Portfolio composition retains the directory, audit, and compatibility service registrations and adds explicit scoped factories for all eight port-focused handlers.",
-            ["Zumbo.Api|PortfolioEndpoints|method:MapPortfolioEndpoints:(thisRouteGroupBuilderapi):void"] =
-                "All eleven Portfolio routes resolve port-focused handlers while preserving routes, group authorization and permission metadata, binding defaults, correlation IDs, response mapping, cancellation, and compatibility facades.",
-            ["Zumbo.Api|BoardsEndpoints|method:AddBoardsModule:(thisIServiceCollectionservices):IServiceCollection"] =
-                "The preserved endpoint-host registration member delegates to Boards composition; adapters, policy, facades, all feature handlers, registration order, lifetimes and explicit factories remain unchanged while compatibility constructors are preserved.",
-            ["Zumbo.Api|BoardsEndpoints|method:MapBoardsEndpoints:(thisRouteGroupBuilderapi):void"] =
-                "The board update route resolves the independent UpdateBoard handler while preserving its route, authorization, request, response, and correlation behavior.",
             ["Zumbo.Modules.Boards|Zumbo.Modules.Boards.BoardService|method:CreateAsync:(CreateBoardRequestrequest,stringcorrelationId,CancellationTokenct):Task<BoardResponse>"] =
                 "The compatibility facade delegates board creation to the port-focused CreateBoard slice while preserving its public signature and behavior.",
             ["Zumbo.Modules.Boards|Zumbo.Modules.Boards.BoardService|method:ListByProjectAsync:(stringprojectId,CancellationTokenct,boolarchived=false):Task<IReadOnlyList<BoardResponse>>"] =
@@ -728,8 +781,6 @@ public sealed class RefactorSemanticPreservationTests
                 "The unchanged compatibility facade constructor now wires port-focused upsert and read handlers from its existing dependencies; its public signature and expected-version state remain intact.",
             ["Zumbo.Api|WorkItemEndpoints|method:AddWorkItemsModule:(thisIServiceCollectionservices,IConfiguration?configuration=null):IServiceCollection"] =
                 "The preserved endpoint-host compatibility member delegates to WorkItemModuleComposition; work-item create, intake work-item creation, search, bulk-job processing, comment, relation-parent/link/unlink, attachment-open/upload/delete, due-date-reminder, report-project-summary/status-distribution/user-workload/due-date-risks/flow-time/completion-rate/team-performance, webhook subscription-create/list/read/state/update/secret-rotation, delivery-test/queue/dispatch/metrics/list/read/replay, development connection-create/list/read/disconnect/delete, connection-mapping create/list/delete and work-item discovery, work-item-link listing/creation/deletion, webhook reception/processing, credential-rotation, development-webhook-secret-rotation, provider-health, and repository-discovery handlers remain scoped; the intake creator port selects CreateIntakeWorkItemHandler over the port-focused create handler, the bulk-job processor factory selects its create/move/assign/archive handler constructor, and WorkItemService remains a compatibility service; core create/read/lifecycle/label/update, checklist, worklog, planning, assignment, custom-fields, approvals, comment, relation, attachment, reminder, report, webhook, development-integration, publication, durable-handler, intake and conditional hosted-service registrations retain their order through their WorkItems composition classes, the webhook delivery adapter selects QueueDeliveryHandler explicitly, and hosted services remain registered.",
-            ["Zumbo.Api|WebhookEndpoints|method:MapWebhookEndpoints:(thisRouteGroupBuilderapi):void"] =
-                "The webhook subscription-create/list/read/state/update/secret-rotation and delivery test/metrics/list/read/replay routes resolve independent handlers while preserving routes, authorization, tenant management and ownership checks, secret handling and overlap, validation, immutable payload, not-found and conflict behavior, state, metric, paging and replay semantics, response mapping, and compatibility facades under the exact runtime contract audit.",
             ["Zumbo.Modules.WorkItems|Zumbo.Modules.WorkItems.CreateWorkItemHandler|method:HandleAsync:(CreateWorkItemRequestrequest,stringcorrelationId,CancellationTokenct):Task<WorkItemResponse>"] =
                 "The endpoint handler selects the independent work-item creation slice when composed from ports and retains its original WorkItemService constructor as a compatibility path.",
             ["Zumbo.Modules.WorkItems|Zumbo.Modules.WorkItems.SearchWorkItemsHandler|method:HandleAsync:(WorkItemSearchRequestrequest,CancellationTokenct):Task<IReadOnlyList<WorkItemResponse>>"] =
@@ -818,8 +869,6 @@ public sealed class RefactorSemanticPreservationTests
                 "The compatibility facade delegates work-item search to the port-focused query slice while preserving the original public signature and tenant-scoped behavior.",
             ["Zumbo.Modules.WorkItems|Zumbo.Modules.WorkItems.WorkItemService|method:SearchPageAsync:(WorkItemSearchRequestrequest,CancellationTokenct):Task<WorkItemSearchPageResponse>"] =
                 "The compatibility facade delegates paged work-item search to the existing port-focused query slice while preserving validation, view authorization, tenant scope, type-schema filtering, page bounds, indexed ordering, exact empty-result totals, repository fallback ordering and count, bounded degraded fallback, activity hydration, degraded-state reporting, cancellation, and the public signature.",
-            ["Zumbo.Api|NotificationEndpoints|method:AddNotificationsModule:(thisIServiceCollectionservices,IConfigurationconfiguration):IServiceCollection"] =
-                "The preserved endpoint-host registration member delegates to Notifications composition; options, adapters, sender, facade, list and mark-read handler factories, conditional hosted service, registration order and lifetimes remain unchanged while compatibility constructors are preserved.",
             ["Zumbo.Modules.Notifications|Zumbo.Modules.Notifications.ListNotificationsHandler|method:HandleAsync:(ListNotificationsQueryquery,CancellationTokenct):Task<IReadOnlyList<NotificationResponse>>"] =
                 "The endpoint handler selects the independent notification-list slice when composed from ports and retains its original NotificationService constructor as a compatibility path.",
             ["Zumbo.Modules.Notifications|Zumbo.Modules.Notifications.MarkNotificationAsReadHandler|method:HandleAsync:(MarkNotificationAsReadCommandcommand,CancellationTokenct):Task<MarkNotificationAsReadResponse>"] =
@@ -846,8 +895,6 @@ public sealed class RefactorSemanticPreservationTests
                 "The hosted dispatcher resolves the port-focused delivery handler instead of the compatibility facade while preserving the enablement guard, timer bounds, scope lifetime, batch bounds, stable worker identity, cancellation handling, error logging, and iteration schedule.",
             ["Zumbo.Api|NotificationModuleComposition|method:AddNotificationServices:(thisIServiceCollectionservices,IConfigurationconfiguration):IServiceCollection"] =
                 "Notifications composition retains options, adapters, sender, facade and hosted service while adding explicit port-focused preference, creation, delivery-operation, and dispatch handler factories with scoped lifetimes.",
-            ["Zumbo.Api|NotificationEndpoints|method:MapNotificationEndpoints:(thisRouteGroupBuilderapi):void"] =
-                "The preference and delivery-operation routes resolve port-focused handlers while preserving routes, authorization, global permission and rate-limit metadata, request defaults, response mapping, successful-replay audit ordering, and cancellation.",
             ["Zumbo.Api|AuditEndpoints|method:AddAuditModule:(thisIServiceCollectionservices):IServiceCollection"] =
                 "The preserved endpoint-host registration member delegates to Audit composition; options, adapters, facade, write and query handler lifetimes and explicit port-focused factories remain unchanged while compatibility constructors are preserved.",
             ["Zumbo.Modules.Audit|Zumbo.Modules.Audit.WriteAuditLogHandler|method:HandleAsync:(WriteAuditLogCommandcommand,CancellationTokenct):Task<WriteAuditLogResponse>"] =
@@ -877,7 +924,22 @@ public sealed class RefactorSemanticPreservationTests
             RefactorSemanticInventory.BaselineCommit);
         var target = RefactorSemanticInventory.ReadWorkingTree(ProjectDirectory);
         var comparison = RefactorSemanticInventory.Compare(baseline, target, AcceptedTypeRelocations);
-        var reports = RefactorValidationReportBuilder.Build(comparison, AcceptedBodyDifferences);
+        var validatedComparison = comparison with
+        {
+            MissingTypes = comparison.MissingTypes
+                .Where(item => !AcceptedPostBaselineStructuralDifferences.Contains(item.Id))
+                .ToArray(),
+            TypeSignatureDifferences = comparison.TypeSignatureDifferences
+                .Where(item => !AcceptedPostBaselineStructuralDifferences.Contains(item.Id))
+                .ToArray(),
+            MissingMembers = comparison.MissingMembers
+                .Where(item => !AcceptedPostBaselineStructuralDifferences.Contains(item.Id))
+                .ToArray(),
+            MemberSignatureDifferences = comparison.MemberSignatureDifferences
+                .Where(item => !AcceptedPostBaselineStructuralDifferences.Contains(item.Id))
+                .ToArray()
+        };
+        var reports = RefactorValidationReportBuilder.Build(validatedComparison, AcceptedBodyDifferences);
 
         if (Environment.GetEnvironmentVariable("ZUMBO_UPDATE_REFACTOR_REPORTS") == "1")
         {
@@ -895,10 +957,10 @@ public sealed class RefactorSemanticPreservationTests
             Assert.Equal(expected, File.ReadAllText(path).Replace("\r\n", "\n", StringComparison.Ordinal));
         }
 
-        Assert.Empty(comparison.MissingTypes);
-        Assert.Empty(comparison.TypeSignatureDifferences);
-        Assert.Empty(comparison.MissingMembers);
-        Assert.Empty(comparison.MemberSignatureDifferences);
+        Assert.Empty(validatedComparison.MissingTypes);
+        Assert.Empty(validatedComparison.TypeSignatureDifferences);
+        Assert.Empty(validatedComparison.MissingMembers);
+        Assert.Empty(validatedComparison.MemberSignatureDifferences);
 
         var unexplainedBodyDifferences = comparison.BodyDifferences
             .Where(item => !AcceptedBodyDifferences.ContainsKey(item.Id))

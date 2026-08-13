@@ -10,6 +10,11 @@ const ACTION_LABELS: Readonly<Record<string, string>> = {
 };
 const ENTITY_LABELS: Readonly<Record<string, string>> = { AutomationRule: 'Otomasyon', Board: 'Pano', Dashboard: 'Pano raporu', Identity: 'Kullanıcı', IntakeForm: 'Talep formu', IntakeSubmission: 'Talep', Organization: 'Organizasyon', Project: 'Proje', Team: 'Ekip', WorkItem: 'İş', WorkItemBulkJob: 'Toplu iş' };
 const FIELD_LABELS: Readonly<Record<string, string>> = { assigneeUserId: 'Sorumlu', name: 'Ad', priority: 'Öncelik', role: 'Rol', status: 'Durum', title: 'Başlık', value: 'Değer' };
+const VALUE_LABELS: Readonly<Record<string, string>> = {
+  Archived: 'Arşivlendi', Completed: 'Tamamlandı', Draft: 'Taslak', InProgress: 'Devam ediyor', InReview: 'İncelemede',
+  New: 'Yeni', Open: 'Açık', Planned: 'Planlandı', Processing: 'İşleniyor', Published: 'Yayında', Rejected: 'Reddedildi', Resolved: 'Çözüldü'
+};
+const INTERNAL_ID_PATTERN = /\b[0-9a-f]{32}\b/gi;
 
 export function hasAuditPermission(roles: readonly AuditRole[], context: AuditUserContext, permission: 'AuditRead' | 'AuditReadAll'): boolean {
   return roles.some(role => role.isActive && context.roleNames.includes(role.name) && role.permissions.some(value => value === '*' || value === permission));
@@ -65,7 +70,11 @@ export function integrityState(result: AuditIntegrity | null): AuditIntegritySta
 
 function safeValue(value: string | null | undefined, redacted: boolean): string | null {
   if (value === null || value === undefined || value === '') return null;
-  return redacted ? '[GİZLENDİ]' : String(value).slice(0, 500);
+  if (redacted) return '[GİZLENDİ]';
+  const text = String(value).slice(0, 500);
+  const linkedState = /^([A-Za-z]+):[0-9a-f]{32}$/i.exec(text);
+  if (linkedState && VALUE_LABELS[linkedState[1]]) return `${VALUE_LABELS[linkedState[1]]} · iş kaydı oluşturuldu`;
+  return (VALUE_LABELS[text] ?? text).replace(INTERNAL_ID_PATTERN, 'iç kimlik gizlendi');
 }
 function bounded(value: string, maximum: number): string { return String(value ?? '').trim().slice(0, maximum); }
 function boundary(value: string, endOfDay: boolean): string {

@@ -1,4 +1,5 @@
 using Zumbo.BuildingBlocks.Application.Security;
+using Zumbo.Api.Presentation.Authorization;
 
 internal static class PermissionEndpointExtensions
 {

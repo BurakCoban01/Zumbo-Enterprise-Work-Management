@@ -294,9 +294,19 @@ public sealed class ApiFlowTests : IClassFixture<WebApplicationFactory<Program>>
         sprint = await PostAsync<SprintResponse>(
             $"/api/sprints/{sprint.Id}/complete",
             new CompleteSprintRequest(null));
-        var summary = await GetAsync<ProjectSummaryResponse>($"/api/work-items/reports/project-summary/{project.Id}");
+        var summaryResponse = await _client.GetAsync($"/api/work-items/reports/project-summary/{project.Id}");
+        summaryResponse.EnsureSuccessStatusCode();
+        Assert.True(summaryResponse.Headers.Contains("X-Zumbo-Report-Generated-At"));
+        Assert.True(summaryResponse.Headers.Contains("X-Zumbo-Report-Source-Version"));
+        Assert.True(summaryResponse.Headers.Contains("X-Zumbo-Report-Stale"));
+        Assert.True(summaryResponse.Headers.Contains("X-Zumbo-Report-Age-Seconds"));
+        var summaryEnvelope = await summaryResponse.Content.ReadFromJsonAsync<ApiResponse<ProjectSummaryResponse>>();
+        Assert.NotNull(summaryEnvelope);
+        Assert.True(summaryEnvelope.Success);
+        var summary = summaryEnvelope.Data!;
         var statusDistribution = await GetAsync<IReadOnlyList<StatusDistributionResponse>>($"/api/work-items/reports/status-distribution/{project.Id}");
         var workload = await GetAsync<IReadOnlyList<UserWorkloadResponse>>($"/api/work-items/reports/user-workload/{project.Id}");
+        var dueDateRisks = await GetAsync<IReadOnlyList<DueDateRiskResponse>>($"/api/work-items/reports/due-date-risks/{project.Id}");
         var start = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-1).ToString("yyyy-MM-dd");
         var end = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(1).ToString("yyyy-MM-dd");
         var burndown = await GetAsync<IReadOnlyList<SprintBurndownPointResponse>>(
@@ -332,6 +342,7 @@ public sealed class ApiFlowTests : IClassFixture<WebApplicationFactory<Program>>
         Assert.Equal(1, summary.Done);
         Assert.Contains(statusDistribution, x => x.Status == "Done" && x.Count == 1);
         Assert.Contains(workload, x => x.UserId == register.User.Id);
+        Assert.Empty(dueDateRisks);
         Assert.Contains(burndown, x => x.RemainingPoints == 0 && x.RemainingItems == 0);
         Assert.Contains(velocity, x => x.SprintId == sprint.Id && x.CompletedItems == 1 && x.CompletedPoints == 8);
         Assert.Equal(1, flowTime.CompletedItems);
@@ -643,6 +654,10 @@ public sealed class ApiFlowTests : IClassFixture<WebApplicationFactory<Program>>
             value => value.Any(x => x.Id == workItem.Id),
             "Created work item was not indexed.");
         Assert.Contains(createdSearch, x => x.Id == workItem.Id);
+        var createdSearchPage = await PostAsync<WorkItemSearchPageResponse>(
+            "/api/work-items/search",
+            new WorkItemSearchRequest(project.Id, null, null, "indexed", 1, 20));
+        Assert.Contains(createdSearchPage.Items, x => x.Id == workItem.Id);
 
         var label = "search-label-" + stamp;
         workItem = await PostAsync<WorkItemResponse>($"/api/work-items/{workItem.Id}/labels", new AddLabelRequest(label));

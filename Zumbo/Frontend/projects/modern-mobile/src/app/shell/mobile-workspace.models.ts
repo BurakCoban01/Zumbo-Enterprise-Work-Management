@@ -140,3 +140,7 @@ export function dueTime(item: MobileWorkItem): number { return item.dueDate ? ne
 export function notificationLabel(item: MobileNotification): string {
   return ({ Mention: 'Bahsetme', Assignment: 'Atama', ApprovalRequest: 'Onay isteği', Approval: 'Onay sonucu', DueDateReminder: 'Tarih hatırlatması', TeamInvitation: 'Ekip daveti' } as Record<string, string>)[item.type] ?? 'Bildirim';
 }
+
+export function priorityLabel(value: string): string {
+  return ({ Critical: 'Kritik', High: 'Yüksek', Medium: 'Orta', Low: 'Düşük' } as Record<string, string>)[value] ?? value;
+}

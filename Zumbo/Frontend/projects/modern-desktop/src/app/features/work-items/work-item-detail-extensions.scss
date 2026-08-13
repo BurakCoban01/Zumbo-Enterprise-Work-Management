@@ -4,7 +4,7 @@
 .activity-tabs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border-bottom: 1px solid var(--line); margin-bottom: 8px; }
 .activity-tabs button { min-height: 38px; border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--muted); font-size: 12px; }
 .activity-tabs button.active { border-bottom-color: var(--accent); color: var(--accent-strong); }
-.activity-list { display: grid; gap: 0; }
+.activity-list { display: grid; max-height: min(52vh, 520px); gap: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; }
 .activity-list article { display: grid; gap: 3px; border-bottom: 1px solid var(--line); padding: 9px 2px; }
 .activity-list strong { color: var(--ink); font-size: 13px; }
 .activity-list span { color: var(--muted); font-size: 12px; }
