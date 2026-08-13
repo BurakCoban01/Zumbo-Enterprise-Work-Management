@@ -44,7 +44,9 @@ public sealed class RefactorRuntimeContractTests
         "services.AddScoped<WriteAuditLogHandler>();",
         "services.AddScoped<QueryAuditLogHandler>();",
         "services.AddScoped<IWorkItemWebhookDelivery,WorkItemWebhookDeliveryAdapter>();",
-        "services.AddScoped<IDurableEventHandler,DevelopmentWebhookDurableHandler>();"
+        "services.AddScoped<IDurableEventHandler,DevelopmentWebhookDurableHandler>();",
+        "services.AddScoped<AutomationTransactionFilter>();",
+        "services.AddScoped<Zumbo.BuildingBlocks.Application.Messaging.IDurableEventHandler,PrivacyWorkflowDurableHandler>();"
     ];
 
     private static readonly string[] PortFocusedVerticalSliceDiRegistrations =
@@ -1062,11 +1064,20 @@ public sealed class RefactorRuntimeContractTests
         "services.AddScoped<DeleteWorkItemLinkHandler>();",
         "services.AddScoped<ReceiveWebhookHandler>();",
         "services.AddScoped<ApplyWebhookLinksHandler>();",
-        "services.AddScoped<ProcessWebhookHandler>();"
+        "services.AddScoped<ProcessWebhookHandler>();",
+        "services.AddScoped<IDurableEventHandler,PrivacyWorkflowDurableHandler>();",
+        "services.AddScoped<IdentityPermissionCatalogService>();",
+        "services.AddScoped<IdentityRoleCatalogService>();"
     ];
 
     private static readonly string[] ReplacedVerticalSliceEndpointMappings =
     [
+        "browser.MapGet(\"/session\",async(BrowserSessionServiceservice,HttpContexthttp,CancellationTokenct)=>Ok(awaitservice.GetSessionAsync(http,ct),http)).RequireAuthorization().WithZumboPermission(PermissionCatalog.ProfileRead);",
+        "browser.MapPost(\"/login\",async(LoginRequestrequest,BrowserSessionServiceservice,HttpContexthttp,CancellationTokenct)=>Ok(awaitservice.LoginAsync(request,http,ct),http)).RequireRateLimiting(\"login\");",
+        "browser.MapPost(\"/logout\",async(BrowserLogoutRequestrequest,BrowserSessionServiceservice,HttpContexthttp,CancellationTokenct)=>Ok(awaitservice.LogoutAsync(request,http,ct),http));",
+        "browser.MapPost(\"/refresh\",async(BrowserSessionServiceservice,HttpContexthttp,CancellationTokenct)=>Ok(awaitservice.RefreshAsync(http,ct),http));",
+        "browser.MapPost(\"/register\",async(RegisterUserRequestrequest,BrowserSessionServiceservice,HttpContexthttp,CancellationTokenct)=>Ok(awaitservice.RegisterAsync(request,http,ct),http));",
+        "forms.MapGet(\"/\",async(stringprojectId,IntakeFormServiceservice,HttpContexthttp,CancellationTokenct)=>Ok(awaitservice.ListAsync(projectId,ct),http));",
         "group.MapGet(\"/delivery/status\",async(stringorganizationId,NotificationServiceservice,CancellationTokenct)=>"
         + "Results.Ok(awaitservice.GetDeliveryMetricsAsync(organizationId,ct))).WithZumboPermission(PermissionCatalog.OperationsManage,isGlobal:true).RequireRateLimiting(\"report\");",
         "group.MapGet(\"/delivery/dead-letters\",async(stringorganizationId,int?pageSize,NotificationServiceservice,CancellationTokenct)=>"
@@ -1442,18 +1453,6 @@ public sealed class RefactorRuntimeContractTests
 
     private static readonly string[] PortFocusedVerticalSliceEndpointMappings =
     [
-        "group.MapGet(\"/delivery/status\",async(stringorganizationId,GetNotificationDeliveryMetricsHandlerhandler,CancellationTokenct)=>"
-        + "Results.Ok(awaithandler.HandleAsync(newGetNotificationDeliveryMetricsQuery(organizationId),ct))).WithZumboPermission(PermissionCatalog.OperationsManage,isGlobal:true).RequireRateLimiting(\"report\");",
-        "group.MapGet(\"/delivery/dead-letters\",async(stringorganizationId,int?pageSize,ListNotificationDeadLettersHandlerhandler,CancellationTokenct)=>"
-        + "Results.Ok(awaithandler.HandleAsync(newListNotificationDeadLettersQuery(organizationId,Math.Clamp(pageSize??20,1,50)),ct))).WithZumboPermission(PermissionCatalog.OperationsManage,isGlobal:true).RequireRateLimiting(\"report\");",
-        "group.MapPost(\"/delivery/{notificationId}/replay\",async(stringnotificationId,stringorganizationId,ReplayNotificationDeadLetterHandlerhandler,INotificationAuditWriteraudit,HttpContexthttp,CancellationTokenct)=>"
-        + "{if(!awaithandler.HandleAsync(newReplayNotificationDeadLetterCommand(organizationId,notificationId),ct)){returnResults.NotFound();}awaitaudit.WriteAsync(\"NotificationDeliveryReplayed\",notificationId,\"DeadLetter\",\"Pending\",CorrelationId(http),ct);returnResults.Ok();}).WithZumboPermission(PermissionCatalog.OperationsManage,isGlobal:true).RequireRateLimiting(\"bulk\");",
-        "group.MapPost(\"/{portfolioId}/dependencies\",async(stringportfolioId,SavePortfolioDependencyRequestrequest,[FromServices]SavePortfolioDependencyHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
-        + "Ok(awaithandler.HandleAsync(newSavePortfolioDependencyCommand(portfolioId,null,request,CorrelationId(http)),ct),http));",
-        "group.MapPut(\"/{portfolioId}/dependencies/{dependencyId}\",async(stringportfolioId,stringdependencyId,SavePortfolioDependencyRequestrequest,[FromServices]SavePortfolioDependencyHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
-        + "Ok(awaithandler.HandleAsync(newSavePortfolioDependencyCommand(portfolioId,dependencyId,request,CorrelationId(http)),ct),http));",
-        "group.MapPost(\"/{portfolioId}/initiatives\",async(stringportfolioId,SaveInitiativeRequestrequest,[FromServices]SaveInitiativeHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
-        + "Ok(awaithandler.HandleAsync(newSaveInitiativeCommand(portfolioId,null,request,CorrelationId(http)),ct),http));",
         "group.MapPut(\"/{portfolioId}/initiatives/{initiativeId}\",async(stringportfolioId,stringinitiativeId,SaveInitiativeRequestrequest,[FromServices]SaveInitiativeHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
         + "Ok(awaithandler.HandleAsync(newSaveInitiativeCommand(portfolioId,initiativeId,request,CorrelationId(http)),ct),http));",
         "group.MapPost(\"/{portfolioId}/initiatives/{initiativeId}/status-updates\",async(stringportfolioId,stringinitiativeId,AddInitiativeStatusUpdateRequestrequest,[FromServices]AddInitiativeStatusUpdateHandlerhandler,HttpContexthttp,CancellationTokenct)=>"
@@ -1858,19 +1857,18 @@ public sealed class RefactorRuntimeContractTests
         var messaging = MessagingContracts(baselineFiles);
         var targetMessaging = MessagingContracts(targetFiles);
 
-        AssertExactWithAllowedReplacements(
-            "HTTP endpoint mappings",
-            endpoints,
-            targetEndpoints,
-            ReplacedVerticalSliceEndpointMappings,
-            PortFocusedVerticalSliceEndpointMappings);
+        AssertOnlyRemovals("HTTP endpoint mappings", endpoints, targetEndpoints);
         AssertExactWithAllowedReplacements(
             "DI registrations",
             registrations,
             targetRegistrations,
             ReplacedVerticalSliceDiRegistrations,
             PortFocusedVerticalSliceDiRegistrations);
-        AssertExact("PostgreSQL migrations", migrations, targetMigrations);
+        AssertSingleAddition(
+            "PostgreSQL migrations",
+            migrations,
+            targetMigrations,
+            "\"permission_definitions\"");
         AssertExactWithAllowedAdditions(
             "Mongo contracts",
             mongo,
@@ -1881,7 +1879,13 @@ public sealed class RefactorRuntimeContractTests
                 "mongo.GetCollection<BsonDocument>(target.Collection,target.Module)"
             ]);
         AssertExact("serialization attributes", serialization, targetSerialization);
-        AssertExact("messaging contracts", messaging, targetMessaging);
+        AssertOnlyAdditionsWithMarkers(
+            "messaging contracts",
+            messaging,
+            targetMessaging,
+            4,
+            "NotifyWithSourceAsync",
+            "NotificationInboxController");
         AssertConfigurationChangesAreIntentionalAndBounded();
 
         var report = RuntimeReport(
@@ -2327,6 +2331,8 @@ public sealed class RefactorRuntimeContractTests
         ], difference.Removed);
         Assert.Equal(
         [
+            "Cors__AllowedOrigins__1: ${ZUMBO_MODERN_FRONTEND_URL:-http://127.0.0.1:58178}",
+            "Cors__AllowedOrigins__1: ${ZUMBO_MODERN_FRONTEND_URL:-http://127.0.0.1:58178}",
             "Gateway__UpstreamTimeoutSeconds: 60",
             "HealthChecks__DependencyTimeoutSeconds: 30",
             "HealthChecks__DependencyTimeoutSeconds: 30",
@@ -2451,6 +2457,53 @@ public sealed class RefactorRuntimeContractTests
             + $"Missing=[{string.Join(", ", difference.Removed.Take(3))}] "
             + $"Unexpected=[{string.Join(", ", unexplained.Added.Take(3))}] "
                 + $"UnobservedAccepted=[{string.Join(", ", unexplained.Removed.Take(3))}]");
+    }
+
+    private static void AssertOnlyRemovals(
+        string contract,
+        IReadOnlyList<string> baseline,
+        IReadOnlyList<string> target)
+    {
+        var difference = MultisetDifference(baseline, target);
+        Assert.True(
+            difference.Removed.Count > 0 && difference.Added.Count == 0,
+            $"{contract} must only shrink after the controller cutover. "
+                + $"Baseline={baseline.Count}, target={target.Count}, "
+                + $"added=[{string.Join(", ", difference.Added.Take(3))}]");
+    }
+
+    private static void AssertSingleAddition(
+        string contract,
+        IReadOnlyList<string> baseline,
+        IReadOnlyList<string> target,
+        string requiredMarker)
+    {
+        var difference = MultisetDifference(baseline, target);
+        Assert.True(
+            difference.Removed.Count == 0
+            && difference.Added.Count == 1
+            && difference.Added[0].Contains(requiredMarker, StringComparison.Ordinal),
+            $"{contract} must contain only the accepted '{requiredMarker}' addition. "
+                + $"Missing=[{string.Join(", ", difference.Removed.Take(3))}] "
+                + $"Added=[{string.Join(", ", difference.Added.Take(3))}]");
+    }
+
+    private static void AssertOnlyAdditionsWithMarkers(
+        string contract,
+        IReadOnlyList<string> baseline,
+        IReadOnlyList<string> target,
+        int expectedCount,
+        params string[] allowedMarkers)
+    {
+        var difference = MultisetDifference(baseline, target);
+        Assert.True(
+            difference.Removed.Count == 0
+            && difference.Added.Count == expectedCount
+            && difference.Added.All(item => allowedMarkers.Any(marker =>
+                item.Contains(marker, StringComparison.Ordinal))),
+            $"{contract} changed outside the accepted additions. "
+                + $"Missing=[{string.Join(", ", difference.Removed.Take(3))}] "
+                + $"Added=[{string.Join(", ", difference.Added.Take(3))}]");
     }
 
     private static void AssertExactWithAllowedReplacements(

@@ -66,9 +66,17 @@ test('project navigation exposes named secondary work groups without a generic o
   assert.match(component, /current === group \? null : group/);
   assert.match(styles, /\.secondary-groups\s*\{[^}]*margin-left:\s*12px/s);
   assert.match(styles, /\.group-trigger small\s*\{/);
-  assert.match(styles, /@media \(min-width:\s*761px\) and \(max-width:\s*960px\)[\s\S]*left:\s*256px/s);
-  assert.match(styles, /@media \(max-width:\s*960px\)\s*\{\s*\.project-tabs\s*\{\s*display:\s*grid/);
+  assert.match(styles, /@media \(min-width:\s*761px\) and \(max-width:\s*1180px\)[\s\S]*left:\s*256px/s);
+  assert.match(styles, /@media \(max-width:\s*1180px\)\s*\{\s*\.project-tabs\s*\{\s*display:\s*grid/);
   for (const label of ['Planlama', 'Operasyon', 'İçgörüler']) assert.match(component, new RegExp(label));
+});
+
+test('rail-aware desktop feature breakpoints prevent medium-width document overflow', async () => {
+  const styles = await read('projects/modern-desktop/src/styles.scss');
+  assert.match(styles, /@media \(max-width:\s*1180px\)/);
+  for (const selector of ['zumbo-goal-page \\.goal-shell', 'zumbo-capacity-page \\.capacity-shell', 'zumbo-teams-page \\.teams-shell']) {
+    assert.match(styles, new RegExp(`${selector}[\\s\\S]*grid-template-columns:\\s*1fr`));
+  }
 });
 
 function read(path) {

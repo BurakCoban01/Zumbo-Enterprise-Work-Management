@@ -11,6 +11,7 @@ const [models, core, service, page, template, workspace, workspaceTemplate] = aw
 test('modern Audit preserves capability, query, cursor, export and integrity contracts', () => {
   assert.match(models, /interface AuditEntry/); assert.match(models, /interface AuditIntegrity/);
   assert.match(core, /AuditReadAll/); assert.match(core, /Kaynak türü ve kaynak kimliği birlikte girilmelidir/); assert.match(core, /safeAuditChanges/);
+  assert.match(core, /iş kaydı oluşturuldu/); assert.match(core, /INTERNAL_ID_PATTERN/);
   assert.match(service, /\/api\/audit\/integrity\//); assert.match(service, /\/api\/audit\/export/);
   assert.match(page, /nextCursor/); assert.match(page, /if \(this\.allowed\(\)\) this\.loadInitial\(\)/);
   assert.match(template, /Bütünlüğü doğrula/); assert.match(template, /Güvenli değişiklik özeti/);

@@ -23,8 +23,9 @@ public sealed class WorkItemAttachmentsControllerContractTests(WebApplicationFac
         _ = factory.CreateClient();
         var endpoints = factory.Services.GetServices<EndpointDataSource>().SelectMany(source => source.Endpoints).OfType<RouteEndpoint>()
             .Where(endpoint => endpoint.Metadata.GetMetadata<ControllerActionDescriptor>()?.ControllerTypeInfo.AsType() == typeof(WorkItemAttachmentsController)).ToList();
-        Assert.Equal(4, endpoints.Count);
+        Assert.Equal(5, endpoints.Count);
 
+        AssertContract(endpoints, HttpMethods.Get, "api/work-items/{id}/attachments", PermissionCatalog.WorkItemView, "api");
         AssertContract(endpoints, HttpMethods.Post, "api/work-items/{id}/attachments/upload", PermissionCatalog.AttachmentCreate, "upload");
         AssertContract(endpoints, HttpMethods.Get, "api/work-items/{id}/attachments/{attachmentId}/preview", PermissionCatalog.WorkItemView, "api");
         AssertContract(endpoints, HttpMethods.Get, "api/work-items/{id}/attachments/{attachmentId}/download", PermissionCatalog.WorkItemView, "api");

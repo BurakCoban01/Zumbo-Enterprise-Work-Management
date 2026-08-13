@@ -52,15 +52,6 @@ internal static class ApiPipeline
 
         var api = app.MapGroup("/api").RequireRateLimiting("api");
         app.MapControllers();
-        api.MapKnowledgeEndpoints();
-        api.MapWorkflowEndpoints();
-        api.MapAutomationEndpoints();
-        api.MapWorkItemEndpoints();
-        api.MapDashboardEndpoints();
-        api.MapCapacityPlanningEndpoints();
-        api.MapSprintEndpoints();
-        api.MapWorkItemTypeSchemaEndpoints();
-
         if (app.Environment.IsDevelopment())
         {
             app.MapGet("/", () => Results.Redirect("/swagger"));

@@ -33,6 +33,11 @@
         <span><strong>Hesap ve güvenlik</strong><small>Parola, bildirimler, cihazlar ve veri tercihleri</small></span>
         <ion-icon name="chevron-forward-outline"/>
       </a>
+      <button class="theme-toggle" type="button" (click)="theme.toggle()" [attr.aria-label]="theme.theme() === 'dark' ? 'Açık temaya geç' : 'Koyu temaya geç'">
+        <ion-icon [name]="theme.theme() === 'dark' ? 'sunny-outline' : 'moon-outline'"/>
+        <span><strong>Görünüm</strong><small>{{theme.theme() === 'dark' ? 'Koyu tema' : 'Açık tema'}}</small></span>
+        <ion-icon name="chevron-forward-outline"/>
+      </button>
     </section>
     @if (canIntegrations() || canOperations()) { <section><h2>Yönetim</h2>@if (canIntegrations()) { <a routerLink="/workspace/integrations"><ion-icon name="link-outline"/><span><strong>Entegrasyonlar</strong><small>Webhook ve geliştirme bağlantıları</small></span><ion-icon name="chevron-forward-outline"/></a> }@if (canOperations()) { <a routerLink="/workspace/operations"><ion-icon name="server-outline"/><span><strong>Operasyonlar</strong><small>Sistem sağlığı ve müdahale kuyrukları</small></span><ion-icon name="chevron-forward-outline"/></a> }</section> }
     <section><h2>Oturum</h2><button type="button" (click)="logout()"><ion-icon name="log-out-outline"/><span>Çıkış yap</span></button></section>

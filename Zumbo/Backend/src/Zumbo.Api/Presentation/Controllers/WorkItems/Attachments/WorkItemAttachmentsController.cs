@@ -20,6 +20,15 @@ namespace Zumbo.Api.Presentation.Controllers.WorkItems.Attachments;
 [DurableTransaction("WorkItems")]
 public sealed class WorkItemAttachmentsController : ApiControllerBase
 {
+    [HttpGet]
+    public async Task<IActionResult> List(
+        [FromRoute] string id,
+        [FromQuery] int? page,
+        [FromQuery] int? pageSize,
+        [FromServices] WorkItemActivityQueryService service,
+        CancellationToken cancellationToken) =>
+        OkEnvelopeResult(await service.ListAttachmentsAsync(id, page ?? 1, pageSize ?? 50, cancellationToken));
+
     [HttpPost("upload")]
     [DisableAntiforgeryForController]
     [EnableRateLimiting("upload")]

@@ -4,6 +4,10 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 
 import { dirname, extname, relative, resolve } from 'node:path';
 
 const root = resolve(import.meta.dirname, '../..');
+if (!existsSync(resolve(root, 'Frontend/desktop-bulma/index.html'))) {
+  await import('./Test-FinalUserGuide.mjs');
+  process.exit(0);
+}
 const coveragePath = resolve(root, 'docs/user-guide/coverage.json');
 const coverage = JSON.parse(readFileSync(coveragePath, 'utf8'));
 const guidePath = resolve(root, coverage.guide);

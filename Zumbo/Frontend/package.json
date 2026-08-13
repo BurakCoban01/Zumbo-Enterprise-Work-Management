@@ -18,7 +18,7 @@
     "preview:modern:canonical": "node tests/static-server.mjs dist-modern --canonical",
     "quality:modern": "node --test --test-concurrency=1 tests/modern-*.test.mjs && ng build modern-desktop --configuration production && ng build modern-mobile --configuration production",
     "lint": "eslint .",
-    "unit": "node --test --test-concurrency=1 tests/modern-*.test.mjs",
+    "unit": "node tests/run-modern-tests.mjs",
     "audit:dependencies": "node tests/dependency-audit.mjs",
     "audit:licenses": "node tests/license-audit.mjs",
     "quality": "pnpm run lint && pnpm run unit && pnpm run build && pnpm run audit:dependencies && pnpm run audit:licenses",
