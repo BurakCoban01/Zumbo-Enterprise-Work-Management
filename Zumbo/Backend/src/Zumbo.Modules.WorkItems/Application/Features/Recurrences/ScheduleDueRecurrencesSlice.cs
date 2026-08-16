@@ -68,38 +68,30 @@ internal sealed class ScheduleDueRecurrencesSlice(
             }
 
             var scheduledFor = recurrence.NextRunAtUtc.Value.ToUniversalTime();
-            var occurrenceId = RecurrenceOccurrenceIdentity.Create(recurrence.Id, scheduledFor);
-            var occurrence = await occurrences.SelectAsync(item => item.Id == occurrenceId, ct);
+            var occurrence = await occurrences.SelectAsync(
+                item => item.RecurrenceId == recurrence.Id
+                    && item.ScheduledForUtc == scheduledFor,
+                ct);
             if (occurrence is null)
             {
-                try
+                var occurrenceId = RecurrenceOccurrenceIdentity.Create(recurrence.Id, scheduledFor);
+                occurrence = await occurrences.CreateAsync(new WorkItemRecurrenceOccurrenceDocument
                 {
-                    await occurrences.CreateAsync(new WorkItemRecurrenceOccurrenceDocument
-                    {
-                        Id = occurrenceId,
-                        OrganizationId = recurrence.OrganizationId,
-                        ProjectId = recurrence.ProjectId,
-                        RecurrenceId = recurrence.Id,
-                        TemplateId = recurrence.TemplateId,
-                        ScheduledForUtc = scheduledFor,
-                        CreatedAt = now
-                    }, ct);
-                }
-                catch (DocumentConflictException)
-                {
-                    occurrence = await occurrences.SelectAsync(
-                        item => item.Id == occurrenceId,
-                        ct);
-                    if (occurrence is null)
-                        throw;
-                }
+                    Id = occurrenceId,
+                    OrganizationId = recurrence.OrganizationId,
+                    ProjectId = recurrence.ProjectId,
+                    RecurrenceId = recurrence.Id,
+                    TemplateId = recurrence.TemplateId,
+                    ScheduledForUtc = scheduledFor,
+                    CreatedAt = now
+                }, ct);
             }
 
             await recurrencePublisher.PublishAsync(new WorkItemRecurrenceDueEvent(
                 recurrence.OrganizationId,
                 recurrence.ProjectId,
                 recurrence.Id,
-                occurrenceId,
+                occurrence.Id,
                 scheduledFor), ct);
             recurrence.ScheduledOccurrences = checked(recurrence.ScheduledOccurrences + 1);
             var next = RecurrenceSchedulePolicy.Next(
