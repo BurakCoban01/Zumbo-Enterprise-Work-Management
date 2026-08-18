@@ -1,5 +1,8 @@
 @media (max-width: 1180px) {
-  .work-detail { left: 76px; }.work-detail-body { display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; gap: 12px; padding: 10px; }.work-detail-body > main { display: contents; }.work-detail-body > main > p { order: 0; }.work-detail-body > main > section[aria-labelledby="description-title"] { order: 1; }.work-detail-body > main > section[aria-labelledby="checklist-title"] { order: 2; }.work-detail-properties { order: 3; min-height: auto; grid-template-columns: repeat(2, minmax(0, 1fr)); overflow: visible; padding: 10px; }.work-detail-body > main > section[aria-labelledby="attachments-title"] { order: 4; }.work-detail-body > main > section[aria-labelledby="development-title"] { order: 5; }.work-detail-body > main > section[aria-labelledby="activity-title"] { order: 6; }
+  .work-detail { left: 76px; }
+}
+@media (max-width: 980px) {
+  .work-detail-body { display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; gap: 12px; padding: 10px; }.work-detail-body > main { display: contents; }.work-detail-body > main > p { order: 0; }.work-detail-body > main > section[aria-labelledby="description-title"] { order: 1; }.work-detail-body > main > section[aria-labelledby="checklist-title"] { order: 2; }.work-detail-properties { order: 3; min-height: auto; grid-template-columns: repeat(2, minmax(0, 1fr)); overflow: visible; padding: 10px; }.work-detail-body > main > section[aria-labelledby="attachments-title"] { order: 4; }.work-detail-body > main > section[aria-labelledby="development-title"] { order: 5; }.work-detail-body > main > section[aria-labelledby="activity-title"] { order: 6; }
   .work-detail-properties { border-top: 1px solid var(--line); border-left: 0; }
 }
 @media (max-width: 840px) {

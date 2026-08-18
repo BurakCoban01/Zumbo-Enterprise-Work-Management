@@ -71,6 +71,22 @@ test('mobile work paging appends only unseen task identities', async () => {
   assert.deepEqual(merged.map(item => item.id), ['one', 'two', 'three']);
 });
 
+test('mobile project summary filters preserve their matching work set', async () => {
+  const source = await read('projects/modern-mobile/src/app/features/work/mobile-work.core.ts');
+  const model = transpileCommonJs(source);
+  const now = Date.parse('2026-08-18T12:00:00Z');
+  const items = [
+    { id: 'todo', status: 'To Do', dueDate: '2026-08-19T12:00:00Z' },
+    { id: 'active', status: 'In Progress', dueDate: '2026-08-19T12:00:00Z' },
+    { id: 'overdue', status: 'Test', dueDate: '2026-08-17T12:00:00Z' },
+    { id: 'done', status: 'Done', dueDate: '2026-08-17T12:00:00Z', completedAt: '2026-08-17T13:00:00Z' }
+  ];
+
+  assert.deepEqual(model.filterProjectWorkItems(items, 'active', 'To Do', now).map(item => item.id), ['active', 'overdue']);
+  assert.deepEqual(model.filterProjectWorkItems(items, 'done', 'To Do', now).map(item => item.id), ['done']);
+  assert.deepEqual(model.filterProjectWorkItems(items, 'overdue', 'To Do', now).map(item => item.id), ['overdue']);
+});
+
 test('mobile task detail keeps permission, offline and bounded collaboration contracts', async () => {
   const page = await read('projects/modern-mobile/src/app/features/task-detail/mobile-task-detail.page.ts');
   const template = await read('projects/modern-mobile/src/app/features/task-detail/mobile-task-detail.page.html');
@@ -151,6 +167,8 @@ test('mobile project hub preserves overview, adaptive board and planning access'
   assert.match(page, /realtime\.connect\(this\.projectId\)/);
   assert.match(page, /realtime\.resync\$/);
   assert.match(page, /realtime\.synchronize\(value\.tasks\)/);
+  assert.match(template, /\[queryParams\]="\{focus:metricFocus\(\)\}"/);
+  assert.match(await read('projects/modern-mobile/src/app/features/work/mobile-project-work.page.ts'), /filterProjectWorkItems/);
   assert.equal((template.match(/<ion-segment-button/g) ?? []).length, 3);
   assert.match(template, /@for\(status of statuses\(\)/);
   assert.match(styles, /overflow-x:auto/);

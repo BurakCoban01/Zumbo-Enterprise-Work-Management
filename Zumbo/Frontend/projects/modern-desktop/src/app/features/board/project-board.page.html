@@ -22,7 +22,7 @@
     <div class="board-empty"><strong>Bu projede pano yok</strong><p>Projede çalışmayı düzenlemek için bir pano gerekir.</p></div>
   } @else if (!error()) {
     <div class="board-scroll">
-      <div class="board-columns" [style.--board-column-count]="columns().length">
+      <div class="board-columns">
         @for (column of columns(); track column.id) {
           <section class="board-lane" [class.drop-active]="dropLaneId() === column.id" [class.at-limit]="atWipLimit(column)" (dragover)="dragOverLane($event, column)" (drop)="dropOnLane($event, column)" [attr.aria-label]="column.name + ' kolonu'">
             <header><div><h3>{{ column.name }}</h3><span>@if (column.tasks.length !== columnTaskCount(column)) { {{ column.tasks.length }} · }{{ columnTaskCount(column) }}@if (column.wipLimit) { / {{ column.wipLimit }} }</span></div>@if (atWipLimit(column)) { <small>WIP limiti</small> }</header>
