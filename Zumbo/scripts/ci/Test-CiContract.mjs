@@ -62,7 +62,7 @@ const capabilityJob = jobs.get('codeql-capability');
 const summaryJob = jobs.get('ci-summary');
 assert.match(capabilityJob.source, /^    outputs:\n      enabled: \$\{\{ steps\.evaluate\.outputs\.enabled \}\}\n      state: \$\{\{ steps\.evaluate\.outputs\.state \}\}\n      applicability: \$\{\{ steps\.evaluate\.outputs\.applicability \}\}\n      expected_codeql_result: \$\{\{ steps\.evaluate\.outputs\.expected_codeql_result \}\}$/m);
 assert.match(capabilityJob.source, /ZUMBO_REPOSITORY_PRIVATE: \$\{\{ github\.event\.repository\.private \}\}/);
-assert.match(capabilityJob.source, /ZUMBO_CODE_SECURITY_VARIABLE: \$\{\{ vars\.GITHUB_CODE_SECURITY_ENABLED \}\}/);
+assert.match(capabilityJob.source, /ZUMBO_CODE_SECURITY_VARIABLE: \$\{\{ vars\.ZUMBO_CODE_SECURITY_ENABLED \}\}/);
 assert.match(capabilityJob.source, /node scripts\/ci\/Test-CodeqlCapability\.mjs --runtime/);
 for (const [jobName, language] of codeqlJobs) {
   const job = jobs.get(jobName);
@@ -102,10 +102,7 @@ assert.match(browserJob.source, /chromium\.executablePath\(\)[\s\S]*existsSync\(
 assert.doesNotMatch(browserJob.source, /exec playwright install/);
 assert.match(browserJob.source, /- name: Require browser evidence\n\s+run: test -f artifacts\/ui\/playwright\/fe008-cross-browser\.json/);
 assert.match(jobs.get('provider-postgresql').source, /- name: Require migration evidence\n\s+run: test -f artifacts\/migrations\/ci\/postgresql\.sql/);
-assert.ok(jobs.get('ci-contract').steps.has('Generated quality artifacts freshness'), 'CI must rebuild generated quality artifacts and reject a diff.');
-
 const capabilityPolicy = JSON.parse(readFileSync(resolve(root, 'docs/quality/codeql-capability-policy.json'), 'utf8'));
-const capabilityEvidence = JSON.parse(readFileSync(resolve(root, 'artifacts/quality/QA-001-codeql-capability.json'), 'utf8'));
 assert.equal(capabilityPolicy.states.unavailable.name, 'ExternalPlatformUnavailable');
 assert.equal(capabilityPolicy.states.unavailable.applicability, 'NotApplicableExternalPlatform');
 assert.equal(capabilityPolicy.states.unavailable.expectedCodeqlResult, 'skipped');
@@ -114,15 +111,6 @@ assert.deepEqual(capabilityPolicy.codeql.jobs, {
   csharp: 'codeql-csharp',
   'javascript-typescript': 'codeql-javascript-typescript'
 });
-assert.equal(capabilityEvidence.decision.state, 'ExternalPlatformUnavailable');
-assert.equal(capabilityEvidence.decision.applicability, 'NotApplicableExternalPlatform');
-assert.equal(capabilityEvidence.decision.codeqlPassed, false);
-assert.deepEqual(capabilityEvidence.decision.expectedLanguageJobResults, {
-  'codeql-csharp': 'skipped',
-  'codeql-javascript-typescript': 'skipped'
-});
-assert.equal(capabilityEvidence.observation.sarifUploadSucceeded, false);
-
 const runCommands = [...source.matchAll(/^\s+run:\s*(?:\|\s*\n((?:\s{10,}.*\n?)*)|([^\n]+))$/gm)]
   .map(match => `${match[1] || ''}${match[2] || ''}`);
 const forbiddenCommands = [

@@ -1142,7 +1142,7 @@ public sealed class MongoMigrationRunnerTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task RequiredIndexes_AcceptEquivalentLegacyNamesWithoutDroppingThem()
+    public async Task RequiredIndexes_ReplaceLegacyFullUniqueIdentityIndexes()
     {
         var users = _database.GetCollection<BsonDocument>("users");
         await users.Indexes.CreateManyAsync(
@@ -1172,10 +1172,18 @@ public sealed class MongoMigrationRunnerTests : IAsyncLifetime
         var names = (await cursor.ToListAsync()).Select(index => index["name"].AsString).ToList();
 
         Assert.Equal(MongoMigrationStates.Completed, outcome.Status);
-        Assert.Contains("Username_1", names);
-        Assert.Contains("Email_1", names);
-        Assert.DoesNotContain("ux_users_username_ci", names);
-        Assert.DoesNotContain("ux_users_email_ci", names);
+        Assert.DoesNotContain("Username_1", names);
+        Assert.DoesNotContain("Email_1", names);
+        Assert.Contains("ux_users_username_ci", names);
+        Assert.Contains("ux_users_email_ci", names);
+
+        await users.InsertManyAsync(
+        [
+            new BsonDocument { ["_id"] = "username-only-a", ["Username"] = "username-a" },
+            new BsonDocument { ["_id"] = "username-only-b", ["Username"] = "username-b" },
+            new BsonDocument { ["_id"] = "email-only-a", ["Email"] = "email-a@zumbo.local" },
+            new BsonDocument { ["_id"] = "email-only-b", ["Email"] = "email-b@zumbo.local" }
+        ]);
     }
 
     [Fact]
@@ -1693,8 +1701,8 @@ public sealed class MongoMigrationRunnerTests : IAsyncLifetime
 
     private static IReadOnlyList<ExpectedIndex> RequiredIndexes() =>
     [
-        Index("Identity", "users", "ux_users_username_ci", Keys(("Username", 1)), unique: true, caseInsensitive: true),
-        Index("Identity", "users", "ux_users_email_ci", Keys(("Email", 1)), unique: true, caseInsensitive: true),
+        Index("Identity", "users", "ux_users_username_ci", Keys(("Username", 1)), unique: true, partialFilter: StringField("Username"), caseInsensitive: true),
+        Index("Identity", "users", "ux_users_email_ci", Keys(("Email", 1)), unique: true, partialFilter: StringField("Email"), caseInsensitive: true),
         Index("Identity", "users", "ix_users_active_username", Keys(("IsActive", 1), ("Username", 1), ("_id", 1))),
         Index("Identity", "users", "ix_users_organization_active_username", Keys(("OrganizationId", 1), ("IsActive", 1), ("Username", 1), ("_id", 1))),
         Index("Identity", "users", "ix_users_refresh_token_hash", Keys(("RefreshTokens.TokenHash", 1))),
@@ -1758,6 +1766,9 @@ public sealed class MongoMigrationRunnerTests : IAsyncLifetime
 
         return document;
     }
+
+    private static BsonDocument StringField(string name) =>
+        new(name, new BsonDocument("$type", "string"));
 
     private static ExpectedIndex Index(
         string module,

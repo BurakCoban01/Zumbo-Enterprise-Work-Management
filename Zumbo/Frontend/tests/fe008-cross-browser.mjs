@@ -123,8 +123,8 @@ async function runSurface(browserName, browser, surface) {
     if (!expected) unexpected.push(`console: ${message.text()}`);
   });
 
-  const route = isMobile ? '/mobile-ionic/index.html' : '/desktop-bulma/index.html';
-  const readySelector = isMobile ? '.login-surface' : '.desktop-login';
+  const route = isMobile ? '/modern-mobile/login' : '/modern-desktop/login';
+  const readySelector = isMobile ? '.mobile-login' : '.login-panel';
   const screenshotName = `fe008-${surface}-smoke.png`;
   try {
     await page.goto(`${frontendBaseUrl}${route}`, { waitUntil: 'networkidle' });

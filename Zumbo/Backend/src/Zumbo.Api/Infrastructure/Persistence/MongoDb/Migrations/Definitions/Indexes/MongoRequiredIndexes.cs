@@ -9,8 +9,8 @@ public static class MongoRequiredIndexes
 {
     public static IReadOnlyList<MongoIndexSpecification> All { get; } =
     [
-        Index("Identity", "users", "ux_users_username_ci", new("Username", 1), unique: true, ci: true),
-        Index("Identity", "users", "ux_users_email_ci", new("Email", 1), unique: true, ci: true),
+        Index("Identity", "users", "ux_users_username_ci", new("Username", 1), unique: true, ci: true, partial: StringField("Username")),
+        Index("Identity", "users", "ux_users_email_ci", new("Email", 1), unique: true, ci: true, partial: StringField("Email")),
         Index("Identity", "users", "ix_users_active_username", Keys(("IsActive", 1), ("Username", 1), ("_id", 1))),
         Index("Identity", "users", "ix_users_organization_active_username", Keys(("OrganizationId", 1), ("IsActive", 1), ("Username", 1), ("_id", 1))),
         Index("Identity", "users", "ix_users_refresh_token_hash", new("RefreshTokens.TokenHash", 1)),
@@ -79,4 +79,7 @@ public static class MongoRequiredIndexes
 
         return document;
     }
+
+    private static BsonDocument StringField(string name) =>
+        new(name, new BsonDocument("$type", "string"));
 }

@@ -78,7 +78,7 @@ function parseCodeSecurityVariable(value) {
     return value === 'false' ? 'false' : 'unset';
   }
   if (value === 'true') return 'true';
-  throw new Error(`GITHUB_CODE_SECURITY_ENABLED is ambiguous: ${display(value)}.`);
+  throw new Error(`ZUMBO_CODE_SECURITY_ENABLED is ambiguous: ${display(value)}.`);
 }
 
 function display(value) {

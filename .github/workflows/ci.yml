@@ -33,7 +33,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: "20.20.0"
+          node-version: "22.22.3"
 
       - name: Artifact retention and secret boundary
         run: node scripts/ci/Test-CiContract.mjs
@@ -67,7 +67,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: "20.20.0"
+          node-version: "22.22.3"
 
       - name: Restore and validate dependency manifests
         shell: pwsh
@@ -247,7 +247,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: "20.20.0"
+          node-version: "22.22.3"
 
       - name: Setup pnpm
         run: corepack enable && corepack prepare pnpm@9.0.0 --activate
@@ -258,21 +258,36 @@ jobs:
       - name: Frontend lint unit and production build
         run: |
           pnpm --dir Frontend run lint
-          pnpm --dir Frontend run unit
           pnpm --dir Frontend run build
+          pnpm --dir Frontend run unit
 
       - name: Frontend vulnerability and license policy
         run: |
           pnpm --dir Frontend run audit:dependencies
           pnpm --dir Frontend run audit:licenses
 
+  runtime-browser:
+    timeout-minutes: 40
+    runs-on: ubuntu-latest
+    env:
+      ZUMBO_JWT_SIGNING_KEY: ci-only-signing-key-000000000000000000000000000000000000000000000000
+      ZUMBO_MINIO_ROOT_USER: ci-minio-user
+      ZUMBO_MINIO_ROOT_PASSWORD: ci-only-minio-password-00000000
+      ZUMBO_IDENTITY_ADMIN_EMAIL: ci-admin@zumbo.local
+      ZUMBO_IDENTITY_BOOTSTRAP_TOKEN: ci-only-bootstrap-token-000000000000
+      ZUMBO_REGISTRATION_PROVISIONING_MODE: ProductionLike
+      ZUMBO_DOCKER_SUBNET: 10.250.3.0/24
+      ZUMBO_API_URL: http://127.0.0.1:58089
+      ZUMBO_FRONTEND_URL: http://127.0.0.1:58177
+      ZUMBO_FRONTEND_PORT: "58177"
+    steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Setup Node
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: "20.20.0"
+          node-version: "22.22.3"
 
       - name: Setup pnpm
         run: corepack enable && corepack prepare pnpm@9.0.0 --activate
@@ -342,7 +357,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: "20.20.0"
+          node-version: "22.22.3"
 
       - name: Setup pnpm
         run: corepack enable && corepack prepare pnpm@9.0.0 --activate
@@ -406,13 +421,13 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: "20.20.0"
+          node-version: "22.22.3"
 
       - name: Evaluate CodeQL capability policy
         id: evaluate
         env:
           ZUMBO_REPOSITORY_PRIVATE: ${{ github.event.repository.private }}
-          ZUMBO_CODE_SECURITY_VARIABLE: ${{ vars.GITHUB_CODE_SECURITY_ENABLED }}
+          ZUMBO_CODE_SECURITY_VARIABLE: ${{ vars.ZUMBO_CODE_SECURITY_ENABLED }}
         run: node scripts/ci/Test-CodeqlCapability.mjs --runtime
 
   codeql-csharp:
@@ -488,7 +503,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: "20.20.0"
+          node-version: "22.22.3"
 
       - name: Require every gate job
         env:

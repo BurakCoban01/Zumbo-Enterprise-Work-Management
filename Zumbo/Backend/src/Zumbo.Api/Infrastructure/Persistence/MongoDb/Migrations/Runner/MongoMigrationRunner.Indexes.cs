@@ -42,6 +42,12 @@ public sealed partial class MongoMigrationRunner{
             var collection = mongo.GetCollection<BsonDocument>(group.Key.Collection, group.Key.Module);
             using var cursor = await collection.Indexes.ListAsync(cancellationToken);
             var currentIndexes = await cursor.ToListAsync(cancellationToken);
+            createdIndexes += await ReplaceLegacyIdentityIndexesAsync(
+                migrationId,
+                group,
+                collection,
+                currentIndexes,
+                cancellationToken);
             var models = group
                 .Where(specification => !currentIndexes.Any(index =>
                     IsEquivalentIndex(index, specification)))
@@ -74,7 +80,8 @@ public sealed partial class MongoMigrationRunner{
 
     private static bool IsEquivalentIndex(
         BsonDocument current,
-        MongoIndexSpecification expected)
+        MongoIndexSpecification expected,
+        bool comparePartialFilter = true)
     {
         if (current["key"].AsBsonDocument != expected.Keys
             || current.GetValue("unique", false).ToBoolean() != expected.Unique)
@@ -98,10 +105,57 @@ public sealed partial class MongoMigrationRunner{
             return false;
         }
 
+        if (!comparePartialFilter)
+        {
+            return true;
+        }
+
         var currentPartialFilter = current.TryGetValue("partialFilterExpression", out var partial)
             ? partial.AsBsonDocument
             : null;
         return currentPartialFilter == expected.PartialFilter;
+    }
+
+    private static async Task<int> ReplaceLegacyIdentityIndexesAsync(
+        string migrationId,
+        IEnumerable<MongoIndexSpecification> specifications,
+        IMongoCollection<BsonDocument> collection,
+        List<BsonDocument> currentIndexes,
+        CancellationToken cancellationToken)
+    {
+        if (migrationId != IndexMigrationId)
+        {
+            return 0;
+        }
+
+        var replacements = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["ux_users_username_ci"] = "Username_1",
+            ["ux_users_email_ci"] = "Email_1"
+        };
+        var replaced = 0;
+        foreach (var specification in specifications)
+        {
+            if (!replacements.TryGetValue(specification.Name, out var legacyName))
+            {
+                continue;
+            }
+
+            var legacy = currentIndexes.FirstOrDefault(index =>
+                index.GetValue("name", string.Empty).AsString == legacyName);
+            if (legacy is null
+                || IsEquivalentIndex(legacy, specification)
+                || !IsEquivalentIndex(legacy, specification, comparePartialFilter: false))
+            {
+                continue;
+            }
+
+            await collection.Indexes.DropOneAsync(legacyName, cancellationToken);
+            currentIndexes.Remove(legacy);
+            replaced++;
+        }
+
+        return replaced;
     }
 
     private static bool IsSupersededIndex(string migrationId, string indexName) =>
