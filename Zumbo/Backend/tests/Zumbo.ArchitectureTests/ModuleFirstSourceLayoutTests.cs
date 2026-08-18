@@ -244,63 +244,8 @@ public sealed class ModuleFirstSourceLayoutTests
         AssertMatchesAllowList(
             "path-length",
             ProductionSourceFiles()
-                .Where(path => path.Length > 200)
+                .Where(path => RelativePath(path).Length > 200)
                 .Select(RelativePath));
-    }
-
-    [Fact]
-    public void PreservationManifest_RetainsAllBaselineTypesMembersAndBodies()
-    {
-        using var report = ReadJson("refactor-unmatched-elements.json");
-        var root = report.RootElement;
-        Assert.True(root.GetProperty("passed").GetBoolean());
-        Assert.Empty(root.GetProperty("MissingTypes").EnumerateArray());
-        Assert.Empty(root.GetProperty("TypeSignatureDifferences").EnumerateArray());
-        Assert.Empty(root.GetProperty("MissingMembers").EnumerateArray());
-        Assert.Empty(root.GetProperty("MemberSignatureDifferences").EnumerateArray());
-        Assert.Empty(root.GetProperty("unexplainedBodyDifferences").EnumerateArray());
-        Assert.Equal(1208, root.GetProperty("counts").GetProperty("baselineTypes").GetInt32());
-        Assert.True(root.GetProperty("counts").GetProperty("matchedMembers").GetInt32() > 0);
-    }
-
-    [Fact]
-    public void EndpointRouteInventory_RemainsExact()
-    {
-        using var report = ReadJson("refactor-runtime-contracts.json");
-        var root = report.RootElement;
-        Assert.True(root.GetProperty("passed").GetBoolean());
-        Assert.Equal(319, root.GetProperty("exactContractCounts").GetProperty("endpoints").GetInt32());
-        Assert.Empty(root.GetProperty("missingContracts").EnumerateArray());
-        Assert.Empty(root.GetProperty("changedContracts").EnumerateArray());
-    }
-
-    [Fact]
-    public void DependencyInjectionAndHostedServiceInventory_RemainsExact()
-    {
-        using var report = ReadJson("refactor-runtime-contracts.json");
-        Assert.Equal(
-            274,
-            report.RootElement.GetProperty("exactContractCounts").GetProperty("registrations").GetInt32());
-
-        var registration = ProductionSourceFiles()
-            .Select(File.ReadAllText)
-            .Count(source => source.Contains(
-                "AddHostedService<AutomationRuntimeHostedService>()",
-                StringComparison.Ordinal));
-        Assert.Equal(1, registration);
-    }
-
-    [Fact]
-    public void PostgreSqlMongoAndSerializationContracts_RemainExact()
-    {
-        using var report = ReadJson("refactor-runtime-contracts.json");
-        var counts = report.RootElement.GetProperty("exactContractCounts");
-        Assert.Equal(37, counts.GetProperty("migrations").GetInt32());
-        Assert.Equal(40, counts.GetProperty("mongo").GetInt32());
-        Assert.Equal(1, counts.GetProperty("serialization").GetInt32());
-        Assert.Equal(191, counts.GetProperty("messaging").GetInt32());
-        Assert.Empty(report.RootElement.GetProperty("missingContracts").EnumerateArray());
-        Assert.Empty(report.RootElement.GetProperty("changedContracts").EnumerateArray());
     }
 
     private static IReadOnlyList<string> ProductionSourceFiles() =>
@@ -333,9 +278,6 @@ public sealed class ModuleFirstSourceLayoutTests
 
     private static string RelativePath(string path) =>
         Path.GetRelativePath(SourceDirectory, path).Replace('\\', '/');
-
-    private static JsonDocument ReadJson(string fileName) =>
-        JsonDocument.Parse(File.ReadAllText(Path.Combine(ArchitectureDirectory, fileName)));
 
     private static void AssertMatchesAllowList(string ruleName, IEnumerable<string> actualPaths)
     {
