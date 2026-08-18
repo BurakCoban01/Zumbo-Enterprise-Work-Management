@@ -33,7 +33,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: "20.20.0"
+          node-version: "22.22.3"
 
       - name: Artifact retention and secret boundary
         run: node scripts/ci/Test-CiContract.mjs
@@ -67,7 +67,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: "20.20.0"
+          node-version: "22.22.3"
 
       - name: Restore and validate dependency manifests
         shell: pwsh
@@ -247,7 +247,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: "20.20.0"
+          node-version: "22.22.3"
 
       - name: Setup pnpm
         run: corepack enable && corepack prepare pnpm@9.0.0 --activate
@@ -287,7 +287,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: "20.20.0"
+          node-version: "22.22.3"
 
       - name: Setup pnpm
         run: corepack enable && corepack prepare pnpm@9.0.0 --activate
@@ -357,7 +357,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: "20.20.0"
+          node-version: "22.22.3"
 
       - name: Setup pnpm
         run: corepack enable && corepack prepare pnpm@9.0.0 --activate
@@ -421,7 +421,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: "20.20.0"
+          node-version: "22.22.3"
 
       - name: Evaluate CodeQL capability policy
         id: evaluate
@@ -503,7 +503,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: "20.20.0"
+          node-version: "22.22.3"
 
       - name: Require every gate job
         env:

@@ -38,7 +38,10 @@ assert.deepEqual(trackedExisting, ['Zumbo/Frontend/pnpm-lock.yaml', 'Zumbo/Front
 
 const packageJson = JSON.parse(readFileSync(resolve(frontendRoot, 'package.json'), 'utf8'));
 assert.equal(packageJson.packageManager, 'pnpm@9.0.0');
-assert.deepEqual(packageJson.engines, { node: '>=20.9.0 <21', pnpm: '9.0.0' });
+assert.deepEqual(packageJson.engines, {
+  node: '>=20.9.0 <21 || >=22.22.3 <23 || >=24.15.0 <25',
+  pnpm: '9.0.0'
+});
 
 const workspace = readFileSync(resolve(frontendRoot, 'pnpm-workspace.yaml'), 'utf8').replaceAll('\r\n', '\n').trim();
 assert.equal(workspace, 'packages:\n  - .');
@@ -60,7 +63,7 @@ for (const line of pnpmWorkflowLines) {
   assert.match(line, /pnpm --dir Frontend/, `CI command bypasses the authoritative Frontend root: ${line.trim()}`);
 }
 
-const readme = readFileSync(resolve(applicationRoot, 'readme.md'), 'utf8');
+const readme = readFileSync(resolve(applicationRoot, 'README.md'), 'utf8');
 const firstRun = readFileSync(resolve(applicationRoot, 'docs/runbooks/first-run.md'), 'utf8');
 assert.match(readme, /Frontend\/` tek pnpm workspace köküdür/);
 assert.match(firstRun, /Frontend\/` authoritative pnpm workspace köküdür/);
