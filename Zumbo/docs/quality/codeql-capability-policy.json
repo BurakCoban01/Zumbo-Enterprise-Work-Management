@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "capability": "GitHubCodeScanning",
+  "variable": {
+    "name": "ZUMBO_CODE_SECURITY_ENABLED",
+    "enabledValue": "true"
+  },
+  "activation": {
+    "publicRepository": true,
+    "privateRepositoryRequiresAuditedVariable": true,
+    "ambiguousOrMissingContextRejected": true
+  },
+  "states": {
+    "available": {
+      "name": "Available",
+      "applicability": "Applicable",
+      "expectedCodeqlResult": "success"
+    },
+    "unavailable": {
+      "name": "ExternalPlatformUnavailable",
+      "applicability": "NotApplicableExternalPlatform",
+      "expectedCodeqlResult": "skipped",
+      "codeqlPassed": false
+    }
+  },
+  "codeql": {
+    "languages": ["csharp", "javascript-typescript"],
+    "jobs": {
+      "csharp": "codeql-csharp",
+      "javascript-typescript": "codeql-javascript-typescript"
+    },
+    "queries": "security-extended",
+    "minimumJobPermissions": {
+      "actions": "read",
+      "contents": "read",
+      "security-events": "write"
+    }
+  },
+  "mandatoryAlternativeJobs": ["security-containers", "frontend", "backend-core"]
+}
