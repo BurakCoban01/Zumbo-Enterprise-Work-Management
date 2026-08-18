@@ -18,6 +18,12 @@ The repository contains the complete product: application source, API contracts,
 - Knowledge documents and development/webhook integrations
 - Responsive desktop and mobile experiences with offline-aware PWA support
 
+## Product gallery
+
+[![Zumbo project board](Zumbo/docs/media/desktop-project-board.png)](Zumbo/docs/media/desktop-project-board.png)
+
+See the [curated product gallery](Zumbo/docs/media/README.md) for daily work, planning, reporting, security and mobile workflows.
+
 ## Architecture
 
 Zumbo is implemented as a modular monolith. Business modules own their domain and application behavior, while explicit contracts and ports isolate presentation, persistence and infrastructure concerns. Feature-oriented command/query slices keep use cases reviewable without coupling them to a database or HTTP adapter.
@@ -165,6 +171,8 @@ The environment generator refuses to overwrite an existing `.env` file and creat
 - [Database operations](Zumbo/docs/operations/database-migrations.md)
 - [Scripts reference](Zumbo/scripts/README.md)
 - [Contracts reference](Zumbo/contracts/README.md)
+- [Product gallery](Zumbo/docs/media/README.md)
+- [Changelog](Zumbo/CHANGELOG.md)
 
 ## Useful commands
 

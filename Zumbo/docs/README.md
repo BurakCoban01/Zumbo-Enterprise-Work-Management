@@ -33,3 +33,8 @@ This directory contains stable product, architecture, quality and operations gui
 - [Frontend](../Frontend/README.md)
 - [Scripts](../scripts/README.md)
 - [API contracts](../contracts/README.md)
+
+## Product reference
+
+- [Product gallery](media/README.md)
+- [Changelog](../CHANGELOG.md)
