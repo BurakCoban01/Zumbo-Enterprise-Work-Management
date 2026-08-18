@@ -4,6 +4,20 @@ Zumbo is an enterprise work-management platform for coordinating projects, teams
 
 The repository contains the complete product: application source, API contracts, database providers, operational tooling, automated tests and continuous-integration workflows.
 
+## Technology stack
+
+| Area | Technologies |
+| --- | --- |
+| Backend | .NET 8, ASP.NET Core 8.0.28, controller-based APIs, SignalR |
+| Gateway | YARP 2.3.0 |
+| Desktop | Angular 22.0.8, Angular CLI 22.0.9, Bulma 1.0.2 |
+| Mobile | Angular 22.0.8, Ionic Angular 8.8.15 |
+| Persistence | MongoDB Driver 2.30.0, PostgreSQL/Npgsql 8.0.9 |
+| Distributed services | Redis, OpenSearch, S3-compatible object storage |
+| Observability | OpenTelemetry 1.17.0, Prometheus and Grafana configurations |
+| Testing | xUnit 2.9.3, ASP.NET Core test host, Node test runner, Playwright Core 1.61.1 |
+| Tooling | pnpm 9.0.0, TypeScript 6.0.2, Docker Compose |
+
 ## Key capabilities
 
 - Project, team and organization lifecycle management
@@ -52,22 +66,6 @@ flowchart LR
 ```
 
 The API host composes modules and controller-based `/api/**` presentation. SignalR hubs, health endpoints and gateway behavior remain framework-specific adapters. Architecture tests enforce project references and module boundaries.
-
-## Technology stack
-
-| Area | Technologies |
-| --- | --- |
-| Backend | .NET 8, ASP.NET Core 8.0.28, controller-based APIs, SignalR |
-| Gateway | YARP 2.3.0 |
-| Desktop | Angular 22.0.8, Angular CLI 22.0.9, Bulma 1.0.2 |
-| Mobile | Angular 22.0.8, Ionic Angular 8.8.15 |
-| Persistence | MongoDB Driver 2.30.0, PostgreSQL/Npgsql 8.0.9 |
-| Distributed services | Redis, OpenSearch, S3-compatible object storage |
-| Observability | OpenTelemetry 1.17.0, Prometheus and Grafana configurations |
-| Testing | xUnit 2.9.3, ASP.NET Core test host, Node test runner, Playwright Core 1.61.1 |
-| Tooling | pnpm 9.0.0, TypeScript 6.0.2, Docker Compose |
-
-Versions above are pinned in [`Directory.Packages.props`](Zumbo/Backend/Directory.Packages.props) and [`package.json`](Zumbo/Frontend/package.json).
 
 ## Repository map
 
