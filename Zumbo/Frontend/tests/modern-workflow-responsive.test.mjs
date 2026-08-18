@@ -16,11 +16,12 @@ test('board uses document flow and fits columns without a horizontal board canva
   assert.doesNotMatch(styles, /\.board-lane\s*\{[^}]*max-height/s);
   assert.doesNotMatch(responsive, /\.board-lane\s*\{[^}]*max-height/s);
   assert.match(styles, /\.board-scroll\s*\{[^}]*overflow:\s*visible/s);
-  assert.match(styles, /\.board-columns\s*\{[^}]*grid-template-columns:\s*repeat\(var\(--board-column-count/s);
-  assert.doesNotMatch(responsive, /grid-template-columns:\s*repeat\(2/);
-  assert.match(responsive, /@media \(max-width:\s*960px\)[\s\S]*grid-template-columns:\s*repeat\(3/s);
-  assert.match(responsive, /@media \(max-width:\s*700px\)[\s\S]*grid-template-columns:\s*minmax\(0,\s*1fr\)/s);
-  assert.match(template, /\[style\.--board-column-count\]="columns\(\)\.length"/);
+  assert.match(styles, /\.board-columns\s*\{[^}]*grid-template-columns:\s*repeat\(auto-fit,\s*minmax\(min\(100%,\s*145px\),\s*1fr\)\)/s);
+  assert.doesNotMatch(responsive, /\.board-columns\s*\{[^}]*grid-template-columns:\s*repeat\(2/s);
+  assert.match(styles, /container:\s*project-board\s*\/\s*inline-size/);
+  assert.match(responsive, /@container project-board \(max-width:\s*960px\)[\s\S]*\.card-move-actions/s);
+  assert.match(responsive, /@container project-board \(max-width:\s*700px\)[\s\S]*grid-template-columns:\s*minmax\(0,\s*1fr\)/s);
+  assert.doesNotMatch(template, /--board-column-count/);
   assert.match(template, /\(click\)="openTask\(\$event, task\)"/);
   assert.match(component, /target\.closest\('a, button, input, select, textarea'\)/);
   assert.match(styles, /\.lane-cards\s*\{[^}]*overflow:\s*visible/s);
@@ -39,7 +40,8 @@ test('work item detail has one scroll owner and places bounded operational conte
   assert.match(styles, /\.work-detail-body\s*>\s*main,\s*\.work-detail-properties\s*\{[^}]*overflow:\s*visible/s);
   assert.ok(template.indexOf('id="attachments-title"') < template.indexOf('id="activity-title"'));
   assert.ok(template.indexOf('id="development-title"') < template.indexOf('id="activity-title"'));
-  assert.match(responsive, /@media \(max-width:\s*1180px\)/);
+  assert.match(responsive, /@media \(max-width:\s*1180px\)[\s\S]*\.work-detail\s*\{\s*left:\s*76px/s);
+  assert.match(responsive, /@media \(max-width:\s*980px\)/);
   assert.match(responsive, /\.work-detail-properties\s*\{\s*order:\s*3/);
   assert.match(responsive, /\.work-detail-properties\s*\{[^}]*min-height:\s*auto/);
   assert.match(responsive, /\.work-detail-properties\s*\{[^}]*grid-template-columns:\s*repeat\(2,/);

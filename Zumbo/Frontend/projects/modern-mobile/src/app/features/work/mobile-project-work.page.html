@@ -3,6 +3,7 @@
   <ion-refresher slot="fixed" (ionRefresh)="refresh($event)"><ion-refresher-content pullingText="Yenile"/></ion-refresher>
   <main class="work-page">
     <header class="work-intro"><p>{{project()?.key||'Proje'}}</p><h1>{{project()?.name||'Proje işleri'}}</h1><span>Duruma göre filtreleyin ve işin ayrıntısına geçin.</span></header>
+    @if(focus()){<div class="focus-context" role="status"><span><small>Aktif özet filtresi</small><strong>{{focusLabel()}}</strong></span><button type="button" (click)="clearFocus()">Tüm işleri göster</button></div>}
     <nav class="status-filter" aria-label="İş durumu">
       <button type="button" [class.active]="!selectedStatus()" (click)="setStatus('')">Tümü</button>
       @for(status of statuses();track status.name){<button type="button" [class.active]="selectedStatus()===status.name" (click)="setStatus(status.name)">{{status.name}}</button>}

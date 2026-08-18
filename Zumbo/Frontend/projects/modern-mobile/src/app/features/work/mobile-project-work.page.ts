@@ -6,7 +6,7 @@ import { firstValueFrom } from 'rxjs';
 import { ZumboRealtimeService } from '@zumbo/modern-shared';
 import { MobileWorkItemRecord, MobileWorkflowStatus, priorityLabel } from '../../shell/mobile-workspace.models';
 import { MobileWorkspaceStore } from '../../shell/mobile-workspace.store';
-import { mergeUniqueWorkItems } from './mobile-work.core';
+import { filterProjectWorkItems, mergeUniqueWorkItems, type ProjectWorkFocus } from './mobile-work.core';
 import { MobileWorkService } from './mobile-work.service';
 
 @Component({
@@ -25,9 +25,11 @@ export class MobileProjectWorkPage implements OnInit {
   protected readonly projectId = this.route.snapshot.paramMap.get('projectId') ?? '';
   protected readonly project = computed(() => this.store.projects().find(item => item.id === this.projectId));
   protected readonly priorityLabel = priorityLabel;
-  protected readonly items = signal<readonly MobileWorkItemRecord[]>([]);
+  protected readonly loadedItems = signal<readonly MobileWorkItemRecord[]>([]);
   protected readonly statuses = signal<readonly MobileWorkflowStatus[]>([]);
   protected readonly selectedStatus = signal('');
+  protected readonly focus = signal<ProjectWorkFocus | null>(readFocus(this.route.snapshot.queryParamMap.get('focus')));
+  protected readonly items = computed(() => filterProjectWorkItems(this.loadedItems(), this.focus(), this.statuses()[0]?.name));
   protected readonly page = signal(1);
   protected readonly hasMore = signal(false);
   protected readonly degraded = signal(false);
@@ -55,7 +57,7 @@ export class MobileProjectWorkPage implements OnInit {
       await this.store.load();
       const response = await firstValueFrom(this.service.loadProject(this.projectId, this.selectedStatus()));
       this.statuses.set([...response.workflow.statuses].sort((a, b) => (a.position ?? 0) - (b.position ?? 0)));
-      this.items.set(response.result.items);
+      this.loadedItems.set(response.result.items);
       this.realtime.synchronize(response.result.items);
       this.page.set(1);
       this.hasMore.set(response.result.items.length === 50);
@@ -70,8 +72,15 @@ export class MobileProjectWorkPage implements OnInit {
 
   protected setStatus(status: string): void {
     if (status === this.selectedStatus()) return;
+    this.focus.set(null);
     this.selectedStatus.set(status);
     void this.load();
+  }
+
+  protected clearFocus(): void { this.focus.set(null); }
+
+  protected focusLabel(): string {
+    return ({ total: 'Tüm proje işleri', active: 'Devam eden işler', done: 'Tamamlanan işler', overdue: 'Geciken işler' } as const)[this.focus() ?? 'total'];
   }
 
   protected async loadMore(): Promise<void> {
@@ -80,7 +89,7 @@ export class MobileProjectWorkPage implements OnInit {
     try {
       const nextPage = this.page() + 1;
       const result = await firstValueFrom(this.service.search(this.projectId, '', nextPage, 50, this.selectedStatus()));
-      this.items.update(current => mergeUniqueWorkItems(current, result.items));
+      this.loadedItems.update(current => mergeUniqueWorkItems(current, result.items));
       this.page.set(nextPage);
       this.hasMore.set(result.items.length === 50);
       this.degraded.set(result.degraded === true);
@@ -102,4 +111,8 @@ export class MobileProjectWorkPage implements OnInit {
   protected date(value?: string | null): string {
     return value ? new Intl.DateTimeFormat('tr-TR', { day: '2-digit', month: 'short' }).format(new Date(value)) : '';
   }
+}
+
+function readFocus(value: string | null): ProjectWorkFocus | null {
+  return ['total', 'active', 'done', 'overdue'].includes(value ?? '') ? value as ProjectWorkFocus : null;
 }
