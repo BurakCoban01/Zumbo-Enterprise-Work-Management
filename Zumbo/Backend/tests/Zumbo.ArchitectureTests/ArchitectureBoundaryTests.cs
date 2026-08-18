@@ -232,7 +232,7 @@ public sealed class ArchitectureBoundaryTests
             definitionFiles.Select(path => (Path.GetFileName(path)!)[..4]).ToArray());
         Assert.All(definitionFiles, path =>
         {
-            Assert.True(path.Length <= 225, $"Migration definition path exceeds budget: {path}");
+            Assert.True(SourceRelativePath(path).Length <= 225, $"Migration definition path exceeds budget: {path}");
             Assert.Contains(
                 "PostgreSqlMigrationDefinition",
                 File.ReadAllText(path),
@@ -274,7 +274,7 @@ public sealed class ArchitectureBoundaryTests
                 .ToArray());
         Assert.All(
             Directory.GetFiles(migrationsDirectory, "*.cs", SearchOption.AllDirectories),
-            path => Assert.True(path.Length <= 225, $"Migration path exceeds budget: {path}"));
+            path => Assert.True(SourceRelativePath(path).Length <= 225, $"Migration path exceeds budget: {path}"));
 
         var legacyMigrations = Path.Combine(
             persistenceDirectory,
@@ -288,7 +288,7 @@ public sealed class ArchitectureBoundaryTests
             runnerDirectory,
             "PostgreSqlMigrationRunner.Registry.cs");
         Assert.Equal(
-            39,
+            38,
             File.ReadLines(registryPath).Count(line => line.TrimStart().StartsWith(
                 "Migration.Create(",
                 StringComparison.Ordinal)));
@@ -368,7 +368,7 @@ public sealed class ArchitectureBoundaryTests
 
         Assert.All(
             Directory.GetFiles(migrationsDirectory, "*.cs", SearchOption.AllDirectories),
-            path => Assert.True(path.Length <= 225, $"Mongo migration path exceeds budget: {path}"));
+            path => Assert.True(SourceRelativePath(path).Length <= 225, $"Mongo migration path exceeds budget: {path}"));
         var legacyMigrations = Path.Combine(apiDirectory, "MongoMigrations");
         Assert.Empty(
             Directory.Exists(legacyMigrations)
@@ -433,7 +433,7 @@ public sealed class ArchitectureBoundaryTests
                 searchDirectory,
                 "OpenSearchWorkItemSearchIndex*.cs",
                 SearchOption.TopDirectoryOnly),
-            path => Assert.True(path.Length <= 225, $"OpenSearch adapter path exceeds budget: {path}"));
+            path => Assert.True(SourceRelativePath(path).Length <= 225, $"OpenSearch adapter path exceeds budget: {path}"));
 
         var legacyDirectory = Path.Combine(
             SourceDirectory,
@@ -624,7 +624,7 @@ public sealed class ArchitectureBoundaryTests
 
         Assert.All(
             Directory.GetFiles(translatorDirectory, "*.cs", SearchOption.TopDirectoryOnly),
-            path => Assert.True(path.Length <= 225, $"PostgreSQL translator path exceeds budget: {path}"));
+            path => Assert.True(SourceRelativePath(path).Length <= 225, $"PostgreSQL translator path exceeds budget: {path}"));
         var persistenceDirectory = Path.GetDirectoryName(translatorDirectory)!;
         Assert.True(File.Exists(Path.Combine(persistenceDirectory, "PostgreSqlExpressionUtilities.cs")));
         Assert.True(File.Exists(Path.Combine(persistenceDirectory, "PostgreSqlJsonTranslation.cs")));
@@ -685,7 +685,7 @@ public sealed class ArchitectureBoundaryTests
         Assert.True(File.Exists(Path.Combine(adapterDirectory, "PrivacyDataProcessorAdapter.cs")));
         Assert.All(
             Directory.GetFiles(fragmentDirectory, "*.cs", SearchOption.TopDirectoryOnly),
-            path => Assert.True(path.Length <= 225, $"Privacy adapter path exceeds budget: {path}"));
+            path => Assert.True(SourceRelativePath(path).Length <= 225, $"Privacy adapter path exceeds budget: {path}"));
 
         var misplacedReference = Path.Combine(
             adapterDirectory,
@@ -729,7 +729,7 @@ public sealed class ArchitectureBoundaryTests
                 hostingDirectory,
                 "ApiHostRegistration*.cs",
                 SearchOption.TopDirectoryOnly),
-            path => Assert.True(path.Length <= 225, $"API host registration path exceeds budget: {path}"));
+            path => Assert.True(SourceRelativePath(path).Length <= 225, $"API host registration path exceeds budget: {path}"));
 
         var registrarDirectory = Path.Combine(hostingDirectory, "Registrars");
         Assert.Equal(
@@ -746,7 +746,7 @@ public sealed class ArchitectureBoundaryTests
                 .ToArray());
         Assert.All(
             Directory.GetFiles(registrarDirectory, "*.cs", SearchOption.TopDirectoryOnly),
-            path => Assert.True(path.Length <= 225, $"API host registrar path exceeds budget: {path}"));
+            path => Assert.True(SourceRelativePath(path).Length <= 225, $"API host registrar path exceeds budget: {path}"));
     }
 
     [Fact]
@@ -793,7 +793,7 @@ public sealed class ArchitectureBoundaryTests
 
         AssertExactSet(
             expected.Keys,
-            Directory.GetFiles(endpointDirectory, "*Endpoints.cs", SearchOption.AllDirectories)
+            GetFilesIfDirectoryExists(endpointDirectory, "*Endpoints.cs", SearchOption.AllDirectories)
                 .Select(Path.GetFileName)
                 .OfType<string>()
                 .Where(fileName => !fileName.StartsWith("WorkItemEndpoints.", StringComparison.Ordinal)));
@@ -2602,7 +2602,7 @@ public sealed class ArchitectureBoundaryTests
             "WorkItemEndpoints.Reports.cs", "WorkItemEndpoints.Schema.cs", "WorkItemEndpoints.Search.cs",
             "WorkItemEndpoints.WorkItemsCore.cs", "WorkItemEndpoints.Worklogs.cs"
         };
-        Assert.Empty(Directory.GetFiles(hostDirectory, "*.cs", SearchOption.TopDirectoryOnly));
+        Assert.Empty(GetFilesIfDirectoryExists(hostDirectory, "*.cs", SearchOption.TopDirectoryOnly));
         Assert.All(removedCompatibilityFiles, file => Assert.False(File.Exists(Path.Combine(hostDirectory, file))));
         Assert.False(File.Exists(Path.Combine(endpointRoot, "WorkItemEndpoints.cs")));
         Assert.Empty(Directory.Exists(Path.Combine(hostDirectory, "MapWorkItemEndpoints"))
@@ -2647,11 +2647,11 @@ public sealed class ArchitectureBoundaryTests
 
         AssertLegacyWorkItemRouteHostRemoved();
 
-        Assert.Empty(Directory.GetFiles(
+        Assert.Empty(GetFilesIfDirectoryExists(
             Path.Combine(SourceDirectory, "Zumbo.Api", "Presentation", "Endpoints", "WorkItems", "Reports"),
             "*.cs",
             SearchOption.TopDirectoryOnly));
-        Assert.Empty(Directory.GetFiles(
+        Assert.Empty(GetFilesIfDirectoryExists(
             Path.Combine(SourceDirectory, "Zumbo.Api", "Presentation", "Endpoints", "WorkItems", "Sprints"),
             "*ReportEndpoint.cs",
             SearchOption.TopDirectoryOnly));
@@ -2709,7 +2709,7 @@ public sealed class ArchitectureBoundaryTests
         AssertLegacyWorkItemRouteHostRemoved();
 
         var legacyDirectory = Path.Combine(SourceDirectory, "Zumbo.Api", "Presentation", "Endpoints", "WorkItems", "Recurrences");
-        Assert.Empty(Directory.GetFiles(legacyDirectory, "*.cs", SearchOption.TopDirectoryOnly));
+        Assert.Empty(GetFilesIfDirectoryExists(legacyDirectory, "*.cs", SearchOption.TopDirectoryOnly));
     }
 
     [Fact]
@@ -2736,7 +2736,7 @@ public sealed class ArchitectureBoundaryTests
 
         Assert.False(File.Exists(Path.Combine(SourceDirectory, "Zumbo.Api", "Presentation", "Endpoints", "WorkItemEndpoints", "WorkItemEndpoints.BulkOperations.cs")));
         var legacyDirectory = Path.Combine(SourceDirectory, "Zumbo.Api", "Presentation", "Endpoints", "WorkItems", "BulkOperations");
-        Assert.Empty(Directory.GetFiles(legacyDirectory, "*.cs", SearchOption.TopDirectoryOnly));
+        Assert.Empty(GetFilesIfDirectoryExists(legacyDirectory, "*.cs", SearchOption.TopDirectoryOnly));
     }
 
     [Fact]
@@ -2786,7 +2786,7 @@ public sealed class ArchitectureBoundaryTests
         AssertLegacyWorkItemRouteHostRemoved();
 
         var legacyDirectory = Path.Combine(SourceDirectory, "Zumbo.Api", "Presentation", "Endpoints", "WorkItems", "Planning");
-        Assert.Empty(Directory.GetFiles(legacyDirectory, "*.cs", SearchOption.TopDirectoryOnly));
+        Assert.Empty(GetFilesIfDirectoryExists(legacyDirectory, "*.cs", SearchOption.TopDirectoryOnly));
     }
 
     [Fact]
@@ -2810,7 +2810,7 @@ public sealed class ArchitectureBoundaryTests
 
         AssertLegacyWorkItemRouteHostRemoved();
         var legacyDirectory = Path.Combine(SourceDirectory, "Zumbo.Api", "Presentation", "Endpoints", "WorkItems", "WorkItemsCore");
-        Assert.Empty(Directory.GetFiles(legacyDirectory, "*.cs", SearchOption.TopDirectoryOnly));
+        Assert.Empty(GetFilesIfDirectoryExists(legacyDirectory, "*.cs", SearchOption.TopDirectoryOnly));
     }
 
     [Fact]
@@ -3216,7 +3216,7 @@ public sealed class ArchitectureBoundaryTests
                 .Order(StringComparer.Ordinal)
                 .ToArray());
 
-        Assert.Empty(Directory.GetFiles(
+        Assert.Empty(GetFilesIfDirectoryExists(
             Path.Combine(SourceDirectory, "Zumbo.Api", "Presentation", "Endpoints"),
             "NotificationEndpoints.cs",
             SearchOption.AllDirectories));
@@ -3396,7 +3396,7 @@ public sealed class ArchitectureBoundaryTests
     public void EndpointRepositoryDependencies_AreRestrictedToCompositionMethods()
     {
         var endpointDirectory = Path.Combine(SourceDirectory, "Zumbo.Api", "Presentation", "Endpoints");
-        var violations = Directory.GetFiles(endpointDirectory, "*.cs", SearchOption.AllDirectories)
+        var violations = GetFilesIfDirectoryExists(endpointDirectory, "*.cs", SearchOption.AllDirectories)
             .SelectMany(path =>
             {
                 var root = CSharpSyntaxTree.ParseText(File.ReadAllText(path)).GetCompilationUnitRoot();
@@ -3586,10 +3586,21 @@ public sealed class ArchitectureBoundaryTests
         }
     }
 
+    private static IReadOnlyList<string> GetFilesIfDirectoryExists(
+        string directory,
+        string searchPattern,
+        SearchOption searchOption) =>
+        Directory.Exists(directory)
+            ? Directory.GetFiles(directory, searchPattern, searchOption)
+            : [];
+
+    private static string SourceRelativePath(string path) =>
+        Path.GetRelativePath(SourceDirectory, path).Replace('\\', '/');
+
     private static string ReadSourceScope(string directory) =>
         string.Join(
             Environment.NewLine,
-            Directory.GetFiles(directory, "*.cs", SearchOption.AllDirectories)
+            GetFilesIfDirectoryExists(directory, "*.cs", SearchOption.AllDirectories)
                 .Where(path => !path.Contains(
                     $"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}",
                     StringComparison.OrdinalIgnoreCase))

@@ -47,7 +47,7 @@ Invoke-Native 'docker' @(
     '--exclude', 'Backend/tests', '--exclude', 'Frontend/tests', '--exclude', 'Frontend/vendor',
     '--exclude', '**/bin', '--exclude', '**/obj', '--json',
     '--output', '/src/artifacts/security/generated/semgrep.json',
-    'Backend/src', 'Frontend/desktop-bulma', 'Frontend/mobile-ionic'
+    'Backend/src', 'Frontend/projects', 'Frontend/shared'
 )
 
 Write-Host 'Trivy secret ve yapılandırma taraması çalışıyor...'

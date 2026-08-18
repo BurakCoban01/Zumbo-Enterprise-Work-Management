@@ -21,7 +21,7 @@
     "unit": "node tests/run-modern-tests.mjs",
     "audit:dependencies": "node tests/dependency-audit.mjs",
     "audit:licenses": "node tests/license-audit.mjs",
-    "quality": "pnpm run lint && pnpm run unit && pnpm run build && pnpm run audit:dependencies && pnpm run audit:licenses",
+    "quality": "pnpm run lint && pnpm run build && pnpm run unit && pnpm run audit:dependencies && pnpm run audit:licenses",
     "preview": "node tests/static-server.mjs dist-modern --canonical",
     "test:assets:chromium": "pnpm run build && node tests/runtime-assets.mjs --browser chromium",
     "test:assets:firefox": "pnpm run build && node tests/runtime-assets.mjs --browser firefox",

@@ -10,7 +10,7 @@ public sealed partial class MongoMigrationRunner(
     IOptions<MongoMigrationOptions> configuredOptions,
     ILogger<MongoMigrationRunner> logger)
 {
-    public const string IndexMigrationId = "20260719_001_required_indexes";
+    public const string IndexMigrationId = "20260818_001_required_indexes_v2";
     public const string RankMigrationId = "20260719_002_workitem_rank_backfill";
     public const string DurableMessagingIndexMigrationId = "20260719_003_durable_messaging_indexes";
     public const string IdentityCredentialIndexMigrationId = "20260719_004_identity_credential_indexes";

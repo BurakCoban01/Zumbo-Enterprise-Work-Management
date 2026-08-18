@@ -104,8 +104,8 @@ public sealed class ObservabilityContractTests
         Assert.Contains("ZumboApiHighErrorBudgetBurn", alerts);
         Assert.Contains("ZumboOutboxOldestPendingHigh", alerts);
         Assert.Contains("HTTP p95 latency", dashboard);
-        Assert.Contains("Exporter Arızası", runbook);
-        Assert.Contains("Metric label'ları tenant, user, project", runbook);
+        Assert.Contains("Exporter failure", runbook);
+        Assert.Contains("Metric labels never include tenant, user or project identifiers", runbook);
     }
 
     private static string BackendRoot() => Path.GetFullPath(Path.Combine(

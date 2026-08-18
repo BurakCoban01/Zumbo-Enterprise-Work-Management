@@ -61,8 +61,8 @@ $package = Get-Content -LiteralPath $frontendPackagePath -Raw -Encoding utf8 | C
 if ($package.packageManager -ne 'pnpm@9.0.0' -or $package.engines.pnpm -ne '9.0.0') {
     throw 'Frontend packageManager and engines.pnpm must both pin pnpm 9.0.0.'
 }
-if ($package.engines.node -ne '>=20.9.0 <21') {
-    throw 'Frontend engines.node must remain >=20.9.0 <21.'
+if ($package.engines.node -ne '>=20.9.0 <21 || >=22.22.3 <23 || >=24.15.0 <25') {
+    throw 'Frontend engines.node must retain the audited Node 20, 22 and 24 LTS ranges.'
 }
 foreach ($duplicatePath in $duplicateFrontendPaths) {
     if (Test-Path -LiteralPath $duplicatePath) {
