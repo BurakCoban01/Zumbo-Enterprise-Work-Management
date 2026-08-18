@@ -1,8 +1,8 @@
 <ion-header><ion-toolbar><ion-title>Giriş</ion-title></ion-toolbar></ion-header>
 <ion-content [fullscreen]="true">
-  <main class="mobile-login" id="main-content">
+  <section class="mobile-login" id="main-content" aria-labelledby="mobile-login-title">
     <div class="modern-mobile-brand"><img src="shared/zumbo-mark.svg" alt=""><span>Zumbo</span></div>
-    <header><h1>Çalışma alanına giriş</h1><p>Görevlerinize ve ekip projelerinize devam edin.</p></header>
+    <header><h1 id="mobile-login-title">Çalışma alanına giriş</h1><p>Görevlerinize ve ekip projelerinize devam edin.</p></header>
     <form [formGroup]="form" (ngSubmit)="submit()">
       <ion-item><ion-input label="Kullanıcı" labelPlacement="stacked" formControlName="usernameOrEmail" autocomplete="username" required /></ion-item>
       <ion-item><ion-input label="Parola" labelPlacement="stacked" type="password" formControlName="password" autocomplete="current-password" required /></ion-item>
@@ -13,5 +13,5 @@
       <ion-button type="submit" expand="block" [disabled]="busy() || form.invalid">{{ busy() ? 'Giriş yapılıyor' : 'Giriş yap' }}</ion-button>
       <a class="forgot-link" routerLink="/forgot-password">Parolamı unuttum</a>
     </form>
-  </main>
+  </section>
 </ion-content>

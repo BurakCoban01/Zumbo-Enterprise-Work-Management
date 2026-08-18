@@ -1693,8 +1693,8 @@ public sealed class MongoMigrationRunnerTests : IAsyncLifetime
 
     private static IReadOnlyList<ExpectedIndex> RequiredIndexes() =>
     [
-        Index("Identity", "users", "ux_users_username_ci", Keys(("Username", 1)), unique: true, caseInsensitive: true),
-        Index("Identity", "users", "ux_users_email_ci", Keys(("Email", 1)), unique: true, caseInsensitive: true),
+        Index("Identity", "users", "ux_users_username_ci", Keys(("Username", 1)), unique: true, partialFilter: StringField("Username"), caseInsensitive: true),
+        Index("Identity", "users", "ux_users_email_ci", Keys(("Email", 1)), unique: true, partialFilter: StringField("Email"), caseInsensitive: true),
         Index("Identity", "users", "ix_users_active_username", Keys(("IsActive", 1), ("Username", 1), ("_id", 1))),
         Index("Identity", "users", "ix_users_organization_active_username", Keys(("OrganizationId", 1), ("IsActive", 1), ("Username", 1), ("_id", 1))),
         Index("Identity", "users", "ix_users_refresh_token_hash", Keys(("RefreshTokens.TokenHash", 1))),
@@ -1758,6 +1758,9 @@ public sealed class MongoMigrationRunnerTests : IAsyncLifetime
 
         return document;
     }
+
+    private static BsonDocument StringField(string name) =>
+        new(name, new BsonDocument("$type", "string"));
 
     private static ExpectedIndex Index(
         string module,

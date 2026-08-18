@@ -258,8 +258,8 @@ jobs:
       - name: Frontend lint unit and production build
         run: |
           pnpm --dir Frontend run lint
-          pnpm --dir Frontend run unit
           pnpm --dir Frontend run build
+          pnpm --dir Frontend run unit
 
       - name: Frontend vulnerability and license policy
         run: |
