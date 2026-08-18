@@ -22,6 +22,12 @@ The repository contains the complete product: application source, API contracts,
 
 [![Zumbo project board](Zumbo/docs/media/desktop-project-board.png)](Zumbo/docs/media/desktop-project-board.png)
 
+<img width="1732" height="871" alt="Ekran görüntüsü 2026-08-18 204739" src="https://github.com/user-attachments/assets/c067a862-45c5-4de2-ae88-c72ac915d8f8" />
+
+<img width="1729" height="938" alt="Ekran görüntüsü 2026-08-18 204420" src="https://github.com/user-attachments/assets/b74c1947-9f23-4013-b916-0e71cd8ca621" />
+
+<img width="1711" height="934" alt="Ekran görüntüsü 2026-08-18 204546" src="https://github.com/user-attachments/assets/8de22212-1f8a-4142-a1b3-ae169e4ef44b" />
+
 See the [curated product gallery](Zumbo/docs/media/README.md) for daily work, planning, reporting, security and mobile workflows.
 
 ## Architecture
