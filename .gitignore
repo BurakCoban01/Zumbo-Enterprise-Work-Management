@@ -1,0 +1,51 @@
+# IDE and operating-system files
+.idea/
+.vscode/
+.vs/
+.DS_Store
+Thumbs.db
+
+# .NET outputs
+**/bin/
+**/obj/
+**/TestResults/
+*.user
+*.suo
+
+# Frontend outputs and dependencies
+**/node_modules/
+**/dist/
+**/dist-modern/
+**/dist-modern-dev/
+**/coverage/
+**/.angular/
+**/.playwright/
+**/test-results/
+pnpm-debug.log*
+npm-debug.log*
+
+# Local configuration, runtime data and secrets
+.env
+.env.*
+!.env.example
+**/storage/
+!Zumbo/Backend/src/Zumbo.BuildingBlocks.Infrastructure/Storage/
+!Zumbo/Backend/src/Zumbo.BuildingBlocks.Infrastructure/Storage/*.cs
+**/DataProtection-Keys/
+*.pfx
+*.key
+
+# Generated validation output
+Zumbo/artifacts/
+Zumbo/Backend/.production-like/
+Zumbo/Backend/.tmp/
+Zumbo/Frontend/runtime-config.js
+Zumbo/Frontend/vendor/
+.trivy-cache/
+.runlogs/
+*.log
+*.out
+*.err
+
+# Windows reserved device name
+nul
